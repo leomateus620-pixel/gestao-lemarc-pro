@@ -1,0 +1,3 @@
+import { Factory } from "lucide-react";
+import { GlassCard } from "./GlassCard";
+export function IndustrialHeader({ title, subtitle }: { title: string; subtitle: string }) { return <GlassCard className="industrial-gradient p-5"><div className="flex items-center gap-3"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground orange-glow"><Factory size={24} /></div><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Gestão Lemarc</p><h1 className="font-display text-2xl font-black text-foreground">{title}</h1><p className="text-xs text-muted-foreground">{subtitle}</p></div></div></GlassCard>; }

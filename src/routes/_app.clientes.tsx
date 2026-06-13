@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
-import { clientes } from "@/lib/mock/clientes";
+import { clientes } from "@/lib/mock/clients";
 import { Phone, MapPin, Plus, Building2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/clientes")({

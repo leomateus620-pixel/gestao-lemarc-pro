@@ -1,0 +1,5 @@
+import { CheckCircle2 } from "lucide-react";
+export type TimelineItem = { etapa: string; hora: string; concluida: boolean };
+export function Timeline({ items }: { items: TimelineItem[] }) {
+  return <div className="space-y-3">{items.map((t, i) => <div key={`${t.etapa}-${i}`} className="flex items-start gap-3"><div className="relative flex flex-col items-center"><div className={`grid h-8 w-8 place-items-center rounded-full ${t.concluida ? "bg-primary text-primary-foreground shadow-[var(--shadow-glow-orange)]" : "border border-border bg-secondary text-muted-foreground"}`}>{t.concluida ? <CheckCircle2 size={15} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</div>{i < items.length - 1 && <div className={`mt-1 h-7 w-px ${t.concluida ? "bg-primary/60" : "bg-border"}`} />}</div><div className="flex-1 pb-2"><div className={`text-sm font-bold ${t.concluida ? "text-foreground" : "text-muted-foreground"}`}>{t.etapa}</div><div className="text-[11px] text-muted-foreground">{t.hora}</div></div></div>)}</div>;
+}

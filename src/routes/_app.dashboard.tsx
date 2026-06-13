@@ -4,8 +4,8 @@ import { StatCard } from "@/components/app/StatCard";
 import { GlassCard } from "@/components/app/GlassCard";
 import { OrderCard } from "@/components/app/OrderCard";
 import { useRole } from "@/components/app/RoleContext";
-import { ordens, ordensStats } from "@/lib/mock/ordens";
-import { ClipboardList, Activity, CheckCircle2, Clock, Plus, Play, MapPin, Building2 } from "lucide-react";
+import { ordens, ordensStats } from "@/lib/mock/serviceOrders";
+import { ClipboardList, Activity, CheckCircle2, Clock, Plus, Play, MapPin, Building2, Receipt, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/app/StatusBadge";
 
@@ -36,9 +36,14 @@ function GestorView({ name }: { name: string }) {
       <section className="mt-5 grid grid-cols-2 gap-3">
         <StatCard label="OS abertas" value={ordensStats.abertas} icon={ClipboardList} accent />
         <StatCard label="Em execução" value={ordensStats.emExecucao} icon={Activity} />
-        <StatCard label="Concluídas hoje" value={ordensStats.concluidasHoje} icon={CheckCircle2} />
+        <StatCard label="Aguard. revisão" value={ordensStats.aguardandoRevisao} icon={AlertTriangle} />
         <StatCard label="Horas no mês" value={ordensStats.horasMes} hint="+12% vs anterior" icon={Clock} />
+        <StatCard label="Valor estimado" value={`R$ ${Math.round(ordensStats.valorEstimado/1000)}k`} icon={Receipt} accent />
       </section>
+
+      <GlassCard className="mt-4 border-status-review/30 bg-status-review/10 p-4">
+        <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-status-review" size={20} /><div><div className="font-display text-sm font-black uppercase tracking-wider text-foreground">{ordensStats.aguardandoRevisao} OS pendentes de revisão</div><p className="mt-1 text-xs text-muted-foreground">Finalize a aprovação para liberar cobrança e relatório para o cliente.</p></div></div>
+      </GlassCard>
 
       <Link to="/ordens/nova" className="mt-4 block">
         <GlassCard className="flex items-center gap-3 border-primary/40 bg-primary/10 p-4">

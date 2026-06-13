@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { OrderCard } from "@/components/app/OrderCard";
-import { ordens } from "@/lib/mock/ordens";
+import { ordens } from "@/lib/mock/serviceOrders";
 import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { statusLabels, type OrderStatus } from "@/components/app/StatusBadge";
+import { EmptyState } from "@/components/app/EmptyState";
 
 export const Route = createFileRoute("/_app/ordens/")({
   head: () => ({ meta: [{ title: "Ordens de serviço — Gestão Lemarc" }] }),
@@ -17,8 +18,9 @@ const filters: ({ key: "todas" } | { key: OrderStatus })[] = [
   { key: "pending" },
   { key: "transit" },
   { key: "running" },
+  { key: "finished" },
   { key: "review" },
-  { key: "done" },
+  { key: "approved" },
 ];
 
 function OrdensList() {
@@ -82,9 +84,7 @@ function OrdensList() {
       <div className="mt-4 space-y-3">
         {filtered.map((o) => <OrderCard key={o.id} ordem={o} />)}
         {filtered.length === 0 && (
-          <div className="glass mt-6 rounded-2xl p-8 text-center text-sm text-muted-foreground">
-            Nenhuma OS encontrada com os filtros atuais.
-          </div>
+          <EmptyState icon={Search} title="Nenhuma OS encontrada" text="Ajuste a busca ou os filtros para localizar ordens de serviço." />
         )}
       </div>
     </AppShell>

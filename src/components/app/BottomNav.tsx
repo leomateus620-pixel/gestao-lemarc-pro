@@ -5,8 +5,8 @@ const items = [
   { to: "/dashboard", label: "Início", icon: Home },
   { to: "/ordens", label: "Ordens", icon: ClipboardList },
   { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/colaboradores", label: "Equipe", icon: HardHat },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { to: "/colaboradores", label: "Mais", icon: HardHat },
 ] as const;
 
 export function BottomNav() {
