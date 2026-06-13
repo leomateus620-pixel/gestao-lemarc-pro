@@ -3,7 +3,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { useRole } from "@/components/app/RoleContext";
-import { getOrdem } from "@/lib/mock/ordens";
+import { getOrdem, type Ordem } from "@/lib/mock/ordens";
+import type { OrderStatus } from "@/components/app/StatusBadge";
 import { Building2, MapPin, User, Clock, Camera, FileText, Play, Send, CheckCircle2, Truck, Receipt, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -24,17 +25,18 @@ export const Route = createFileRoute("/_app/ordens/$id")({
 });
 
 function OrdemDetalhe() {
-  const { ordem } = Route.useLoaderData();
+  const { ordem } = Route.useLoaderData() as { ordem: Ordem };
   const { role } = useRole();
-  const [status, setStatus] = useState(ordem.status);
+  const [status, setStatus] = useState<OrderStatus>(ordem.status);
 
-  const nextAction = {
-    pending: { label: "Iniciar deslocamento", icon: Truck, next: "transit" as const },
-    transit: { label: "Iniciar serviço", icon: Play, next: "running" as const },
-    running: { label: "Finalizar e enviar para revisão", icon: Send, next: "review" as const },
-    review: { label: "Aguardando aprovação do gestor", icon: CheckCircle2, next: "review" as const },
-    done: { label: "Concluída", icon: CheckCircle2, next: "done" as const },
-  }[status];
+  const actions: Record<OrderStatus, { label: string; icon: typeof Truck; next: OrderStatus }> = {
+    pending: { label: "Iniciar deslocamento", icon: Truck, next: "transit" },
+    transit: { label: "Iniciar serviço", icon: Play, next: "running" },
+    running: { label: "Finalizar e enviar para revisão", icon: Send, next: "review" },
+    review: { label: "Aguardando aprovação do gestor", icon: CheckCircle2, next: "review" },
+    done: { label: "Concluída", icon: CheckCircle2, next: "done" },
+  };
+  const nextAction = actions[status];
 
   const horas = Math.floor(ordem.tempoTrabalhadoMin / 60);
   const min = ordem.tempoTrabalhadoMin % 60;
@@ -66,7 +68,7 @@ function OrdemDetalhe() {
 
       <Section title="Linha do tempo" icon={Clock}>
         <div className="space-y-3">
-          {ordem.timeline.map((t, i) => (
+          {ordem.timeline.map((t: Ordem["timeline"][number], i: number) => (
             <div key={i} className="flex items-start gap-3">
               <div className="relative flex flex-col items-center">
                 <div className={`grid h-7 w-7 place-items-center rounded-full ${
