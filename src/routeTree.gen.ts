@@ -9,38 +9,161 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradores'
+import { Route as AppClientesRouteImport } from './routes/_app.clientes'
+import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
+import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
+import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppColaboradoresRoute = AppColaboradoresRouteImport.update({
+  id: '/colaboradores',
+  path: '/colaboradores',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesRoute = AppClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
+  id: '/ordens/',
+  path: '/ordens/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdensNovaRoute = AppOrdensNovaRouteImport.update({
+  id: '/ordens/nova',
+  path: '/ordens/nova',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdensIdRoute = AppOrdensIdRouteImport.update({
+  id: '/ordens/$id',
+  path: '/ordens/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/clientes': typeof AppClientesRoute
+  '/colaboradores': typeof AppColaboradoresRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/relatorios': typeof AppRelatoriosRoute
+  '/ordens/$id': typeof AppOrdensIdRoute
+  '/ordens/nova': typeof AppOrdensNovaRoute
+  '/ordens/': typeof AppOrdensIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/clientes': typeof AppClientesRoute
+  '/colaboradores': typeof AppColaboradoresRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/relatorios': typeof AppRelatoriosRoute
+  '/ordens/$id': typeof AppOrdensIdRoute
+  '/ordens/nova': typeof AppOrdensNovaRoute
+  '/ordens': typeof AppOrdensIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/clientes': typeof AppClientesRoute
+  '/_app/colaboradores': typeof AppColaboradoresRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/relatorios': typeof AppRelatoriosRoute
+  '/_app/ordens/$id': typeof AppOrdensIdRoute
+  '/_app/ordens/nova': typeof AppOrdensNovaRoute
+  '/_app/ordens/': typeof AppOrdensIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/clientes'
+    | '/colaboradores'
+    | '/dashboard'
+    | '/relatorios'
+    | '/ordens/$id'
+    | '/ordens/nova'
+    | '/ordens/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/clientes'
+    | '/colaboradores'
+    | '/dashboard'
+    | '/relatorios'
+    | '/ordens/$id'
+    | '/ordens/nova'
+    | '/ordens'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/login'
+    | '/_app/clientes'
+    | '/_app/colaboradores'
+    | '/_app/dashboard'
+    | '/_app/relatorios'
+    | '/_app/ordens/$id'
+    | '/_app/ordens/nova'
+    | '/_app/ordens/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +171,85 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/relatorios': {
+      id: '/_app/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AppRelatoriosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/colaboradores': {
+      id: '/_app/colaboradores'
+      path: '/colaboradores'
+      fullPath: '/colaboradores'
+      preLoaderRoute: typeof AppColaboradoresRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clientes': {
+      id: '/_app/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AppClientesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ordens/': {
+      id: '/_app/ordens/'
+      path: '/ordens'
+      fullPath: '/ordens/'
+      preLoaderRoute: typeof AppOrdensIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ordens/nova': {
+      id: '/_app/ordens/nova'
+      path: '/ordens/nova'
+      fullPath: '/ordens/nova'
+      preLoaderRoute: typeof AppOrdensNovaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ordens/$id': {
+      id: '/_app/ordens/$id'
+      path: '/ordens/$id'
+      fullPath: '/ordens/$id'
+      preLoaderRoute: typeof AppOrdensIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppClientesRoute: typeof AppClientesRoute
+  AppColaboradoresRoute: typeof AppColaboradoresRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppRelatoriosRoute: typeof AppRelatoriosRoute
+  AppOrdensIdRoute: typeof AppOrdensIdRoute
+  AppOrdensNovaRoute: typeof AppOrdensNovaRoute
+  AppOrdensIndexRoute: typeof AppOrdensIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppClientesRoute: AppClientesRoute,
+  AppColaboradoresRoute: AppColaboradoresRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppRelatoriosRoute: AppRelatoriosRoute,
+  AppOrdensIdRoute: AppOrdensIdRoute,
+  AppOrdensNovaRoute: AppOrdensNovaRoute,
+  AppOrdensIndexRoute: AppOrdensIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
