@@ -115,14 +115,18 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
@@ -142,14 +146,22 @@
   box-shadow: var(--shadow-card);
 }
 
-@utility blueprint-bg {
+@utility lemarc-app-bg {
   background-color: var(--navy-deep);
   background-image:
-    radial-gradient(ellipse at top right, oklch(0.72 0.19 50 / 0.18), transparent 50%),
-    radial-gradient(ellipse at bottom left, oklch(0.4 0.15 250 / 0.25), transparent 55%),
-    linear-gradient(oklch(1 0 0 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(1 0 0 / 0.035) 1px, transparent 1px);
-  background-size: auto, auto, 32px 32px, 32px 32px;
+    radial-gradient(ellipse at 18% -12%, oklch(0.72 0.19 50 / 0.1), transparent 42%),
+    radial-gradient(ellipse at 90% 108%, oklch(0.34 0.07 250 / 0.26), transparent 46%),
+    linear-gradient(
+      145deg,
+      oklch(0.18 0.045 252),
+      oklch(0.115 0.032 252) 58%,
+      oklch(0.15 0.035 250)
+    );
+  background-attachment: fixed;
+}
+
+@utility blueprint-bg {
+  @apply lemarc-app-bg;
 }
 
 @utility safe-bottom {
@@ -157,46 +169,222 @@
 }
 
 @utility glass-card {
-  background: linear-gradient(135deg, color-mix(in oklab, var(--card) 82%, transparent), color-mix(in oklab, var(--navy-soft) 58%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--card) 82%, transparent),
+    color-mix(in oklab, var(--navy-soft) 58%, transparent)
+  );
   backdrop-filter: blur(16px) saturate(145%);
   border: 1px solid color-mix(in oklab, white 11%, transparent);
   box-shadow: var(--shadow-card);
 }
 
 @utility blueprint-pattern {
-  background-image: linear-gradient(oklch(1 0 0 / 0.045) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0 / 0.045) 1px, transparent 1px), radial-gradient(circle at 100% 0%, oklch(0.72 0.19 50 / 0.16), transparent 45%);
-  background-size: 24px 24px, 24px 24px, auto;
+  background-image: linear-gradient(
+    145deg,
+    oklch(0.2 0.045 252 / 0.92),
+    oklch(0.14 0.036 252 / 0.96)
+  );
 }
 
 @utility industrial-gradient {
-  background: radial-gradient(circle at 100% 0%, oklch(0.72 0.19 50 / 0.22), transparent 35%), linear-gradient(135deg, var(--navy-soft), var(--navy-deep));
+  background:
+    radial-gradient(circle at 100% 0%, oklch(0.72 0.19 50 / 0.22), transparent 35%),
+    linear-gradient(135deg, var(--navy-soft), var(--navy-deep));
 }
 
-@utility orange-glow { box-shadow: var(--shadow-glow-orange); }
-@utility section-title { font-family: var(--font-display); font-size: 0.78rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; color: var(--foreground); }
+@utility orange-glow {
+  box-shadow: var(--shadow-glow-orange);
+}
+@utility section-title {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--foreground);
+}
 
 @layer base {
-  button, a { -webkit-tap-highlight-color: transparent; }
-  input, textarea, select { font-size: 16px; }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
-@utility lemarc-command-grid { background-image: radial-gradient(circle at 20% 0%, oklch(0.72 0.19 50 / 0.20), transparent 32%), radial-gradient(circle at 100% 100%, oklch(0.42 0.14 245 / 0.22), transparent 38%), linear-gradient(oklch(1 0 0 / 0.045) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0 / 0.04) 1px, transparent 1px); background-size: auto, auto, 28px 28px, 28px 28px; }
-@utility lemarc-grain { position: relative; } @utility lemarc-grain-before { content:""; }
-@utility lemarc-liquid { background: linear-gradient(145deg, oklch(1 0 0 / 0.14), oklch(1 0 0 / 0.045)); backdrop-filter: blur(22px) saturate(165%); border: 1px solid oklch(1 0 0 / 0.14); box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.20), 0 20px 60px -24px oklch(0 0 0 / 0.75); }
-@utility lemarc-liquid-card { position: relative; overflow: hidden; background: linear-gradient(145deg, oklch(0.28 0.04 252 / 0.84), oklch(0.17 0.04 252 / 0.72)); backdrop-filter: blur(22px) saturate(165%); border: 1px solid oklch(1 0 0 / 0.12); box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.16), 0 20px 48px -22px oklch(0 0 0 / 0.78), 0 0 0 1px oklch(0.72 0.19 50 / 0.035); }
-@utility lemarc-premium-surface { background: linear-gradient(180deg, oklch(1 0 0 / 0.10), oklch(1 0 0 / 0.035)); border: 1px solid oklch(1 0 0 / 0.10); box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14); }
-@utility lemarc-card-highlight { background-image: linear-gradient(125deg, oklch(1 0 0 / 0.20), transparent 34%, oklch(0.72 0.19 50 / 0.10) 52%, transparent 74%); }
-@utility lemarc-orange-glow { box-shadow: 0 14px 34px -14px oklch(0.72 0.19 50 / 0.85), inset 0 1px 0 oklch(1 0 0 / 0.25); }
-@utility lemarc-active-glow { box-shadow: 0 0 0 1px oklch(0.72 0.19 50 / 0.42), 0 18px 44px -22px oklch(0.72 0.19 50 / 0.9); }
-@utility lemarc-pressable { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease; } @utility lemarc-hero-gradient { background: radial-gradient(circle at 92% 8%, oklch(0.72 0.19 50 / 0.32), transparent 32%), linear-gradient(135deg, oklch(0.29 0.05 252 / 0.95), oklch(0.15 0.045 252 / 0.95)); }
-@utility lemarc-status-rail { position: relative; } @utility lemarc-bottom-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 7.5rem); }
-@utility lemarc-page-enter { animation: lemarc-page-enter .42s ease both; } @utility lemarc-shimmer { background-image: linear-gradient(110deg, transparent 0%, oklch(1 0 0 / .16) 45%, transparent 72%); background-size: 220% 100%; animation: lemarc-shimmer 3.6s ease-in-out infinite; }
-@utility lemarc-3d-card { transform-style: preserve-3d; transform: perspective(900px) rotateX(2.5deg) rotateY(-2deg) translateZ(0); }
-.lemarc-liquid-card::before, .lemarc-card-highlight::before { content:""; position:absolute; inset:0; pointer-events:none; background: linear-gradient(125deg, oklch(1 0 0 / .18), transparent 28%, transparent 62%, oklch(0.72 0.19 50 / .10)); opacity:.72; }
-.lemarc-liquid-card > * { position: relative; z-index: 1; }
-.lemarc-pressable:active { transform: scale(.98); }
-.lemarc-status-rail::after { content:""; position:absolute; left:0; top:14px; bottom:14px; width:4px; border-radius:999px; background: var(--rail-color, var(--primary)); box-shadow: 0 0 22px color-mix(in oklab, var(--rail-color, var(--primary)) 70%, transparent); }
-.lemarc-grain::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.20; mix-blend-mode:overlay; background-image: radial-gradient(circle at 20% 30%, white 0 1px, transparent 1px), radial-gradient(circle at 70% 80%, white 0 1px, transparent 1px); background-size: 18px 18px, 23px 23px; }
-@keyframes lemarc-page-enter { from { opacity:0; transform: translateY(10px) scale(.99); } to { opacity:1; transform:none; } }
-@keyframes lemarc-shimmer { 0%,100%{background-position: 180% 0} 50%{background-position: -80% 0} }
-@media (prefers-reduced-motion: reduce) { .lemarc-page-enter, .lemarc-shimmer { animation: none; } .lemarc-pressable { transition: none; } .lemarc-3d-card { transform: none; } }
+@utility lemarc-command-grid {
+  background-image: linear-gradient(
+    145deg,
+    oklch(0.18 0.045 252),
+    oklch(0.115 0.032 252) 58%,
+    oklch(0.15 0.035 250)
+  );
+  background-attachment: fixed;
+}
+@utility lemarc-grain {
+  position: relative;
+}
+@utility lemarc-grain-before {
+  content: "";
+}
+@utility lemarc-liquid {
+  background: linear-gradient(145deg, oklch(1 0 0 / 0.14), oklch(1 0 0 / 0.045));
+  backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid oklch(1 0 0 / 0.14);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.2),
+    0 20px 60px -24px oklch(0 0 0 / 0.75);
+}
+@utility lemarc-liquid-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, oklch(0.28 0.04 252 / 0.84), oklch(0.17 0.04 252 / 0.72));
+  backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid oklch(1 0 0 / 0.12);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.16),
+    0 20px 48px -22px oklch(0 0 0 / 0.78),
+    0 0 0 1px oklch(0.72 0.19 50 / 0.035);
+}
+@utility lemarc-premium-surface {
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.1), oklch(1 0 0 / 0.035));
+  border: 1px solid oklch(1 0 0 / 0.1);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14);
+}
+@utility lemarc-card-highlight {
+  background-image: linear-gradient(
+    125deg,
+    oklch(1 0 0 / 0.2),
+    transparent 34%,
+    oklch(0.72 0.19 50 / 0.1) 52%,
+    transparent 74%
+  );
+}
+@utility lemarc-orange-glow {
+  box-shadow:
+    0 14px 34px -14px oklch(0.72 0.19 50 / 0.85),
+    inset 0 1px 0 oklch(1 0 0 / 0.25);
+}
+@utility lemarc-active-glow {
+  box-shadow:
+    0 0 0 1px oklch(0.72 0.19 50 / 0.42),
+    0 18px 44px -22px oklch(0.72 0.19 50 / 0.9);
+}
+@utility lemarc-pressable {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+@utility lemarc-hero-gradient {
+  background:
+    radial-gradient(circle at 92% 8%, oklch(0.72 0.19 50 / 0.32), transparent 32%),
+    linear-gradient(135deg, oklch(0.29 0.05 252 / 0.95), oklch(0.15 0.045 252 / 0.95));
+}
+@utility lemarc-status-rail {
+  position: relative;
+}
+@utility lemarc-bottom-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
+}
+@utility lemarc-page-enter {
+  animation: lemarc-page-enter 0.42s ease both;
+}
+@utility lemarc-shimmer {
+  background-image: linear-gradient(
+    110deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.16) 45%,
+    transparent 72%
+  );
+  background-size: 220% 100%;
+  animation: lemarc-shimmer 3.6s ease-in-out infinite;
+}
+@utility lemarc-3d-card {
+  transform-style: preserve-3d;
+  transform: perspective(900px) rotateX(2.5deg) rotateY(-2deg) translateZ(0);
+}
+.lemarc-liquid-card::before,
+.lemarc-card-highlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    oklch(1 0 0 / 0.18),
+    transparent 28%,
+    transparent 62%,
+    oklch(0.72 0.19 50 / 0.1)
+  );
+  opacity: 0.72;
+}
+.lemarc-liquid-card > * {
+  position: relative;
+  z-index: 1;
+}
+.lemarc-pressable:active {
+  transform: scale(0.98);
+}
+.lemarc-status-rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--rail-color, var(--primary));
+  box-shadow: 0 0 22px color-mix(in oklab, var(--rail-color, var(--primary)) 70%, transparent);
+}
+.lemarc-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  mix-blend-mode: overlay;
+  background-image:
+    radial-gradient(circle at 20% 30%, white 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 80%, white 0 1px, transparent 1px);
+  background-size:
+    18px 18px,
+    23px 23px;
+}
+@keyframes lemarc-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lemarc-shimmer {
+  0%,
+  100% {
+    background-position: 180% 0;
+  }
+  50% {
+    background-position: -80% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lemarc-page-enter,
+  .lemarc-shimmer {
+    animation: none;
+  }
+  .lemarc-pressable {
+    transition: none;
+  }
+  .lemarc-3d-card {
+    transform: none;
+  }
+}
