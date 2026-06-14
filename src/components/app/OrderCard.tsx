@@ -1,38 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, Building2, Clock, Cog, HardHat, MapPin, Wrench, Zap } from "lucide-react";
-import { GlassCard } from "./GlassCard";
+import { Bot, Building2, Clock, Cog, HardHat, MapPin, Wrench, Zap, Gauge } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import type { Ordem, ServiceType } from "@/lib/mock/serviceOrders";
-
-const icons: Record<ServiceType, typeof Wrench> = {
-  "Manutenção Mecânica": Cog,
-  "Manutenção Elétrica": Zap,
-  "Automação Industrial": Bot,
-  "Montagem Industrial": HardHat,
-  Instalação: Wrench,
-  "Visita Técnica": Wrench,
-  Emergência: Zap,
-};
-
-export function OrderCard({ ordem }: { ordem: Ordem }) {
-  const Icon = icons[ordem.area];
-  const elapsed = ordem.tempoTrabalhadoMin ? `${Math.floor(ordem.tempoTrabalhadoMin / 60)}h${String(ordem.tempoTrabalhadoMin % 60).padStart(2, "0")}` : "—";
-  return (
-    <Link to="/ordens/$id" params={{ id: ordem.id }} className="block">
-      <GlassCard className="p-4 transition-transform active:scale-[0.99]">
-        <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/25"><Icon size={21} /></div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-primary"><span>OS #{ordem.numero}</span><span className="text-muted-foreground">·</span><span className="text-muted-foreground">{ordem.area}</span></div>
-            <h3 className="mt-1 line-clamp-2 font-display text-base font-bold leading-tight text-foreground">{ordem.titulo}</h3>
-            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Building2 size={12} className="shrink-0 text-primary" /><span className="truncate">{ordem.cliente} · {ordem.unidade}</span></div>
-            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><HardHat size={12} className="shrink-0 text-primary" /><span className="truncate">{ordem.colaborador}</span></div>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><StatusBadge status={ordem.status} /><PriorityBadge prioridade={ordem.prioridade} /></div>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={11} />{ordem.distanciaKm} km</span><span className="flex items-center gap-1"><Clock size={11} />{ordem.horario}</span><span className="text-right font-bold text-foreground">{elapsed}</span></div>
-      </GlassCard>
-    </Link>
-  );
-}
+const icons: Record<ServiceType, typeof Wrench> = { "Manutenção Mecânica": Cog, "Manutenção Elétrica": Zap, "Automação Industrial": Bot, "Montagem Industrial": HardHat, Instalação: Wrench, "Visita Técnica": Wrench, Emergência: Zap };
+const rail: Record<string,string> = { pending:"var(--status-pending)", transit:"var(--status-transit)", running:"var(--status-running)", finished:"var(--status-done)", review:"var(--status-review)", approved:"var(--status-done)" };
+export function OrderCard({ ordem }: { ordem: Ordem }) { const Icon=icons[ordem.area]; const elapsed=ordem.tempoTrabalhadoMin?`${Math.floor(ordem.tempoTrabalhadoMin/60)}h${String(ordem.tempoTrabalhadoMin%60).padStart(2,"0")}`:"—"; return <Link to="/ordens/$id" params={{id:ordem.id}} className="block"><article className="lemarc-liquid-card lemarc-status-rail lemarc-pressable rounded-3xl p-4 pl-5 active:scale-[0.98]" style={{"--rail-color": rail[ordem.status]} as React.CSSProperties}><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/14 text-primary ring-1 ring-primary/25 lemarc-shimmer"><Icon size={22}/></div><div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-1.5"><span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-primary">OS #{ordem.numero}</span><span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{ordem.area}</span></div><h3 className="mt-1 line-clamp-2 font-display text-base font-black leading-tight text-foreground">{ordem.titulo}</h3><div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Building2 size={12} className="shrink-0 text-primary"/><span className="truncate">{ordem.cliente} · {ordem.unidade}</span></div><div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><HardHat size={12} className="shrink-0 text-primary"/><span className="truncate">{ordem.colaborador}</span></div></div><StatusBadge status={ordem.status}/></div><div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><PriorityBadge prioridade={ordem.prioridade}/>{ordem.prioridade==="alta"&&<span className="rounded-full border border-destructive/30 bg-destructive/15 px-2 py-0.5 text-[10px] font-black uppercase text-destructive">Urgente</span>}</div><div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={11}/>{ordem.distanciaKm} km</span><span className="flex items-center gap-1"><Clock size={11}/>{ordem.horario}</span><span className="flex items-center gap-1"><Gauge size={11}/>{elapsed}</span><span className="text-right font-bold text-foreground">{ordem.data}</span></div></article></Link>; }

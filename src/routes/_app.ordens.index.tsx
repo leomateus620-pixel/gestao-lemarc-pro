@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
+import { FilterChips, PageHero } from "@/components/app/operations";
 import { OrderCard } from "@/components/app/OrderCard";
 import { ordens } from "@/lib/mock/serviceOrders";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { statusLabels, type OrderStatus } from "@/components/app/StatusBadge";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -46,7 +47,8 @@ function OrdensList() {
         </Link>
       }
     >
-      <div className="mt-2 flex items-center gap-2">
+      <PageHero eyebrow="Execução e acompanhamento" title="Ordens" description="Busca, filtros por status e cards táteis para acompanhar o campo." icon={ClipboardList} />
+      <div className="mt-4 flex items-center gap-2">
         <div className="glass flex flex-1 items-center gap-2 rounded-xl px-3">
           <Search size={16} className="text-muted-foreground" />
           <Input
@@ -56,30 +58,12 @@ function OrdensList() {
             className="h-11 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
           />
         </div>
-        <button className="glass grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground">
+        <button className="lemarc-liquid grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground lemarc-pressable">
           <SlidersHorizontal size={16} />
         </button>
       </div>
 
-      <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        {filters.map((f) => {
-          const label = f.key === "todas" ? "Todas" : statusLabels[f.key];
-          const active = filter === f.key;
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                active
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-secondary/50 text-muted-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      <div className="mt-4"><FilterChips items={filters.map((f) => ({ key: f.key, label: f.key === "todas" ? "Todas" : statusLabels[f.key], count: f.key === "todas" ? ordens.length : ordens.filter((o) => o.status === f.key).length }))} value={filter} onChange={setFilter} /></div>
 
       <div className="mt-4 space-y-3">
         {filtered.map((o) => <OrderCard key={o.id} ordem={o} />)}
