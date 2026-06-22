@@ -348,7 +348,7 @@ function BasicInfoStep({
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-  titleRef: React.RefObject<HTMLInputElement>;
+  titleRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
     <GlassCard className="space-y-5 p-5 sm:p-6">
