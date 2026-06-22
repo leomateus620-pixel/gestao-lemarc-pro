@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
-import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 
 const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
 export const Route = createFileRoute("/login")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Entrar - Gestao Lemarc" },
@@ -24,37 +25,41 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showEmail, setShowEmail] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const submitTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    return () => {
-      if (submitTimer.current) {
-        window.clearTimeout(submitTimer.current);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) nav({ to: "/dashboard", replace: true });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        nav({ to: "/dashboard", replace: true });
       }
-    };
-  }, []);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [nav]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handleGoogle() {
     if (isSubmitting) return;
-
-    if (!email.trim() || !password) {
-      setError("Informe e-mail e senha para acessar o sistema.");
-      return;
-    }
-
     setError("");
     setIsSubmitting(true);
-    submitTimer.current = window.setTimeout(() => {
-      nav({ to: "/dashboard" });
-    }, 520);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        setError("Não foi possível iniciar o login com Google. Tente novamente.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (result.redirected) return;
+      nav({ to: "/dashboard", replace: true });
+    } catch (err) {
+      console.error(err);
+      setError("Erro inesperado ao acessar o sistema.");
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -70,102 +75,35 @@ function LoginPage() {
 
             <div className="mx-auto w-full max-w-[440px] lg:mx-0">
               <GlassLoginCard>
-                <form className="space-y-5" noValidate onSubmit={handleSubmit}>
-                  <div>
-                    <label
-                      className="text-xs font-semibold uppercase tracking-[0.14em] text-white/72"
-                      htmlFor="login-email"
-                    >
-                      E-mail
-                    </label>
-                    <div className="relative mt-2">
-                      <Mail
-                        aria-hidden="true"
-                        className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/48"
-                      />
-                      <Input
-                        aria-describedby={error ? "login-error" : undefined}
-                        aria-invalid={Boolean(error)}
-                        aria-required="true"
-                        autoCapitalize="none"
-                        autoComplete="username"
-                        className={cn(
-                          "lemarc-login-input h-[3.25rem] rounded-xl border-white/12 bg-white/[0.065] pl-11 pr-12 text-[15px] font-medium text-white shadow-none placeholder:text-white/36 hover:border-white/22 focus-visible:border-orange-glow/70 focus-visible:ring-2 focus-visible:ring-orange-glow/55",
-                          error && "border-red-300/45 focus-visible:ring-red-300/35",
-                        )}
-                        disabled={isSubmitting}
-                        id="login-email"
-                        inputMode="email"
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="seuemail@empresa.com"
-                        spellCheck={false}
-                        type={showEmail ? "email" : "password"}
-                        value={email}
-                      />
-                      <button
-                        aria-label={showEmail ? "Ocultar e-mail" : "Mostrar e-mail"}
-                        className="absolute right-2.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-white/58 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-glow/60 disabled:pointer-events-none disabled:opacity-45"
-                        disabled={isSubmitting}
-                        onClick={() => setShowEmail((current) => !current)}
-                        type="button"
-                      >
-                        {showEmail ? (
-                          <EyeOff aria-hidden="true" className="size-4" />
-                        ) : (
-                          <Eye aria-hidden="true" className="size-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                <div className="space-y-5">
+                  <p className="text-sm leading-6 text-white/72">
+                    Acesso exclusivo para colaboradores Lemarc Industrial.
+                    Entre com sua conta Google corporativa para abrir suas ordens
+                    de serviço.
+                  </p>
 
-                  <div>
-                    <label
-                      className="text-xs font-semibold uppercase tracking-[0.14em] text-white/72"
-                      htmlFor="login-password"
-                    >
-                      Senha
-                    </label>
-                    <div className="relative mt-2">
-                      <LockKeyhole
-                        aria-hidden="true"
-                        className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/48"
-                      />
-                      <Input
-                        aria-describedby={error ? "login-error" : undefined}
-                        aria-invalid={Boolean(error)}
-                        aria-required="true"
-                        autoComplete="current-password"
-                        className={cn(
-                          "lemarc-login-input h-[3.25rem] rounded-xl border-white/12 bg-white/[0.065] pl-11 pr-12 text-[15px] font-medium text-white shadow-none placeholder:text-white/36 hover:border-white/22 focus-visible:border-orange-glow/70 focus-visible:ring-2 focus-visible:ring-orange-glow/55",
-                          error && "border-red-300/45 focus-visible:ring-red-300/35",
-                        )}
-                        disabled={isSubmitting}
-                        id="login-password"
-                        onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Digite sua senha"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                      />
-                      <button
-                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                        className="absolute right-2.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-white/58 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-glow/60 disabled:pointer-events-none disabled:opacity-45"
-                        disabled={isSubmitting}
-                        onClick={() => setShowPassword((current) => !current)}
-                        type="button"
-                      >
-                        {showPassword ? (
-                          <EyeOff aria-hidden="true" className="size-4" />
-                        ) : (
-                          <Eye aria-hidden="true" className="size-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  <Button
+                    className="h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep shadow-lg hover:bg-white/95 disabled:opacity-70"
+                    disabled={isSubmitting}
+                    onClick={handleGoogle}
+                    type="button"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      <>
+                        <GoogleIcon />
+                        Entrar com Google
+                      </>
+                    )}
+                  </Button>
 
                   {error ? (
                     <div
                       className="flex items-start gap-2 rounded-xl border border-red-300/22 bg-red-500/10 px-3 py-2.5 text-sm font-medium leading-snug text-red-50"
-                      id="login-error"
                       role="alert"
                     >
                       <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -173,24 +111,15 @@ function LoginPage() {
                     </div>
                   ) : null}
 
-                  <Button
-                    className="lemarc-login-cta h-[3.25rem] w-full rounded-xl text-[15px] font-extrabold uppercase tracking-[0.08em] text-navy-deep disabled:opacity-70"
-                    disabled={isSubmitting}
-                    type="submit"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 aria-hidden="true" className="animate-spin" />
-                        Acessando
-                      </>
-                    ) : (
-                      <>
-                        Entrar no sistema
-                        <ArrowRight aria-hidden="true" />
-                      </>
-                    )}
-                  </Button>
-                </form>
+                  <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs leading-snug text-white/60">
+                    <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-orange-glow" />
+                    <span>
+                      Sua sessão é criptografada e fica salva apenas neste
+                      dispositivo. Os acessos ficam registrados na central
+                      operacional Lemarc.
+                    </span>
+                  </div>
+                </div>
               </GlassLoginCard>
             </div>
           </div>
