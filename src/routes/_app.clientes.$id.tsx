@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -20,16 +20,15 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useClientDetailQuery } from "@/hooks/useClients";
-import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
+import { clientPageQueryOptions, useClientPageQuery } from "@/hooks/useClients";
 import {
   createClientUnit,
   deleteClientUnit,
+  getClientPage,
   updateClientUnit,
 } from "@/lib/api/clients.functions";
 import { maskCNPJ } from "@/lib/cnpj";
 import { cn } from "@/lib/utils";
-import { isDone, isInProgress, isCancelled, isPending } from "@/lib/serviceOrders/status";
 import type { ClientUnit } from "@/types/client";
 import { statusLabel, priorityLabel } from "@/types/serviceOrder";
 
@@ -38,6 +37,15 @@ export const Route = createFileRoute("/_app/clientes/$id")({
     meta: [{ title: `Cliente — Gestão Lemarc` }],
     title: params.id,
   }),
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(
+      clientPageQueryOptions(params.id, (args) => getClientPage(args)),
+    ),
+  pendingComponent: () => (
+    <AppShell title="Cliente" back>
+      <div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />
+    </AppShell>
+  ),
   component: DetailPage,
   notFoundComponent: () => (
     <AppShell title="Cliente não encontrado" back>
@@ -56,25 +64,16 @@ export const Route = createFileRoute("/_app/clientes/$id")({
 function DetailPage() {
   return (
     <AppShell title="Cliente" back>
-      <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
-        <Detail />
-      </Suspense>
+      <Detail />
     </AppShell>
   );
 }
 
 function Detail() {
   const { id } = Route.useParams();
-  const { data } = useClientDetailQuery(id);
-  const { data: orders } = useServiceOrdersQuery();
+  const { data } = useClientPageQuery(id);
   if (!data) throw notFound();
-  const { client, units } = data;
-
-  const clientOrders = orders.filter((o) => o.client_id === client.id);
-  const open = clientOrders.filter((o) => !isDone(o) && !isCancelled(o));
-  const running = clientOrders.filter(isInProgress);
-  const pending = clientOrders.filter(isPending);
-  const done = clientOrders.filter(isDone);
+  const { client, units, orders: clientOrders, counts } = data;
   const lastOrder = clientOrders[0];
 
   return (
