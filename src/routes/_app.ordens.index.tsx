@@ -1,41 +1,46 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { ClipboardList, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { Suspense, useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+import { ClipboardList, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { EmptyState } from "@/components/app/EmptyState";
 import { FilterChips, PageHero } from "@/components/app/operations";
-import { OrderCard } from "@/components/app/OrderCard";
+import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
+import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { Input } from "@/components/ui/input";
-import { statusLabels, type OrderStatus } from "@/components/app/StatusBadge";
-import { ordens } from "@/lib/mock/serviceOrders";
+import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
+import { filterByPeriod, type Period } from "@/lib/serviceOrders/period";
+import { isAlert, isIncomplete, statusBucket } from "@/lib/serviceOrders/status";
+
+type StatusFilter = "todas" | "pendente" | "andamento" | "revisao" | "concluida";
+type SpecialFilter = "alertas" | "incompletas" | "none";
+
+const searchSchema = z.object({
+  status: fallback(
+    z.enum(["todas", "pendente", "andamento", "revisao", "concluida"]),
+    "todas",
+  ).default("todas"),
+  period: fallback(z.enum(["day", "week", "month", "all"]), "all").default("all"),
+  filtro: fallback(z.enum(["alertas", "incompletas", "none"]), "none").default("none"),
+  q: fallback(z.string(), "").default(""),
+});
 
 export const Route = createFileRoute("/_app/ordens/")({
   head: () => ({ meta: [{ title: "Ordens de serviço — Gestão Lemarc" }] }),
-  component: OrdensList,
+  validateSearch: zodValidator(searchSchema),
+  component: OrdensPage,
 });
 
-const filters: ({ key: "todas" } | { key: OrderStatus })[] = [
-  { key: "todas" },
-  { key: "pending" },
-  { key: "transit" },
-  { key: "running" },
-  { key: "finished" },
-  { key: "review" },
-  { key: "approved" },
+const statusFilters: { key: StatusFilter; label: string }[] = [
+  { key: "todas", label: "Todas" },
+  { key: "pendente", label: "Pendentes" },
+  { key: "andamento", label: "Em andamento" },
+  { key: "revisao", label: "Aguard. revisão" },
+  { key: "concluida", label: "Concluídas" },
 ];
 
-function OrdensList() {
-  const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<"todas" | OrderStatus>("todas");
-
-  const filtered = ordens.filter((ordem) => {
-    const searchable =
-      `${ordem.numero} ${ordem.titulo} ${ordem.cliente} ${ordem.local}`.toLowerCase();
-    const matchesQ = !q || searchable.includes(q.toLowerCase());
-    const matchesFilter = filter === "todas" || ordem.status === filter;
-    return matchesQ && matchesFilter;
-  });
-
+function OrdensPage() {
   return (
     <AppShell
       title="Ordens de serviço"
@@ -49,50 +54,115 @@ function OrdensList() {
         </Link>
       }
     >
+      <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
+        <OrdensList />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+function OrdensList() {
+  const { status, period, filtro, q } = Route.useSearch();
+  const navigate = useNavigate({ from: "/ordens" });
+  const { data: orders } = useServiceOrdersQuery();
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(() => {
+    const byPeriod = filterByPeriod(orders, period as Period);
+    return byPeriod.filter((o) => {
+      if (status !== "todas") {
+        const b = statusBucket[o.status];
+        if (status === "pendente" && b !== "pending") return false;
+        if (status === "andamento" && b !== "inProgress") return false;
+        if (status === "revisao" && b !== "review") return false;
+        if (status === "concluida" && b !== "done") return false;
+      }
+      if (filtro === "alertas" && !isAlert(o)) return false;
+      if (filtro === "incompletas" && !isIncomplete(o)) return false;
+      if (q) {
+        const needle = q.toLowerCase();
+        const hay = `${o.number} ${o.title} ${o.client?.name ?? ""} ${o.technician?.full_name ?? ""}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [orders, status, period, filtro, q]);
+
+  function setStatus(next: StatusFilter) {
+    navigate({ search: (prev) => ({ ...prev, status: next }) });
+  }
+  function setPeriod(next: Period) {
+    navigate({ search: (prev) => ({ ...prev, period: next }) });
+  }
+  function setFiltro(next: SpecialFilter) {
+    navigate({ search: (prev) => ({ ...prev, filtro: next }) });
+  }
+  function setQuery(next: string) {
+    navigate({ search: (prev) => ({ ...prev, q: next }) });
+  }
+
+  return (
+    <>
       <PageHero
         eyebrow="Execução e acompanhamento"
         title="Ordens"
-        description="Busca, filtros por status e timeline operacional para acompanhar campo, revisão e cobrança."
+        description="Filtre por período, status, alertas ou pendências para acompanhar o campo, revisão e cobrança."
         icon={ClipboardList}
       />
 
-      <div className="mt-5 flex items-center gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <MetricPeriodFilter value={period as Period} onChange={setPeriod} />
+        {(filtro !== "none" || status !== "todas") && (
+          <button
+            type="button"
+            onClick={() => navigate({ search: { status: "todas", period: "all", filtro: "none", q: "" } })}
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
         <div className="glass flex flex-1 items-center gap-2 rounded-2xl px-3">
           <Search size={16} className="text-muted-foreground" />
           <Input
             value={q}
-            onChange={(event) => setQ(event.target.value)}
-            placeholder="Buscar por OS, cliente, setor..."
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por número, cliente, técnico..."
             className="h-12 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
           />
         </div>
-        <button
-          type="button"
-          className="lemarc-liquid lemarc-pressable grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Ajustar filtros"
-        >
-          <SlidersHorizontal size={17} />
-        </button>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <FilterChips
-          items={filters.map((item) => ({
-            key: item.key,
-            label: item.key === "todas" ? "Todas" : statusLabels[item.key],
-            count:
-              item.key === "todas"
-                ? ordens.length
-                : ordens.filter((ordem) => ordem.status === item.key).length,
+          items={statusFilters.map((it) => ({
+            key: it.key,
+            label: it.label,
+            count: 0,
           }))}
-          value={filter}
-          onChange={setFilter}
+          value={status}
+          onChange={(v) => setStatus(v as StatusFilter)}
         />
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-        {filtered.map((ordem) => (
-          <OrderCard key={ordem.id} ordem={ordem} />
+      {filtro !== "none" && (
+        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+          Filtro especial: {filtro === "alertas" ? "Alertas operacionais" : "OS incompletas"}
+          <button
+            onClick={() => setFiltro("none")}
+            className="rounded-full bg-primary/20 px-1.5"
+            aria-label="Remover filtro"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <div className="mt-5 grid gap-3 xl:grid-cols-2">
+        {filtered.map((order) => (
+          <ServiceOrderCard key={order.id} order={order} />
         ))}
       </div>
 
@@ -105,6 +175,6 @@ function OrdensList() {
           />
         </div>
       )}
-    </AppShell>
+    </>
   );
 }
