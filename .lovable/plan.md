@@ -1,117 +1,63 @@
-## Área de Clientes — refator real + unidades + integração com OS
+## Problema
 
-Substituir mocks por dados reais (Supabase), expandir o cadastro de cliente com campos completos, criar tabela de **unidades** vinculadas, e organizar rotas para reutilização em OS, dashboard e relatórios.
+A tela `/clientes/:id` está lenta e às vezes mostra erro porque ela:
 
-### Banco de dados (migration)
+1. Faz **3 RPCs** sequenciais via Suspense: detalhe do cliente (`getClientDetail`) **e** a lista **completa** de OS (`listServiceOrders`) para depois filtrar no front por `client_id`. Com o crescimento das OS, esse fetch fica grande e lento, e qualquer falha na junção pesada (`clients`, `technicians`, `client_units`) derruba a página inteira.
+2. Não tem **loader** na rota — só Suspense — então nada é pré-carregado quando o usuário passa o mouse no card de "Visualizar" na listagem. Cada clique espera tudo do zero.
+3. Reusa a query global `["service-orders"]` (sem `staleTime` real para o detalhe), então mesmo voltar e abrir outro cliente refaz toda a lista.
 
-**Alterar `public.clients`** adicionando colunas:
-- `cnpj text unique` (com índice; validado server-side)
-- `segment text`, `address text`, `city text`, `state text`
-- `phone text`, `email text`
-- `responsible_name text`
-- `active boolean not null default true`
+## Solução estrutural
 
-> A coluna legada `unit text` será mantida por compatibilidade temporária (a wizard de OS atual usa `clients.unit` apenas como label). Nada será deletado.
+Buscar **apenas o necessário para a tela**, em **uma única chamada paralela**, com **prefetch no hover** da listagem.
 
-**Criar `public.client_units`**:
-- `id uuid pk`, `client_id uuid fk → clients(id) on delete cascade`
-- `name text not null`, `is_primary boolean default false`
-- `sector text`, `city text`, `state text`, `address text`
-- `responsible_name text`, `phone text`, `notes text`
-- `active boolean default true`, `created_by`, `created_at`, `updated_at`
-- Índice por `client_id`; GRANTs `authenticated`+`service_role`; RLS por owner (mesmo padrão de `clients`).
+### 1. Novo server function `getClientPage` (`src/lib/api/clients.functions.ts`)
 
-**Alterar `public.service_orders`**:
-- Adicionar `client_unit_id uuid references client_units(id) on delete set null` + índice.
+Retorna num único round-trip:
 
-### Server functions (`src/lib/api/`)
+```text
+{
+  client,                 // 1 row (clients)
+  units,                  // N rows (client_units do cliente)
+  orders: [               // só OS deste client_id, colunas enxutas
+    id, number, title, status, priority,
+    opened_at, scheduled_for, finished_at,
+    client_unit:client_units(id, name)
+  ],
+  counts: { open, running, pending, done, total } // computado server-side
+}
+```
 
-`clients.functions.ts` (novo) e expandir `serviceOrders.functions.ts`:
-- `listClientsFull` — clientes + agregados (unit_count, os_open, os_done) via consultas com count.
-- `getClient(id)` — detalhe + unidades + métricas.
-- `createClient(input)` — empresa + array opcional de unidades (insere tudo numa transação lógica; primeira unidade marcada principal). Verifica CNPJ duplicado.
-- `updateClient(id, patch)`, `deleteClient(id)`.
-- `listClientUnits(clientId)`, `createClientUnit`, `updateClientUnit`, `deleteClientUnit`.
-- `listServiceOrdersByClient(clientId)`.
-- Ajustar `createServiceOrder` para aceitar `client_unit_id`.
+Implementação: `Promise.all` de 3 selects no Supabase (`clients` por id, `client_units` por `client_id`, `service_orders` por `client_id` ordenado por `opened_at desc`). Sem o join pesado com `technicians` (não é usado nessa tela). `counts` agregado no handler para não enviar arrays redundantes ao cliente.
 
-Tipos em `src/types/client.ts`.
+### 2. Hook + loader
 
-### Rotas (TanStack file-based, prefixo `_app`)
+- `useClientPageQuery(id)` em `src/hooks/useClients.ts` com `queryKey: ["client-page", id]`, `staleTime: 30_000`.
+- Loader da rota `_app.clientes.$id.tsx` chama `context.queryClient.ensureQueryData(...)` para o id — TanStack Router já pré-carrega no `mouseenter` do `<Link>`, então abrir o cliente fica instantâneo após hover.
+- Mantém `errorComponent` e `notFoundComponent` (já existem) e adiciona `pendingComponent` mais leve.
 
-- `/clientes` — lista (`_app.clientes.index.tsx`, refator do atual).
-- `/clientes/novo` — wizard de cadastro (`_app.clientes.novo.tsx`).
-- `/clientes/$id` — detalhe com abas Visão geral / Unidades / OS / Contatos (`_app.clientes.$id.index.tsx`).
-- `/clientes/$id/editar` — edição (`_app.clientes.$id.editar.tsx`).
-- `/clientes/$id/unidades/nova` — nova unidade.
-- `/clientes/$id/unidades/$unitId` — detalhe/edição da unidade.
+### 3. Refatorar `_app.clientes.$id.tsx`
 
-A rota atual `_app.clientes.tsx` vira layout `_app.clientes.tsx` (só `<Outlet/>`) + `_app.clientes.index.tsx`.
+- Remover `useClientDetailQuery` + `useServiceOrdersQuery`; usar somente `useClientPageQuery`.
+- Usar `data.counts` direto nos mini-cards (sem filtrar arrays no render).
+- Tab "OS" itera `data.orders` (já filtrado e ordenado pelo servidor).
+- Manter mutações de unidade invalidando `["client-page", id]` (em vez de `["client", id]`).
 
-### Tela `/clientes`
+### 4. Lista de clientes (`_app.clientes.index.tsx`)
 
-- Header com identidade Lemarc (eyebrow, título "Clientes industriais", subtítulo, CTA "Cadastrar empresa").
-- 4 métricas reais: Empresas ativas, Unidades, OS ativas (status ≠ approved/cancelled), Com pendência.
-- Busca por nome / CNPJ / cidade / segmento / responsável / unidade (client-side sobre dados carregados).
-- Chips: Todos · Com OS ativa · Sem OS · Ativos · Inativos.
-- `ClientCard` (novo) refinado: nome, CNPJ, segmento, cidade/UF, badges (X unidades · Y OS abertas · Z concluídas), responsável, telefone/e-mail, status, ações rápidas (Detalhes / Nova OS / Adicionar unidade / Editar).
-- Empty state premium quando 0 clientes.
+- No `<Link to="/clientes/$id">`: deixar o `preload="intent"` padrão do TanStack ativo (é o default; confirmar que nada o desabilita). Como a rota agora tem loader, hover já dispara o fetch.
 
-### Cadastro `/clientes/novo`
+### 5. Limpeza
 
-Wizard 4 etapas (mesmo padrão visual da wizard de OS já aprovada):
-1. **Dados da empresa** — nome*, CNPJ* (máscara + validação 14 dígitos + checagem de duplicidade server-side), segmento.
-2. **Localização & contato** — cidade*, UF*, endereço, telefone, e-mail, responsável.
-3. **Unidades** — lista editável (add/remove inline). Permite zero unidades; primeira marcada como Matriz/principal.
-4. **Revisão** — resumo + "Criar cliente".
+- Manter `getClientDetail` por compat ou removê-lo se não houver outro consumidor (a rota `editar` continua usando — preservar).
+- Não alterar schema do banco, RLS, rotas existentes ou outras telas.
 
-Após salvar: redireciona para `/clientes/$id`.
+## Resultado esperado
 
-### Detalhe `/clientes/$id`
+- 1 RPC pequena no lugar de 2 (uma delas full-table).
+- Página aparece praticamente instantânea após hover na listagem.
+- Erro de carga deixa de derrubar a tela inteira porque a query é escopo-único e a junção pesada com `technicians` é eliminada.
 
-- Header: nome, badge ativo/inativo, CNPJ, cidade/UF; botões "Nova OS", "Adicionar unidade", "Editar".
-- 4 cards resumo: unidades, OS abertas, em andamento, concluídas + última OS aberta + técnico recente.
-- Tabs (Tabs do shadcn já existem): Visão geral, Unidades, OS, Contatos, Histórico.
-- Aba **Unidades**: cards com nome, local, responsável, contagem OS, status; ações editar/desativar.
-- Aba **OS**: usa `listServiceOrdersByClient` com filtros (status, período, técnico, prioridade).
+## Validação
 
-### Integração com OS
-
-- `ClientStep` da wizard atual passa a buscar pelo novo `listClientsFull` (mantendo shape compatível).
-- Adicionar `UnitStep` opcional dentro da etapa Cliente: após selecionar empresa com unidades, mostrar seletor de unidade (com opção "Sem unidade específica").
-- Preencher `client_unit_id` no payload.
-- Botão "Nova OS" do detalhe/unidade navega para `/ordens/nova?clientId=…&unitId=…`; wizard lê search params e pré-seleciona.
-- Dashboard: substituir contagem de "clientes ativos" pela contagem real via OS reais (já existe hook — apenas confirmar consumo do agregado novo).
-
-### Componentes a criar
-
-`src/components/clientes/`:
-- `ClientsHeader.tsx`, `ClientsMetrics.tsx`, `ClientMetricCard.tsx`
-- `ClientsSearchAndFilters.tsx`, `ClientCard.tsx`, `ClientEmptyState.tsx`
-- `wizard/ClientWizard.tsx` + steps + `UnitsEditor.tsx`
-- `detail/ClientDetailHeader.tsx`, `ClientSummaryCards.tsx`, `ClientUnitsSection.tsx`, `ClientServiceOrdersSection.tsx`, `UnitCard.tsx`, `UnitForm.tsx`
-
-Hooks: `useClients`, `useClient`, `useClientUnits`, `useClientServiceOrders`, `useClientMetrics`.
-
-Utils: `src/lib/cnpj.ts` — máscara + validação de DV + normalizador.
-
-### Visual / motion
-
-Mantém tokens navy/laranja/cyan, glass cards, micro-spring no hover (mesmo padrão da home/wizard de OS). Sem framer-motion novo — usar transitions CSS + `usePhysicsCard` existente quando fizer sentido. Respeita `prefers-reduced-motion`.
-
-### Remoção de mocks
-
-- Apagar uso de `src/lib/mock/clients.ts` na tela; manter arquivo intocado (outros lugares podem referenciar — só remover import na nova `_app.clientes.index.tsx`).
-
-### Fora do escopo
-
-- Importação em lote de CNPJs / consulta Receita.
-- Anexos por cliente / upload de logo.
-- Permissões granulares por cliente.
-- Refator visual de outras telas que não a área de clientes.
-
-### Verificação final
-
-- Migration aplicada, types regenerados.
 - `bun run build` limpo.
-- Playwright: criar empresa com 2 unidades → abrir detalhe → criar OS pré-vinculada → conferir em `/ordens` e dashboard.
+- Playwright: listar clientes → hover no card → abrir → confirmar que as 4 métricas, tabs Unidades e OS aparecem com dados reais e sem erro no console; medir tempo do clique até render.
