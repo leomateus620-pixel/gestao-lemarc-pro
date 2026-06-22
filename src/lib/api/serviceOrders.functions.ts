@@ -98,10 +98,30 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
       status: data.status,
     };
     if (data.status === "running") patch.started_at = now;
-    if (data.status === "finished") patch.finished_at = now;
+    if (data.status === "finished") {
+      patch.finished_at = now;
+      patch.closed_at = now;
+    }
     if (data.status === "approved") {
       patch.approved_at = now;
       patch.closed_at = now;
+    }
+    if (data.status === "cancelled") {
+      patch.closed_at = now;
+    }
+    // Reabertura: limpa timestamps de fechamento para não exibir tempo total falso.
+    if (
+      data.status === "pending" ||
+      data.status === "dispatched" ||
+      data.status === "transit" ||
+      data.status === "running" ||
+      data.status === "review"
+    ) {
+      patch.closed_at = null;
+      if (data.status !== "review") {
+        patch.finished_at = null;
+        patch.approved_at = null;
+      }
     }
     const { data: row, error } = await context.supabase
       .from("service_orders")
