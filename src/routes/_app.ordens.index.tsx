@@ -65,7 +65,6 @@ function OrdensList() {
   const { status, period, filtro, q } = Route.useSearch();
   const navigate = useNavigate({ from: "/ordens" });
   const { data: orders } = useServiceOrdersQuery();
-  const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
     const byPeriod = filterByPeriod(orders, period as Period);
@@ -88,18 +87,15 @@ function OrdensList() {
     });
   }, [orders, status, period, filtro, q]);
 
-  function setStatus(next: StatusFilter) {
-    navigate({ search: (prev) => ({ ...prev, status: next }) });
-  }
-  function setPeriod(next: Period) {
-    navigate({ search: (prev) => ({ ...prev, period: next }) });
-  }
-  function setFiltro(next: SpecialFilter) {
-    navigate({ search: (prev) => ({ ...prev, filtro: next }) });
-  }
-  function setQuery(next: string) {
-    navigate({ search: (prev) => ({ ...prev, q: next }) });
-  }
+  type Search = { status: StatusFilter; period: Period; filtro: SpecialFilter; q: string };
+  const setStatus = (next: StatusFilter) =>
+    navigate({ search: (prev: Search) => ({ ...prev, status: next }) });
+  const setPeriod = (next: Period) =>
+    navigate({ search: (prev: Search) => ({ ...prev, period: next }) });
+  const setFiltro = (next: SpecialFilter) =>
+    navigate({ search: (prev: Search) => ({ ...prev, filtro: next }) });
+  const setQuery = (next: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, q: next }) });
 
   return (
     <>
