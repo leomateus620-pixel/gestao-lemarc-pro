@@ -1,62 +1,67 @@
-# Redesign visual da Dashboard — Premium Editorial
+## Refator da tela `/ordens/nova` em wizard multi-etapas
 
-Reformulação puramente visual da área superior da `/dashboard`: header da marca, hero "Operação · Hoje" e estado vazio. Toda a lógica funcional, rotas, hooks, filtros, métricas e cards subsequentes permanecem inalterados.
+Reorganizar o cadastro de OS num fluxo lateral por etapas, preservando rotas, payload, mutations e destino dos dados. Mudança puramente de UX/UI + composição de estado local.
 
-## Escopo do redesign
+## 5 etapas
 
-1. **Header da marca** (`AppShell` topo / faixa de identidade da dashboard)
-   - Logo Lemarc em laranja com sombra contida (sem glow exagerado)
-   - "Gestão Lemarc" + eyebrow em mono ciano "Operação · {período}"
-   - Indicador "Sistema Ativo" com ponto pulsante esmeralda
-   - Avatar refinado + botão "+" integrado, hover com microelevação
+1. **Dados iniciais** — título*, descrição, local/setor, previsão
+2. **Cliente** — segmented "Selecionar existente / Cadastrar novo"; quick-create inline
+3. **Técnico** — mesmo padrão da etapa 2; opção "Sem técnico definido" explícita
+4. **Serviço & prioridade** — tipo em cards/chips grandes; prioridade em 4 pills com cores semânticas (baixa neutro, média laranja, alta âmbar, urgente vermelho)
+5. **Revisão** — resumo em blocos + CTA "Criar ordem de serviço"
 
-2. **Hero "Operação · Hoje"** (`OperationTodayCard`)
-   - Superfície contínua `bg-[#0a0f1d]` com borda `white/10`, halo gradiente laranja→ciano muito sutil atrás
-   - Padrão técnico radial-dot a 3% de opacidade no fundo
-   - Saudação grande "Olá, {nome}." + linha-resumo com destaque laranja itálico nas OS pendentes
-   - Segmented filter Hoje/Semana/Mês em pill `bg-white/5`
-   - CTA "Nova OS" laranja sólido, tátil (translate-y no hover, scale no active), sombra contida
-   - Mini-status (4) como módulos `bg-white/5 border-white/5 rounded-xl`, número grande tonal no hover (laranja/ciano/âmbar/esmeralda)
+## Arquitetura de componentes
 
-3. **Empty state** (`EmptyOperations`)
-   - Composição centrada com ícone industrial em container `rounded-2xl` com halo ciano blur atrás
-   - Título + subtítulo + CTA refinado
-   - Container `border-dashed white/5 rounded-3xl`, respiro vertical generoso
+Em `src/components/ordens/wizard/`:
 
-4. **Cards de métricas abaixo** — não tocar comportamento; apenas alinhar cor de borda/fundo (`#0a0f1d` / `white/10`) se necessário para coerência. Sem mudança funcional.
+- `ServiceOrderWizard.tsx` — estado central (`useReducer` ou `useState` único do form), controle de step, validação por etapa, mutations existentes (`createServiceOrder`, `createClient`, `createTechnician`) reaproveitadas sem alterar payload
+- `WizardStepper.tsx` — stepper horizontal (desktop) / compacto (mobile), indica atual/concluídas, clique volta a etapas válidas
+- `WizardShell.tsx` — viewport com slide lateral via Framer Motion (`AnimatePresence` + `x` spring), respeita `prefers-reduced-motion`
+- `StepFooter.tsx` — botões Voltar / Continuar; na etapa 5 vira "Criar OS"
+- `steps/BasicInfoStep.tsx`
+- `steps/ClientStep.tsx` + `InlineQuickCreateClient.tsx`
+- `steps/TechnicianStep.tsx` + `InlineQuickCreateTechnician.tsx`
+- `steps/ServiceTypeStep.tsx`
+- `steps/ReviewStep.tsx`
+- `useServiceOrderDraft.ts` — estado tipado do rascunho + validators por etapa
 
-## Física e motion
+`src/routes/_app.ordens.nova.tsx` passa a montar apenas `<AppShell><ServiceOrderWizard /></AppShell>`. Header da página refinado (alinhamento, hierarquia do título, subtítulo "Nova OS · {usuário}").
 
-- Spring sutil em hover (translate-y -2px, ~200ms)
-- Brilho direcional radial seguindo o cursor sobre o hero (CSS vars + handler leve)
-- CTA com `active:scale-[0.97]`
-- `prefers-reduced-motion`: desativa parallax e brilho direcional
-- Mobile: efeitos reduzidos, grid 2x2 dos mini-status
+## Estado e submit
 
-## Tokens / cores
+- Mesmo shape de input do `createServiceOrder` atual (`title, description, client_id, technician_id, service_type, priority, location, scheduled_for`). Nenhuma mudança em server functions, schema, RLS, queries.
+- `clientId`/`techId` resolvidos antes do submit final: se o usuário usou quick-create numa etapa, o id retornado pela mutation já fica no rascunho.
+- Invalidations e navegação pós-criação iguais às atuais (`navigate /ordens/$id`).
+- Rascunho mantido em memória do componente (sem localStorage por enquanto — fora do escopo declarado).
 
-Usar os tokens semânticos existentes em `src/styles.css` (navy/orange/cyan já presentes). Sem hex hard-coded espalhado nos componentes — adicionar tokens auxiliares se faltar (`--hero-surface`, `--hero-border`).
+## Validação progressiva
 
-## Arquivos afetados
+- Etapa 1: `title.trim().length >= 3`
+- Etapa 2: `clientId` selecionado **ou** quick-create concluído (id presente)
+- Etapa 3: `techId` selecionado **ou** explicitamente "sem técnico"
+- Etapa 4: `service_type` e `priority` definidos
+- Etapa 5: revisão, mostra pendências se houver
 
-- `src/components/dashboard/OperationTodayCard.tsx` — rewrite visual
-- `src/components/dashboard/EmptyOperations.tsx` — rewrite visual
-- `src/components/dashboard/MetricPeriodFilter.tsx` — refinar pill (sem mudar API)
-- `src/components/app/AppShell.tsx` ou header equivalente da dashboard — refinar topbar (ajuste mínimo se afetar outras rotas; preferir refinar somente o cabeçalho dentro do `/dashboard`)
-- `src/routes/_app.dashboard.tsx` — pequenos ajustes de spacing/composição
-- `src/styles.css` — eventuais novos tokens semânticos para superfície do hero
-- (opcional) `src/hooks/useCursorGlow.ts` — novo hook leve para brilho direcional
+Mensagens curtas abaixo dos campos. Botão "Continuar" desabilitado quando inválido.
 
-## Fora de escopo
+## Visual
 
-- Rotas, navegação, filtros, dados, server functions, RLS
-- Lógica/props dos cards de métricas (`MetricCard`)
-- Mock data, hooks de query
-- Componentes de OS (`ServiceOrderCard`)
+- Tokens já existentes (navy/orange/cyan); sem hex hard-coded.
+- Inputs com altura confortável, foco em `ring-primary/40`, hover sutil.
+- Cards de tipo de serviço com ícone + label, estado selecionado com borda primary e leve elevação.
+- Prioridade em pills coloridas tonais.
+- Stepper: trilha `white/10`, segmentos preenchidos `primary`, círculo atual com pulso suave.
+- Transição lateral 220ms spring; mobile reduz amplitude.
 
-## Validação
+## Fora do escopo
 
-- Conferir build/typecheck automáticos
-- Screenshot Playwright em desktop + mobile da `/dashboard` antes de finalizar
-- Verificar que filtros Hoje/Semana/Mês continuam mudando métricas
-- Verificar empty state com 0 OS e estado com OS reais
+- Server functions, schema, RLS, payload, rotas
+- Lógica de mutations (`createServiceOrder/Client/Technician`)
+- Persistência em localStorage
+- `AppShell` global (só ajuste local do título)
+
+## Validação final
+
+- Build/typecheck
+- Playwright: percorrer as 5 etapas em desktop e mobile, validar criação real e redirecionamento para `/ordens/$id`
+- Conferir que filtros/listagem em `/ordens` continuam recebendo a nova OS
