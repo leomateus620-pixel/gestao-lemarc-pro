@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          notes: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          notes?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -44,6 +74,126 @@ export type Database = {
         }
         Relationships: []
       }
+      service_orders: {
+        Row: {
+          approved_at: string | null
+          client_id: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          finished_at: string | null
+          hour_rate: number | null
+          id: string
+          location: string | null
+          number: number
+          opened_at: string
+          priority: Database["public"]["Enums"]["service_priority"] | null
+          scheduled_for: string | null
+          service_type: Database["public"]["Enums"]["service_type"] | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string
+          updated_at: string
+          worked_minutes: number | null
+        }
+        Insert: {
+          approved_at?: string | null
+          client_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          finished_at?: string | null
+          hour_rate?: number | null
+          id?: string
+          location?: string | null
+          number?: number
+          opened_at?: string
+          priority?: Database["public"]["Enums"]["service_priority"] | null
+          scheduled_for?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["service_order_status"]
+          technician_id?: string | null
+          title: string
+          updated_at?: string
+          worked_minutes?: number | null
+        }
+        Update: {
+          approved_at?: string | null
+          client_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          finished_at?: string | null
+          hour_rate?: number | null
+          id?: string
+          location?: string | null
+          number?: number
+          opened_at?: string
+          priority?: Database["public"]["Enums"]["service_priority"] | null
+          scheduled_for?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["service_order_status"]
+          technician_id?: string | null
+          title?: string
+          updated_at?: string
+          worked_minutes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technicians: {
+        Row: {
+          created_at: string
+          created_by: string
+          full_name: string
+          id: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          full_name: string
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -52,7 +202,24 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      service_order_status:
+        | "pending"
+        | "dispatched"
+        | "transit"
+        | "running"
+        | "finished"
+        | "review"
+        | "approved"
+        | "cancelled"
+      service_priority: "baixa" | "media" | "alta" | "urgente"
+      service_type:
+        | "mecanica"
+        | "eletrica"
+        | "automacao"
+        | "montagem"
+        | "instalacao"
+        | "visita"
+        | "emergencia"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -179,6 +346,27 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      service_order_status: [
+        "pending",
+        "dispatched",
+        "transit",
+        "running",
+        "finished",
+        "review",
+        "approved",
+        "cancelled",
+      ],
+      service_priority: ["baixa", "media", "alta", "urgente"],
+      service_type: [
+        "mecanica",
+        "eletrica",
+        "automacao",
+        "montagem",
+        "instalacao",
+        "visita",
+        "emergencia",
+      ],
+    },
   },
 } as const

@@ -1,263 +1,299 @@
+import { Suspense, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { ClipboardCheck, Plus } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
-import { PrimaryCTA, Stepper } from "@/components/app/operations";
+import { PrimaryCTA } from "@/components/app/operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { clientes } from "@/lib/mock/clients";
-import { colaboradores } from "@/lib/mock/collaborators";
-import type { Priority } from "@/components/app/PriorityBadge";
-import type { ServiceType } from "@/lib/mock/serviceOrders";
-import { Check, ChevronRight, ClipboardCheck } from "lucide-react";
+import { useClientsQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
+import {
+  createClient as createClientFn,
+  createServiceOrder,
+  createTechnician,
+} from "@/lib/api/serviceOrders.functions";
+import {
+  priorityLabel,
+  serviceTypeLabel,
+  type ServicePriority,
+  type ServiceType,
+} from "@/types/serviceOrder";
 
 export const Route = createFileRoute("/_app/ordens/nova")({
   head: () => ({ meta: [{ title: "Nova OS — Gestão Lemarc" }] }),
-  component: NovaOS,
+  component: NovaOSPage,
 });
-const steps = ["Cliente", "Serviço", "Equipe", "Descrição", "Revisão"] as const;
-const tipos: ServiceType[] = [
-  "Manutenção Mecânica",
-  "Manutenção Elétrica",
-  "Automação Industrial",
-  "Montagem Industrial",
-  "Instalação",
-  "Visita Técnica",
-  "Emergência",
-];
 
-function NovaOS() {
-  const nav = useNavigate();
-  const [step, setStep] = useState(0);
-  const [cliente, setCliente] = useState(clientes[0]);
-  const [unidade, setUnidade] = useState(clientes[0].unidades[0]);
-  const [tipo, setTipo] = useState<ServiceType>(tipos[0]);
-  const [colab, setColab] = useState(colaboradores[0]);
-  const [titulo, setTitulo] = useState("");
-  const [desc, setDesc] = useState("");
-  const [prio, setPrio] = useState<Priority>("media");
-  const [created, setCreated] = useState(false);
-  const next = () => (step === steps.length - 1 ? setCreated(true) : setStep((s) => s + 1));
+const serviceTypes = Object.entries(serviceTypeLabel) as [ServiceType, string][];
+const priorities = Object.entries(priorityLabel) as [ServicePriority, string][];
 
+function NovaOSPage() {
   return (
     <AppShell title="Nova ordem de serviço" back>
-      {created ? (
-        <GlassCard className="lemarc-hero-gradient mt-2 p-5 text-center">
-          <ClipboardCheck className="mx-auto text-primary" size={34} />
-          <h1 className="mt-3 font-display text-2xl font-black text-foreground">OS criada</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ordem mockada pronta para acompanhamento.
-          </p>
-          <div className="mt-4">
-            <PrimaryCTA to="/ordens/o-1042" icon={ClipboardCheck}>
-              Abrir detalhe
-            </PrimaryCTA>
-          </div>
-        </GlassCard>
-      ) : (
-        <Stepper steps={steps} current={step} />
-      )}
-
-      {!created && (
-        <div className="mt-5 space-y-3">
-          {step === 0 && (
-            <>
-              <GlassCard className="p-4">
-                <p className="section-title">Cliente e unidade</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Selecione o cliente industrial e a unidade operacional.
-                </p>
-              </GlassCard>
-              {clientes.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setCliente(c);
-                    setUnidade(c.unidades[0]);
-                  }}
-                  className="w-full text-left active:scale-[0.99]"
-                >
-                  <GlassCard
-                    className={`p-4 ${cliente.id === c.id ? "border-primary/60 bg-primary/10" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-display text-base font-bold text-foreground">
-                          {c.nome}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {c.segmento} · {c.cidade}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {c.unidades.map((u) => (
-                            <span
-                              key={u}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCliente(c);
-                                setUnidade(u);
-                              }}
-                              className={`rounded-full border px-2 py-1 text-[10px] font-bold uppercase ${cliente.id === c.id && unidade === u ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary/50 text-muted-foreground"}`}
-                            >
-                              {u}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      {cliente.id === c.id && <Check className="shrink-0 text-primary" size={20} />}
-                    </div>
-                  </GlassCard>
-                </button>
-              ))}
-            </>
-          )}
-
-          {step === 1 && (
-            <GlassCard className="space-y-4 p-5">
-              <div>
-                <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                  Tipo de serviço
-                </label>
-                <div className="mt-2 grid gap-2">
-                  {tipos.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTipo(t)}
-                      className={`rounded-xl border px-3 py-3 text-left text-sm font-bold ${tipo === t ? "border-primary bg-primary/15 text-primary" : "border-border bg-secondary/50 text-foreground"}`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                  Prioridade
-                </label>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  {(["baixa", "media", "alta"] as const).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPrio(p)}
-                      className={`rounded-xl border px-3 py-3 text-xs font-black uppercase tracking-wider ${prio === p ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary/50 text-muted-foreground"}`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </GlassCard>
-          )}
-
-          {step === 2 &&
-            colaboradores.map((c) => (
-              <button key={c.id} onClick={() => setColab(c)} className="w-full text-left">
-                <GlassCard
-                  className={`flex items-center justify-between p-4 ${colab.id === c.id ? "border-primary/60 bg-primary/10" : ""}`}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-secondary font-display font-black text-primary">
-                      {c.nome
-                        .split(" ")
-                        .map((n) => n[0])
-                        .slice(0, 2)
-                        .join("")}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate font-display text-sm font-bold text-foreground">
-                        {c.nome}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.funcao} · {c.status}
-                      </div>
-                    </div>
-                  </div>
-                  {colab.id === c.id && <Check className="shrink-0 text-primary" size={20} />}
-                </GlassCard>
-              </button>
-            ))}
-
-          {step === 3 && (
-            <GlassCard className="space-y-4 p-5">
-              <div>
-                <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                  Título do serviço
-                </label>
-                <Input
-                  value={titulo}
-                  onChange={(e) => setTitulo(e.target.value)}
-                  placeholder="Ex.: Manutenção do compressor"
-                  className="mt-1.5 h-12 border-border bg-secondary/60"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                  Descrição inicial
-                </label>
-                <Textarea
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
-                  placeholder="Sintoma, escopo, ferramentas, EPI e observações iniciais..."
-                  className="mt-1.5 min-h-32 border-border bg-secondary/60"
-                />
-              </div>
-            </GlassCard>
-          )}
-
-          {step === 4 && (
-            <GlassCard className="space-y-3 p-5 text-sm">
-              <Row k="Cliente" v={cliente.nome} />
-              <Row k="Unidade" v={unidade} />
-              <Row k="Tipo" v={tipo} />
-              <Row k="Prioridade" v={prio.toUpperCase()} />
-              <Row k="Colaborador" v={colab.nome} />
-              <Row k="Função" v={colab.funcao} />
-              <Row k="Título" v={titulo || "OS mockada sem título"} />
-              <div className="border-t border-border pt-3">
-                <div className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                  Descrição
-                </div>
-                <p className="mt-1 text-sm text-foreground">
-                  {desc || "Descrição inicial será preenchida em campo."}
-                </p>
-              </div>
-            </GlassCard>
-          )}
-        </div>
-      )}
-
-      {!created && (
-        <div className="sticky bottom-24 z-20 mt-6 flex gap-2 pb-2">
-          {step > 0 && (
-            <Button
-              variant="secondary"
-              onClick={() => setStep((s) => s - 1)}
-              className="h-12 flex-1 bg-secondary text-foreground hover:bg-secondary/80"
-            >
-              Voltar
-            </Button>
-          )}
-          <div className="flex-[2]">
-            <PrimaryCTA
-              onClick={next}
-              icon={step === steps.length - 1 ? ClipboardCheck : ChevronRight}
-            >
-              {step === steps.length - 1 ? "Criar OS mockada" : "Continuar"}
-            </PrimaryCTA>
-          </div>
-        </div>
-      )}
+      <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
+        <NovaOS />
+      </Suspense>
     </AppShell>
   );
 }
-function Row({ k, v }: { k: string; v: string }) {
+
+function NovaOS() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: clients } = useClientsQuery();
+  const { data: technicians } = useTechniciansQuery();
+
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [clientId, setClientId] = useState<string>("");
+  const [techId, setTechId] = useState<string>("");
+  const [type, setType] = useState<ServiceType>("mecanica");
+  const [prio, setPrio] = useState<ServicePriority>("media");
+  const [location, setLocation] = useState("");
+  const [scheduled, setScheduled] = useState("");
+
+  const [newClient, setNewClient] = useState("");
+  const [newClientUnit, setNewClientUnit] = useState("");
+  const [newTech, setNewTech] = useState("");
+  const [newTechRole, setNewTechRole] = useState("");
+
+  const createOrder = useServerFn(createServiceOrder);
+  const createCli = useServerFn(createClientFn);
+  const createTec = useServerFn(createTechnician);
+
+  const clientMutation = useMutation({
+    mutationFn: () => createCli({ data: { name: newClient, unit: newClientUnit || null } }),
+    onSuccess: (row) => {
+      setClientId(row.id);
+      setNewClient("");
+      setNewClientUnit("");
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    },
+  });
+
+  const techMutation = useMutation({
+    mutationFn: () => createTec({ data: { full_name: newTech, role: newTechRole || null } }),
+    onSuccess: (row) => {
+      setTechId(row.id);
+      setNewTech("");
+      setNewTechRole("");
+      queryClient.invalidateQueries({ queryKey: ["technicians"] });
+    },
+  });
+
+  const orderMutation = useMutation({
+    mutationFn: () =>
+      createOrder({
+        data: {
+          title,
+          description: desc || null,
+          client_id: clientId || null,
+          technician_id: techId || null,
+          service_type: type,
+          priority: prio,
+          location: location || null,
+          scheduled_for: scheduled ? new Date(scheduled).toISOString() : null,
+        },
+      }),
+    onSuccess: (row) => {
+      queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      navigate({ to: "/ordens/$id", params: { id: row.id } });
+    },
+  });
+
+  const canSubmit = title.trim().length >= 3 && !orderMutation.isPending;
+
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-        {k}
-      </span>
-      <span className="text-right font-semibold text-foreground">{v}</span>
+    <div className="mt-2 space-y-4">
+      <GlassCard className="space-y-4 p-5">
+        <Field label="Título do serviço *">
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex.: Manutenção do compressor"
+            className="h-12 border-border bg-secondary/60"
+          />
+        </Field>
+        <Field label="Descrição inicial">
+          <Textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            placeholder="Sintoma, escopo, ferramentas, EPI..."
+            className="min-h-28 border-border bg-secondary/60"
+          />
+        </Field>
+        <Field label="Local / setor">
+          <Input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Ex.: Casa de máquinas"
+            className="h-12 border-border bg-secondary/60"
+          />
+        </Field>
+        <Field label="Previsão (data e hora)">
+          <Input
+            type="datetime-local"
+            value={scheduled}
+            onChange={(e) => setScheduled(e.target.value)}
+            className="h-12 border-border bg-secondary/60"
+          />
+        </Field>
+      </GlassCard>
+
+      <GlassCard className="space-y-3 p-5">
+        <p className="section-title">Cliente</p>
+        <select
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          className="h-12 w-full rounded-xl border border-border bg-secondary/60 px-3 text-sm text-foreground"
+        >
+          <option value="">— Selecione um cliente —</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+              {c.unit ? ` · ${c.unit}` : ""}
+            </option>
+          ))}
+        </select>
+        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/10 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Ou cadastre rapidamente
+          </p>
+          <Input
+            value={newClient}
+            onChange={(e) => setNewClient(e.target.value)}
+            placeholder="Nome do cliente"
+            className="h-11 border-border bg-secondary/60"
+          />
+          <Input
+            value={newClientUnit}
+            onChange={(e) => setNewClientUnit(e.target.value)}
+            placeholder="Unidade (opcional)"
+            className="h-11 border-border bg-secondary/60"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!newClient.trim() || clientMutation.isPending}
+            onClick={() => clientMutation.mutate()}
+            className="h-10 gap-2 bg-secondary text-foreground"
+          >
+            <Plus size={14} /> {clientMutation.isPending ? "Salvando..." : "Adicionar cliente"}
+          </Button>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="space-y-3 p-5">
+        <p className="section-title">Técnico responsável</p>
+        <select
+          value={techId}
+          onChange={(e) => setTechId(e.target.value)}
+          className="h-12 w-full rounded-xl border border-border bg-secondary/60 px-3 text-sm text-foreground"
+        >
+          <option value="">— Sem técnico definido —</option>
+          {technicians.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.full_name}
+              {t.role ? ` · ${t.role}` : ""}
+            </option>
+          ))}
+        </select>
+        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/10 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Cadastrar técnico
+          </p>
+          <Input
+            value={newTech}
+            onChange={(e) => setNewTech(e.target.value)}
+            placeholder="Nome do técnico"
+            className="h-11 border-border bg-secondary/60"
+          />
+          <Input
+            value={newTechRole}
+            onChange={(e) => setNewTechRole(e.target.value)}
+            placeholder="Função (opcional)"
+            className="h-11 border-border bg-secondary/60"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!newTech.trim() || techMutation.isPending}
+            onClick={() => techMutation.mutate()}
+            className="h-10 gap-2 bg-secondary text-foreground"
+          >
+            <Plus size={14} /> {techMutation.isPending ? "Salvando..." : "Adicionar técnico"}
+          </Button>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="space-y-4 p-5">
+        <Field label="Tipo de serviço">
+          <div className="grid gap-2">
+            {serviceTypes.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setType(key)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-bold ${
+                  type === key
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border bg-secondary/50 text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Prioridade">
+          <div className="grid grid-cols-4 gap-2">
+            {priorities.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPrio(key)}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase tracking-[0.12em] ${
+                  prio === key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-secondary/50 text-muted-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </GlassCard>
+
+      {orderMutation.isError && (
+        <p className="text-sm text-rose-300">
+          Não foi possível criar a OS: {(orderMutation.error as Error).message}
+        </p>
+      )}
+
+      <div className="sticky bottom-24 z-20 pb-2">
+        <PrimaryCTA
+          onClick={() => orderMutation.mutate()}
+          icon={ClipboardCheck}
+          disabled={!canSubmit}
+        >
+          {orderMutation.isPending ? "Criando OS..." : "Criar ordem de serviço"}
+        </PrimaryCTA>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <div className="mt-1.5">{children}</div>
     </div>
   );
 }
