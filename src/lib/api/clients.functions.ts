@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { ClientFull, ClientUnit, ClientUnitInput } from "@/types/client";
+import type { Database } from "@/integrations/supabase/types";
 import { isValidCNPJ, onlyDigits } from "@/lib/cnpj";
 
 const CLIENT_COLS =
@@ -133,7 +134,7 @@ export const updateCompany = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: UpdateCompanyInput) => data)
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = { ...data.patch };
+    const patch: Database["public"]["Tables"]["clients"]["Update"] = { ...data.patch };
     if (patch.cnpj !== undefined) {
       const digits = patch.cnpj ? onlyDigits(String(patch.cnpj)) : null;
       if (digits && !isValidCNPJ(digits)) throw new Error("CNPJ inválido.");
