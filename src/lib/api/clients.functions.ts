@@ -51,6 +51,79 @@ export const getClientDetail = createServerFn({ method: "GET" })
     return { client: client as ClientFull, units: (units ?? []) as ClientUnit[] };
   });
 
+const PAGE_ORDER_COLS = `
+  id, number, title, status, priority, client_id, client_unit_id,
+  opened_at, scheduled_for, started_at, finished_at,
+  client_unit:client_units!service_orders_client_unit_id_fkey(id, name)
+`;
+
+export const getClientPage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data, context }) => {
+    const [
+      { data: client, error: e1 },
+      { data: units, error: e2 },
+      { data: orders, error: e3 },
+    ] = await Promise.all([
+      context.supabase.from("clients").select(CLIENT_COLS).eq("id", data.id).maybeSingle(),
+      context.supabase
+        .from("client_units")
+        .select(UNIT_COLS)
+        .eq("client_id", data.id)
+        .order("is_primary", { ascending: false })
+        .order("name"),
+      context.supabase
+        .from("service_orders")
+        .select(PAGE_ORDER_COLS)
+        .eq("client_id", data.id)
+        .order("opened_at", { ascending: false }),
+    ]);
+    if (e1) throw new Error(e1.message);
+    if (e2) throw new Error(e2.message);
+    if (e3) throw new Error(e3.message);
+    if (!client) return null;
+
+    const list = (orders ?? []) as Array<{
+      id: string;
+      number: number;
+      title: string;
+      status: string;
+      priority: string | null;
+      client_id: string | null;
+      client_unit_id: string | null;
+      opened_at: string | null;
+      scheduled_for: string | null;
+      started_at: string | null;
+      finished_at: string | null;
+      client_unit: { id: string; name: string } | null;
+    }>;
+
+    const counts = {
+      total: list.length,
+      open: 0,
+      running: 0,
+      pending: 0,
+      done: 0,
+      cancelled: 0,
+    };
+    for (const o of list) {
+      const s = o.status;
+      if (s === "running") counts.running++;
+      if (s === "pending") counts.pending++;
+      if (s === "finished" || s === "approved") counts.done++;
+      if (s === "cancelled") counts.cancelled++;
+      if (s !== "finished" && s !== "approved" && s !== "cancelled") counts.open++;
+    }
+
+    return {
+      client: client as ClientFull,
+      units: (units ?? []) as ClientUnit[],
+      orders: list,
+      counts,
+    };
+  });
+
 type CreateCompanyInput = {
   name: string;
   cnpj?: string | null;
