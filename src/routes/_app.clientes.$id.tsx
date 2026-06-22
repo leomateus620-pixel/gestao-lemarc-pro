@@ -134,9 +134,9 @@ function Detail() {
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Mini label="Unidades" value={units.length} />
-        <Mini label="OS abertas" value={open.length} accent />
-        <Mini label="Em andamento" value={running.length} />
-        <Mini label="Concluídas" value={done.length} />
+        <Mini label="OS abertas" value={counts.open} accent />
+        <Mini label="Em andamento" value={counts.running} />
+        <Mini label="Concluídas" value={counts.done} />
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
