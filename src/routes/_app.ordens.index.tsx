@@ -10,7 +10,7 @@ import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { Input } from "@/components/ui/input";
 import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
-import { filterByPeriod, type Period } from "@/lib/serviceOrders/period";
+import { filterByPeriod, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import { isAlert, isIncomplete, statusBucket } from "@/lib/serviceOrders/status";
 
 type StatusFilter = "todas" | "pendente" | "andamento" | "revisao" | "concluida";
@@ -21,7 +21,9 @@ const searchSchema = z.object({
     z.enum(["todas", "pendente", "andamento", "revisao", "concluida"]),
     "todas",
   ).default("todas"),
-  period: fallback(z.enum(["day", "week", "month", "all"]), "all").default("all"),
+  period: fallback(z.enum(["day", "week", "month", "custom", "all"]), "all").default("all"),
+  from: fallback(z.string(), "").default(""),
+  to: fallback(z.string(), "").default(""),
   filtro: fallback(z.enum(["alertas", "incompletas", "none"]), "none").default("none"),
   q: fallback(z.string(), "").default(""),
 });
@@ -106,12 +108,16 @@ function OrdensSkeleton() {
 }
 
 function OrdensList() {
-  const { status, period, filtro, q } = Route.useSearch();
+  const { status, period, from, to, filtro, q } = Route.useSearch();
   const navigate = useNavigate({ from: "/ordens" });
   const { data: orders } = useServiceOrdersQuery();
+  const periodRange = useMemo<PeriodRange>(
+    () => ({ from: from || undefined, to: to || undefined }),
+    [from, to],
+  );
 
   const filtered = useMemo(() => {
-    const byPeriod = filterByPeriod(orders, period as Period);
+    const byPeriod = filterByPeriod(orders, period as Period, periodRange);
     return byPeriod.filter((o) => {
       if (status !== "todas") {
         const b = statusBucket[o.status];
@@ -130,13 +136,27 @@ function OrdensList() {
       }
       return true;
     });
-  }, [orders, status, period, filtro, q]);
+  }, [orders, status, period, periodRange, filtro, q]);
 
-  type Search = { status: StatusFilter; period: Period; filtro: SpecialFilter; q: string };
+  type Search = {
+    status: StatusFilter;
+    period: Period;
+    from: string;
+    to: string;
+    filtro: SpecialFilter;
+    q: string;
+  };
   const setStatus = (next: StatusFilter) =>
     navigate({ search: (prev: Search) => ({ ...prev, status: next }) });
-  const setPeriod = (next: Period) =>
-    navigate({ search: (prev: Search) => ({ ...prev, period: next }) });
+  const setPeriodWithRange = (next: Period, range?: PeriodRange) =>
+    navigate({
+      search: (prev: Search) => ({
+        ...prev,
+        period: next,
+        from: next === "custom" ? (range?.from ?? prev.from) : "",
+        to: next === "custom" ? (range?.to ?? prev.to) : "",
+      }),
+    });
   const setFiltro = (next: SpecialFilter) =>
     navigate({ search: (prev: Search) => ({ ...prev, filtro: next }) });
   const setQuery = (next: string) => navigate({ search: (prev: Search) => ({ ...prev, q: next }) });
@@ -151,12 +171,26 @@ function OrdensList() {
       />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <MetricPeriodFilter value={period as Period} onChange={setPeriod} />
+        <MetricPeriodFilter
+          value={period as Period}
+          range={periodRange}
+          onChange={setPeriodWithRange}
+          label="Período da lista"
+        />
         {(filtro !== "none" || status !== "todas") && (
           <button
             type="button"
             onClick={() =>
-              navigate({ search: { status: "todas", period: "all", filtro: "none", q: "" } })
+              navigate({
+                search: {
+                  status: "todas",
+                  period: "all",
+                  from: "",
+                  to: "",
+                  filtro: "none",
+                  q: "",
+                },
+              })
             }
             className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
           >

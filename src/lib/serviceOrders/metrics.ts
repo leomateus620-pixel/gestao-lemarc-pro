@@ -1,5 +1,5 @@
 import type { ServiceOrder } from "@/types/serviceOrder";
-import { filterByPeriod, type Period } from "./period";
+import { filterByPeriod, type Period, type PeriodRange } from "./period";
 import {
   isAlert,
   isAwaitingReview,
@@ -12,6 +12,7 @@ import {
 
 export type DashboardMetrics = {
   period: Period;
+  periodRange?: PeriodRange;
   total: number;
   pending: number;
   inProgress: number;
@@ -27,10 +28,15 @@ export type DashboardMetrics = {
   doneOrders: ServiceOrder[];
   alertOrders: ServiceOrder[];
   incompleteOrders: ServiceOrder[];
+  periodOrders: ServiceOrder[];
 };
 
-export function computeMetrics(allOrders: ServiceOrder[], period: Period): DashboardMetrics {
-  const orders = filterByPeriod(allOrders, period).filter((o) => !isCancelled(o));
+export function computeMetrics(
+  allOrders: ServiceOrder[],
+  period: Period,
+  periodRange?: PeriodRange,
+): DashboardMetrics {
+  const orders = filterByPeriod(allOrders, period, periodRange).filter((o) => !isCancelled(o));
 
   const pendingOrders = orders.filter(isPending);
   const inProgressOrders = orders.filter(isInProgress);
@@ -40,7 +46,10 @@ export function computeMetrics(allOrders: ServiceOrder[], period: Period): Dashb
   const incompleteOrders = orders.filter(isIncomplete);
 
   const activeClients = new Set(
-    orders.filter((o) => !isDone(o)).map((o) => o.client_id).filter(Boolean) as string[],
+    orders
+      .filter((o) => !isDone(o))
+      .map((o) => o.client_id)
+      .filter(Boolean) as string[],
   ).size;
 
   const techniciansInField = new Set(
@@ -49,6 +58,7 @@ export function computeMetrics(allOrders: ServiceOrder[], period: Period): Dashb
 
   return {
     period,
+    periodRange,
     total: orders.length,
     pending: pendingOrders.length,
     inProgress: inProgressOrders.length,
@@ -64,5 +74,6 @@ export function computeMetrics(allOrders: ServiceOrder[], period: Period): Dashb
     doneOrders,
     alertOrders,
     incompleteOrders,
+    periodOrders: orders,
   };
 }
