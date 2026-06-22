@@ -62,15 +62,15 @@ export function OperationTodayCard({
       />
       {/* corner ambient halos */}
       <div
-        className="pointer-events-none absolute -right-24 -top-28 size-72 rounded-full bg-[#ff7a18]/[0.10] blur-3xl"
+        className="pointer-events-none absolute -right-24 -top-28 size-72 rounded-full bg-[#ff7a18]/[0.06] blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-32 -left-20 size-72 rounded-full bg-cyan-500/[0.06] blur-3xl"
+        className="pointer-events-none absolute -bottom-32 -left-20 size-72 rounded-full bg-cyan-500/[0.04] blur-3xl"
         aria-hidden
       />
 
-      <div className="relative p-6 sm:p-8">
+      <div className="relative p-5 sm:p-7 lg:p-8">
         <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 space-y-4">
             <div className="flex items-center gap-2">
