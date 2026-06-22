@@ -14,31 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      clients: {
+      client_units: {
         Row: {
+          active: boolean
+          address: string | null
+          city: string | null
+          client_id: string
           created_at: string
           created_by: string
           id: string
+          is_primary: boolean
           name: string
           notes: string | null
+          phone: string | null
+          responsible_name: string | null
+          sector: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_primary?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          responsible_name?: string | null
+          sector?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          responsible_name?: string | null
+          sector?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_units_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          active: boolean
+          address: string | null
+          city: string | null
+          cnpj: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          responsible_name: string | null
+          segment: string | null
+          state: string | null
           unit: string | null
           updated_at: string
         }
         Insert: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
           created_at?: string
           created_by: string
+          email?: string | null
           id?: string
           name: string
           notes?: string | null
+          phone?: string | null
+          responsible_name?: string | null
+          segment?: string | null
+          state?: string | null
           unit?: string | null
           updated_at?: string
         }
         Update: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
           created_at?: string
           created_by?: string
+          email?: string | null
           id?: string
           name?: string
           notes?: string | null
+          phone?: string | null
+          responsible_name?: string | null
+          segment?: string | null
+          state?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -78,6 +167,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           client_id: string | null
+          client_unit_id: string | null
           closed_at: string | null
           created_at: string
           created_by: string
@@ -101,6 +191,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           client_id?: string | null
+          client_unit_id?: string | null
           closed_at?: string | null
           created_at?: string
           created_by: string
@@ -124,6 +215,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           client_id?: string | null
+          client_unit_id?: string | null
           closed_at?: string | null
           created_at?: string
           created_by?: string
@@ -150,6 +242,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_client_unit_id_fkey"
+            columns: ["client_unit_id"]
+            isOneToOne: false
+            referencedRelation: "client_units"
             referencedColumns: ["id"]
           },
           {
