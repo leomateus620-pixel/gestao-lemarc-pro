@@ -1,82 +1,62 @@
+## Objetivo
 
-## Gestão Lemarc — Plano da v1 (UI/estrutura, sem backend)
+Substituir o login mockado atual por um login real usando **Lovable Cloud** com **Sign in with Google** (gerenciado), persistindo os usuários e sessões automaticamente.
 
-Construir a base visual e de navegação do app mobile-first, com dados fictícios. Sem autenticação real, sem banco — pronto para receber regras de negócio depois.
+## O que será feito
 
-### Identidade visual (design tokens em `src/styles.css`)
+### 1. Ativar Lovable Cloud
+- Provisiona banco, autenticação e armazenamento, sem o usuário precisar criar contas externas.
+- Habilita o provider **Google** gerenciado (sem necessidade de configurar OAuth no Google Console).
 
-- Navy profundo como fundo (`--background` ~ oklch(0.18 0.04 250))
-- Azul aço para superfícies (`--card`, `--secondary`)
-- Laranja vibrante de destaque (`--primary` ~ oklch(0.72 0.19 50)) — CTAs e status ativo
-- Branco para texto principal, cinza azulado para secundário
-- Glass leve: `background: color-mix(in oklab, var(--card) 75%, transparent)` + `backdrop-filter: blur(14px)` + borda 1px translúcida
-- Sombras suaves multicamada (`--shadow-card`, `--shadow-glow-orange`)
-- Tipografia: display industrial (Archivo / Saira Condensed) + corpo neutro (Inter)
-- Iconografia: lucide-react (Wrench, HardHat, Cog, Zap, Factory, ClipboardList, Camera, Play, Square)
-- Padrão sutil de "blueprint" / linhas em headers de seção
+### 2. Tabela de perfis (`profiles`)
+Para guardar dados do usuário vindos do Google (nome, email, avatar) e permitir associar papéis (gestor/colaborador) no futuro:
 
-### Arquitetura de rotas (TanStack Start, file-based)
+- `profiles` ligada a `auth.users` (FK com `ON DELETE CASCADE`)
+- Campos: `id`, `user_id`, `full_name`, `avatar_url`, `email`, `created_at`
+- RLS: cada usuário lê/atualiza apenas o próprio perfil
+- Trigger `handle_new_user` cria o perfil automaticamente ao primeiro login
+- GRANTs corretos para `authenticated` e `service_role`
 
+> Papéis (gestor/colaborador) continuarão mockados via `RoleContext` nesta fase — a tabela `user_roles` segura fica para um próximo passo, quando ligarmos o sistema de permissões real.
+
+### 3. Tela de Login (`/login`)
+Reescrita mantendo a estética industrial atual (navy + laranja, glass, Archivo/Inter, logo Lemarc):
+
+- Botão grande **"Entrar com Google"** com ícone oficial
+- Texto curto explicando o acesso restrito a colaboradores Lemarc
+- Loading state durante o redirect OAuth
+- Mensagem de erro elegante em caso de falha
+- Remove o formulário fake de email/senha (não havia lógica real)
+
+Fluxo:
 ```
-src/routes/
-  __root.tsx                 → shell global (HeadContent, providers)
-  index.tsx                  → redireciona para /login (mock)
-  login.tsx                  → tela de login
-  _app.tsx                   → layout autenticado mock (AppShell + BottomNav mobile)
-  _app.dashboard.tsx         → dashboard (gestor OU colaborador conforme role mock)
-  _app.ordens.index.tsx      → lista de OS
-  _app.ordens.nova.tsx       → criar nova OS
-  _app.ordens.$id.tsx        → detalhe da OS (com ações de fluxo)
-  _app.clientes.tsx          → lista simples de clientes
-  _app.colaboradores.tsx     → lista simples de colaboradores
-  _app.relatorios.tsx        → relatórios (cards + gráfico mock)
+[Login] → lovable.auth.signInWithOAuth('google') → Google → callback → /dashboard
 ```
 
-Role mock (gestor/colaborador) controlada via Zustand ou contexto leve — alterna o conteúdo do dashboard e os itens visíveis na navegação. Botão de troca de papel visível para demo.
+### 4. Sessão e proteção de rotas
+- `onAuthStateChange` configurado uma única vez em `__root.tsx` (SIGNED_IN / SIGNED_OUT / USER_UPDATED)
+- Mover as rotas autenticadas (`dashboard`, `ordens`, `clientes`, `colaboradores`, `relatorios`) para o layout gerenciado `src/routes/_authenticated/` (gate `ssr:false` que redireciona para `/login` quando não há sessão)
+- `/login` permanece rota pública
+- `index.tsx` redireciona para `/dashboard` (que por sua vez redireciona para `/login` se deslogado)
 
-### Componentes-chave (`src/components/`)
+### 5. Header / AppShell
+- Mostrar **avatar + nome reais** do Google no header (vindos de `profiles` ou `user.user_metadata`)
+- Botão **Sair** chama `supabase.auth.signOut()` com limpeza correta (cancel queries → clear cache → signOut → navigate replace)
 
-- `AppShell` — header com logo Gestão Lemarc, avatar, ícone de notificações
-- `BottomNav` — navegação inferior fixa (Início, Ordens, Clientes, Relatórios, Perfil)
-- `GlassCard` — wrapper com efeito glass
-- `StatCard` — métrica + ícone + delta (dashboard gestor)
-- `OrderCard` — card de OS na lista (cliente, unidade, status, prioridade, tempo)
-- `StatusBadge` — variantes: Pendente / Em Deslocamento / Em Execução / Em Revisão / Concluída
-- `BigActionButton` — botão laranja grande (Iniciar OS no dashboard colaborador)
-- `Timeline` — etapas do fluxo da OS no detalhe
-- `PhotoGrid` — placeholders de fotos anexadas
-- `EmptyState`, `SectionHeader`
+## Detalhes técnicos
 
-### Fluxo na tela de detalhe da OS
+- Cliente browser: `@/integrations/supabase/client`
+- Provider Google ativado via `supabase--configure_social_auth` no mesmo turno
+- Chamada OAuth usa o broker da Lovable: `lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin })` — **não** chamar `supabase.auth.signInWithOAuth` direto para Google
+- Migration única com: `create table profiles`, GRANTs, `enable RLS`, policies (`select/update` usando `auth.uid() = user_id`), function `handle_new_user` (SECURITY DEFINER), trigger `on_auth_user_created`
 
-Botão único contextual que avança o estado (mock, sem persistência real):
-Pendente → Iniciar Deslocamento → Iniciar Serviço → Adicionar Descrição/Fotos → Finalizar → Enviar para Revisão. Timeline mostra carimbos de hora fictícios. Para gestor: cartão com "Tempo trabalhado" e botão "Gerar relatório de cobrança" (abre modal mock).
+## Fora do escopo desta etapa
 
-### Dados mockados (`src/lib/mock/`)
+- Login por email/senha (pode ser adicionado depois se quiser)
+- Sistema real de papéis (gestor vs colaborador) com tabela `user_roles` e RLS por papel
+- Convite/aprovação de novos usuários (qualquer Google logado entra — adicionamos allowlist depois se necessário)
+- Persistência real das ordens de serviço (continua mock)
 
-`clientes.ts`, `colaboradores.ts`, `ordens.ts`, `relatorios.ts` com 6–10 itens cada, nomes realistas do setor (ex.: "Metalúrgica São Bento — Unidade Jundiaí"), serviços nas áreas mecânica/elétrica/automação/montagem/manutenção/instalação.
+## Resultado
 
-### Telas — conteúdo
-
-1. **Login** — fundo navy com textura blueprint, card glass central, logo "Gestão Lemarc" (texto estilizado + ícone engrenagem laranja), campos e-mail/senha, botão laranja "Entrar", link "Esqueci minha senha". Submit → navega para `/dashboard`.
-2. **Dashboard Gestor** — 4 StatCards (OS abertas, em execução, concluídas hoje, horas trabalhadas), lista das últimas OS, atalho "Nova OS".
-3. **Dashboard Colaborador** — saudação, próxima OS destacada, BigActionButton "Iniciar Ordem de Serviço", lista compacta das OS do dia.
-4. **Lista de OS** — busca + filtros (status, prioridade), lista de OrderCards.
-5. **Detalhe da OS** — header com cliente/unidade/status, dados do serviço, timeline, fotos, botão de ação contextual.
-6. **Nova OS** — formulário multi-step simples (cliente → unidade → colaborador → descrição/prioridade → revisar), apenas UI.
-7. **Clientes** — lista com avatar/iniciais, nome, unidades, contato.
-8. **Colaboradores** — lista com função (Mecânico, Eletricista, Técnico em Automação…), status (Disponível/Em campo).
-9. **Relatórios** — cards de totais, gráfico de barras mock (Recharts) horas por colaborador, lista exportável (mock).
-
-### Detalhes técnicos
-
-- Mobile-first: container `max-w-md mx-auto`, safe-areas, BottomNav fixa com `pb-[env(safe-area-inset-bottom)]`
-- `preview_ui--set_preview_device_viewport` para mobile no fim do build
-- Sem Lovable Cloud nesta etapa — tudo mock
-- shadcn já presente: usar Button, Input, Card, Badge, Tabs, Dialog, Sheet (para filtros)
-- Recharts para o gráfico de relatórios
-- Atualizar `head()` em cada rota com título/descr próprios; manter `__root.tsx` com `<Outlet />`
-
-### Fora de escopo (próximas iterações)
-
-Autenticação real, banco/Cloud, upload real de fotos, geolocalização, geração de PDF, push notifications, RLS/roles server-side.
+Ao final, qualquer pessoa abre `/login`, clica em **Entrar com Google**, autentica, e cai no dashboard com nome e foto reais — a sessão fica salva e protege as rotas internas automaticamente.
