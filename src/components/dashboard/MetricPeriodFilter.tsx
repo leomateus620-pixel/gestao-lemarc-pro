@@ -19,7 +19,7 @@ export function MetricPeriodFilter({
   return (
     <div
       className={cn(
-        "inline-flex rounded-full border border-white/10 bg-black/30 p-0.5 backdrop-blur-md",
+        "inline-flex rounded-xl border border-white/10 bg-white/[0.04] p-1 backdrop-blur-md",
         className,
       )}
     >
@@ -31,9 +31,9 @@ export function MetricPeriodFilter({
             type="button"
             onClick={() => onChange(it.key)}
             className={cn(
-              "rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition",
+              "rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all duration-200",
               active
-                ? "bg-primary text-primary-foreground shadow-[0_0_18px_var(--primary)]"
+                ? "bg-white/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(0,0,0,0.4)]"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
