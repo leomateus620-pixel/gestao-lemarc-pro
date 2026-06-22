@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { ClientFull, ClientUnit, ClientUnitInput } from "@/types/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { ServiceOrderStatus, ServicePriority } from "@/types/serviceOrder";
 import { isValidCNPJ, onlyDigits } from "@/lib/cnpj";
 
 const CLIENT_COLS =
@@ -88,8 +89,8 @@ export const getClientPage = createServerFn({ method: "GET" })
       id: string;
       number: number;
       title: string;
-      status: string;
-      priority: string | null;
+      status: ServiceOrderStatus;
+      priority: ServicePriority | null;
       client_id: string | null;
       client_unit_id: string | null;
       opened_at: string | null;
