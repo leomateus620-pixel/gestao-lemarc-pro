@@ -1,0 +1,159 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type {
+  ServiceOrder,
+  ServiceOrderStatus,
+  ServicePriority,
+  ServiceType,
+} from "@/types/serviceOrder";
+
+const ORDER_SELECT = `
+  id, number, title, description, client_id, technician_id,
+  service_type, priority, status, location, scheduled_for,
+  opened_at, started_at, finished_at, approved_at, closed_at,
+  hour_rate, worked_minutes, created_by, created_at, updated_at,
+  client:clients!service_orders_client_id_fkey(id, name, unit),
+  technician:technicians!service_orders_technician_id_fkey(id, full_name, role)
+`;
+
+function normalize(row: any): ServiceOrder {
+  return {
+    ...row,
+    client: row.client ?? null,
+    technician: row.technician ?? null,
+  } as ServiceOrder;
+}
+
+export const listServiceOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("service_orders")
+      .select(ORDER_SELECT)
+      .order("opened_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(normalize);
+  });
+
+export const getServiceOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("service_orders")
+      .select(ORDER_SELECT)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return null;
+    return normalize(row);
+  });
+
+type CreateInput = {
+  title: string;
+  description?: string | null;
+  client_id?: string | null;
+  technician_id?: string | null;
+  service_type?: ServiceType | null;
+  priority?: ServicePriority | null;
+  location?: string | null;
+  scheduled_for?: string | null;
+};
+
+export const createServiceOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: CreateInput) => data)
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("service_orders")
+      .insert({
+        title: data.title,
+        description: data.description ?? null,
+        client_id: data.client_id ?? null,
+        technician_id: data.technician_id ?? null,
+        service_type: data.service_type ?? null,
+        priority: data.priority ?? null,
+        location: data.location ?? null,
+        scheduled_for: data.scheduled_for ?? null,
+        status: "pending",
+        created_by: context.userId,
+      })
+      .select(ORDER_SELECT)
+      .single();
+    if (error) throw new Error(error.message);
+    return normalize(row);
+  });
+
+export const updateServiceOrderStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)
+  .handler(async ({ data, context }) => {
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = { status: data.status };
+    if (data.status === "running") patch.started_at = now;
+    if (data.status === "finished") patch.finished_at = now;
+    if (data.status === "approved") {
+      patch.approved_at = now;
+      patch.closed_at = now;
+    }
+    const { data: row, error } = await context.supabase
+      .from("service_orders")
+      .update(patch)
+      .eq("id", data.id)
+      .select(ORDER_SELECT)
+      .single();
+    if (error) throw new Error(error.message);
+    return normalize(row);
+  });
+
+// ---------- Clients ----------
+
+export const listClients = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("clients")
+      .select("id, name, unit")
+      .order("name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const createClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { name: string; unit?: string | null }) => data)
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("clients")
+      .insert({ name: data.name, unit: data.unit ?? null, created_by: context.userId })
+      .select("id, name, unit")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+// ---------- Technicians ----------
+
+export const listTechnicians = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("technicians")
+      .select("id, full_name, role")
+      .order("full_name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const createTechnician = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { full_name: string; role?: string | null }) => data)
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("technicians")
+      .insert({ full_name: data.full_name, role: data.role ?? null, created_by: context.userId })
+      .select("id, full_name, role")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
