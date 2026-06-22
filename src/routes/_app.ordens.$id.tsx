@@ -28,6 +28,12 @@ import {
   type ServiceOrderStatus,
 } from "@/types/serviceOrder";
 import { missingFields } from "@/lib/serviceOrders/status";
+import {
+  formatServiceOrderDateTime,
+  formatServiceOrderDuration,
+  getClosedAt,
+  getOpenedAt,
+} from "@/lib/serviceOrders/time";
 
 export const Route = createFileRoute("/_app/ordens/$id")({
   head: ({ params }) => ({ meta: [{ title: `OS #${params.id} — Gestão Lemarc` }] }),
@@ -112,8 +118,28 @@ function OrdemDetalhe() {
             </span>
           )}
           <span className="rounded-full border border-border bg-secondary/50 px-2 py-0.5">
-            Aberta {new Date(order.opened_at).toLocaleString("pt-BR")}
+            Aberta {formatServiceOrderDateTime(getOpenedAt(order)) ?? "—"}
           </span>
+          {(() => {
+            const closed = getClosedAt(order);
+            const closedLabel = formatServiceOrderDateTime(closed);
+            if (!closedLabel) return null;
+            const verb = order.status === "cancelled" ? "Cancelada" : "Fechada";
+            return (
+              <span className="rounded-full border border-border bg-secondary/50 px-2 py-0.5">
+                {verb} {closedLabel}
+              </span>
+            );
+          })()}
+          {(() => {
+            const dur = formatServiceOrderDuration(getOpenedAt(order), getClosedAt(order));
+            if (!dur) return null;
+            return (
+              <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary">
+                Tempo total {dur}
+              </span>
+            );
+          })()}
         </div>
         <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
           <MetaRow icon={Building2}>
@@ -233,8 +259,8 @@ function Timeline({ order }: { order: ServiceOrder }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-foreground">{e.label}</p>
-            <p className="text-xs text-muted-foreground">
-              {e.iso ? new Date(e.iso).toLocaleString("pt-BR") : "—"}
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {formatServiceOrderDateTime(e.iso) ?? "—"}
             </p>
           </div>
         </li>
