@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/app/GlassCard";
-import { useClientsQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import {
   createClient as createClientFn,
   createServiceOrder,
@@ -40,6 +41,7 @@ type Draft = {
   location: string;
   scheduled: string;
   clientId: string;
+  unitId: string;
   techId: string;
   noTech: boolean;
   type: ServiceType;
@@ -74,10 +76,17 @@ const typeIcon: Record<ServiceType, typeof Cog> = {
   emergencia: Zap,
 };
 
-export function ServiceOrderWizard() {
+export function ServiceOrderWizard({
+  initialClientId,
+  initialUnitId,
+}: {
+  initialClientId?: string;
+  initialUnitId?: string;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: clients } = useClientsQuery();
+  const { data: clients } = useClientsFullQuery();
+  const { data: units } = useAllUnitsQuery();
   const { data: technicians } = useTechniciansQuery();
 
   const [step, setStep] = useState(0);
@@ -86,7 +95,8 @@ export function ServiceOrderWizard() {
     description: "",
     location: "",
     scheduled: "",
-    clientId: "",
+    clientId: initialClientId ?? "",
+    unitId: initialUnitId ?? "",
     techId: "",
     noTech: false,
     type: "mecanica",
@@ -118,6 +128,7 @@ export function ServiceOrderWizard() {
           title: draft.title,
           description: draft.description || null,
           client_id: draft.clientId || null,
+          client_unit_id: draft.unitId || null,
           technician_id: draft.noTech ? null : draft.techId || null,
           service_type: draft.type,
           priority: draft.priority,
@@ -166,6 +177,7 @@ export function ServiceOrderWizard() {
               draft={draft}
               set={set}
               clients={clients}
+              units={units}
               onCreated={(id) => set("clientId", id)}
             />
           </StepSlot>
