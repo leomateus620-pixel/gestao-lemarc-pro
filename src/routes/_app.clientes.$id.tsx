@@ -307,7 +307,7 @@ function UnitsSection({
       setName("");
       setSector("");
       setAdding(false);
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
     },
   });
@@ -316,7 +316,7 @@ function UnitsSection({
     mutationFn: (u: ClientUnit) =>
       update({ data: { id: u.id, patch: { active: !u.active } } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
     },
   });
@@ -324,7 +324,7 @@ function UnitsSection({
   const removeMut = useMutation({
     mutationFn: (id: string) => remove({ data: { id } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
     },
   });
