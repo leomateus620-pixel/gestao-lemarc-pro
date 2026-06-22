@@ -313,20 +313,3 @@ function InfoCell({
   );
 }
 
-// Legacy helpers (kept for reference, no longer used).
-function _OperationalStatLegacy({
-  icon: _Icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
-  void label;
-  void value;
-  void accent;
-  return null;
-}
