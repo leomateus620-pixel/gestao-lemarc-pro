@@ -70,7 +70,7 @@ export function MetricPeriodFilter({
   return (
     <div
       className={cn(
-        "w-full rounded-2xl border border-white/[0.12] bg-white/[0.045] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_14px_34px_-26px_rgba(0,0,0,0.8)] backdrop-blur-md sm:w-auto",
+        "w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 backdrop-blur-md sm:w-auto",
         className,
       )}
     >
@@ -95,7 +95,7 @@ export function MetricPeriodFilter({
                 className={cn(
                   "min-h-9 shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
                   active
-                    ? "bg-primary text-primary-foreground shadow-[0_10px_22px_-14px_oklch(0.72_0.19_50/0.85),inset_0_1px_0_rgba(255,255,255,0.25)]"
+                    ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
                     : "text-muted-foreground hover:bg-white/[0.07] hover:text-foreground",
                 )}
               >

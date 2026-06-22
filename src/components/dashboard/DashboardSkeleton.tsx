@@ -31,7 +31,7 @@ export function DashboardSkeleton() {
 
 function SkeletonMetric() {
   return (
-    <div className="relative min-h-[268px] overflow-hidden rounded-[1.55rem] border border-white/[0.08] bg-white/[0.04] p-5 shadow-[inset_0_1px_0_oklch(1_0_0/0.08)]">
+    <div className="relative min-h-[252px] overflow-hidden rounded-[1.4rem] border border-white/[0.07] bg-white/[0.03] p-5 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)]">
       <div className="lemarc-shimmer absolute inset-0 opacity-25" />
       <div className="relative pl-2">
         <div className="flex items-start justify-between gap-3">
@@ -39,17 +39,17 @@ function SkeletonMetric() {
             <div className="h-2.5 w-28 rounded-full bg-white/[0.08]" />
             <div className="h-10 w-16 rounded-xl bg-white/[0.08]" />
           </div>
-          <div className="h-11 w-11 rounded-2xl bg-white/[0.07]" />
+          <div className="h-10 w-10 rounded-xl bg-white/[0.06]" />
         </div>
         <div className="mt-4 h-3 w-full rounded-full bg-white/[0.06]" />
-        <div className="mt-4 space-y-2 rounded-2xl border border-white/[0.06] bg-white/[0.04] p-2.5">
-          <div className="h-8 rounded-xl bg-white/[0.06]" />
-          <div className="h-8 rounded-xl bg-white/[0.06]" />
-          <div className="h-8 rounded-xl bg-white/[0.06]" />
+        <div className="mt-3.5 space-y-2 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5">
+          <div className="h-6 rounded-md bg-white/[0.05]" />
+          <div className="h-6 rounded-md bg-white/[0.05]" />
+          <div className="h-6 rounded-md bg-white/[0.05]" />
         </div>
       </div>
-      <div className="absolute bottom-4 left-6 right-4 h-px bg-white/[0.08]" />
-      <div className="absolute bottom-0 left-0 top-4 w-[5px] rounded-r-full bg-white/[0.08]" />
+      <div className="absolute bottom-10 left-6 right-4 h-px bg-white/[0.06]" />
+      <div className="absolute bottom-6 left-0 top-6 w-[3px] rounded-r-full bg-white/[0.07]" />
     </div>
   );
 }

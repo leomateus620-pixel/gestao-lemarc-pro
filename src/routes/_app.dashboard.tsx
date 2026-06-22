@@ -172,11 +172,11 @@ function Dashboard() {
         periodRange={periodRange}
       />
 
-      <section className="mt-5 space-y-3">
-        <div className="flex flex-col gap-3 rounded-3xl border border-white/[0.10] bg-[#0b1424]/78 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_22px_48px_-34px_rgba(0,0,0,0.9)] sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 px-1">
+      <section className="mt-6 space-y-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#0b1424]/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-3">
+          <div className="min-w-0 px-1 sm:px-0">
             <h2 className="section-title">Cards operacionais</h2>
-            <p className="mt-1 text-xs font-semibold text-muted-foreground">Resumo {periodText}.</p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground/80">Resumo {periodText}.</p>
           </div>
           <MetricPeriodFilter
             value={period}

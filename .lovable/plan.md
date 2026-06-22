@@ -1,79 +1,67 @@
-## Objetivo
-Tornar oficial o registro e a exibição do horário de **abertura**, **fechamento** e **tempo total** das Ordens de Serviço, reaproveitando a arquitetura existente e adicionando UI consistente em Home, Ordens, Detalhe e Cliente. Sem mocks, sem quebra de rotas.
+## Revisão do PR #2 — Cards Operacionais da Home
 
-## Validação da arquitetura atual (já confirmada)
-A tabela `public.service_orders` já possui todos os campos necessários:
-- `opened_at timestamptz NOT NULL DEFAULT now()` → preenchido automaticamente na criação.
-- `started_at`, `finished_at`, `approved_at`, `closed_at timestamptz` → já são atualizados pela server fn `updateServiceOrderStatus` (em `serviceOrders.functions.ts`): `running → started_at`, `finished → finished_at`, `approved → approved_at + closed_at`.
-- `status service_order_status NOT NULL`, `updated_at` com trigger.
+Foco: validação funcional + polimento visual sobre o trabalho do Codex. Sem refazer, sem mexer em backend, auth, schema, hooks de dados ou rotas.
 
-Conclusão: **nenhuma migração de schema é necessária**. A única lacuna é (a) o `closed_at` não ser gravado em outros encerramentos operacionais (cancelamento, finished sem aprovação) e (b) não existir formatação/UX de tempo total.
+### 1. Validação funcional (antes de qualquer pixel)
 
-## Mudanças
+Rodar Playwright autenticado (sessão Supabase já injetada no sandbox) em `/dashboard`, `/ordens`, `/ordens/nova`, `/clientes`, `/colaboradores` em viewport desktop (1280) e mobile (390). Capturar screenshots e console.
 
-### 1. Backend — `src/lib/api/serviceOrders.functions.ts`
-Ajustar `updateServiceOrderStatus` para que `closed_at` reflita **qualquer encerramento operacional**:
-- `finished` → também setar `closed_at = now()` (mantendo `finished_at`). Hoje só `approved` fecha; cards em "Concluída" ficariam sem fechamento.
-- `cancelled` → setar `closed_at = now()` (para histórico), sem `approved_at`.
-- `approved` → mantém comportamento atual.
-- Reabertura (qualquer transição de status fechado para `pending`/`running`) → limpar `closed_at`, `finished_at`, `approved_at` conforme o destino, para não exibir tempo total falso.
+Checar:
+- Cada `MetricCard` navega para a rota certa com os search params atuais (`status`, `filtro`, `period`, `from`, `to`).
+- Em `/ordens` os params `period=custom&from=&to=` chegam, alimentam `MetricPeriodFilter` e filtram via `filterByPeriod` sem quebrar `status`/`filtro`/`q`.
+- Trocar Hoje → Semana → Mês → Personalizado e voltar mantém URL coerente; "Limpar filtros" reseta para `period=all`.
+- Caso patológico: `from > to` → `periodWindow` já inverte; confirmar contagens.
+- Período vazio mostra 0 + badge "Sem registros" e CTA continua clicável.
+- Bottom nav não sobrepõe o último card (padding bottom do `AppShell`).
 
-Sem novas tabelas de eventos (escopo recomenda "apenas se fizer sentido"; o histórico já é derivável dos timestamps existentes — fica como dívida explícita).
+Se quebrar: corrigir cirurgicamente (sem reescrever).
 
-### 2. Tipos — `src/types/serviceOrder.ts`
-Helpers de classificação:
-- `isClosedStatus(status)` → true para `finished | approved | cancelled`.
-- `closureKind(order)` → `'concluida' | 'aprovada' | 'cancelada' | null`.
+### 2. Polimento visual (sem alterar lógica)
 
-### 3. Utilidades de tempo — novo `src/lib/serviceOrders/time.ts`
-Funções puras, timezone `America/Sao_Paulo` por padrão (sem mudar timezone global):
-- `formatServiceOrderDateTime(iso)` → `"hoje, 11:46"`, `"ontem, 16:10"`, `"22/06, 10:29"`.
-- `formatRelativeServiceOrderTime(iso)` → `"há 15min"`, `"há 2h"`, `"há 3d"`.
-- `formatServiceOrderDuration(openedAt, closedAt)` → `"45min"`, `"1h34min"`, `"2d 3h"`.
-- `getOpenedAt(order)` → `order.opened_at ?? order.created_at`.
-- `getClosedAt(order)` → `approved_at ?? finished_at ?? closed_at` priorizando o mais relevante por status; retorna `null` se ainda aberta.
-- `getDurationMinutes(order)` → calculado dinamicamente; `null` se aberta.
+Arquivos tocados apenas para CSS/markup leve:
 
-Substitui (consolidando) `formatShortDateTime`/`formatElapsed` que hoje vivem inline em `ServiceOrderCard.tsx`.
+**`src/components/dashboard/MetricCard.tsx`**
+- Reduzir densidade: mini-resumo com fundo mais discreto (`bg-white/[0.03]` em vez de `[0.055]`), sem borda interna em cada linha — usar divisores `divide-y divide-white/[0.04]` para parecer menos "tabela".
+- Ícone de fundo: cair de `size-28 opacity-[0.055]` para `size-24 opacity-[0.04]`, recuar mais para o canto.
+- Badge: reduzir para `text-[9px]` em `px-1.5 py-0.5`, remover `min-w-0 max-w-[9rem]` (deixa fluido).
+- Borda externa mais sutil: `border-white/[0.08]`; remover o degradê pesado do topo (manter só o trilho lateral).
+- Trilho lateral: 3px em vez de 5px; reduzir glow.
+- Altura mínima consistente: `min-h-[244px]` em todos para alinhar a grid.
+- CTA do rodapé: tipografia `text-[10px]` mantida mas com `text-muted-foreground` + seta colorida — não disputa com o número.
 
-### 4. UI — `src/components/app/ServiceOrderCard.tsx`
-Substituir o bloco "Aberta / Prevista" do `MetaLine` inferior por uma **mini-timeline compacta** (chips, mantendo navy + identidade atual):
+**`src/components/dashboard/MetricPeriodFilter.tsx`**
+- Integrar ao bloco "Cards operacionais": remover borda/shadow externos quando dentro do card-pai (já está dentro de wrapper no dashboard). Manter visual standalone em `/ordens`.
+- Botão ativo: laranja mais sóbrio (sem `shadow-[var(--shadow-glow-orange)]` forte; usar sombra interna sutil).
+- Mobile: garantir `lemarc-smart-scroll` com fade laterais; inputs de data em `grid-cols-2` no mobile (não empilhar 4 linhas).
 
-- **OS aberta** (`pending | dispatched | transit | running | review`):
-  - Chip 1: `Aberta hoje, 11:46` (ícone Clock3).
-  - Chip 2 (se houver): `Prevista hoje, 12:00` (CalendarClock).
-  - Chip 3: `há 15min` (tom neutro).
-- **OS fechada** (`finished | approved`):
-  - Chip 1: `Aberta hoje, 11:46`.
-  - Chip 2: `Fechada hoje, 13:20` (CheckCircle2).
-  - Chip 3 destacado: `Tempo total 1h34min` (tabular-nums, accent do status).
-- **OS cancelada**:
-  - Chip 1: `Aberta ...`.
-  - Chip 2: `Cancelada hoje, 13:20` (XCircle, tom destructive).
-  - Sem "Tempo total".
-- **Fallbacks**: `Abertura não registrada` / `Fechamento não registrado` (tom muted, italic), sem quebrar layout.
+**`src/components/dashboard/OperationTodayCard.tsx`**
+- Reduzir padding mobile (`p-5` em vez de `p-6 sm:p-8` no breakpoint pequeno).
+- Halos laranja/cyan: baixar opacidade (`/[0.06]` e `/[0.04]`).
+- Mini Stats: aumentar contraste do label (`text-muted-foreground` → `text-muted-foreground/90`).
 
-O rodapé `SummaryChip` atual deixa de duplicar `formatElapsed` (passa a ser parte da timeline). As pendências (técnico/unidade/dados) seguem inalteradas.
+**`src/components/dashboard/DashboardSkeleton.tsx`**
+- Ajustar altura para casar com novo `min-h-[244px]`.
 
-### 5. Detalhe da OS — `src/routes/_app.ordens.$id.tsx`
-Adicionar bloco "Linha do tempo" com as mesmas três informações em formato vertical (Aberta · Iniciada · Fechada · Tempo total), reusando as utilidades novas. Sem mexer em ações já existentes.
+**`src/hooks/usePhysicsCard.ts`** (apenas se necessário): confirmar que `mobileMaxRotate` já reduz parallax e que respeita `prefers-reduced-motion`. Se não respeitar, adicionar guard.
 
-### 6. Home / Ordens / Cliente
-Como todos consomem `ServiceOrderCard`, ganham o comportamento automaticamente. Verificar `_app.dashboard.tsx`, `_app.ordens.index.tsx` e `_app.clientes.$id.tsx` apenas para confirmar que nenhum exibe tempo por conta própria (substituir se sim).
+**`src/routes/_app.dashboard.tsx`**
+- Wrapper "Cards operacionais": espaçamento `mt-6`, padding `p-4`, separar título e filtro com mais respiro no desktop.
 
-### 7. Validação
-- `bun tsc --noEmit` (executado pela harness no build).
-- Playwright headless (1280x1800 e 390x844): criar OS, abrir card → confirmar "Aberta ..."; mover OS para `approved` via UI/server fn → confirmar "Fechada ..." + "Tempo total". Screenshots em `/tmp/browser/os-tempo/`.
-- `psql` para conferir 1 linha real pós-fechamento (opened_at, closed_at, approved_at preenchidos).
+### 3. Fora de escopo (não tocar)
 
-## Fora de escopo (dívida sinalizada)
-- Tabela `service_order_events` (histórico granular) — não criada; timestamps cobrem o caso de uso atual.
-- `duration_minutes` persistido — calculado dinamicamente para evitar drift.
-- `closed_by` — exige novo campo + ajustes RLS; pode ser feito numa próxima rodada se solicitado.
+- `useOperationalDashboard`, `metrics.ts`, `period.ts` — lógica já correta, mantida intacta.
+- `serviceOrders.functions.ts`, queries, supabase client, auth.
+- `ServiceOrderCard`, `ClientCard` (revisões anteriores já aplicadas).
+- `routeTree.gen.ts` — regenerado automaticamente pelo plugin; não editar manualmente.
 
-## Critérios de aceite
-- `opened_at` salvo na criação (já é); aparece em todos os cards.
-- `closed_at` salvo em `finished`/`approved`/`cancelled`; limpo em reabertura.
-- Tempo total exibido **somente** quando há fechamento real.
-- OS aberta mostra tempo decorrido (`há Xmin/h/d`), nunca "tempo total".
-- Rotas existentes intactas, sem mocks, responsivo em desktop/mobile.
+### 4. Verificação final
+
+- `tsc` limpo (build automático do harness).
+- Playwright revisita Home desktop + mobile e `/ordens` com `?period=custom&from=...&to=...`, screenshot final.
+- Reportar qualquer dívida preexistente (Prettier/CRLF, Fast Refresh) sem corrigir.
+
+### Detalhes técnicos
+
+- Nenhum hook novo, nenhum tipo novo.
+- Mudanças concentradas em ~5 arquivos, todas em classes Tailwind / markup.
+- Sem novas dependências.
