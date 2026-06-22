@@ -23,6 +23,7 @@ function normalize(row: any): ServiceOrder {
     ...row,
     client: row.client ?? null,
     technician: row.technician ?? null,
+    client_unit: row.client_unit ?? null,
   } as ServiceOrder;
 }
 
