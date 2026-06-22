@@ -49,6 +49,13 @@ export const statusLabel: Record<ServiceOrderStatus, string> = {
 
 export type ClientLite = { id: string; name: string; unit: string | null };
 export type TechnicianLite = { id: string; full_name: string; role: string | null };
+export type ClientUnitLite = {
+  id: string;
+  name: string;
+  sector: string | null;
+  city: string | null;
+  state: string | null;
+};
 
 export type ServiceOrder = {
   id: string;
@@ -56,6 +63,7 @@ export type ServiceOrder = {
   title: string;
   description: string | null;
   client_id: string | null;
+  client_unit_id: string | null;
   technician_id: string | null;
   service_type: ServiceType | null;
   priority: ServicePriority | null;
@@ -74,4 +82,5 @@ export type ServiceOrder = {
   updated_at: string;
   client: ClientLite | null;
   technician: TechnicianLite | null;
+  client_unit: ClientUnitLite | null;
 };
