@@ -4,15 +4,27 @@ import {
   AlertTriangle,
   Building2,
   CalendarClock,
+  CheckCircle2,
   Clock3,
   Factory,
   HardHat,
   MapPin,
+  Timer,
+  XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { isAlert, isIncomplete, missingFields, statusBucket } from "@/lib/serviceOrders/status";
+import {
+  closureKind,
+  formatRelativeServiceOrderTime,
+  formatServiceOrderDateTime,
+  formatServiceOrderDuration,
+  getClosedAt,
+  getOpenedAt,
+  isClosedStatus,
+} from "@/lib/serviceOrders/time";
 import {
   priorityLabel,
   serviceTypeLabel,
@@ -63,56 +75,6 @@ function cardAccent(order: ServiceOrder): CardAccent {
   return "steel";
 }
 
-function formatTime(date: Date) {
-  return date.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function formatShortDateTime(iso: string | null) {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-
-  if (isSameDay(date, now)) return `hoje, ${formatTime(date)}`;
-  if (isSameDay(date, yesterday)) return `ontem, ${formatTime(date)}`;
-
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatElapsed(iso: string) {
-  const opened = new Date(iso);
-  if (Number.isNaN(opened.getTime())) return "Abertura sem data";
-
-  const diffMinutes = Math.max(0, Math.floor((Date.now() - opened.getTime()) / 60_000));
-  if (diffMinutes < 2) return "Aberta agora";
-  if (diffMinutes < 60) return `Aberta há ${diffMinutes}min`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `Aberta há ${diffHours}h`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `Aberta há ${diffDays}d`;
-}
-
 export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
   const accent = accentConfig[cardAccent(order)];
   const physics = usePhysicsCard<HTMLDivElement>({
@@ -127,8 +89,14 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
   const hasClient = Boolean(order.client_id || order.client?.name);
   const unitName = order.client_unit?.name ?? order.client?.unit;
   const localName = order.location ?? order.client_unit?.sector;
-  const openedAt = formatShortDateTime(order.opened_at);
-  const scheduledFor = formatShortDateTime(order.scheduled_for);
+  const openedIso = getOpenedAt(order);
+  const closedIso = getClosedAt(order);
+  const openedAt = formatServiceOrderDateTime(openedIso);
+  const closedAt = formatServiceOrderDateTime(closedIso);
+  const scheduledFor = formatServiceOrderDateTime(order.scheduled_for);
+  const elapsed = !isClosedStatus(order.status) ? formatRelativeServiceOrderTime(openedIso) : null;
+  const duration = formatServiceOrderDuration(openedIso, closedIso);
+  const closure = closureKind(order);
   const style = {
     ...physics.style,
     "--lemarc-card-accent": accent.color,
@@ -204,23 +172,42 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
                 pending: !hasTechnician,
               }}
             />
-            <MetaLine
-              left={{
-                icon: Clock3,
-                value: openedAt ? `Aberta ${openedAt}` : "Abertura sem data",
-                pending: !openedAt,
-              }}
-              right={{
-                icon: CalendarClock,
-                value: scheduledFor ? `Prevista ${scheduledFor}` : "Sem previsão",
-                pending: !scheduledFor,
-              }}
-            />
           </div>
 
-          {/* Rodapé: tempo + pendências (somente quando relevantes) */}
+          {/* Mini-timeline: abertura, fechamento, duração ou tempo decorrido */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <SummaryChip icon={Clock3}>{formatElapsed(order.opened_at)}</SummaryChip>
+            <SummaryChip icon={Clock3}>
+              {openedAt ? `Aberta ${openedAt}` : "Abertura não registrada"}
+            </SummaryChip>
+            {closure === "cancelada" ? (
+              <SummaryChip icon={XCircle} tone="danger">
+                {closedAt ? `Cancelada ${closedAt}` : "Cancelada"}
+              </SummaryChip>
+            ) : closure ? (
+              <>
+                <SummaryChip icon={CheckCircle2} tone="accent">
+                  {closedAt
+                    ? `${closure === "aprovada" ? "Aprovada" : "Concluída"} ${closedAt}`
+                    : "Fechamento não registrado"}
+                </SummaryChip>
+                {duration && (
+                  <SummaryChip icon={Timer} tone="accent">
+                    Tempo total {duration}
+                  </SummaryChip>
+                )}
+              </>
+            ) : (
+              <>
+                {scheduledFor && (
+                  <SummaryChip icon={CalendarClock}>Prevista {scheduledFor}</SummaryChip>
+                )}
+                {elapsed && <SummaryChip icon={Timer}>{elapsed}</SummaryChip>}
+              </>
+            )}
+          </div>
+
+          {/* Pendências (somente quando relevantes) */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {!hasTechnician && (
               <SummaryChip icon={AlertTriangle} tone="warn">
                 Técnico pendente
@@ -322,23 +309,30 @@ function SummaryChip({
 }: {
   icon: LucideIcon;
   children: ReactNode;
-  tone?: "neutral" | "warn";
+  tone?: "neutral" | "warn" | "accent" | "danger";
 }) {
+  const toneClass =
+    tone === "warn"
+      ? "border border-status-review/30 bg-status-review/10 text-status-review"
+      : tone === "accent"
+        ? "border border-[color-mix(in_oklab,var(--lemarc-card-accent)_35%,transparent)] bg-[color-mix(in_oklab,var(--lemarc-card-accent)_14%,transparent)] text-[var(--lemarc-card-accent)]"
+        : tone === "danger"
+          ? "border border-destructive/40 bg-destructive/10 text-destructive"
+          : "border border-white/[0.08] bg-white/[0.04] text-muted-foreground";
+  const iconClass =
+    tone === "warn"
+      ? "text-status-review"
+      : tone === "danger"
+        ? "text-destructive"
+        : "text-[var(--lemarc-card-accent)]";
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-[0.1em]",
-        tone === "warn"
-          ? "border border-status-review/30 bg-status-review/10 text-status-review"
-          : "border border-white/[0.08] bg-white/[0.04] text-muted-foreground",
+        "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-[0.1em] tabular-nums",
+        toneClass,
       )}
     >
-      <Icon
-        className={cn(
-          "h-3 w-3 shrink-0",
-          tone === "warn" ? "text-status-review" : "text-[var(--lemarc-card-accent)]",
-        )}
-      />
+      <Icon className={cn("h-3 w-3 shrink-0", iconClass)} />
       <span className="truncate">{children}</span>
     </span>
   );
