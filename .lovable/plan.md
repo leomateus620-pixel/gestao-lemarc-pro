@@ -1,67 +1,117 @@
-## Refator da tela `/ordens/nova` em wizard multi-etapas
+## Área de Clientes — refator real + unidades + integração com OS
 
-Reorganizar o cadastro de OS num fluxo lateral por etapas, preservando rotas, payload, mutations e destino dos dados. Mudança puramente de UX/UI + composição de estado local.
+Substituir mocks por dados reais (Supabase), expandir o cadastro de cliente com campos completos, criar tabela de **unidades** vinculadas, e organizar rotas para reutilização em OS, dashboard e relatórios.
 
-## 5 etapas
+### Banco de dados (migration)
 
-1. **Dados iniciais** — título*, descrição, local/setor, previsão
-2. **Cliente** — segmented "Selecionar existente / Cadastrar novo"; quick-create inline
-3. **Técnico** — mesmo padrão da etapa 2; opção "Sem técnico definido" explícita
-4. **Serviço & prioridade** — tipo em cards/chips grandes; prioridade em 4 pills com cores semânticas (baixa neutro, média laranja, alta âmbar, urgente vermelho)
-5. **Revisão** — resumo em blocos + CTA "Criar ordem de serviço"
+**Alterar `public.clients`** adicionando colunas:
+- `cnpj text unique` (com índice; validado server-side)
+- `segment text`, `address text`, `city text`, `state text`
+- `phone text`, `email text`
+- `responsible_name text`
+- `active boolean not null default true`
 
-## Arquitetura de componentes
+> A coluna legada `unit text` será mantida por compatibilidade temporária (a wizard de OS atual usa `clients.unit` apenas como label). Nada será deletado.
 
-Em `src/components/ordens/wizard/`:
+**Criar `public.client_units`**:
+- `id uuid pk`, `client_id uuid fk → clients(id) on delete cascade`
+- `name text not null`, `is_primary boolean default false`
+- `sector text`, `city text`, `state text`, `address text`
+- `responsible_name text`, `phone text`, `notes text`
+- `active boolean default true`, `created_by`, `created_at`, `updated_at`
+- Índice por `client_id`; GRANTs `authenticated`+`service_role`; RLS por owner (mesmo padrão de `clients`).
 
-- `ServiceOrderWizard.tsx` — estado central (`useReducer` ou `useState` único do form), controle de step, validação por etapa, mutations existentes (`createServiceOrder`, `createClient`, `createTechnician`) reaproveitadas sem alterar payload
-- `WizardStepper.tsx` — stepper horizontal (desktop) / compacto (mobile), indica atual/concluídas, clique volta a etapas válidas
-- `WizardShell.tsx` — viewport com slide lateral via Framer Motion (`AnimatePresence` + `x` spring), respeita `prefers-reduced-motion`
-- `StepFooter.tsx` — botões Voltar / Continuar; na etapa 5 vira "Criar OS"
-- `steps/BasicInfoStep.tsx`
-- `steps/ClientStep.tsx` + `InlineQuickCreateClient.tsx`
-- `steps/TechnicianStep.tsx` + `InlineQuickCreateTechnician.tsx`
-- `steps/ServiceTypeStep.tsx`
-- `steps/ReviewStep.tsx`
-- `useServiceOrderDraft.ts` — estado tipado do rascunho + validators por etapa
+**Alterar `public.service_orders`**:
+- Adicionar `client_unit_id uuid references client_units(id) on delete set null` + índice.
 
-`src/routes/_app.ordens.nova.tsx` passa a montar apenas `<AppShell><ServiceOrderWizard /></AppShell>`. Header da página refinado (alinhamento, hierarquia do título, subtítulo "Nova OS · {usuário}").
+### Server functions (`src/lib/api/`)
 
-## Estado e submit
+`clients.functions.ts` (novo) e expandir `serviceOrders.functions.ts`:
+- `listClientsFull` — clientes + agregados (unit_count, os_open, os_done) via consultas com count.
+- `getClient(id)` — detalhe + unidades + métricas.
+- `createClient(input)` — empresa + array opcional de unidades (insere tudo numa transação lógica; primeira unidade marcada principal). Verifica CNPJ duplicado.
+- `updateClient(id, patch)`, `deleteClient(id)`.
+- `listClientUnits(clientId)`, `createClientUnit`, `updateClientUnit`, `deleteClientUnit`.
+- `listServiceOrdersByClient(clientId)`.
+- Ajustar `createServiceOrder` para aceitar `client_unit_id`.
 
-- Mesmo shape de input do `createServiceOrder` atual (`title, description, client_id, technician_id, service_type, priority, location, scheduled_for`). Nenhuma mudança em server functions, schema, RLS, queries.
-- `clientId`/`techId` resolvidos antes do submit final: se o usuário usou quick-create numa etapa, o id retornado pela mutation já fica no rascunho.
-- Invalidations e navegação pós-criação iguais às atuais (`navigate /ordens/$id`).
-- Rascunho mantido em memória do componente (sem localStorage por enquanto — fora do escopo declarado).
+Tipos em `src/types/client.ts`.
 
-## Validação progressiva
+### Rotas (TanStack file-based, prefixo `_app`)
 
-- Etapa 1: `title.trim().length >= 3`
-- Etapa 2: `clientId` selecionado **ou** quick-create concluído (id presente)
-- Etapa 3: `techId` selecionado **ou** explicitamente "sem técnico"
-- Etapa 4: `service_type` e `priority` definidos
-- Etapa 5: revisão, mostra pendências se houver
+- `/clientes` — lista (`_app.clientes.index.tsx`, refator do atual).
+- `/clientes/novo` — wizard de cadastro (`_app.clientes.novo.tsx`).
+- `/clientes/$id` — detalhe com abas Visão geral / Unidades / OS / Contatos (`_app.clientes.$id.index.tsx`).
+- `/clientes/$id/editar` — edição (`_app.clientes.$id.editar.tsx`).
+- `/clientes/$id/unidades/nova` — nova unidade.
+- `/clientes/$id/unidades/$unitId` — detalhe/edição da unidade.
 
-Mensagens curtas abaixo dos campos. Botão "Continuar" desabilitado quando inválido.
+A rota atual `_app.clientes.tsx` vira layout `_app.clientes.tsx` (só `<Outlet/>`) + `_app.clientes.index.tsx`.
 
-## Visual
+### Tela `/clientes`
 
-- Tokens já existentes (navy/orange/cyan); sem hex hard-coded.
-- Inputs com altura confortável, foco em `ring-primary/40`, hover sutil.
-- Cards de tipo de serviço com ícone + label, estado selecionado com borda primary e leve elevação.
-- Prioridade em pills coloridas tonais.
-- Stepper: trilha `white/10`, segmentos preenchidos `primary`, círculo atual com pulso suave.
-- Transição lateral 220ms spring; mobile reduz amplitude.
+- Header com identidade Lemarc (eyebrow, título "Clientes industriais", subtítulo, CTA "Cadastrar empresa").
+- 4 métricas reais: Empresas ativas, Unidades, OS ativas (status ≠ approved/cancelled), Com pendência.
+- Busca por nome / CNPJ / cidade / segmento / responsável / unidade (client-side sobre dados carregados).
+- Chips: Todos · Com OS ativa · Sem OS · Ativos · Inativos.
+- `ClientCard` (novo) refinado: nome, CNPJ, segmento, cidade/UF, badges (X unidades · Y OS abertas · Z concluídas), responsável, telefone/e-mail, status, ações rápidas (Detalhes / Nova OS / Adicionar unidade / Editar).
+- Empty state premium quando 0 clientes.
 
-## Fora do escopo
+### Cadastro `/clientes/novo`
 
-- Server functions, schema, RLS, payload, rotas
-- Lógica de mutations (`createServiceOrder/Client/Technician`)
-- Persistência em localStorage
-- `AppShell` global (só ajuste local do título)
+Wizard 4 etapas (mesmo padrão visual da wizard de OS já aprovada):
+1. **Dados da empresa** — nome*, CNPJ* (máscara + validação 14 dígitos + checagem de duplicidade server-side), segmento.
+2. **Localização & contato** — cidade*, UF*, endereço, telefone, e-mail, responsável.
+3. **Unidades** — lista editável (add/remove inline). Permite zero unidades; primeira marcada como Matriz/principal.
+4. **Revisão** — resumo + "Criar cliente".
 
-## Validação final
+Após salvar: redireciona para `/clientes/$id`.
 
-- Build/typecheck
-- Playwright: percorrer as 5 etapas em desktop e mobile, validar criação real e redirecionamento para `/ordens/$id`
-- Conferir que filtros/listagem em `/ordens` continuam recebendo a nova OS
+### Detalhe `/clientes/$id`
+
+- Header: nome, badge ativo/inativo, CNPJ, cidade/UF; botões "Nova OS", "Adicionar unidade", "Editar".
+- 4 cards resumo: unidades, OS abertas, em andamento, concluídas + última OS aberta + técnico recente.
+- Tabs (Tabs do shadcn já existem): Visão geral, Unidades, OS, Contatos, Histórico.
+- Aba **Unidades**: cards com nome, local, responsável, contagem OS, status; ações editar/desativar.
+- Aba **OS**: usa `listServiceOrdersByClient` com filtros (status, período, técnico, prioridade).
+
+### Integração com OS
+
+- `ClientStep` da wizard atual passa a buscar pelo novo `listClientsFull` (mantendo shape compatível).
+- Adicionar `UnitStep` opcional dentro da etapa Cliente: após selecionar empresa com unidades, mostrar seletor de unidade (com opção "Sem unidade específica").
+- Preencher `client_unit_id` no payload.
+- Botão "Nova OS" do detalhe/unidade navega para `/ordens/nova?clientId=…&unitId=…`; wizard lê search params e pré-seleciona.
+- Dashboard: substituir contagem de "clientes ativos" pela contagem real via OS reais (já existe hook — apenas confirmar consumo do agregado novo).
+
+### Componentes a criar
+
+`src/components/clientes/`:
+- `ClientsHeader.tsx`, `ClientsMetrics.tsx`, `ClientMetricCard.tsx`
+- `ClientsSearchAndFilters.tsx`, `ClientCard.tsx`, `ClientEmptyState.tsx`
+- `wizard/ClientWizard.tsx` + steps + `UnitsEditor.tsx`
+- `detail/ClientDetailHeader.tsx`, `ClientSummaryCards.tsx`, `ClientUnitsSection.tsx`, `ClientServiceOrdersSection.tsx`, `UnitCard.tsx`, `UnitForm.tsx`
+
+Hooks: `useClients`, `useClient`, `useClientUnits`, `useClientServiceOrders`, `useClientMetrics`.
+
+Utils: `src/lib/cnpj.ts` — máscara + validação de DV + normalizador.
+
+### Visual / motion
+
+Mantém tokens navy/laranja/cyan, glass cards, micro-spring no hover (mesmo padrão da home/wizard de OS). Sem framer-motion novo — usar transitions CSS + `usePhysicsCard` existente quando fizer sentido. Respeita `prefers-reduced-motion`.
+
+### Remoção de mocks
+
+- Apagar uso de `src/lib/mock/clients.ts` na tela; manter arquivo intocado (outros lugares podem referenciar — só remover import na nova `_app.clientes.index.tsx`).
+
+### Fora do escopo
+
+- Importação em lote de CNPJs / consulta Receita.
+- Anexos por cliente / upload de logo.
+- Permissões granulares por cliente.
+- Refator visual de outras telas que não a área de clientes.
+
+### Verificação final
+
+- Migration aplicada, types regenerados.
+- `bun run build` limpo.
+- Playwright: criar empresa com 2 unidades → abrir detalhe → criar OS pré-vinculada → conferir em `/ordens` e dashboard.
