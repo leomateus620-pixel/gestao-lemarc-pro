@@ -1,40 +1,18 @@
-import { Suspense, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { ClipboardCheck, Plus } from "lucide-react";
+import { Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app/AppShell";
-import { GlassCard } from "@/components/app/GlassCard";
-import { PrimaryCTA } from "@/components/app/operations";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useClientsQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
-import {
-  createClient as createClientFn,
-  createServiceOrder,
-  createTechnician,
-} from "@/lib/api/serviceOrders.functions";
-import {
-  priorityLabel,
-  serviceTypeLabel,
-  type ServicePriority,
-  type ServiceType,
-} from "@/types/serviceOrder";
+import { ServiceOrderWizard } from "@/components/ordens/ServiceOrderWizard";
 
 export const Route = createFileRoute("/_app/ordens/nova")({
   head: () => ({ meta: [{ title: "Nova OS — Gestão Lemarc" }] }),
   component: NovaOSPage,
 });
 
-const serviceTypes = Object.entries(serviceTypeLabel) as [ServiceType, string][];
-const priorities = Object.entries(priorityLabel) as [ServicePriority, string][];
-
 function NovaOSPage() {
   return (
     <AppShell title="Nova ordem de serviço" back>
       <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
-        <NovaOS />
+        <ServiceOrderWizard />
       </Suspense>
     </AppShell>
   );
