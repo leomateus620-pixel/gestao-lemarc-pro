@@ -1,63 +1,117 @@
-## Problema
+## Escopo
 
-A tela `/clientes/:id` está lenta e às vezes mostra erro porque ela:
+Reescrever apenas a camada visual de 4 componentes, sem tocar em rotas, hooks, queries, payloads, ações ou dados. Mesmos props, mesmos imports, mesmos links de saída.
 
-1. Faz **3 RPCs** sequenciais via Suspense: detalhe do cliente (`getClientDetail`) **e** a lista **completa** de OS (`listServiceOrders`) para depois filtrar no front por `client_id`. Com o crescimento das OS, esse fetch fica grande e lento, e qualquer falha na junção pesada (`clients`, `technicians`, `client_units`) derruba a página inteira.
-2. Não tem **loader** na rota — só Suspense — então nada é pré-carregado quando o usuário passa o mouse no card de "Visualizar" na listagem. Cada clique espera tudo do zero.
-3. Reusa a query global `["service-orders"]` (sem `staleTime` real para o detalhe), então mesmo voltar e abrir outro cliente refaz toda a lista.
+Arquivos afetados:
+- `src/components/app/ServiceOrderCard.tsx`
+- `src/components/clientes/ClientCard.tsx`
+- `src/components/dashboard/MetricCard.tsx`
+- `src/components/dashboard/OperationTodayCard.tsx` (mini stats)
+- `src/components/app/EmptyState.tsx`
+- Pequeno ajuste de `pb-*` no `AppShell` se a bottom nav estiver cobrindo o final das listas (verificar e ajustar somente se necessário).
 
-## Solução estrutural
+Nada é alterado em: `useServiceOrders`, `useClients`, `useOperationalDashboard`, server functions, route files, search params, `usePhysicsCard`.
 
-Buscar **apenas o necessário para a tela**, em **uma única chamada paralela**, com **prefetch no hover** da listagem.
+## Princípios de design comuns
 
-### 1. Novo server function `getClientPage` (`src/lib/api/clients.functions.ts`)
+- Mantém identidade Lemarc: navy profundo, laranja, ciano, glass sutil, física suave do `usePhysicsCard` (reduzida no mobile).
+- Reduz "grade de caixinhas". Substitui blocos repetidos por linhas/listas com ícone discreto, divisores finos e chips.
+- Hierarquia tipográfica mais clara: título dominante; metadados em peso menor; números tabulares com `tabular-nums`.
+- Faixa lateral semântica de status já existe — refinar (mais fina, gradiente vertical) em vez de adicionar mais glows.
+- Sem novos blocos com `border + bg` espelhados; usar `divide-y border-white/[0.06]` para listas internas.
+- Mobile-first: padding compacto, sem grid 2x3 obrigatório, sem overflow horizontal.
 
-Retorna num único round-trip:
+## ServiceOrderCard — nova composição
+
+Layout em 3 zonas (não mais grid de 6 caixas):
 
 ```text
-{
-  client,                 // 1 row (clients)
-  units,                  // N rows (client_units do cliente)
-  orders: [               // só OS deste client_id, colunas enxutas
-    id, number, title, status, priority,
-    opened_at, scheduled_for, finished_at,
-    client_unit:client_units(id, name)
-  ],
-  counts: { open, running, pending, done, total } // computado server-side
-}
+┌──┬─────────────────────────────────────────────────┐
+│  │ OS #1003 · Manutenção elétrica   [● Aprovada]  │
+│██│ Título da OS (display, 1.05rem, line-clamp-2)  │
+│██│                                  Prioridade md  │
+│  ├─────────────────────────────────────────────────┤
+│  │ 🏢 Cliente · Unidade                            │
+│  │ 📍 Local / setor    👷 Técnico                  │
+│  │ 🕒 Aberta hoje 11:46    ⏱ Prev. hoje 12:00     │
+│  ├─────────────────────────────────────────────────┤
+│  │ ⏳ há 24min   🔗 Unidade vinculada  [pend.?]    │
+└──┴─────────────────────────────────────────────────┘
 ```
 
-Implementação: `Promise.all` de 3 selects no Supabase (`clients` por id, `client_units` por `client_id`, `service_orders` por `client_id` ordenado por `opened_at desc`). Sem o join pesado com `technicians` (não é usado nessa tela). `counts` agregado no handler para não enviar arrays redundantes ao cliente.
+Mudanças concretas:
+- Header: número + tipo à esquerda; status badge grande à direita; prioridade vira chip pequeno abaixo do status (peso menor, sem competir com o título).
+- Título sobe em destaque (sem mudar dado).
+- Substituir o `grid sm:grid-cols-2` de 6 `ServiceOrderMetaRow` por uma **lista vertical com divisores**: 3 linhas (cliente/unidade, local/técnico, abertura/previsão). Em desktop (≥`lg`), cada linha pode dividir em 2 colunas usando `lg:grid-cols-2 lg:gap-x-6` para aproveitar o espaço horizontal sem virar caixinhas.
+- Ícones menores (`h-3.5 w-3.5`), sem bolha quadrada `h-8 w-8` ao redor — apenas o ícone na cor do accent.
+- Faixa lateral: manter, mas reduzir para `w-[3px]`, com gradiente vertical (`from-accent via-accent/60 to-transparent`) — assinatura mais elegante.
+- Estado "pendente" por campo: texto em `text-muted-foreground/70` + ícone âmbar pequeno, sem trocar o fundo do bloco.
+- Rodapé: manter chips, mas dedup — remover "Técnico definido" e "Unidade vinculada" quando OK; só mostrar quando pendente (vira aviso). Sempre mostrar "Aberta há Xmin".
+- Hover desktop: sombra cresce levemente, faixa lateral pulsa de opacidade; no mobile reduzir.
 
-### 2. Hook + loader
+## ClientCard — perfil operacional
 
-- `useClientPageQuery(id)` em `src/hooks/useClients.ts` com `queryKey: ["client-page", id]`, `staleTime: 30_000`.
-- Loader da rota `_app.clientes.$id.tsx` chama `context.queryClient.ensureQueryData(...)` para o id — TanStack Router já pré-carrega no `mouseenter` do `<Link>`, então abrir o cliente fica instantâneo após hover.
-- Mantém `errorComponent` e `notFoundComponent` (já existem) e adiciona `pendingComponent` mais leve.
+```text
+┌──┬──────────────────────────────────────────────┐
+│  │ [AV] Nome da empresa            [● Ativo]    │
+│██│      CNPJ · Segmento                          │
+│  ├──────────────────────────────────────────────┤
+│  │  3 Unidades  ·  2 OS abertas  ·  18 concl.   │  (linha de pílulas)
+│  ├──────────────────────────────────────────────┤
+│  │ 🕒 Última: OS #1002 aberta hoje 09:12        │
+│  │ 📍 São Paulo / SP    👤 Eduardo Lima         │
+│  │ 📞 (11) 99…        ✉ contato@…               │
+│  ├──────────────────────────────────────────────┤
+│  │            [+ Nova OS]      Detalhes →       │
+└──┴──────────────────────────────────────────────┘
+```
 
-### 3. Refatorar `_app.clientes.$id.tsx`
+Mudanças concretas:
+- Avatar maior e mais refinado (manter dimensões atuais, ajustar gradiente interno mais sutil).
+- Nome em `text-lg font-black` (mais dominante); CNPJ e segmento em uma única linha com `·` como separador, sem chips quadradas.
+- Status "Ativo/Inativo" como selo no topo direito (mantém).
+- **Indicadores**: substituir `OperationalStat` em grid 3-col com bordas por uma **única linha de pílulas inline** separadas por `·`, com número em `font-display tabular-nums` e label em uppercase menor. Em mobile vira flex-wrap. Acento laranja apenas quando `osOpen > 0`.
+- Substituir os 4 `InfoPanel` em grid por **lista compacta com divisores finos**, ícone pequeno alinhado à esquerda. Última movimentação aparece como primeira linha destacada (texto levemente mais forte).
+- Ações no rodapé: integradas em barra com `border-t border-white/[0.06]`, "Nova OS" laranja menor, "Detalhes" como link ghost com seta animada no hover; sem caixa de fundo pesada.
 
-- Remover `useClientDetailQuery` + `useServiceOrdersQuery`; usar somente `useClientPageQuery`.
-- Usar `data.counts` direto nos mini-cards (sem filtrar arrays no render).
-- Tab "OS" itera `data.orders` (já filtrado e ordenado pelo servidor).
-- Manter mutações de unidade invalidando `["client-page", id]` (em vez de `["client", id]`).
+## MetricCard (Home) — refinamento
 
-### 4. Lista de clientes (`_app.clientes.index.tsx`)
+- Diminuir `min-h-[172px]` para auto + `min-h-[148px]`.
+- Número principal mantém destaque (`text-[2.6rem]`), mas remover ícone em "card" quadrado grande à direita; usar **ícone fantasma maior, posicionado no canto inferior-direito com `opacity-10`** como marca d'água — leitura do número fica limpa.
+- Title em cima, valor logo abaixo, subtitle em 1-2 linhas; rodapé com `footerLabel` + seta (mantém).
+- Faixa lateral fica mais fina; remover o `top-0 h-px gradient` (excesso de adornos).
+- `emphasis` (alertas > 0) vira animação `pulse` discreta na faixa lateral em vez de sombra vermelha forte.
 
-- No `<Link to="/clientes/$id">`: deixar o `preload="intent"` padrão do TanStack ativo (é o default; confirmar que nada o desabilita). Como a rota agora tem loader, hover já dispara o fetch.
+## OperationTodayCard mini stats
 
-### 5. Limpeza
+- Manter card pai. Refinar os 4 `Stat`:
+  - Reduzir altura (`p-4` → `p-3.5`), número menor (`text-2xl`), label monoespaçada.
+  - Substituir caixa do ícone por ícone solto na cor do tom (sem `border + bg`).
+  - Divisor vertical fino entre cards no desktop usando `divide-x divide-white/[0.05]` em um grid alternativo, mantendo gap-3 no mobile.
 
-- Manter `getClientDetail` por compat ou removê-lo se não houver outro consumidor (a rota `editar` continua usando — preservar).
-- Não alterar schema do banco, RLS, rotas existentes ou outras telas.
+## EmptyState
 
-## Resultado esperado
+- Mais humano e industrial. Ícone em moldura hexagonal/diamante sutil (rotacionada com `rotate-45` em um wrapper externo, ícone com `-rotate-45` para ficar reto) em vez de quadrado.
+- Adicionar slot opcional `action?: ReactNode` para CTA (compatível com chamadas atuais que não passam — opcional, sem breaking change).
+- Padding mais generoso no desktop, compacto no mobile (`p-6 sm:p-8`).
 
-- 1 RPC pequena no lugar de 2 (uma delas full-table).
-- Página aparece praticamente instantânea após hover na listagem.
-- Erro de carga deixa de derrubar a tela inteira porque a query é escopo-único e a junção pesada com `technicians` é eliminada.
+## Responsividade e bottom nav
+
+- Cards usam `p-4 sm:p-5`, títulos `text-base sm:text-lg`.
+- Garantir `min-w-0` + `truncate` em todos os textos longos.
+- Verificar `_app.tsx` / `AppShell` para `pb-` suficiente quando `BottomNav` está visível. Se faltar, aumentar `pb-24 sm:pb-8` no container principal do AppShell — única edição estrutural permitida fora dos cards, e só se a bottom nav estiver cobrindo conteúdo.
 
 ## Validação
 
-- `bun run build` limpo.
-- Playwright: listar clientes → hover no card → abrir → confirmar que as 4 métricas, tabs Unidades e OS aparecem com dados reais e sem erro no console; medir tempo do clique até render.
+- `rg` para confirmar que nenhum import/uso externo dos componentes mudou de assinatura.
+- Build automático do harness valida TS/Vite.
+- Inspeção visual via Playwright headless em viewport 390 (mobile) e 1280 (desktop) das rotas `/dashboard`, `/ordens`, `/clientes` — capturar screenshot e confirmar:
+  - sem overflow horizontal,
+  - badges e títulos legíveis,
+  - bottom nav não cobre último card.
+
+## Critérios de aceite
+
+- Visual menos "caixinha", mais autoral, hierarquia clara.
+- Dados, rotas, hooks e ações intactos (diff cirúrgico nos 5 arquivos listados).
+- Build verde; sem regressão em mobile/desktop.

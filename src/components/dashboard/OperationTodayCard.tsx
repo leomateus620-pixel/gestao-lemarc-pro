@@ -145,55 +145,39 @@ function Stat({
 }) {
   const tones = {
     steel: {
-      hover: "group-hover/stat:text-slate-100",
       icon: "text-slate-300",
-      border: "hover:border-white/[0.16]",
       rail: "bg-slate-300",
-      chip: "border-white/[0.08] bg-white/[0.04]",
     },
     orange: {
-      hover: "group-hover/stat:text-[#ff9a4d]",
       icon: "text-[#ff9a4d]",
-      border: "hover:border-[#ff7a18]/30",
       rail: "bg-[#ff7a18]",
-      chip: "border-[#ff7a18]/25 bg-[#ff7a18]/10",
     },
     amber: {
-      hover: "group-hover/stat:text-amber-300",
       icon: "text-amber-300",
-      border: "hover:border-amber-400/30",
       rail: "bg-amber-300",
-      chip: "border-amber-400/25 bg-amber-400/10",
     },
     green: {
-      hover: "group-hover/stat:text-emerald-300",
       icon: "text-emerald-300",
-      border: "hover:border-emerald-400/30",
       rail: "bg-emerald-300",
-      chip: "border-emerald-400/25 bg-emerald-400/10",
     },
   }[tone];
   const formatted = String(value).padStart(2, "0");
   return (
     <div
-      className={`group/stat relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 pl-5 shadow-[inset_0_1px_0_oklch(1_0_0/0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.055] ${tones.border}`}
+      className="group/stat relative overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 pl-4 transition-colors duration-200 hover:bg-white/[0.05]"
     >
       <div
         aria-hidden
-        className={`absolute bottom-3 left-0 top-3 w-1 rounded-r-full ${tones.rail}`}
+        className={`absolute bottom-2.5 left-0 top-2.5 w-[2px] rounded-r-full ${tones.rail} opacity-80`}
       />
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/85">
           {label}
         </span>
-        <span
-          className={`grid h-7 w-7 shrink-0 place-items-center rounded-xl border ${tones.chip}`}
-        >
-          <Icon size={13} className={`${tones.icon} transition-colors`} strokeWidth={2.2} />
-        </span>
+        <Icon size={14} className={`${tones.icon} shrink-0`} strokeWidth={2.2} />
       </div>
       <p
-        className={`mt-3 font-display text-3xl font-black leading-none tracking-tight text-foreground transition-colors ${tones.hover}`}
+        className="mt-2.5 font-display text-2xl font-black leading-none tracking-tight text-foreground tabular-nums sm:text-[1.75rem]"
       >
         {formatted}
       </p>
