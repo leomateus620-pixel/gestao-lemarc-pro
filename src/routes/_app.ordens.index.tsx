@@ -54,10 +54,54 @@ function OrdensPage() {
         </Link>
       }
     >
-      <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
+      <Suspense fallback={<OrdensSkeleton />}>
         <OrdensList />
       </Suspense>
     </AppShell>
+  );
+}
+
+function OrdensSkeleton() {
+  return (
+    <div className="mt-2 space-y-4">
+      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5">
+        <div className="lemarc-shimmer absolute inset-0 opacity-25" />
+        <div className="relative flex items-start gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-white/[0.08]" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="h-3 w-36 rounded-full bg-white/[0.08]" />
+            <div className="h-7 w-44 rounded-xl bg-white/[0.08]" />
+            <div className="h-4 w-full max-w-md rounded-full bg-white/[0.06]" />
+          </div>
+        </div>
+      </div>
+      <div className="h-12 rounded-2xl border border-white/[0.08] bg-white/[0.035]" />
+      <div className="grid gap-3 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="relative min-h-[238px] overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.03] p-5"
+          >
+            <div className="lemarc-shimmer absolute inset-0 opacity-25" />
+            <div className="absolute bottom-4 left-0 top-4 w-[5px] rounded-r-full bg-white/[0.08]" />
+            <div className="relative pl-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="h-3 w-24 rounded-full bg-white/[0.08]" />
+                  <div className="h-5 w-44 rounded-lg bg-white/[0.08]" />
+                </div>
+                <div className="h-7 w-24 rounded-full bg-white/[0.08]" />
+              </div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="h-[3.25rem] rounded-2xl bg-white/[0.045]" />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -80,7 +124,8 @@ function OrdensList() {
       if (filtro === "incompletas" && !isIncomplete(o)) return false;
       if (q) {
         const needle = q.toLowerCase();
-        const hay = `${o.number} ${o.title} ${o.client?.name ?? ""} ${o.technician?.full_name ?? ""}`.toLowerCase();
+        const hay =
+          `${o.number} ${o.title} ${o.client?.name ?? ""} ${o.technician?.full_name ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -94,8 +139,7 @@ function OrdensList() {
     navigate({ search: (prev: Search) => ({ ...prev, period: next }) });
   const setFiltro = (next: SpecialFilter) =>
     navigate({ search: (prev: Search) => ({ ...prev, filtro: next }) });
-  const setQuery = (next: string) =>
-    navigate({ search: (prev: Search) => ({ ...prev, q: next }) });
+  const setQuery = (next: string) => navigate({ search: (prev: Search) => ({ ...prev, q: next }) });
 
   return (
     <>
@@ -111,7 +155,9 @@ function OrdensList() {
         {(filtro !== "none" || status !== "todas") && (
           <button
             type="button"
-            onClick={() => navigate({ search: { status: "todas", period: "all", filtro: "none", q: "" } })}
+            onClick={() =>
+              navigate({ search: { status: "todas", period: "all", filtro: "none", q: "" } })
+            }
             className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
           >
             Limpar filtros

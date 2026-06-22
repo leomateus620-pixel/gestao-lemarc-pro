@@ -39,12 +39,67 @@ function ClientesIndex() {
         </Link>
       }
     >
-      <Suspense
-        fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}
-      >
+      <Suspense fallback={<ClientesSkeleton />}>
         <ClientesList />
       </Suspense>
     </AppShell>
+  );
+}
+
+function ClientesSkeleton() {
+  return (
+    <div className="mt-2 space-y-4">
+      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5">
+        <div className="lemarc-shimmer absolute inset-0 opacity-25" />
+        <div className="relative flex items-start gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-white/[0.08]" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="h-3 w-32 rounded-full bg-white/[0.08]" />
+            <div className="h-7 w-56 rounded-xl bg-white/[0.08]" />
+            <div className="h-4 w-full max-w-lg rounded-full bg-white/[0.06]" />
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-40 rounded-[1.55rem] border border-white/[0.08] bg-white/[0.03]"
+          />
+        ))}
+      </div>
+      <div className="h-11 rounded-xl border border-white/[0.08] bg-white/[0.035]" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="relative min-h-[280px] overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.03] p-5"
+          >
+            <div className="lemarc-shimmer absolute inset-0 opacity-25" />
+            <div className="absolute bottom-4 left-0 top-4 w-[5px] rounded-r-full bg-white/[0.08]" />
+            <div className="relative pl-2">
+              <div className="flex gap-3">
+                <div className="h-[3.25rem] w-[3.25rem] rounded-2xl bg-white/[0.08]" />
+                <div className="flex-1 space-y-3">
+                  <div className="h-5 w-44 rounded-lg bg-white/[0.08]" />
+                  <div className="h-3 w-32 rounded-full bg-white/[0.06]" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="h-[4.5rem] rounded-2xl bg-white/[0.045]" />
+                ))}
+              </div>
+              <div className="mt-3 h-12 rounded-2xl bg-white/[0.045]" />
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="h-12 rounded-2xl bg-white/[0.04]" />
+                <div className="h-12 rounded-2xl bg-white/[0.04]" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -64,12 +119,21 @@ function ClientesList() {
   }, [units]);
 
   const osByClient = useMemo(() => {
-    const m = new Map<string, { open: number; done: number }>();
+    const m = new Map<
+      string,
+      { open: number; done: number; lastOrder: (typeof orders)[number] | null }
+    >();
     orders.forEach((o) => {
       if (!o.client_id) return;
-      const cur = m.get(o.client_id) ?? { open: 0, done: 0 };
+      const cur = m.get(o.client_id) ?? { open: 0, done: 0, lastOrder: null };
       if (isDone(o)) cur.done += 1;
       else if (!isCancelled(o)) cur.open += 1;
+      if (
+        !cur.lastOrder ||
+        new Date(o.opened_at).getTime() > new Date(cur.lastOrder.opened_at).getTime()
+      ) {
+        cur.lastOrder = o;
+      }
       m.set(o.client_id, cur);
     });
     return m;
@@ -197,6 +261,7 @@ function ClientesList() {
               unitCount={unitsByClient.get(c.id) ?? 0}
               osOpen={osByClient.get(c.id)?.open ?? 0}
               osDone={osByClient.get(c.id)?.done ?? 0}
+              lastOrder={osByClient.get(c.id)?.lastOrder ?? null}
             />
           ))}
         </div>
@@ -212,8 +277,7 @@ function EmptyClients() {
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-50"
         style={{
-          backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
           backgroundSize: "16px 16px",
         }}
       />
