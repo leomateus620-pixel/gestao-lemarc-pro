@@ -1,43 +1,62 @@
-## Objetivo
-Aplicar controle por papéis (RBAC) nas OS, clientes e técnicos. Admin enxerga e edita tudo; operador só os próprios registros. Profiles permanece privado por usuário.
+# Redesign visual da Dashboard — Premium Editorial
 
-## 1. Migração de banco
+Reformulação puramente visual da área superior da `/dashboard`: header da marca, hero "Operação · Hoje" e estado vazio. Toda a lógica funcional, rotas, hooks, filtros, métricas e cards subsequentes permanecem inalterados.
 
-### Tabela de papéis (padrão Lovable, sem recursão de RLS)
-- Enum `public.app_role` com valores `admin`, `operador`.
-- Tabela `public.user_roles` (`id`, `user_id` → `auth.users`, `role app_role`, `created_at`, unique `(user_id, role)`).
-- GRANT `SELECT` para `authenticated`, `ALL` para `service_role`.
-- RLS ligada com políticas:
-  - Usuário lê os próprios papéis.
-  - Só admin insere/edita/exclui papéis (via `has_role`).
+## Escopo do redesign
 
-### Função `public.has_role(_user_id uuid, _role app_role)`
-`SECURITY DEFINER`, `STABLE`, `search_path = public`. Usada em todas as políticas para evitar recursão.
+1. **Header da marca** (`AppShell` topo / faixa de identidade da dashboard)
+   - Logo Lemarc em laranja com sombra contida (sem glow exagerado)
+   - "Gestão Lemarc" + eyebrow em mono ciano "Operação · {período}"
+   - Indicador "Sistema Ativo" com ponto pulsante esmeralda
+   - Avatar refinado + botão "+" integrado, hover com microelevação
 
-### Substituir políticas de `service_orders`, `clients`, `technicians`
-Remover as políticas atuais "Authenticated can view/insert" e "Creator can update/delete" e recriar:
+2. **Hero "Operação · Hoje"** (`OperationTodayCard`)
+   - Superfície contínua `bg-[#0a0f1d]` com borda `white/10`, halo gradiente laranja→ciano muito sutil atrás
+   - Padrão técnico radial-dot a 3% de opacidade no fundo
+   - Saudação grande "Olá, {nome}." + linha-resumo com destaque laranja itálico nas OS pendentes
+   - Segmented filter Hoje/Semana/Mês em pill `bg-white/5`
+   - CTA "Nova OS" laranja sólido, tátil (translate-y no hover, scale no active), sombra contida
+   - Mini-status (4) como módulos `bg-white/5 border-white/5 rounded-xl`, número grande tonal no hover (laranja/ciano/âmbar/esmeralda)
 
-- **SELECT**: `public.has_role(auth.uid(), 'admin') OR created_by = auth.uid()`
-- **INSERT**: `with check (created_by = auth.uid())` (admin também é autenticado, passa)
-- **UPDATE**: `using (has_role(auth.uid(),'admin') OR created_by = auth.uid())` + mesmo `with check`
-- **DELETE**: `using (has_role(auth.uid(),'admin') OR created_by = auth.uid())`
+3. **Empty state** (`EmptyOperations`)
+   - Composição centrada com ícone industrial em container `rounded-2xl` com halo ciano blur atrás
+   - Título + subtítulo + CTA refinado
+   - Container `border-dashed white/5 rounded-3xl`, respiro vertical generoso
 
-Resultado: operador só vê/edita o que criou; admin vê e edita tudo. Profiles fica como está (cada um o seu).
+4. **Cards de métricas abaixo** — não tocar comportamento; apenas alinhar cor de borda/fundo (`#0a0f1d` / `white/10`) se necessário para coerência. Sem mudança funcional.
 
-### Bootstrap do primeiro admin
-Inserir papel `admin` para o primeiro usuário existente em `auth.users` (ou nenhum, se vazio), para não travar o sistema. Próximos admins são promovidos por outro admin.
+## Física e motion
 
-## 2. Código de aplicação (build mode)
+- Spring sutil em hover (translate-y -2px, ~200ms)
+- Brilho direcional radial seguindo o cursor sobre o hero (CSS vars + handler leve)
+- CTA com `active:scale-[0.97]`
+- `prefers-reduced-motion`: desativa parallax e brilho direcional
+- Mobile: efeitos reduzidos, grid 2x2 dos mini-status
 
-- `src/hooks/useUserRole.ts` — hook que consulta `user_roles` do usuário logado via `supabase.auth.getUser()` + select.
-- Esconder no UI ações destrutivas (excluir OS de outro usuário) quando não for admin — a RLS já bloqueia, isto é só UX.
-- Nenhuma alteração nas server functions: continuam usando `requireSupabaseAuth`, e a RLS faz o resto.
+## Tokens / cores
+
+Usar os tokens semânticos existentes em `src/styles.css` (navy/orange/cyan já presentes). Sem hex hard-coded espalhado nos componentes — adicionar tokens auxiliares se faltar (`--hero-surface`, `--hero-border`).
+
+## Arquivos afetados
+
+- `src/components/dashboard/OperationTodayCard.tsx` — rewrite visual
+- `src/components/dashboard/EmptyOperations.tsx` — rewrite visual
+- `src/components/dashboard/MetricPeriodFilter.tsx` — refinar pill (sem mudar API)
+- `src/components/app/AppShell.tsx` ou header equivalente da dashboard — refinar topbar (ajuste mínimo se afetar outras rotas; preferir refinar somente o cabeçalho dentro do `/dashboard`)
+- `src/routes/_app.dashboard.tsx` — pequenos ajustes de spacing/composição
+- `src/styles.css` — eventuais novos tokens semânticos para superfície do hero
+- (opcional) `src/hooks/useCursorGlow.ts` — novo hook leve para brilho direcional
 
 ## Fora de escopo
-- Tela de gestão de usuários/papéis (pode vir depois).
-- Papel intermediário "supervisor".
-- Mudanças nas tabelas `profiles`.
 
-## Verificação
-- Rodar linter do Supabase após a migração.
-- Testar manualmente: login admin vê todas as OS; login operador só as próprias; INSERT continua funcionando; UPDATE/DELETE de OS alheia retorna erro de RLS para operador.
+- Rotas, navegação, filtros, dados, server functions, RLS
+- Lógica/props dos cards de métricas (`MetricCard`)
+- Mock data, hooks de query
+- Componentes de OS (`ServiceOrderCard`)
+
+## Validação
+
+- Conferir build/typecheck automáticos
+- Screenshot Playwright em desktop + mobile da `/dashboard` antes de finalizar
+- Verificar que filtros Hoje/Semana/Mês continuam mudando métricas
+- Verificar empty state com 0 OS e estado com OS reais
