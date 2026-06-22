@@ -10,11 +10,12 @@ import type {
 
 const ORDER_SELECT = `
   id, number, title, description, client_id, technician_id,
-  service_type, priority, status, location, scheduled_for,
+  service_type, priority, status, location, scheduled_for, client_unit_id,
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit),
-  technician:technicians!service_orders_technician_id_fkey(id, full_name, role)
+  technician:technicians!service_orders_technician_id_fkey(id, full_name, role),
+  client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state)
 `;
 
 function normalize(row: any): ServiceOrder {
@@ -22,6 +23,7 @@ function normalize(row: any): ServiceOrder {
     ...row,
     client: row.client ?? null,
     technician: row.technician ?? null,
+    client_unit: row.client_unit ?? null,
   } as ServiceOrder;
 }
 
@@ -54,6 +56,7 @@ type CreateInput = {
   title: string;
   description?: string | null;
   client_id?: string | null;
+  client_unit_id?: string | null;
   technician_id?: string | null;
   service_type?: ServiceType | null;
   priority?: ServicePriority | null;
@@ -71,6 +74,7 @@ export const createServiceOrder = createServerFn({ method: "POST" })
         title: data.title,
         description: data.description ?? null,
         client_id: data.client_id ?? null,
+        client_unit_id: data.client_unit_id ?? null,
         technician_id: data.technician_id ?? null,
         service_type: data.service_type ?? null,
         priority: data.priority ?? null,

@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/app/GlassCard";
-import { useClientsQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import {
   createClient as createClientFn,
   createServiceOrder,
@@ -40,6 +41,7 @@ type Draft = {
   location: string;
   scheduled: string;
   clientId: string;
+  unitId: string;
   techId: string;
   noTech: boolean;
   type: ServiceType;
@@ -74,10 +76,17 @@ const typeIcon: Record<ServiceType, typeof Cog> = {
   emergencia: Zap,
 };
 
-export function ServiceOrderWizard() {
+export function ServiceOrderWizard({
+  initialClientId,
+  initialUnitId,
+}: {
+  initialClientId?: string;
+  initialUnitId?: string;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: clients } = useClientsQuery();
+  const { data: clients } = useClientsFullQuery();
+  const { data: units } = useAllUnitsQuery();
   const { data: technicians } = useTechniciansQuery();
 
   const [step, setStep] = useState(0);
@@ -86,7 +95,8 @@ export function ServiceOrderWizard() {
     description: "",
     location: "",
     scheduled: "",
-    clientId: "",
+    clientId: initialClientId ?? "",
+    unitId: initialUnitId ?? "",
     techId: "",
     noTech: false,
     type: "mecanica",
@@ -118,6 +128,7 @@ export function ServiceOrderWizard() {
           title: draft.title,
           description: draft.description || null,
           client_id: draft.clientId || null,
+          client_unit_id: draft.unitId || null,
           technician_id: draft.noTech ? null : draft.techId || null,
           service_type: draft.type,
           priority: draft.priority,
@@ -166,6 +177,7 @@ export function ServiceOrderWizard() {
               draft={draft}
               set={set}
               clients={clients}
+              units={units}
               onCreated={(id) => set("clientId", id)}
             />
           </StepSlot>
@@ -407,11 +419,13 @@ function ClientStep({
   draft,
   set,
   clients,
+  units,
   onCreated,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   clients: { id: string; name: string; unit: string | null }[];
+  units: { id: string; client_id: string; name: string; sector: string | null }[];
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -430,10 +444,16 @@ function ClientStep({
     );
   }, [clients, query]);
 
+  const selectedUnits = useMemo(
+    () => units.filter((u) => u.client_id === draft.clientId),
+    [units, draft.clientId],
+  );
+
   const clientMutation = useMutation({
     mutationFn: () => createCli({ data: { name: newName, unit: newUnit || null } }),
     onSuccess: (row) => {
       onCreated(row.id);
+      set("unitId", "");
       setNewName("");
       setNewUnit("");
       setMode("select");
@@ -483,7 +503,10 @@ function ClientStep({
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => set("clientId", c.id)}
+                  onClick={() => {
+                    set("clientId", c.id);
+                    set("unitId", "");
+                  }}
                   className={cn(
                     "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition",
                     active
@@ -506,6 +529,51 @@ function ClientStep({
               );
             })}
           </div>
+
+          {draft.clientId && selectedUnits.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                Unidade do cliente
+              </p>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => set("unitId", "")}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-[11px] font-bold transition",
+                    draft.unitId === ""
+                      ? "border-primary/50 bg-primary/10 text-foreground"
+                      : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]",
+                  )}
+                >
+                  Sem unidade específica
+                </button>
+                {selectedUnits.map((u) => {
+                  const active = draft.unitId === u.id;
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => set("unitId", u.id)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-left text-[11px] font-bold transition",
+                        active
+                          ? "border-primary/50 bg-primary/10 text-foreground"
+                          : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]",
+                      )}
+                    >
+                      <div className="truncate">{u.name}</div>
+                      {u.sector && (
+                        <div className="truncate text-[10px] text-muted-foreground/80">
+                          {u.sector}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
