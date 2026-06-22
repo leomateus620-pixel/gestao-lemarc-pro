@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import type {
   ServiceOrder,
   ServiceOrderStatus,
@@ -89,7 +90,9 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)
   .handler(async ({ data, context }) => {
     const now = new Date().toISOString();
-    const patch: Record<string, unknown> = { status: data.status };
+    const patch: Database["public"]["Tables"]["service_orders"]["Update"] = {
+      status: data.status,
+    };
     if (data.status === "running") patch.started_at = now;
     if (data.status === "finished") patch.finished_at = now;
     if (data.status === "approved") {
