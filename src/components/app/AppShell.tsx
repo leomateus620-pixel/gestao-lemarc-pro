@@ -1,7 +1,8 @@
-import { ChevronLeft, Plus } from "lucide-react";
-import { Link, useRouter } from "@tanstack/react-router";
+import { ChevronLeft, LogOut, Plus } from "lucide-react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Logo } from "./Logo";
 import { useRole } from "./RoleContext";
+import { useAuth } from "./AuthContext";
 import type { ReactNode } from "react";
 
 export function AppShell({
@@ -17,7 +18,15 @@ export function AppShell({
 }) {
   const { name, role } = useRole();
   const router = useRouter();
+  const navigate = useNavigate();
+  const { displayName, avatarUrl, signOut } = useAuth();
   const isHome = !title && !back;
+  const firstName = (displayName || name).split(" ")[0];
+
+  async function handleSignOut() {
+    await signOut();
+    navigate({ to: "/login", replace: true });
+  }
   return (
     <div className="lemarc-app-bg min-h-dvh">
       <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col">
@@ -43,7 +52,7 @@ export function AppShell({
                 </div>
                 <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {isHome ? "Central de operação" : role === "gestor" ? "Gestor" : "Campo"} ·{" "}
-                  {name.split(" ")[0]}
+                  {firstName}
                 </div>
               </div>
               {action ??
@@ -56,9 +65,26 @@ export function AppShell({
                     <Plus size={18} />
                   </Link>
                 ))}
-              <span className="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-primary">
-                {role === "gestor" ? "Gestor" : "Téc."}
-              </span>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="size-9 shrink-0 rounded-full border border-white/15 object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/15 text-[11px] font-black uppercase text-primary">
+                  {firstName.slice(0, 2)}
+                </span>
+              )}
+              <button
+                onClick={handleSignOut}
+                className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition hover:text-foreground lemarc-pressable"
+                aria-label="Sair"
+                title="Sair"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           </div>
         </header>
