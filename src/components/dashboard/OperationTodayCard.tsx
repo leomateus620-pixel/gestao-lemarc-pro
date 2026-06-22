@@ -1,10 +1,9 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ClipboardList, CheckCircle2, Activity, FileCheck2, Plus } from "lucide-react";
-import { MetricPeriodFilter } from "./MetricPeriodFilter";
-import type { Period } from "@/lib/serviceOrders/period";
-import { periodLabel } from "@/lib/serviceOrders/period";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
+import type { Period, PeriodRange } from "@/lib/serviceOrders/period";
+import { periodContextLabel, periodLabel } from "@/lib/serviceOrders/period";
 
 function greetingPrefix(): string {
   const h = new Date().getHours();
@@ -17,14 +16,15 @@ export function OperationTodayCard({
   greetingName,
   metrics,
   period,
-  onPeriodChange,
+  periodRange,
 }: {
   greetingName: string;
   metrics: DashboardMetrics;
   period: Period;
-  onPeriodChange: (p: Period) => void;
+  periodRange?: PeriodRange;
 }) {
   const pendingTotal = metrics.pending + metrics.inProgress + metrics.awaitingReview;
+  const contextLabel = periodContextLabel(period, periodRange);
   const ref = useRef<HTMLDivElement>(null);
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -60,6 +60,16 @@ export function OperationTodayCard({
         }}
         aria-hidden
       />
+      {/* corner ambient halos */}
+      <div
+        className="pointer-events-none absolute -right-24 -top-28 size-72 rounded-full bg-[#ff7a18]/[0.10] blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-32 -left-20 size-72 rounded-full bg-cyan-500/[0.06] blur-3xl"
+        aria-hidden
+      />
+
       <div className="relative p-6 sm:p-8">
         <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 space-y-4">
@@ -80,12 +90,12 @@ export function OperationTodayCard({
               </h1>
               <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
                 {metrics.total === 0 ? (
-                  <>Nenhuma OS registrada no período. Hora de começar.</>
+                  <>Nenhuma OS registrada {contextLabel}. Hora de começar.</>
                 ) : pendingTotal === 0 ? (
                   <>
                     Todas as{" "}
-                    <span className="font-semibold text-emerald-400">{metrics.total} OS</span> do
-                    período foram fechadas. Operação em dia.
+                    <span className="font-semibold text-emerald-400">{metrics.total} OS</span>{" "}
+                    {contextLabel} foram fechadas. Operação em dia.
                   </>
                 ) : (
                   <>
@@ -93,13 +103,11 @@ export function OperationTodayCard({
                     <span className="font-semibold italic text-primary">
                       {pendingTotal} ordens de serviço
                     </span>{" "}
-                    em aberto neste período.
+                    em aberto {contextLabel}.
                   </>
                 )}
               </p>
             </div>
-
-            <MetricPeriodFilter value={period} onChange={onPeriodChange} />
           </div>
 
           <Link
@@ -163,9 +171,7 @@ function Stat({
   }[tone];
   const formatted = String(value).padStart(2, "0");
   return (
-    <div
-      className="group/stat relative overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 pl-4 transition-colors duration-200 hover:bg-white/[0.05]"
-    >
+    <div className="group/stat relative overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 pl-4 transition-colors duration-200 hover:bg-white/[0.05]">
       <div
         aria-hidden
         className={`absolute bottom-2.5 left-0 top-2.5 w-[2px] rounded-r-full ${tones.rail} opacity-80`}
@@ -176,9 +182,7 @@ function Stat({
         </span>
         <Icon size={14} className={`${tones.icon} shrink-0`} strokeWidth={2.2} />
       </div>
-      <p
-        className="mt-2.5 font-display text-2xl font-black leading-none tracking-tight text-foreground tabular-nums sm:text-[1.75rem]"
-      >
+      <p className="mt-2.5 font-display text-2xl font-black leading-none tracking-tight text-foreground tabular-nums sm:text-[1.75rem]">
         {formatted}
       </p>
     </div>
