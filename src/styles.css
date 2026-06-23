@@ -121,7 +121,7 @@
 
   html,
   body {
-    background-color: oklch(0.945 0.022 240);
+    background-color: oklch(0.95 0.018 75);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -151,16 +151,18 @@
 }
 
 @utility lemarc-app-bg {
-  background-color: oklch(0.945 0.022 240);
+  /* Identidade Lemarc: base creme/areia morna com banhos laranja
+     bem perceptíveis nos cantos e leve azul gelo no meio. */
+  background-color: oklch(0.945 0.03 70);
   background-image:
-    radial-gradient(ellipse at 18% -12%, oklch(0.72 0.19 50 / 0.08), transparent 44%),
-    radial-gradient(ellipse at 90% 110%, oklch(0.82 0.06 230 / 0.55), transparent 48%),
-    radial-gradient(ellipse at 50% 50%, oklch(0.97 0.012 235 / 0.6), transparent 70%),
+    radial-gradient(ellipse 80% 70% at 0% 0%, oklch(0.78 0.18 55 / 0.32), transparent 65%),
+    radial-gradient(ellipse 85% 75% at 100% 100%, oklch(0.8 0.15 60 / 0.34), transparent 65%),
+    radial-gradient(ellipse 70% 55% at 50% 50%, oklch(0.93 0.05 235 / 0.42), transparent 75%),
     linear-gradient(
-      160deg,
-      oklch(0.96 0.018 235),
-      oklch(0.93 0.028 245) 58%,
-      oklch(0.95 0.022 230)
+      155deg,
+      oklch(0.955 0.035 70),
+      oklch(0.94 0.025 230) 52%,
+      oklch(0.95 0.045 60)
     );
   background-attachment: fixed;
 }
