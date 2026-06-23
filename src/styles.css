@@ -121,7 +121,7 @@
 
   html,
   body {
-    background-color: oklch(0.945 0.022 240);
+    background-color: oklch(0.95 0.018 75);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
