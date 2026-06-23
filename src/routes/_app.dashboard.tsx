@@ -173,10 +173,10 @@ function Dashboard() {
       />
 
       <section className="mt-6 space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-[#0b1424]/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--on-app-bg)]/10 bg-white/55 p-3 shadow-[0_8px_24px_-18px_oklch(0.2_0.05_252/0.35)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-3">
           <div className="min-w-0 px-1 sm:px-0">
             <h2 className="section-title">Cards operacionais</h2>
-            <p className="mt-1 text-[11px] font-medium text-muted-foreground/80">Resumo {periodText}.</p>
+            <p className="mt-1 text-[11px] font-medium text-[color:var(--on-app-bg-muted)]">Resumo {periodText}.</p>
           </div>
           <MetricPeriodFilter
             value={period}
@@ -294,7 +294,7 @@ function Dashboard() {
               <RouteIcon size={14} />
               Ordens recentes
             </h2>
-            <Link to="/ordens" className="text-xs font-bold text-primary">
+            <Link to="/ordens" className="text-xs font-bold text-primary hover:text-primary/80">
               Ver todas
             </Link>
           </div>

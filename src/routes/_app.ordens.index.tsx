@@ -192,7 +192,7 @@ function OrdensList() {
                 },
               })
             }
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+            className="rounded-full border border-[color:var(--on-app-bg)]/15 bg-white/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--on-app-bg)] hover:bg-white"
           >
             Limpar filtros
           </button>
