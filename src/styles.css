@@ -108,6 +108,10 @@
   --chart-3: oklch(0.78 0.16 90);
   --chart-4: oklch(0.7 0.16 155);
   --chart-5: oklch(0.6 0.18 320);
+
+  /* Cor de texto sobre o fundo claro do app (fora de cards) */
+  --on-app-bg: oklch(0.28 0.04 252);
+  --on-app-bg-muted: oklch(0.46 0.035 250);
 }
 
 @layer base {
