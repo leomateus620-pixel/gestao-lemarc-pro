@@ -510,6 +510,28 @@
     18px 18px,
     23px 23px;
 }
+.lemarc-wizard-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    oklch(0.78 0.18 55 / 0.85),
+    transparent
+  );
+  pointer-events: none;
+}
+.lemarc-wizard-card > * {
+  position: relative;
+  z-index: 1;
+}
+.lemarc-wizard-input::placeholder {
+  color: oklch(1 0 0 / 0.45) !important;
+}
 @keyframes lemarc-page-enter {
   from {
     opacity: 0;
