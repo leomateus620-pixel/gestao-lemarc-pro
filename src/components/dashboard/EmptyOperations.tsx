@@ -3,11 +3,11 @@ import { ClipboardCheck, Plus } from "lucide-react";
 
 export function EmptyOperations() {
   return (
-    <section className="relative mt-5 overflow-hidden rounded-[1.75rem] border border-dashed border-[color:var(--on-app-bg)]/20 bg-white/55 px-6 py-14 shadow-[0_10px_30px_-20px_oklch(0.2_0.05_252/0.35)] backdrop-blur-md sm:py-16">
+    <section className="lemarc-wizard-card relative mt-5 px-6 py-14 sm:py-16">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.08]"
         style={{
-          backgroundImage: "radial-gradient(circle, oklch(0.28 0.04 252 / 0.6) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, oklch(1 0 0 / 0.6) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       />
@@ -18,10 +18,10 @@ export function EmptyOperations() {
           <ClipboardCheck size={32} strokeWidth={1.6} />
         </div>
 
-        <h3 className="mt-5 font-display text-xl font-black tracking-tight text-[color:var(--on-app-bg)]">
+        <h3 className="mt-5 font-display text-xl font-black tracking-tight text-foreground">
           Nenhuma OS cadastrada
         </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-[color:var(--on-app-bg-muted)]">
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
           A operação está limpa no período selecionado. Crie a primeira ordem de serviço para
           acompanhar fila, campo, revisão e fechamento em tempo real.
         </p>
