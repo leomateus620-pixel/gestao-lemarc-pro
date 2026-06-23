@@ -1,9 +1,10 @@
 import { ChevronLeft, LogOut, Plus } from "lucide-react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Logo } from "./Logo";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
 import type { ReactNode } from "react";
+
+const HEADER_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
 export function AppShell({
   children,
@@ -42,8 +43,14 @@ export function AppShell({
                   <ChevronLeft size={21} />
                 </button>
               ) : (
-                <Link to="/dashboard" className="shrink-0">
-                  <Logo size="sm" />
+                <Link to="/dashboard" className="shrink-0" aria-label="Ir para o dashboard">
+                  <img
+                    src={HEADER_LOGO_SRC}
+                    alt="Gestão Lemarc"
+                    decoding="async"
+                    draggable={false}
+                    className="h-9 w-auto max-w-[160px] object-contain"
+                  />
                 </Link>
               )}
               <div className="min-w-0 flex-1">
