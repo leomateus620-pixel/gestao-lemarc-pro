@@ -187,7 +187,7 @@ function Stepper({
   onJump: (i: number) => void;
 }) {
   return (
-    <GlassCard className="p-3 sm:p-4">
+    <GlassCard className="lemarc-wizard-card p-3 sm:p-4">
       <div className="flex items-center gap-1.5 sm:gap-3">
         {STEPS.map((label, i) => {
           const done = i < step;
