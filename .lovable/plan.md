@@ -1,67 +1,72 @@
-## Revisão do PR #2 — Cards Operacionais da Home
+# Fundo azul claro global (sem afetar cards)
 
-Foco: validação funcional + polimento visual sobre o trabalho do Codex. Sem refazer, sem mexer em backend, auth, schema, hooks de dados ou rotas.
+## Objetivo
+Substituir o fundo escuro navy do sistema por um azul claro suave em todas as telas do app (dashboard, ordens, clientes, colaboradores, relatórios, login, detalhes de OS/cliente), mantendo intactos os cards atuais, seus contrastes, seus textos brancos, badges, bordas e glows.
 
-### 1. Validação funcional (antes de qualquer pixel)
+## Estratégia (mínima invasão)
+O fundo visível do app vem essencialmente de **um único utilitário**: `lemarc-app-bg` em `src/styles.css` (aplicado em `AppShell`, login e telas de loading). Os cards usam `--card`, `glass-card`, `lemarc-liquid-card`, etc. — todos com cor própria, independentes de `--background`.
 
-Rodar Playwright autenticado (sessão Supabase já injetada no sandbox) em `/dashboard`, `/ordens`, `/ordens/nova`, `/clientes`, `/colaboradores` em viewport desktop (1280) e mobile (390). Capturar screenshots e console.
+Logo:
+1. Reescrever apenas `lemarc-app-bg` para um azul claro com leve gradiente (não branco puro, tom "blueprint claro").
+2. Não tocar em `--background`, `--card`, `--foreground` nem nos utilitários de card. Cards continuam navy/glass com texto claro — contraste melhora, não piora.
+3. Ajustar somente os **textos/ícones que ficam diretamente sobre o fundo** (fora de cards) para uma cor escura legível sobre azul claro: títulos de seção (`section-title`), header do `AppShell` (título + subtítulo "Central de operação · Nome"), links "Ver todas", o subtítulo cinza do bloco "Cards operacionais", e textos do `EmptyOperations`.
+4. Ajustar o chip do header (`lemarc-liquid` no `AppShell` e na `BottomNav`) para uma variante mais opaca/escura, garantindo que o glass continue legível sobre fundo claro (hoje usa branco translúcido — sumiria).
+5. Login: o card central já é escuro; só o fundo muda.
 
-Checar:
-- Cada `MetricCard` navega para a rota certa com os search params atuais (`status`, `filtro`, `period`, `from`, `to`).
-- Em `/ordens` os params `period=custom&from=&to=` chegam, alimentam `MetricPeriodFilter` e filtram via `filterByPeriod` sem quebrar `status`/`filtro`/`q`.
-- Trocar Hoje → Semana → Mês → Personalizado e voltar mantém URL coerente; "Limpar filtros" reseta para `period=all`.
-- Caso patológico: `from > to` → `periodWindow` já inverte; confirmar contagens.
-- Período vazio mostra 0 + badge "Sem registros" e CTA continua clicável.
-- Bottom nav não sobrepõe o último card (padding bottom do `AppShell`).
+## Paleta proposta
+- Fundo base: `oklch(0.94 0.025 245)` (azul muito claro, levemente acinzentado — não branco).
+- Halos: gradientes radiais suaves em `oklch(0.86 0.04 240)` + `oklch(0.9 0.05 220)` para dar profundidade sem ruído.
+- Texto sobre fundo (novo token `--on-app-bg`): `oklch(0.28 0.04 252)` (navy profundo) para títulos; `oklch(0.42 0.03 250)` para subtítulos.
+- `lemarc-liquid` (chip do header + bottom nav): trocar branco translúcido por `linear-gradient` em navy translúcido (`oklch(0.22 0.045 252 / 0.85)` → `0.7`) com borda branca sutil — mantém o efeito liquid mas legível sobre claro.
 
-Se quebrar: corrigir cirurgicamente (sem reescrever).
+## Arquivos a alterar
+- `src/styles.css`
+  - Reescrever `@utility lemarc-app-bg` (gradiente claro).
+  - Reescrever `@utility lemarc-liquid` (variante navy translúcida).
+  - Atualizar `@utility section-title` → `color: var(--on-app-bg)`.
+  - Adicionar `--on-app-bg` e `--on-app-bg-muted` em `:root`.
+- `src/components/app/AppShell.tsx`
+  - Trocar classes `text-foreground` / `text-muted-foreground` do título e subtítulo do header pelas novas (`text-[color:var(--on-app-bg)]` / `...-muted`). Botão "voltar" e botão "sair" ganham fundo `bg-white/70` em vez de `bg-secondary` para contraste.
+  - Avatar fallback mantém estilo (já tem fundo próprio).
+- `src/routes/_app.dashboard.tsx`
+  - Wrapper "Cards operacionais": trocar `bg-[#0b1424]/60` por uma superfície clara translúcida (`bg-white/55 border-white/60`) para integrar ao novo fundo; manter título escuro.
+  - Header "Ordens recentes" → cor escura.
+- `src/components/dashboard/EmptyOperations.tsx` e `src/components/app/EmptyState.tsx`
+  - Trocar textos `text-muted-foreground` por variante escura.
+- `src/routes/_app.ordens.index.tsx`, `_app.clientes.index.tsx`, `_app.colaboradores.tsx`, `_app.relatorios.tsx`
+  - Verificar headers/subtítulos/labels que ficam fora de cards e aplicar a nova cor escura. Filtros e tabs (já usam superfície própria) permanecem.
+- `src/components/app/BottomNav.tsx`
+  - Sem mudança de markup; herda nova `lemarc-liquid`.
+- `src/routes/_app.tsx` (loader)
+  - Spinner: trocar borda `border-primary/30` por algo visível sobre claro (já é laranja, ok — só conferir).
 
-### 2. Polimento visual (sem alterar lógica)
+## Plano de validação (Playwright autenticado, antes e depois)
+Capturas em desktop 1280 e mobile 390 nas rotas:
+- `/dashboard` (incluindo `OperationTodayCard`, grid de `MetricCard`, "Ordens recentes")
+- `/ordens` (com `?status=andamento` e `?period=custom`)
+- `/ordens/:id` (detalhe)
+- `/clientes`, `/clientes/:id`
+- `/colaboradores`, `/relatorios`
+- `/login`
+- Skeleton (`DashboardSkeleton`) com rede lenta simulada
 
-Arquivos tocados apenas para CSS/markup leve:
+Checks visuais:
+- Nenhum texto "branco sobre branco" ou ilegível sobre o novo fundo.
+- Cards mantêm fundo navy/glass e textos claros — contraste aumenta.
+- Bottom nav legível, não sobrepõe conteúdo.
+- Header sticky com chip liquid escuro continua visível ao rolar.
+- Halos do fundo discretos, sem competir com cards.
 
-**`src/components/dashboard/MetricCard.tsx`**
-- Reduzir densidade: mini-resumo com fundo mais discreto (`bg-white/[0.03]` em vez de `[0.055]`), sem borda interna em cada linha — usar divisores `divide-y divide-white/[0.04]` para parecer menos "tabela".
-- Ícone de fundo: cair de `size-28 opacity-[0.055]` para `size-24 opacity-[0.04]`, recuar mais para o canto.
-- Badge: reduzir para `text-[9px]` em `px-1.5 py-0.5`, remover `min-w-0 max-w-[9rem]` (deixa fluido).
-- Borda externa mais sutil: `border-white/[0.08]`; remover o degradê pesado do topo (manter só o trilho lateral).
-- Trilho lateral: 3px em vez de 5px; reduzir glow.
-- Altura mínima consistente: `min-h-[244px]` em todos para alinhar a grid.
-- CTA do rodapé: tipografia `text-[10px]` mantida mas com `text-muted-foreground` + seta colorida — não disputa com o número.
+## Fora de escopo
+- Nenhum hook, query, rota, schema, ação ou dado. Apenas tokens CSS + classes Tailwind nos pontos listados.
+- Cards (`ServiceOrderCard`, `ClientCard`, `MetricCard`, `OperationTodayCard`, etc.) não são alterados.
 
-**`src/components/dashboard/MetricPeriodFilter.tsx`**
-- Integrar ao bloco "Cards operacionais": remover borda/shadow externos quando dentro do card-pai (já está dentro de wrapper no dashboard). Manter visual standalone em `/ordens`.
-- Botão ativo: laranja mais sóbrio (sem `shadow-[var(--shadow-glow-orange)]` forte; usar sombra interna sutil).
-- Mobile: garantir `lemarc-smart-scroll` com fade laterais; inputs de data em `grid-cols-2` no mobile (não empilhar 4 linhas).
+## Riscos e mitigação
+- **Glass dos cards** ficar "leitoso" sobre claro: `lemarc-liquid-card` já mistura com `--card` (navy) em opacidade alta → permanece escuro. Validar no Playwright.
+- **Inputs/popovers** (shadcn) usam `--input`/`--popover` tokens dark — continuam escuros; só conferir contraste de placeholder se cair sobre fundo.
+- **Skeleton shimmer** pode precisar de tom mais escuro para aparecer; ajustar se Playwright mostrar invisível.
 
-**`src/components/dashboard/OperationTodayCard.tsx`**
-- Reduzir padding mobile (`p-5` em vez de `p-6 sm:p-8` no breakpoint pequeno).
-- Halos laranja/cyan: baixar opacidade (`/[0.06]` e `/[0.04]`).
-- Mini Stats: aumentar contraste do label (`text-muted-foreground` → `text-muted-foreground/90`).
-
-**`src/components/dashboard/DashboardSkeleton.tsx`**
-- Ajustar altura para casar com novo `min-h-[244px]`.
-
-**`src/hooks/usePhysicsCard.ts`** (apenas se necessário): confirmar que `mobileMaxRotate` já reduz parallax e que respeita `prefers-reduced-motion`. Se não respeitar, adicionar guard.
-
-**`src/routes/_app.dashboard.tsx`**
-- Wrapper "Cards operacionais": espaçamento `mt-6`, padding `p-4`, separar título e filtro com mais respiro no desktop.
-
-### 3. Fora de escopo (não tocar)
-
-- `useOperationalDashboard`, `metrics.ts`, `period.ts` — lógica já correta, mantida intacta.
-- `serviceOrders.functions.ts`, queries, supabase client, auth.
-- `ServiceOrderCard`, `ClientCard` (revisões anteriores já aplicadas).
-- `routeTree.gen.ts` — regenerado automaticamente pelo plugin; não editar manualmente.
-
-### 4. Verificação final
-
-- `tsc` limpo (build automático do harness).
-- Playwright revisita Home desktop + mobile e `/ordens` com `?period=custom&from=...&to=...`, screenshot final.
-- Reportar qualquer dívida preexistente (Prettier/CRLF, Fast Refresh) sem corrigir.
-
-### Detalhes técnicos
-
-- Nenhum hook novo, nenhum tipo novo.
-- Mudanças concentradas em ~5 arquivos, todas em classes Tailwind / markup.
-- Sem novas dependências.
+## Entregáveis
+- Diff concentrado em `src/styles.css` + ~6 arquivos de markup.
+- Conjunto de screenshots antes/depois para confirmar que nenhum card perdeu legibilidade.
+- Relato de qualquer dívida visual preexistente fora do escopo.
