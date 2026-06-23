@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { ServiceOrderProgressCard } from "@/components/login/ServiceOrderProgressCard";
 import { Button } from "@/components/ui/button";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,62 +67,67 @@ function LoginPage() {
     <div className="lemarc-login-bg min-h-dvh">
       <LoginBackground />
 
-      <main className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center">
-          <LoginLogo />
+      <main className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-7 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+        <div className="mx-auto grid w-full max-w-[1180px] items-center gap-7 md:gap-8 lg:min-h-[min(760px,calc(100dvh-6rem))] lg:grid-cols-[minmax(0,1fr)_minmax(380px,430px)] lg:gap-10 xl:gap-14">
+          <section className="flex min-w-0 flex-col items-center lg:items-start">
+            <LoginLogo />
 
-          <div className="mt-6 grid w-full items-center gap-6 lg:mt-9 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-12">
-            <LoginIntro />
-
-            <div className="mx-auto w-full max-w-[440px] lg:mx-0">
-              <GlassLoginCard>
-                <div className="space-y-5">
-                  <p className="text-sm leading-6 text-white/72">
-                    Acesso exclusivo para colaboradores Lemarc Industrial.
-                    Entre com sua conta Google corporativa para abrir suas ordens
-                    de serviço.
-                  </p>
-
-                  <Button
-                    className="h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep shadow-lg hover:bg-white/95 disabled:opacity-70"
-                    disabled={isSubmitting}
-                    onClick={handleGoogle}
-                    type="button"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 aria-hidden="true" className="animate-spin" />
-                        Conectando...
-                      </>
-                    ) : (
-                      <>
-                        <GoogleIcon />
-                        Entrar com Google
-                      </>
-                    )}
-                  </Button>
-
-                  {error ? (
-                    <div
-                      className="flex items-start gap-2 rounded-xl border border-red-300/22 bg-red-500/10 px-3 py-2.5 text-sm font-medium leading-snug text-red-50"
-                      role="alert"
-                    >
-                      <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <span>{error}</span>
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs leading-snug text-white/60">
-                    <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-orange-glow" />
-                    <span>
-                      Sua sessão é criptografada e fica salva apenas neste
-                      dispositivo. Os acessos ficam registrados na central
-                      operacional Lemarc.
-                    </span>
-                  </div>
-                </div>
-              </GlassLoginCard>
+            <div className="mt-6 w-full md:mt-7 lg:mt-8">
+              <LoginIntro />
             </div>
+
+            <ServiceOrderProgressCard className="mt-6 w-full max-w-[620px] lg:mt-8" />
+          </section>
+
+          <div className="mx-auto w-full max-w-[440px] lg:mx-0 lg:justify-self-end">
+            <GlassLoginCard>
+              <div className="space-y-5">
+                <p className="text-sm leading-6 text-white/72">
+                  Acesso exclusivo para colaboradores Lemarc Industrial. Entre com sua conta Google
+                  corporativa para abrir suas ordens de serviço.
+                </p>
+
+                <Button
+                  className="h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep shadow-lg hover:bg-white/95 disabled:opacity-70"
+                  disabled={isSubmitting}
+                  onClick={handleGoogle}
+                  type="button"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    <>
+                      <GoogleIcon />
+                      Entrar com Google
+                    </>
+                  )}
+                </Button>
+
+                {error ? (
+                  <div
+                    className="flex items-start gap-2 rounded-xl border border-red-300/22 bg-red-500/10 px-3 py-2.5 text-sm font-medium leading-snug text-red-50"
+                    role="alert"
+                  >
+                    <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                ) : null}
+
+                <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs leading-snug text-white/60">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-orange-glow"
+                  />
+                  <span>
+                    Sua sessão é criptografada e fica salva apenas neste dispositivo. Os acessos
+                    ficam registrados na central operacional Lemarc.
+                  </span>
+                </div>
+              </div>
+            </GlassLoginCard>
           </div>
         </div>
       </main>
@@ -142,10 +148,10 @@ function LoginBackground() {
 
 function LoginLogo() {
   return (
-    <div className="flex w-full justify-center px-2">
+    <div className="flex w-full justify-center px-2 lg:justify-start lg:px-0">
       <img
         alt="Gestao Lemarc Industrial OS Digital"
-        className="lemarc-login-logo h-auto max-h-[76px] w-[min(92vw,390px)] object-contain sm:max-h-[118px] sm:w-[min(82vw,610px)] lg:max-h-[148px] lg:w-[min(58vw,760px)]"
+        className="lemarc-login-logo h-auto max-h-[76px] w-[min(92vw,390px)] object-contain sm:max-h-[118px] sm:w-[min(82vw,520px)] lg:max-h-[118px] lg:w-[min(40vw,500px)] xl:w-[520px]"
         decoding="async"
         src={LOGIN_LOGO_SRC}
       />
@@ -155,9 +161,9 @@ function LoginLogo() {
 
 function LoginIntro() {
   return (
-    <section className="mx-auto max-w-lg text-center lg:mx-0 lg:text-left">
+    <section className="mx-auto max-w-lg text-center lg:mx-0 lg:max-w-[560px] lg:text-left">
       <div className="mx-auto mb-4 h-px w-28 bg-gradient-to-r from-transparent via-orange-glow to-transparent lg:mx-0" />
-      <h1 className="font-display text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+      <h1 className="font-display text-3xl font-black leading-tight text-white sm:text-4xl lg:text-[3.25rem]">
         Acesse sua operação
       </h1>
       <p className="mt-3 text-sm font-medium leading-6 text-white/68 sm:text-base">
