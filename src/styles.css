@@ -207,7 +207,7 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--foreground);
+  color: var(--on-app-bg);
 }
 
 @layer base {
