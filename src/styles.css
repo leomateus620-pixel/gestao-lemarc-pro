@@ -681,6 +681,49 @@
     z-index: 1;
   }
 
+  .lemarc-login-os-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.35rem;
+    padding: 1.25rem;
+    background:
+      radial-gradient(circle at 12% 0%, oklch(1 0 0 / 0.13), transparent 32%),
+      radial-gradient(circle at 94% 12%, oklch(0.72 0.19 50 / 0.22), transparent 36%),
+      linear-gradient(145deg, oklch(0.27 0.045 252 / 0.76), oklch(0.12 0.034 252 / 0.74));
+    backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid oklch(1 0 0 / 0.13);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.18),
+      inset 0 -1px 0 oklch(0 0 0 / 0.24),
+      0 26px 64px -34px oklch(0 0 0 / 0.86),
+      0 12px 28px -22px oklch(0.72 0.19 50 / 0.42);
+  }
+
+  .lemarc-login-os-card::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    pointer-events: none;
+    border-radius: inherit;
+    border: 1px solid oklch(1 0 0 / 0.055);
+  }
+
+  .lemarc-login-os-card::after {
+    content: "";
+    position: absolute;
+    left: 16%;
+    right: 16%;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, oklch(0.78 0.18 55 / 0.85), transparent);
+  }
+
+  .lemarc-login-os-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .lemarc-login-input {
     box-shadow:
       inset 0 1px 0 oklch(1 0 0 / 0.09),
