@@ -363,7 +363,7 @@ function BasicInfoStep({
   titleRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 1 · Dados iniciais"
         title="Conte o essencial da OS"
@@ -462,7 +462,7 @@ function ClientStep({
   });
 
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 2 · Cliente"
         title="Para quem é esta ordem?"
@@ -651,7 +651,7 @@ function TechnicianStep({
   });
 
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 3 · Técnico"
         title="Quem vai executar?"
@@ -796,7 +796,7 @@ function ServiceTypeStep({
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
 }) {
   return (
-    <GlassCard className="space-y-6 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 4 · Serviço"
         title="Que tipo de serviço é este?"
@@ -876,7 +876,7 @@ function ReviewStep({
   const client = clients.find((c) => c.id === draft.clientId);
   const tech = technicians.find((t) => t.id === draft.techId);
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 5 · Revisão"
         title="Confira antes de criar"

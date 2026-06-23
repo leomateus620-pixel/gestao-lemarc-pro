@@ -280,7 +280,7 @@ function CompanyStep({
   cnpjOk: boolean;
 }) {
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 1 · Empresa"
         title="Dados da empresa"
@@ -330,7 +330,7 @@ function LocationStep({
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
 }) {
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 2 · Localização & contato"
         title="Onde fica e quem responde"
@@ -438,7 +438,7 @@ function UnitsStep({
   }
 
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 3 · Unidades"
         title="Unidades operacionais"
@@ -574,7 +574,7 @@ function UnitsStep({
 
 function ReviewStep({ draft }: { draft: Draft }) {
   return (
-    <GlassCard className="space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 4 · Revisão"
         title="Confira antes de cadastrar"
