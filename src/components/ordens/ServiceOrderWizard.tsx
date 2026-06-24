@@ -333,7 +333,7 @@ function StepFooter({
         variant="secondary"
         onClick={onBack}
         disabled={step === 0 || loading}
-        className="h-14 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
+        className="h-12 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40 sm:h-14"
       >
         <ArrowLeft size={16} /> Voltar
       </Button>
@@ -342,7 +342,7 @@ function StepFooter({
         onClick={onNext}
         disabled={!canGoNext || loading}
         className={cn(
-          "lemarc-pressable flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40",
+          "lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40 sm:h-14",
           canGoNext && !loading && "lemarc-orange-glow hover:-translate-y-0.5 active:scale-[0.98]",
         )}
       >
@@ -419,13 +419,14 @@ function BasicInfoStep({
           />
         </div>
         <div className="space-y-1">
-          <FieldLabel>Previsão</FieldLabel>
+          <FieldLabel>Previsão de início</FieldLabel>
           <Input
             type="datetime-local"
             value={draft.scheduled}
             onChange={(e) => set("scheduled", e.target.value)}
-            className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+            className="h-12 rounded-xl border-white/15 bg-white/[0.09] text-foreground focus-visible:ring-primary/40 [color-scheme:dark]"
           />
+          <FieldHint>Quando a execução está prevista para começar.</FieldHint>
         </div>
       </div>
     </GlassCard>
@@ -823,7 +824,7 @@ function ServiceTypeStep({
       />
       <div className="space-y-2">
         <FieldLabel required>Tipo de serviço</FieldLabel>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {serviceTypes.map(([key, label]) => {
             const Icon = typeIcon[key];
             const active = draft.type === key;
@@ -833,9 +834,9 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("type", key)}
                 className={cn(
-                  "group flex flex-col items-start gap-2 rounded-xl border px-3 py-3 text-left transition",
+                  "group flex min-h-[88px] flex-col items-start gap-2 rounded-xl border px-3 py-3.5 text-left transition",
                   active
-                    ? "border-primary/50 bg-primary/10 text-foreground shadow-[0_8px_24px_-16px_hsl(var(--primary)/0.7)]"
+                    ? "border-primary/70 bg-primary/20 text-foreground shadow-[0_10px_28px_-14px_hsl(var(--primary)/0.8)] ring-1 ring-primary/60"
                     : "border-white/10 bg-white/[0.03] text-muted-foreground hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-foreground",
                 )}
               >
@@ -847,7 +848,7 @@ function ServiceTypeStep({
                 >
                   <Icon size={16} />
                 </span>
-                <span className="text-[12px] font-black uppercase tracking-[0.08em]">
+                <span className="text-[11px] font-black uppercase tracking-[0.08em] leading-tight">
                   {label}
                 </span>
               </button>
@@ -855,6 +856,20 @@ function ServiceTypeStep({
           })}
         </div>
       </div>
+
+      {draft.type === "outro" && (
+        <div className="space-y-1 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
+          <FieldLabel required>Descreva o tipo de serviço</FieldLabel>
+          <Input
+            value={draft.typeOther}
+            onChange={(e) => set("typeOther", e.target.value)}
+            placeholder="Ex.: Calibração de sensores de vazão"
+            className="h-12 rounded-xl border-white/15 bg-white/[0.09] focus-visible:ring-primary/40"
+            autoFocus
+          />
+          <FieldHint>Mínimo 3 caracteres. Este texto aparecerá na OS.</FieldHint>
+        </div>
+      )}
 
       <div className="space-y-2">
         <FieldLabel required>Prioridade</FieldLabel>
@@ -867,7 +882,7 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("priority", key)}
                 className={cn(
-                  "rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition",
+                  "min-h-12 rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition",
                   active ? priorityActive[key] : priorityTone[key],
                 )}
               >
