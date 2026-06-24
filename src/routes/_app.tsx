@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useMatches, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { BottomNav } from "@/components/app/BottomNav";
 import { RoleProvider } from "@/components/app/RoleContext";
@@ -15,11 +15,20 @@ function AppLayout() {
       <AuthGate>
         <RoleProvider>
           <Outlet />
-          <BottomNav />
+          <BottomNavSlot />
         </RoleProvider>
       </AuthGate>
     </AuthProvider>
   );
+}
+
+function BottomNavSlot() {
+  const matches = useMatches();
+  const hide = matches.some(
+    (m) => (m.staticData as { hideBottomNav?: boolean } | undefined)?.hideBottomNav,
+  );
+  if (hide) return null;
+  return <BottomNav />;
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {

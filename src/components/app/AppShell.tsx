@@ -11,11 +11,17 @@ export function AppShell({
   title,
   back,
   action,
+  fullscreenForm,
 }: {
   children: ReactNode;
   title?: string;
   back?: boolean;
   action?: ReactNode;
+  /**
+   * Quando true, reserva o espaço inferior só para a barra de ações do
+   * formulário (sem BottomNav) e remove o padding extra do menu.
+   */
+  fullscreenForm?: boolean;
 }) {
   const { name, role } = useRole();
   const router = useRouter();
@@ -95,7 +101,16 @@ export function AppShell({
             </div>
           </div>
         </header>
-        <main className="lemarc-page-enter flex-1 px-4 pb-32 pt-2 sm:px-6 lg:px-8">{children}</main>
+        <main
+          className={
+            "lemarc-page-enter flex-1 px-4 pt-2 sm:px-6 lg:px-8 " +
+            (fullscreenForm
+              ? "pb-[calc(env(safe-area-inset-bottom)+7rem)]"
+              : "pb-32")
+          }
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

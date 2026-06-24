@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Save } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
+import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -16,12 +17,13 @@ import type { ClientFull } from "@/types/client";
 
 export const Route = createFileRoute("/_app/clientes/$id/editar")({
   head: () => ({ meta: [{ title: "Editar cliente — Gestão Lemarc" }] }),
+  staticData: { hideBottomNav: true },
   component: EditPage,
 });
 
 function EditPage() {
   return (
-    <AppShell title="Editar cliente" back>
+    <AppShell title="Editar cliente" back fullscreenForm>
       <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
         <Edit />
       </Suspense>
@@ -30,7 +32,7 @@ function EditPage() {
 }
 
 const inputCls =
-  "h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40";
+  "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
 
 function Edit() {
   const { id } = Route.useParams();
@@ -161,7 +163,7 @@ function Edit() {
           <Textarea
             value={draft.notes}
             onChange={(e) => set("notes", e.target.value)}
-            className="min-h-24 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+            className="min-h-24 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
           />
         </div>
 
@@ -185,12 +187,12 @@ function Edit() {
         <p className="text-sm text-rose-300">{(mut.error as Error).message}</p>
       )}
 
-      <div className="sticky bottom-24 z-20 flex gap-3 pb-2">
+      <FormFlowActions>
         <Button
           type="button"
           variant="secondary"
           onClick={() => navigate({ to: "/clientes/$id", params: { id } })}
-          className="h-14 rounded-2xl bg-white/[0.04] px-5"
+          className="h-14 rounded-2xl bg-white/[0.07] px-5"
         >
           Cancelar
         </Button>
@@ -205,7 +207,7 @@ function Edit() {
         >
           <Save size={18} /> {mut.isPending ? "Salvando..." : "Salvar alterações"}
         </button>
-      </div>
+      </FormFlowActions>
     </div>
   );
 }

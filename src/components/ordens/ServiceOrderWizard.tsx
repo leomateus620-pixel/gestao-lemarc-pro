@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/app/GlassCard";
+import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import {
@@ -54,7 +55,7 @@ const serviceTypes = Object.entries(serviceTypeLabel) as [ServiceType, string][]
 const priorities = Object.entries(priorityLabel) as [ServicePriority, string][];
 
 const priorityTone: Record<ServicePriority, string> = {
-  baixa: "border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.07]",
+  baixa: "border-white/10 bg-white/[0.07] text-foreground hover:bg-white/[0.07]",
   media: "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
   alta: "border-amber-400/40 bg-amber-400/15 text-amber-200 hover:bg-amber-400/20",
   urgente: "border-rose-500/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/20",
@@ -110,6 +111,13 @@ export function ServiceOrderWizard({
     if (step === 0) titleRef.current?.focus();
   }, [step]);
 
+  // Sempre rolar para o topo ao mudar de etapa, em ambos os sentidos.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  }, [step]);
+
   const validity = useMemo(() => {
     return [
       draft.title.trim().length >= 3,
@@ -161,7 +169,7 @@ export function ServiceOrderWizard({
     <div className="mt-2 space-y-5">
       <WizardStepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div className="overflow-hidden">
+      <div className="overflow-x-clip">
         <div
           className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
@@ -257,7 +265,7 @@ function WizardStepper({
                 current
                   ? "border-primary/40 bg-primary/10"
                   : done
-                    ? "border-white/10 bg-white/[0.04]"
+                    ? "border-white/10 bg-white/[0.07]"
                     : "border-white/5 bg-transparent opacity-60",
               )}
             >
@@ -308,13 +316,13 @@ function StepFooter({
   onNext: () => void;
 }) {
   return (
-    <div className="sticky bottom-24 z-20 flex gap-3 pb-2">
+    <FormFlowActions>
       <Button
         type="button"
         variant="secondary"
         onClick={onBack}
         disabled={step === 0 || loading}
-        className="h-14 gap-2 rounded-2xl bg-white/[0.04] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
+        className="h-14 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
       >
         <ArrowLeft size={16} /> Voltar
       </Button>
@@ -334,7 +342,7 @@ function StepFooter({
             ? "Criar ordem de serviço"
             : "Continuar"}
       </button>
-    </div>
+    </FormFlowActions>
   );
 }
 
@@ -376,7 +384,7 @@ function BasicInfoStep({
           value={draft.title}
           onChange={(e) => set("title", e.target.value)}
           placeholder="Ex.: Manutenção preventiva do compressor 02"
-          className="h-14 rounded-xl border-white/10 bg-white/[0.04] text-base font-semibold text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-primary/40"
+          className="h-14 rounded-xl border-white/10 bg-white/[0.07] text-base font-semibold text-foreground placeholder:text-white/55 focus-visible:ring-primary/40"
         />
         <FieldHint>Mínimo 3 caracteres. Use um título curto e específico.</FieldHint>
       </div>
@@ -386,7 +394,7 @@ function BasicInfoStep({
           value={draft.description}
           onChange={(e) => set("description", e.target.value)}
           placeholder="Sintomas, escopo, ferramentas, EPI necessário…"
-          className="min-h-32 rounded-xl border-white/10 bg-white/[0.04] text-sm leading-relaxed focus-visible:ring-primary/40"
+          className="min-h-32 rounded-xl border-white/10 bg-white/[0.07] text-sm leading-relaxed focus-visible:ring-primary/40"
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -396,7 +404,7 @@ function BasicInfoStep({
             value={draft.location}
             onChange={(e) => set("location", e.target.value)}
             placeholder="Ex.: Casa de máquinas"
-            className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+            className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
           />
         </div>
         <div className="space-y-1">
@@ -405,7 +413,7 @@ function BasicInfoStep({
             type="datetime-local"
             value={draft.scheduled}
             onChange={(e) => set("scheduled", e.target.value)}
-            className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+            className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
           />
         </div>
       </div>
@@ -488,7 +496,7 @@ function ClientStep({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar cliente ou unidade…"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] pl-10 focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] pl-10 focus-visible:ring-primary/40"
             />
           </div>
           <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
@@ -583,7 +591,7 @@ function ClientStep({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Razão social ou nome fantasia"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
             />
           </div>
           <div className="space-y-1">
@@ -592,7 +600,7 @@ function ClientStep({
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
               placeholder="Ex.: Filial Campinas"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
             />
           </div>
           <Button
@@ -707,7 +715,7 @@ function TechnicianStep({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar técnico ou função…"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] pl-10 focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] pl-10 focus-visible:ring-primary/40"
             />
           </div>
           <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
@@ -759,7 +767,7 @@ function TechnicianStep({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Nome completo"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
             />
           </div>
           <div className="space-y-1">
@@ -768,7 +776,7 @@ function TechnicianStep({
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
               placeholder="Ex.: Eletricista industrial"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
             />
           </div>
           <Button
@@ -964,7 +972,7 @@ function Segmented<T extends string>({
   items: { value: T; label: string }[];
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-1">
+    <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/[0.07] p-1">
       {items.map((it) => {
         const active = value === it.value;
         return (
