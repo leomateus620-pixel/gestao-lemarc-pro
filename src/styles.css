@@ -558,12 +558,14 @@
     overflow: hidden;
     isolation: isolate;
     background:
-      linear-gradient(115deg, oklch(0.2 0.052 252 / 0.92), transparent 46%),
+      radial-gradient(ellipse 68% 62% at 8% 30%, oklch(0.28 0.07 242 / 0.5), transparent 68%),
+      radial-gradient(ellipse 42% 48% at 88% 28%, oklch(0.72 0.19 50 / 0.1), transparent 72%),
+      linear-gradient(115deg, oklch(0.2 0.052 252 / 0.9), transparent 48%),
       linear-gradient(
         180deg,
-        oklch(0.12 0.036 252),
-        oklch(0.08 0.028 252) 62%,
-        oklch(0.11 0.03 250)
+        oklch(0.115 0.038 252),
+        oklch(0.072 0.026 252) 62%,
+        oklch(0.095 0.03 250)
       );
   }
 
@@ -582,11 +584,11 @@
         transparent 40.8% 100%
       );
     background-size:
-      72px 72px,
-      72px 72px,
+      64px 64px,
+      64px 64px,
       100% 100%;
     mask-image: linear-gradient(180deg, transparent, black 16%, black 82%, transparent);
-    opacity: 0.42;
+    opacity: 0.34;
   }
 
   .lemarc-login-bg::after {
@@ -625,9 +627,26 @@
     box-shadow: 0 0 30px oklch(0.72 0.19 50 / 0.32);
   }
 
+  .lemarc-login-orbit {
+    position: absolute;
+    border-radius: 999px;
+    border: 1px solid oklch(1 0 0 / 0.045);
+    box-shadow:
+      inset 0 0 80px oklch(0.55 0.12 235 / 0.04),
+      0 0 80px oklch(0.55 0.12 235 / 0.025);
+  }
+
   .lemarc-login-logo {
     border-radius: 0.65rem;
     filter: drop-shadow(0 22px 44px oklch(0 0 0 / 0.4));
+  }
+
+  .lemarc-login-enter {
+    animation: lemarc-login-enter 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .lemarc-login-enter-delay-1 {
+    animation-delay: 110ms;
   }
 
   .lemarc-login-card {
@@ -636,14 +655,16 @@
     border-radius: 1.35rem;
     background:
       linear-gradient(145deg, oklch(1 0 0 / 0.13), transparent 34%),
-      linear-gradient(180deg, oklch(0.28 0.044 252 / 0.78), oklch(0.14 0.038 252 / 0.7));
-    backdrop-filter: blur(18px) saturate(150%);
-    border: 1px solid oklch(1 0 0 / 0.14);
+      radial-gradient(circle at 100% 0%, oklch(0.72 0.19 50 / 0.1), transparent 34%),
+      linear-gradient(180deg, oklch(0.27 0.046 252 / 0.84), oklch(0.125 0.036 252 / 0.78));
+    backdrop-filter: blur(22px) saturate(155%);
+    border: 1px solid oklch(1 0 0 / 0.15);
     box-shadow:
       inset 0 1px 0 oklch(1 0 0 / 0.2),
       inset 0 -1px 0 oklch(0 0 0 / 0.28),
-      0 28px 70px -34px oklch(0 0 0 / 0.9),
-      0 0 0 1px oklch(0.72 0.19 50 / 0.06);
+      0 34px 80px -34px oklch(0 0 0 / 0.92),
+      0 12px 36px -28px oklch(0.72 0.19 50 / 0.5),
+      0 0 0 1px oklch(0.72 0.19 50 / 0.055);
   }
 
   .lemarc-login-card::before {
@@ -684,19 +705,20 @@
   .lemarc-login-os-card {
     position: relative;
     overflow: hidden;
-    border-radius: 1.35rem;
-    padding: 1.25rem;
+    border-radius: 1.55rem;
+    padding: 1.35rem;
     background:
-      radial-gradient(circle at 12% 0%, oklch(1 0 0 / 0.13), transparent 32%),
-      radial-gradient(circle at 94% 12%, oklch(0.72 0.19 50 / 0.22), transparent 36%),
-      linear-gradient(145deg, oklch(0.27 0.045 252 / 0.76), oklch(0.12 0.034 252 / 0.74));
-    backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid oklch(1 0 0 / 0.13);
+      radial-gradient(circle at 10% -8%, oklch(0.64 0.13 232 / 0.25), transparent 38%),
+      radial-gradient(circle at 96% 8%, oklch(0.72 0.19 50 / 0.2), transparent 34%),
+      linear-gradient(145deg, oklch(0.245 0.048 252 / 0.9), oklch(0.095 0.03 252 / 0.91));
+    backdrop-filter: blur(24px) saturate(155%);
+    border: 1px solid oklch(1 0 0 / 0.145);
     box-shadow:
-      inset 0 1px 0 oklch(1 0 0 / 0.18),
-      inset 0 -1px 0 oklch(0 0 0 / 0.24),
-      0 26px 64px -34px oklch(0 0 0 / 0.86),
-      0 12px 28px -22px oklch(0.72 0.19 50 / 0.42);
+      inset 0 1px 0 oklch(1 0 0 / 0.2),
+      inset 0 -1px 0 oklch(0 0 0 / 0.3),
+      0 34px 78px -36px oklch(0 0 0 / 0.94),
+      0 16px 38px -28px oklch(0.72 0.19 50 / 0.48),
+      0 0 0 1px oklch(0.55 0.12 235 / 0.05);
   }
 
   .lemarc-login-os-card::before {
@@ -711,8 +733,8 @@
   .lemarc-login-os-card::after {
     content: "";
     position: absolute;
-    left: 16%;
-    right: 16%;
+    left: 12%;
+    right: 12%;
     top: 0;
     height: 1px;
     pointer-events: none;
@@ -722,6 +744,140 @@
   .lemarc-login-os-card > * {
     position: relative;
     z-index: 1;
+  }
+
+  .lemarc-os-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.22;
+    background-image:
+      linear-gradient(oklch(1 0 0 / 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.045) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(110deg, black, transparent 58%);
+  }
+
+  .lemarc-os-scan {
+    position: absolute;
+    inset: -55% -30%;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      112deg,
+      transparent 42%,
+      oklch(0.78 0.18 55 / 0.065) 48%,
+      oklch(1 0 0 / 0.08) 50%,
+      transparent 56%
+    );
+    animation: lemarc-os-scan 7.5s ease-in-out infinite;
+  }
+
+  .lemarc-os-icon-orb {
+    color: var(--orange-glow);
+    border: 1px solid oklch(0.78 0.18 55 / 0.28);
+    background:
+      radial-gradient(circle at 28% 18%, oklch(1 0 0 / 0.26), transparent 28%),
+      linear-gradient(145deg, oklch(0.78 0.18 55 / 0.18), oklch(1 0 0 / 0.035));
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.2),
+      0 18px 34px -22px oklch(0.72 0.19 50 / 0.9);
+  }
+
+  .lemarc-os-console {
+    border: 1px solid oklch(1 0 0 / 0.09);
+    background:
+      linear-gradient(180deg, oklch(1 0 0 / 0.055), transparent 55%), oklch(0.075 0.026 252 / 0.5);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.08),
+      inset 0 0 40px oklch(0.55 0.12 235 / 0.04);
+  }
+
+  .lemarc-os-progress-fill {
+    position: relative;
+    background: linear-gradient(
+      90deg,
+      oklch(0.68 0.18 48),
+      oklch(0.83 0.18 62),
+      oklch(0.9 0.13 72)
+    );
+    box-shadow:
+      0 0 14px oklch(0.72 0.19 50 / 0.48),
+      0 0 2px oklch(1 0 0 / 0.72);
+  }
+
+  .lemarc-os-progress-fill::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: oklch(0.96 0.09 78);
+    box-shadow:
+      0 0 0 4px oklch(0.78 0.18 55 / 0.14),
+      0 0 16px oklch(0.78 0.18 55 / 0.85);
+    transform: translateY(-50%);
+  }
+
+  .lemarc-os-step {
+    border: 1px solid oklch(1 0 0 / 0.12);
+    background: oklch(1 0 0 / 0.055);
+    color: oklch(1 0 0 / 0.44);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.09);
+    transition:
+      color 360ms ease,
+      border-color 360ms ease,
+      background 360ms ease,
+      box-shadow 360ms ease,
+      transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .lemarc-os-step[data-state="active"] {
+    color: var(--orange-glow);
+    border-color: oklch(0.78 0.18 55 / 0.48);
+    background: oklch(0.78 0.18 55 / 0.12);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.14),
+      0 0 0 4px oklch(0.78 0.18 55 / 0.065),
+      0 10px 24px -16px oklch(0.72 0.19 50 / 0.9);
+    transform: translateY(-1px) scale(1.04);
+  }
+
+  .lemarc-os-step[data-state="complete"] {
+    color: var(--navy-deep);
+    border-color: oklch(0.88 0.15 68 / 0.66);
+    background: linear-gradient(145deg, oklch(0.9 0.14 72), oklch(0.72 0.19 50));
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.45),
+      0 10px 24px -16px oklch(0.72 0.19 50 / 0.92);
+  }
+
+  .lemarc-login-google.lemarc-login-google {
+    border: 1px solid oklch(1 0 0 / 0.7);
+    background: linear-gradient(180deg, oklch(1 0 0), oklch(0.955 0.008 250));
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0),
+      0 16px 34px -20px oklch(0 0 0 / 0.84);
+    transition:
+      transform 180ms ease,
+      filter 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .lemarc-login-google.lemarc-login-google:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.025);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0),
+      0 20px 38px -20px oklch(0 0 0 / 0.9),
+      0 10px 24px -20px oklch(0.72 0.19 50 / 0.6);
+  }
+
+  .lemarc-login-google.lemarc-login-google:active:not(:disabled) {
+    transform: translateY(0) scale(0.985);
   }
 
   .lemarc-login-input {
@@ -760,9 +916,39 @@
   }
 }
 
+@keyframes lemarc-login-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lemarc-os-scan {
+  0%,
+  20% {
+    transform: translateX(-24%);
+    opacity: 0;
+  }
+  38%,
+  56% {
+    opacity: 1;
+  }
+  76%,
+  100% {
+    transform: translateX(24%);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lemarc-page-enter,
-  .lemarc-shimmer {
+  .lemarc-shimmer,
+  .lemarc-login-enter,
+  .lemarc-os-scan {
     animation: none;
   }
   .lemarc-pressable,
@@ -782,6 +968,10 @@
   .lemarc-login-cta {
     transition: none;
   }
+  .lemarc-os-step,
+  .lemarc-login-google {
+    transition: none;
+  }
 }
 
 @media (max-width: 767px) {
@@ -795,5 +985,33 @@
 
   .lemarc-login-card {
     border-radius: 1rem;
+  }
+
+  .lemarc-login-os-card {
+    border-radius: 1rem;
+    padding: 0.9rem;
+  }
+
+  .lemarc-login-orbit {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 390px) {
+  .lemarc-login-main {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .lemarc-login-os-card {
+    padding: 0.8rem;
+  }
+}
+
+@supports (padding: max(0px)) {
+  .lemarc-login-main {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 }
