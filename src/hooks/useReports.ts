@@ -21,6 +21,9 @@ function filtersKey(f: ReportFilters) {
     f.serviceType ?? "",
     f.billingStatus ?? "",
     f.onlyWithRate ? "1" : "0",
+    f.onlyCompleted ? "1" : "0",
+    f.onlyAwaitingBilling ? "1" : "0",
+    f.onlyWithObservations ? "1" : "0",
   ];
 }
 
