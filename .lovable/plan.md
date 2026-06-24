@@ -1,66 +1,111 @@
-## Objetivo
+## Escopo
 
-Corrigir a experiência mobile dos fluxos em etapas (Nova OS, Cliente) — botões fixos sem sobrepor conteúdo, BottomNav oculta no cadastro, scroll reset por etapa, sem overflow horizontal, e refinar contraste dos cards mantendo a identidade industrial Lemarc. Desktop, regras de negócio e arquitetura existentes permanecem intactos.
+Refinar o wizard de criação de OS (mobile + desktop) com 4 mudanças funcionais e visuais. Sem mexer em listagem, status, autenticação ou regras de negócio existentes.
 
-## Causa raiz
+---
 
-1. **Botão "Continuar" cobre campos**: em `ServiceOrderWizard.tsx` e `ClientWizard.tsx` a barra de ações usa `sticky bottom-24` dentro do `<main>` que rola junto com o conteúdo, e como a BottomNav (h≈80px) divide o mesmo espaço, o sticky se transforma em "flutuante por cima do conteúdo" sem fundo opaco.
-2. **BottomNav presente no cadastro**: `src/routes/_app.tsx` renderiza `<BottomNav />` globalmente, sem opt-out por rota.
-3. **Scroll não volta ao topo entre etapas**: troca de `step` só translada o carrossel horizontal; `window.scrollY` mantém-se.
-4. **Cards apagados**: `lemarc-wizard-card` está com transparência alta sobre fundo cream — pouco contraste.
-5. **Padding inferior em `<main>`**: `pb-32` é insuficiente quando o sticky+BottomNav coexistem; em flow sem BottomNav, é excessivo.
+## 1. Renomear "Previsão" → "Previsão de início"
 
-## Mudanças
+Mudança apenas de label exibida ao usuário. A coluna do banco `scheduled_for` permanece intacta.
 
-### 1. Layout — opt-out de BottomNav por rota
-- `src/routes/_app.tsx`: ler `useMatches()` e ocultar `<BottomNav />` quando alguma rota ativa tiver `staticData.hideBottomNav === true`.
-- `src/components/app/AppShell.tsx`: aceitar nova prop `fullscreenForm?: boolean`. Quando `true`:
-  - `<main>` recebe `pb-[calc(env(safe-area-inset-bottom)+8.5rem)]` (espaço só para a barra de ações, sem BottomNav).
-  - Caso contrário mantém `pb-32` atual.
-- Rotas que recebem `staticData: { hideBottomNav: true }` e passam `fullscreenForm` ao `AppShell`:
-  - `src/routes/_app.ordens.nova.tsx`
-  - `src/routes/_app.clientes.novo.tsx`
-  - `src/routes/_app.clientes.$id.editar.tsx`
+Arquivos:
+- `src/components/ordens/ServiceOrderWizard.tsx`
+  - `BasicInfoStep`: label do campo `datetime-local` → "Previsão de início".
+  - `ReviewStep`: label da linha de revisão → "Previsão de início".
+- `src/routes/_app.ordens.$id.tsx` (linha 153): texto "Previsto para …" → "Previsão de início: …" para manter consistência.
 
-### 2. Barra de ações fixa reutilizável
-- Criar `src/components/app/FormFlowActions.tsx`:
-  - Container `fixed inset-x-0 bottom-0 z-40` com `pb-[env(safe-area-inset-bottom)]`, gradiente de fundo da cor da página (`lemarc-app-bg`) com blur no topo para "fade-in" do conteúdo (sem cobrir de forma opaca os campos durante o scroll, mas opaco na faixa do botão).
-  - Conteúdo centralizado `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8` e visual glass industrial coerente com a `lemarc-liquid` da topbar.
-  - Slots: `back`, `primary` (label, icon, disabled, loading).
-- Substituir a `<div className="sticky bottom-24 ...">` em:
-  - `src/components/ordens/ServiceOrderWizard.tsx`
-  - `src/components/clientes/ClientWizard.tsx`
-- O conteúdo do wizard recebe `pb-4` interno (não mais `pb-32`), pois o `<main>` já reservou a altura via `fullscreenForm`.
+---
 
-### 3. Scroll reset por etapa
-- Nos dois wizards, `useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [step])`.
-- Respeitar `prefers-reduced-motion` (instant scroll quando reduzido).
+## 2. Novo tipo de serviço "Outro" + campo livre
 
-### 4. Anti overflow horizontal e ajustes mobile
-- Em `styles.css`: garantir `html, body { overflow-x: hidden; }` (verificar antes de duplicar) e `.lemarc-page-enter` sem transforms persistentes.
-- Wizards: trocar wrapper carrossel `overflow-hidden` por `overflow-x-clip` e remover qualquer `min-w` que force largura > viewport.
-- Inputs/Textarea: confirmar `text-base` (>=16px) para evitar zoom no iOS Safari (revisar `src/components/ui/input.tsx` e `textarea.tsx` apenas se ainda usarem `text-sm` em mobile).
+### Banco (migration)
 
-### 5. Refino visual dos cards (`lemarc-wizard-card`)
-Em `src/styles.css`:
-- Aumentar densidade do gradiente de fundo (azul-grafite mais opaco, ~0.92 alpha em vez de translúcido), borda `oklch(1 0 0 / 0.10)` + linha interna `inset 0 1px 0 oklch(1 0 0 / 0.08)`, sombra externa mais firme `0 20px 40px -28px oklch(0 0 0 / 0.6)`.
-- Halo laranja superior reduzido (~0.14) para não roubar a leitura dos labels.
-- `lemarc-wizard-input`: fundo `oklch(1 0 0 / 0.08)`, borda `oklch(1 0 0 / 0.22)`, placeholder `oklch(1 0 0 / 0.55)`, foco com ring laranja.
-- Aplicar `lemarc-wizard-input` aos `<Input>`/`<Textarea>` dos dois wizards (substituir a `inputCls` local).
-- Labels: subir contraste para `oklch(1 0 0 / 0.78)`.
+- `ALTER TYPE public.service_type ADD VALUE IF NOT EXISTS 'outro';`
+- `ALTER TABLE public.service_orders ADD COLUMN IF NOT EXISTS service_type_other text;`
+- Sem alteração em RLS/GRANTs (coluna nova herda permissões da tabela).
 
-### 6. Listagens (Ordens, Clientes, Dashboard)
-- Sem mudanças estruturais. Confirmar que `pb-32` do `<main>` cobre a altura da BottomNav (3.5rem + safe-area). Se necessário, padronizar para `pb-[calc(env(safe-area-inset-bottom)+7rem)]`.
+### Tipos e API
 
-## Fora do escopo
-- Refatorar wizards inteiros, alterar regras de validação, mexer em queries/Supabase, redesenhar BottomNav ou header.
+- `src/types/serviceOrder.ts`: adicionar `"outro"` em `ServiceType` e `serviceTypeLabel.outro = "Outro"`.
+- `src/lib/api/serviceOrders.functions.ts`:
+  - `CreateInput` ganha `service_type_other?: string | null`.
+  - `createServiceOrder` insere `service_type_other`.
+  - `ORDER_SELECT` inclui `service_type_other`.
+- `src/types/serviceOrder.ts` `ServiceOrder` ganha `service_type_other: string | null`.
 
-## Validação
-1. `npm run build` + `tsgo`.
-2. Playwright mobile (390×844) em `/ordens/nova`:
-   - Screenshot etapa 1 → Continuar → screenshot etapa 2 (verifica scroll no topo, botão não cobre).
-   - Confirma ausência de BottomNav nas screenshots.
-   - Repetir até etapa Revisão; confirmar "Criar Ordem de Serviço" fixo.
-3. Repetir fluxo em `/clientes/novo`.
-4. Desktop 1280×1800: confirmar `/dashboard`, `/ordens`, `/clientes` ainda com BottomNav e sem regressão visual.
-5. Verificar overflow-x: `document.documentElement.scrollWidth === clientWidth`.
+### Wizard (`ServiceOrderWizard.tsx`)
+
+- `Draft` ganha `typeOther: string`.
+- `ServiceTypeStep`: card "Outro" aparece no grid (ícone `Pencil` ou `Sparkles`). Quando `draft.type === "outro"`:
+  - Renderiza input "Descreva o tipo de serviço" (obrigatório, mínimo 3 chars), logo abaixo do grid e antes do bloco Prioridade.
+  - Validação da etapa: `validity[3] = draft.type !== "outro" || draft.typeOther.trim().length >= 3`.
+- `typeIcon.outro = Pencil`.
+- Envio: quando type === "outro", passa `service_type_other = draft.typeOther.trim()`; caso contrário envia `null`.
+
+### Exibição na revisão e detalhe
+
+- `ReviewStep`: se `draft.type === "outro"`, mostrar "Outro · {typeOther}".
+- `_app.ordens.$id.tsx`: ao renderizar tipo do serviço, se `service_type === "outro"` exibir o texto de `service_type_other`.
+
+---
+
+## 3. Revisão final mais clara e operacional
+
+Reescrever `ReviewStep` em `ServiceOrderWizard.tsx`:
+
+- Substituir os 3 blocos genéricos por **4 seções** com títulos pedidos:
+  1. **Dados iniciais** — Título (destaque grande, font-display), Descrição.
+  2. **Local e previsão** — Local/setor, Previsão de início.
+  3. **Cliente e técnico** — Cliente, Unidade, Técnico, Função.
+  4. **Serviço e prioridade** — Tipo (com texto custom se "outro"), Prioridade (com chip colorido igual ao do step de serviço).
+- Hierarquia visual:
+  - Card "hero" no topo para o título do serviço (font-display 2xl, badge de prioridade ao lado).
+  - Demais blocos em `grid sm:grid-cols-2`, mobile em coluna única.
+  - Labels em `text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80`, valores em `text-sm font-semibold text-foreground` (alinhados à esquerda, não justificados como hoje).
+  - Cada linha vira `flex flex-col gap-1` (key em cima, value embaixo) em vez de `justify-between` apagado.
+  - Cards com `bg-white/[0.06]` + `border-white/15` + `shadow-[0_12px_36px_-24px_rgba(0,0,0,0.6)]` para sair do tom esbranquiçado.
+  - Ícones pequenos (lucide) à esquerda de cada título de seção.
+
+---
+
+## 4. Botão "Continuar" mais próximo do conteúdo + safe-area
+
+Diagnóstico: `FormFlowActions` é `fixed bottom-0` com fade externo de 24px + padding `py-3`. No `AppShell` há `pb-[calc(env(safe-area-inset-bottom)+7rem)]` reservado para o footer fixo, gerando o "vão" sentido no mobile, principalmente em etapas curtas.
+
+Ajustes:
+
+### `src/components/app/FormFlowActions.tsx`
+- Reduzir altura do fade externo de `h-6` → `h-4`.
+- `py-3` → `py-2.5 sm:py-3`.
+- Gap entre botões `gap-3` → `gap-2 sm:gap-3`.
+
+### `src/components/ordens/ServiceOrderWizard.tsx` e `ClientWizard.tsx`
+- Diminuir altura dos botões no mobile: `h-14` → `h-12 sm:h-14` (Voltar e Continuar) — reduz a faixa fixa e aproxima visualmente.
+
+### `src/components/app/AppShell.tsx`
+- Quando `fullscreenForm`, trocar `pb-[calc(env(safe-area-inset-bottom)+7rem)]` para `pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom)+6.5rem)]`. Mantém clearance suficiente sem sobrar espaço vazio.
+
+### Etapa de Serviço especificamente
+- Grid no mobile: manter `grid-cols-2` (área de toque adequada ~150px), `gap-2` → `gap-2.5` para respiro.
+- Estado ativo do card de tipo: aumentar contraste — `bg-primary/20` + `ring-1 ring-primary/60` no lugar do `bg-primary/10` atual.
+- Cards mais altos no mobile: `py-3` → `py-3.5`, label em `text-[11px]` para legibilidade.
+- Prioridade: já tem bom contraste; apenas confirmar `min-h-12` para área de toque.
+
+---
+
+## 5. Validação
+
+- `bun run build` + `tsgo`.
+- Playwright mobile (390×844) em `/ordens/nova`:
+  - preencher todos os campos, criar OS padrão.
+  - criar OS com tipo "Outro" e descrição custom; confirmar que revisão e detalhe exibem o texto.
+  - confirmar que botão "Continuar" não sobrepõe inputs em nenhuma etapa.
+- Desktop 1280: confirmar grid de 2 colunas na revisão e que o footer fixo continua funcional.
+
+---
+
+## Fora de escopo
+
+- Não mexer em edição/listagem de OS (só leitura do tipo custom no detalhe).
+- Não refatorar steps de Cliente/Técnico.
+- Não alterar BottomNav nem AppShell além do padding ajustado.
