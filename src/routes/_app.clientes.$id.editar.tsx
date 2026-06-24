@@ -16,12 +16,13 @@ import type { ClientFull } from "@/types/client";
 
 export const Route = createFileRoute("/_app/clientes/$id/editar")({
   head: () => ({ meta: [{ title: "Editar cliente — Gestão Lemarc" }] }),
+  staticData: { hideBottomNav: true },
   component: EditPage,
 });
 
 function EditPage() {
   return (
-    <AppShell title="Editar cliente" back>
+    <AppShell title="Editar cliente" back fullscreenForm>
       <Suspense fallback={<div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />}>
         <Edit />
       </Suspense>

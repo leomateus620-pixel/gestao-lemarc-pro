@@ -4,12 +4,13 @@ import { ClientWizard } from "@/components/clientes/ClientWizard";
 
 export const Route = createFileRoute("/_app/clientes/novo")({
   head: () => ({ meta: [{ title: "Novo cliente — Gestão Lemarc" }] }),
+  staticData: { hideBottomNav: true },
   component: NovoClientePage,
 });
 
 function NovoClientePage() {
   return (
-    <AppShell title="Novo cliente" back>
+    <AppShell title="Novo cliente" back fullscreenForm>
       <ClientWizard />
     </AppShell>
   );
