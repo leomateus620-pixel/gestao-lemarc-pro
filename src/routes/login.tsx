@@ -67,28 +67,31 @@ function LoginPage() {
     <div className="lemarc-login-bg min-h-dvh">
       <LoginBackground />
 
-      <main className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-7 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-        <div className="mx-auto grid w-full max-w-[1180px] items-center gap-7 md:gap-8 lg:min-h-[min(760px,calc(100dvh-6rem))] lg:grid-cols-[minmax(0,1fr)_minmax(380px,430px)] lg:gap-10 xl:gap-14">
-          <section className="flex min-w-0 flex-col items-center lg:items-start">
+      <main className="lemarc-login-main relative z-10 flex min-h-dvh items-center justify-center px-4 py-5 sm:px-6 sm:py-8 lg:px-8 lg:py-9">
+        <div className="mx-auto grid w-full max-w-[1216px] items-center gap-6 md:gap-8 lg:min-h-[calc(100dvh-4.5rem)] lg:grid-cols-[minmax(0,1.16fr)_minmax(390px,0.84fr)] lg:gap-12 xl:gap-16">
+          <section className="lemarc-login-enter flex min-w-0 flex-col items-center lg:items-start">
             <LoginLogo />
 
-            <div className="mt-6 w-full md:mt-7 lg:mt-8">
-              <LoginIntro />
+            <div className="mt-3 hidden max-w-[560px] items-center gap-3 text-sm font-medium leading-6 text-white/58 lg:flex">
+              <span className="h-px w-10 shrink-0 bg-gradient-to-r from-orange-glow to-orange-glow/20" />
+              <span>Ordens de serviço conectadas do chamado à entrega técnica.</span>
             </div>
 
-            <ServiceOrderProgressCard className="mt-6 w-full max-w-[620px] lg:mt-8" />
+            <ServiceOrderProgressCard className="mt-4 w-full max-w-[660px] sm:mt-5 lg:mt-7" />
           </section>
 
-          <div className="mx-auto w-full max-w-[440px] lg:mx-0 lg:justify-self-end">
+          <section className="lemarc-login-enter lemarc-login-enter-delay-1 mx-auto w-full max-w-[452px] lg:mx-0 lg:justify-self-end">
+            <LoginIntro />
+
             <GlassLoginCard>
               <div className="space-y-5">
                 <p className="text-sm leading-6 text-white/72">
-                  Acesso exclusivo para colaboradores Lemarc Industrial. Entre com sua conta Google
-                  corporativa para abrir suas ordens de serviço.
+                  Use sua conta Google corporativa para acessar ordens de serviço, equipes e
+                  histórico operacional.
                 </p>
 
                 <Button
-                  className="h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep shadow-lg hover:bg-white/95 disabled:opacity-70"
+                  className="lemarc-login-google h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep disabled:opacity-70"
                   disabled={isSubmitting}
                   onClick={handleGoogle}
                   type="button"
@@ -116,19 +119,19 @@ function LoginPage() {
                   </div>
                 ) : null}
 
-                <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs leading-snug text-white/60">
+                <div className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-xs leading-relaxed text-white/58">
                   <ShieldCheck
                     aria-hidden="true"
                     className="mt-0.5 size-4 shrink-0 text-orange-glow"
                   />
                   <span>
-                    Sua sessão é criptografada e fica salva apenas neste dispositivo. Os acessos
-                    ficam registrados na central operacional Lemarc.
+                    Ambiente protegido. Sua sessão é criptografada e os acessos ficam registrados na
+                    central operacional Lemarc.
                   </span>
                 </div>
               </div>
             </GlassLoginCard>
-          </div>
+          </section>
         </div>
       </main>
     </div>
@@ -140,6 +143,8 @@ function LoginBackground() {
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="lemarc-login-rail left-[7%] top-[18%] h-[58dvh] rotate-[18deg]" />
       <div className="lemarc-login-rail right-[11%] top-[25%] h-[48dvh] -rotate-[14deg] opacity-45" />
+      <div className="lemarc-login-orbit left-[8%] top-[18%] size-[22rem] sm:size-[32rem]" />
+      <div className="lemarc-login-orbit -right-[16rem] bottom-[-18rem] size-[42rem] opacity-45" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-glow/80 to-transparent shadow-[0_0_24px_oklch(0.72_0.19_50_/_0.65)]" />
       <div className="absolute inset-x-10 bottom-8 hidden h-px bg-gradient-to-r from-transparent via-white/18 to-transparent lg:block" />
     </div>
@@ -151,7 +156,7 @@ function LoginLogo() {
     <div className="flex w-full justify-center px-2 lg:justify-start lg:px-0">
       <img
         alt="Gestao Lemarc Industrial OS Digital"
-        className="lemarc-login-logo h-auto max-h-[76px] w-[min(92vw,390px)] object-contain sm:max-h-[118px] sm:w-[min(82vw,520px)] lg:max-h-[118px] lg:w-[min(40vw,500px)] xl:w-[520px]"
+        className="lemarc-login-logo h-auto max-h-[68px] w-[min(88vw,350px)] object-contain sm:max-h-[96px] sm:w-[min(74vw,460px)] lg:max-h-[108px] lg:w-[min(40vw,500px)] xl:w-[520px]"
         decoding="async"
         src={LOGIN_LOGO_SRC}
       />
@@ -161,15 +166,20 @@ function LoginLogo() {
 
 function LoginIntro() {
   return (
-    <section className="mx-auto max-w-lg text-center lg:mx-0 lg:max-w-[560px] lg:text-left">
-      <div className="mx-auto mb-4 h-px w-28 bg-gradient-to-r from-transparent via-orange-glow to-transparent lg:mx-0" />
-      <h1 className="font-display text-3xl font-black leading-tight text-white sm:text-4xl lg:text-[3.25rem]">
+    <header className="mb-4 text-center sm:mb-5 lg:text-left">
+      <div className="mb-3 flex items-center justify-center gap-2 lg:justify-start">
+        <span className="size-1.5 rounded-full bg-orange-glow shadow-[0_0_12px_oklch(0.78_0.18_55/0.9)]" />
+        <span className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-white/48">
+          Central operacional
+        </span>
+      </div>
+      <h1 className="font-display text-[1.85rem] font-black leading-[1.08] text-white sm:text-4xl lg:text-[2.8rem]">
         Acesse sua operação
       </h1>
-      <p className="mt-3 text-sm font-medium leading-6 text-white/68 sm:text-base">
-        Gestão industrial e ordens de serviço em um só lugar.
+      <p className="mx-auto mt-2 max-w-[28rem] text-sm font-medium leading-6 text-white/62 sm:mt-3 sm:text-base lg:mx-0">
+        Gestão industrial clara, segura e pronta para o ritmo da equipe.
       </p>
-    </section>
+    </header>
   );
 }
 
@@ -183,18 +193,27 @@ function GlassLoginCard({ children }: { children: ReactNode }) {
 
   return (
     <section
-      className="lemarc-login-card lemarc-kinetic-card w-full p-5 sm:p-6"
+      className="lemarc-login-card lemarc-kinetic-card w-full p-5 sm:p-6 lg:p-7"
       data-kinetic-active={physics.active ? "true" : "false"}
       ref={physics.ref}
       style={physics.style}
       {...physics.handlers}
     >
       <div className="lemarc-card-glare" />
-      <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-glow">
-          Login operacional
-        </p>
-        <h2 className="mt-2 font-display text-2xl font-black text-white">Bem-vindo</h2>
+      <div className="mb-5 flex items-start justify-between gap-4 sm:mb-6">
+        <div>
+          <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-orange-glow">
+            Login operacional
+          </p>
+          <h2 className="mt-1.5 font-display text-2xl font-black text-white">Bem-vindo</h2>
+        </div>
+        <div
+          aria-hidden="true"
+          className="mt-1 flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-400/[0.07] px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-emerald-200/80"
+        >
+          <span className="size-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_oklch(0.78_0.15_155/0.8)]" />
+          Seguro
+        </div>
       </div>
       {children}
     </section>
