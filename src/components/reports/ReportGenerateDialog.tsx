@@ -32,10 +32,7 @@ import {
   type ServiceType,
 } from "@/types/serviceOrder";
 import { useReportLookupsQuery, useReportOrdersQuery } from "@/hooks/useReports";
-import {
-  formatCurrency,
-  formatNumber,
-} from "@/lib/reports/formatters";
+import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
 import { buildManagerialReport, describePeriod } from "@/lib/reports/managerial";
 
 const STATUS_KEYS = Object.keys(statusLabel) as ServiceOrderStatus[];
@@ -100,15 +97,17 @@ export function ReportGenerateDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 shadow-md">
+        <Button className="lemarc-report-action h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
           <FileDown size={16} /> Gerar relatório gerencial
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[92dvh] w-[96vw] max-w-3xl overflow-y-auto p-0">
+      <DialogContent className="max-h-[92dvh] w-[96vw] max-w-3xl overflow-y-auto border-white/10 bg-[#101a29] p-0 text-foreground">
         <div className="flex flex-col">
-          <DialogHeader className="border-b border-border/60 px-5 pb-3 pt-5">
-            <DialogTitle className="font-display text-lg">Relatório gerencial</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="border-b border-white/10 px-5 pb-3 pt-5">
+            <DialogTitle className="font-display text-lg text-white">
+              Relatório gerencial
+            </DialogTitle>
+            <DialogDescription className="text-slate-300/78">
               Selecione o período e os filtros. O PDF será gerado com dados reais do sistema.
             </DialogDescription>
           </DialogHeader>
@@ -121,8 +120,7 @@ export function ReportGenerateDialog() {
 
 function DialogBody({ onClose }: { onClose: () => void }) {
   const [filters, setFilters] = useState<ReportFilters>(() => defaultFilters());
-  const update = (patch: Partial<ReportFilters>) =>
-    setFilters((prev) => ({ ...prev, ...patch }));
+  const update = (patch: Partial<ReportFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
     <div className="space-y-5 px-5 py-4">
@@ -142,9 +140,7 @@ function PeriodPicker({
 }) {
   return (
     <section>
-      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-        Período
-      </div>
+      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Período</div>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {QUICK_PERIODS.map((p) => {
           const active = filters.period === p.key;
@@ -154,14 +150,14 @@ function PeriodPicker({
               type="button"
               onClick={() => onChange({ period: p.key })}
               className={cn(
-                "rounded-xl border px-3 py-2 text-left transition",
+                "rounded-xl border px-3 py-2.5 text-left transition",
                 active
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border/60 bg-card/50 hover:bg-card",
+                  ? "border-primary/55 bg-primary/15 text-primary shadow-lg"
+                  : "border-white/10 bg-white/[0.055] text-slate-100 hover:bg-white/[0.08]",
               )}
             >
-              <div className="text-xs font-bold">{p.label}</div>
-              <div className="text-[10px] text-muted-foreground">{p.hint}</div>
+              <div className="text-xs font-black">{p.label}</div>
+              <div className="mt-0.5 text-[10px] font-semibold text-slate-300/76">{p.hint}</div>
             </button>
           );
         })}
@@ -171,6 +167,7 @@ function PeriodPicker({
           <div>
             <Label className="text-[11px]">Data inicial</Label>
             <Input
+              className="lemarc-report-control mt-1 h-10 rounded-xl"
               type="date"
               value={filters.from ?? ""}
               onChange={(e) => onChange({ from: e.target.value || null })}
@@ -179,6 +176,7 @@ function PeriodPicker({
           <div>
             <Label className="text-[11px]">Data final</Label>
             <Input
+              className="lemarc-report-control mt-1 h-10 rounded-xl"
               type="date"
               value={filters.to ?? ""}
               onChange={(e) => onChange({ to: e.target.value || null })}
@@ -208,54 +206,71 @@ function FiltersBlock({
 
   return (
     <section className="space-y-3">
-      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-        Filtros
-      </div>
+      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Filtros</div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <SelectField
           label="Cliente"
           value={filters.clientId ?? ALL}
-          onChange={(v) =>
-            onChange({ clientId: v === ALL ? null : v, unitId: null })
-          }
-          options={[{ value: ALL, label: "Todos" }, ...lookups.clients.map((c) => ({ value: c.id, label: c.name }))]}
+          onChange={(v) => onChange({ clientId: v === ALL ? null : v, unitId: null })}
+          options={[
+            { value: ALL, label: "Todos" },
+            ...lookups.clients.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         />
         <SelectField
           label="Unidade"
           value={filters.unitId ?? ALL}
           onChange={(v) => onChange({ unitId: v === ALL ? null : v })}
-          options={[{ value: ALL, label: "Todas" }, ...units.map((u) => ({ value: u.id, label: u.name }))]}
+          options={[
+            { value: ALL, label: "Todas" },
+            ...units.map((u) => ({ value: u.id, label: u.name })),
+          ]}
           disabled={units.length === 0}
         />
         <SelectField
           label="Técnico"
           value={filters.technicianId ?? ALL}
           onChange={(v) => onChange({ technicianId: v === ALL ? null : v })}
-          options={[{ value: ALL, label: "Todos" }, ...lookups.technicians.map((t) => ({ value: t.id, label: t.full_name }))]}
+          options={[
+            { value: ALL, label: "Todos" },
+            ...lookups.technicians.map((t) => ({ value: t.id, label: t.full_name })),
+          ]}
         />
         <SelectField
           label="Status"
           value={filters.status ?? ALL}
           onChange={(v) => onChange({ status: v === ALL ? null : (v as ServiceOrderStatus) })}
-          options={[{ value: ALL, label: "Todos" }, ...STATUS_KEYS.map((k) => ({ value: k, label: statusLabel[k] }))]}
+          options={[
+            { value: ALL, label: "Todos" },
+            ...STATUS_KEYS.map((k) => ({ value: k, label: statusLabel[k] })),
+          ]}
         />
         <SelectField
           label="Prioridade"
           value={filters.priority ?? ALL}
           onChange={(v) => onChange({ priority: v === ALL ? null : (v as ServicePriority) })}
-          options={[{ value: ALL, label: "Todas" }, ...PRIORITY_KEYS.map((k) => ({ value: k, label: priorityLabel[k] }))]}
+          options={[
+            { value: ALL, label: "Todas" },
+            ...PRIORITY_KEYS.map((k) => ({ value: k, label: priorityLabel[k] })),
+          ]}
         />
         <SelectField
           label="Tipo de serviço"
           value={filters.serviceType ?? ALL}
           onChange={(v) => onChange({ serviceType: v === ALL ? null : (v as ServiceType) })}
-          options={[{ value: ALL, label: "Todos" }, ...TYPE_KEYS.map((k) => ({ value: k, label: serviceTypeLabel[k] }))]}
+          options={[
+            { value: ALL, label: "Todos" },
+            ...TYPE_KEYS.map((k) => ({ value: k, label: serviceTypeLabel[k] })),
+          ]}
         />
         <SelectField
           label="Cobrança"
           value={filters.billingStatus ?? ALL}
           onChange={(v) => onChange({ billingStatus: v === ALL ? null : (v as BillingStatus) })}
-          options={[{ value: ALL, label: "Todas" }, ...BILLING_KEYS.map((k) => ({ value: k, label: billingStatusLabel[k] }))]}
+          options={[
+            { value: ALL, label: "Todas" },
+            ...BILLING_KEYS.map((k) => ({ value: k, label: billingStatusLabel[k] })),
+          ]}
         />
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -299,9 +314,11 @@ function SelectField({
 }) {
   return (
     <div>
-      <Label className="text-[11px]">{label}</Label>
+      <Label className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
+        {label}
+      </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className="h-9">
+        <SelectTrigger className="lemarc-report-control mt-1.5 h-10 rounded-xl font-semibold">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-72">
@@ -326,20 +343,14 @@ function Toggle({
   label: string;
 }) {
   return (
-    <label className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-3 py-2 text-xs">
+    <label className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/[0.08]">
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
       <span>{label}</span>
     </label>
   );
 }
 
-function PreviewBlock({
-  filters,
-  onClose,
-}: {
-  filters: ReportFilters;
-  onClose: () => void;
-}) {
+function PreviewBlock({ filters, onClose }: { filters: ReportFilters; onClose: () => void }) {
   // Validate custom range
   const customInvalid =
     filters.period === "custom" &&
@@ -356,28 +367,20 @@ function PreviewBlock({
   }
   if (filters.period === "custom" && (!filters.from || !filters.to)) {
     return (
-      <div className="rounded-xl border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+      <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3 text-xs font-semibold text-slate-300/82">
         Selecione a data inicial e final para visualizar a prévia.
       </div>
     );
   }
 
-  return (
-    <PreviewLoader filters={filters} onClose={onClose} />
-  );
+  return <PreviewLoader filters={filters} onClose={onClose} />;
 }
 
-function PreviewLoader({
-  filters,
-  onClose,
-}: {
-  filters: ReportFilters;
-  onClose: () => void;
-}) {
+function PreviewLoader({ filters, onClose }: { filters: ReportFilters; onClose: () => void }) {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] p-3 text-xs font-semibold text-slate-300/82">
           <Loader2 className="size-3.5 animate-spin" /> Carregando prévia…
         </div>
       }
@@ -387,13 +390,7 @@ function PreviewLoader({
   );
 }
 
-function PreviewContent({
-  filters,
-  onClose,
-}: {
-  filters: ReportFilters;
-  onClose: () => void;
-}) {
+function PreviewContent({ filters, onClose }: { filters: ReportFilters; onClose: () => void }) {
   const { data: rows } = useReportOrdersQuery(filters);
   const report = useMemo(() => buildManagerialReport(rows), [rows]);
   const periodLabel = describePeriod(filters);
@@ -407,13 +404,11 @@ function PreviewContent({
 
   return (
     <section className="space-y-3">
-      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-        Prévia
-      </div>
-      <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-        <div className="text-xs font-semibold text-foreground">{periodLabel}</div>
+      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Prévia</div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3 shadow-inner">
+        <div className="text-xs font-black text-white">{periodLabel}</div>
         {empty ? (
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-xs font-semibold text-slate-300/82">
             Nenhuma Ordem de Serviço encontrada para os filtros selecionados.
           </p>
         ) : (
@@ -421,10 +416,7 @@ function PreviewContent({
             <Stat label="Total OS" value={formatNumber(report.summary.totalOrders)} />
             <Stat label="Concluídas" value={formatNumber(report.summary.finished)} />
             <Stat label="Horas" value={`${report.summary.totalHours.toFixed(1)}h`} />
-            <Stat
-              label="Valor estimado"
-              value={formatCurrency(report.summary.estimatedValue)}
-            />
+            <Stat label="Valor estimado" value={formatCurrency(report.summary.estimatedValue)} />
             <Stat label="Clientes" value={formatNumber(report.summary.clientsInvolved)} />
             <Stat label="Técnicos" value={formatNumber(report.summary.techniciansInvolved)} />
           </div>
@@ -432,10 +424,14 @@ function PreviewContent({
       </div>
 
       <DialogFooter className="gap-2 sm:gap-2">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" className="lemarc-report-action rounded-xl" onClick={onClose}>
           Cancelar
         </Button>
-        <Button onClick={handleGenerate} disabled={empty} className="gap-2">
+        <Button
+          onClick={handleGenerate}
+          disabled={empty}
+          className="lemarc-report-action-primary gap-2 rounded-xl font-black"
+        >
           <Printer size={15} /> Gerar PDF
         </Button>
       </DialogFooter>
@@ -445,11 +441,11 @@ function PreviewContent({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-background/50 px-2.5 py-1.5">
-      <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-2">
+      <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </div>
-      <div className="text-sm font-black text-foreground">{value}</div>
+      <div className="mt-0.5 text-sm font-black text-white">{value}</div>
     </div>
   );
 }

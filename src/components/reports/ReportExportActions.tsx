@@ -18,10 +18,10 @@ export function ReportExportActions({
 }) {
   const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
       <Button
         variant="secondary"
-        className="h-10 gap-2 bg-secondary/60"
+        className="lemarc-report-action h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto"
         disabled={!rows.length}
         onClick={() => downloadCsv(`${filenamePrefix}-${ts}.csv`, ordersToCsv(rows))}
       >
@@ -29,7 +29,7 @@ export function ReportExportActions({
         Exportar CSV
       </Button>
       <Button
-        className="h-10 gap-2 lemarc-orange-glow"
+        className="lemarc-report-action-primary h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto"
         disabled={!rows.length}
         onClick={() => printReport({ title, subtitle, kpis, rows })}
       >

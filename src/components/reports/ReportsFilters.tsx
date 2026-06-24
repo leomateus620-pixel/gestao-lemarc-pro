@@ -47,7 +47,7 @@ function useRouteSetter(routePath: "/_app/relatorios" | "/_app/relatorios/client
   const navigate = useNavigate({ from: routePath });
   return (patch: Patch) =>
     navigate({
-      search: (prev: any) => {
+      search: (prev: Record<string, unknown>) => {
         const next = { ...prev, ...patch };
         // Strip nulls / undefined for cleaner URLs
         Object.keys(next).forEach((k) => {
@@ -80,12 +80,12 @@ export function ReportsFilters({
   }, [filters.clientId, lookups.data.units]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
       <Select
         value={filters.period}
         onValueChange={(v) => setSearch({ period: v as ReportFilters["period"] })}
       >
-        <SelectTrigger className="h-10 w-[148px] bg-secondary/50">
+        <SelectTrigger className="lemarc-report-control h-11 w-full rounded-xl font-bold sm:w-[156px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -98,10 +98,10 @@ export function ReportsFilters({
       </Select>
 
       {filters.period === "custom" && (
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input
             type="date"
-            className="h-10 w-[140px] bg-secondary/50"
+            className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
             value={filters.from?.slice(0, 10) ?? ""}
             onChange={(e) =>
               setSearch({ from: e.target.value ? new Date(e.target.value).toISOString() : null })
@@ -109,7 +109,7 @@ export function ReportsFilters({
           />
           <Input
             type="date"
-            className="h-10 w-[140px] bg-secondary/50"
+            className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
             value={filters.to?.slice(0, 10) ?? ""}
             onChange={(e) =>
               setSearch({ to: e.target.value ? new Date(e.target.value).toISOString() : null })
@@ -123,8 +123,8 @@ export function ReportsFilters({
           <Button
             variant="secondary"
             className={cn(
-              "h-10 gap-2 bg-secondary/50",
-              active > 0 && "border border-primary/40 text-primary",
+              "lemarc-report-action h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto",
+              active > 0 && "border-primary/45 text-primary",
             )}
           >
             <Filter size={15} />
@@ -136,9 +136,12 @@ export function ReportsFilters({
             )}
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
+        <SheetContent
+          side="right"
+          className="w-full max-w-md overflow-y-auto border-white/10 bg-[#101a29] text-foreground"
+        >
           <SheetHeader>
-            <SheetTitle>Filtros do relatório</SheetTitle>
+            <SheetTitle className="font-display text-white">Filtros do relatório</SheetTitle>
           </SheetHeader>
           <div className="mt-4 space-y-4">
             {!hideClient && (
@@ -168,25 +171,19 @@ export function ReportsFilters({
             <FilterSelect
               label="Status"
               value={filters.status ?? ALL}
-              onChange={(v) =>
-                setSearch({ status: v === ALL ? null : (v as ServiceOrderStatus) })
-              }
+              onChange={(v) => setSearch({ status: v === ALL ? null : (v as ServiceOrderStatus) })}
               options={STATUS_KEYS.map((k) => ({ value: k, label: statusLabel[k] }))}
             />
             <FilterSelect
               label="Prioridade"
               value={filters.priority ?? ALL}
-              onChange={(v) =>
-                setSearch({ priority: v === ALL ? null : (v as ServicePriority) })
-              }
+              onChange={(v) => setSearch({ priority: v === ALL ? null : (v as ServicePriority) })}
               options={PRIORITY_KEYS.map((k) => ({ value: k, label: priorityLabel[k] }))}
             />
             <FilterSelect
               label="Tipo de serviço"
               value={filters.serviceType ?? ALL}
-              onChange={(v) =>
-                setSearch({ serviceType: v === ALL ? null : (v as ServiceType) })
-              }
+              onChange={(v) => setSearch({ serviceType: v === ALL ? null : (v as ServiceType) })}
               options={TYPE_KEYS.map((k) => ({ value: k, label: serviceTypeLabel[k] }))}
             />
             <FilterSelect
@@ -197,10 +194,10 @@ export function ReportsFilters({
               }
               options={BILLING_KEYS.map((k) => ({ value: k, label: billingStatusLabel[k] }))}
             />
-            <div className="flex items-center justify-between rounded-xl border border-white/5 bg-secondary/30 p-3">
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.055] p-3">
               <div>
-                <Label className="text-xs font-bold">Somente OS com valor/hora</Label>
-                <p className="text-[11px] text-muted-foreground">
+                <Label className="text-xs font-black text-white">Somente OS com valor/hora</Label>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-300/78">
                   Esconde OS sem hour_rate configurado.
                 </p>
               </div>
@@ -213,7 +210,7 @@ export function ReportsFilters({
           <SheetFooter className="mt-6 flex-row gap-2">
             <Button
               variant="ghost"
-              className="flex-1"
+              className="lemarc-report-action flex-1 rounded-xl"
               onClick={() =>
                 setSearch({
                   period: "month",
@@ -232,7 +229,10 @@ export function ReportsFilters({
             >
               Limpar tudo
             </Button>
-            <Button className="flex-1" onClick={() => setOpen(false)}>
+            <Button
+              className="lemarc-report-action-primary flex-1 rounded-xl font-black"
+              onClick={() => setOpen(false)}
+            >
               Aplicar
             </Button>
           </SheetFooter>
@@ -242,7 +242,7 @@ export function ReportsFilters({
       {active > 0 && (
         <Button
           variant="ghost"
-          className="h-10 gap-1.5 text-xs text-muted-foreground"
+          className="h-11 w-full gap-1.5 rounded-xl text-xs font-black text-slate-300 hover:text-white sm:w-auto"
           onClick={() =>
             setSearch({
               period: "month",
@@ -282,11 +282,11 @@ function FilterSelect({
 }) {
   return (
     <div>
-      <Label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+      <Label className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
         {label}
       </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className="mt-1.5 h-10 bg-secondary/50">
+        <SelectTrigger className="lemarc-report-control mt-1.5 h-11 rounded-xl font-semibold">
           <SelectValue placeholder="Todos" />
         </SelectTrigger>
         <SelectContent>

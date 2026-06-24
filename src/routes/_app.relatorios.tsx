@@ -36,10 +36,7 @@ import {
   TrendArea,
   VerticalBars,
 } from "@/components/reports/ReportCharts";
-import {
-  ReportOrdersMobileList,
-  ReportOrdersTable,
-} from "@/components/reports/ReportOrdersTable";
+import { ReportOrdersMobileList, ReportOrdersTable } from "@/components/reports/ReportOrdersTable";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { ClientReportDrawer } from "@/components/reports/ClientReportDrawer";
 import { ReportGenerateDialog } from "@/components/reports/ReportGenerateDialog";
@@ -74,46 +71,50 @@ function RelatoriosError({ error }: { error: Error }) {
 function RelatoriosPage() {
   return (
     <AppShell title="Relatórios">
-      <PageHeader />
-      <Suspense fallback={<LoadingState />}>
-        <RelatoriosContent />
-      </Suspense>
+      <div className="lemarc-report-page space-y-5">
+        <PageHeader />
+        <Suspense fallback={<LoadingState />}>
+          <RelatoriosContent />
+        </Suspense>
+      </div>
     </AppShell>
   );
 }
 
 function PageHeader() {
   return (
-    <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-          Relatórios operacionais
-        </p>
-        <h1 className="mt-1 font-display text-2xl font-black leading-tight text-foreground sm:text-3xl">
-          Cobrança & produtividade
-        </h1>
-        <p className="mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm">
-          Métricas reais de OS, horas, valor e cobrança — calculadas direto da base
-          operacional, com filtros, exportação e visão por cliente.
-        </p>
-      </div>
-      <Suspense fallback={null}>
-        <div className="flex flex-wrap items-center gap-2">
-          <ReportGenerateDialog />
-          <ClientReportDrawer />
+    <div className="lemarc-report-hero mt-2">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+            Relatórios operacionais
+          </p>
+          <h1 className="mt-2 font-display text-3xl font-black leading-none text-white sm:text-4xl">
+            Cobrança & produtividade
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-300/84">
+            Métricas reais de OS, horas, valor e cobrança calculadas direto da base operacional, com
+            filtros, exportação e visão por cliente.
+          </p>
         </div>
-      </Suspense>
+        <Suspense fallback={null}>
+          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2 lg:flex lg:items-center">
+            <ReportGenerateDialog />
+            <ClientReportDrawer />
+          </div>
+        </Suspense>
+      </div>
     </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="mt-5 space-y-4">
+    <div className="space-y-4">
       <ReportsKpiSkeleton />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="glass-card h-[260px] animate-pulse rounded-2xl" />
+          <div key={i} className="lemarc-report-card h-[268px] animate-pulse rounded-2xl" />
         ))}
       </div>
     </div>
@@ -127,6 +128,8 @@ function RelatoriosContent() {
 
   const overview = useMemo(() => computeOverview(rows), [rows]);
   const series = useMemo(() => computeSeries(rows), [rows]);
+  const hasWorkedMinutes = rows.some((r) => (r.worked_minutes ?? 0) > 0);
+  const hasEstimatedValues = rows.some((r) => r.estimated_value > 0);
 
   const kpis: Kpi[] = [
     {
@@ -139,7 +142,7 @@ function RelatoriosContent() {
     {
       label: "Horas trabalhadas",
       value: `${formatHoursDecimal(overview.totalHours * 60)}h`,
-      hint: "Soma de worked_minutes informado",
+      hint: hasWorkedMinutes ? "Soma de worked_minutes informado" : "Sem horas informadas",
       icon: Clock,
     },
     {
@@ -147,15 +150,20 @@ function RelatoriosContent() {
       value: formatCurrency(overview.estimatedValue),
       hint: overview.ordersMissingRate
         ? `${overview.ordersMissingRate} OS sem valor/hora`
-        : "Pré-cobrança baseada em hour_rate",
+        : hasEstimatedValues
+          ? "Pré-cobrança baseada em hour_rate"
+          : "Configure hour_rate nas OS para ver valores",
       icon: DollarSign,
       tone: "success",
-      alert: overview.ordersMissingRate > 0,
+      alert: overview.ordersMissingRate > 0 || (!hasEstimatedValues && rows.length > 0),
     },
     {
       label: "Tempo médio",
       value: overview.avgLeadTimeMinutes !== null ? formatHours(overview.avgLeadTimeMinutes) : "—",
-      hint: "Abertura até fechamento",
+      hint:
+        overview.avgLeadTimeMinutes !== null
+          ? "Abertura até fechamento"
+          : "Sem OS fechada no período",
       icon: Timer,
     },
     {
@@ -176,7 +184,7 @@ function RelatoriosContent() {
     {
       label: "Ticket médio",
       value: overview.avgTicket > 0 ? formatCurrency(overview.avgTicket) : "—",
-      hint: "Valor médio por OS concluída",
+      hint: overview.avgTicket > 0 ? "Valor médio por OS concluída" : "Sem OS concluída com valor",
       icon: TrendingUp,
     },
     {
@@ -191,15 +199,17 @@ function RelatoriosContent() {
   const kpiTextForPrint = kpis.slice(0, 4).map((k) => ({ label: k.label, value: k.value }));
 
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ReportsFilters filters={filters} routePath="/_app/relatorios" />
-        <ReportExportActions
-          rows={rows}
-          title="Relatório operacional Lemarc"
-          subtitle={`Período: ${filters.period} · ${rows.length} OS`}
-          kpis={kpiTextForPrint}
-        />
+    <div className="space-y-5">
+      <div className="lemarc-report-card p-3 sm:p-3.5">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <ReportsFilters filters={filters} routePath="/_app/relatorios" />
+          <ReportExportActions
+            rows={rows}
+            title="Relatório operacional Lemarc"
+            subtitle={`Período: ${filters.period} · ${rows.length} OS`}
+            kpis={kpiTextForPrint}
+          />
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -230,6 +240,7 @@ function RelatoriosContent() {
               <HorizontalBarList
                 data={series.byTechnicianHours}
                 valueFormatter={(v) => `${formatHoursDecimal(v * 60)}h`}
+                emptyLabel="Sem horas informadas nas OS do período."
               />
             </ReportChartCard>
             <ReportChartCard title="OS por cliente" subtitle="Top 8">
@@ -255,25 +266,28 @@ function RelatoriosContent() {
               <HorizontalBarList
                 data={series.avgLeadByTechnician}
                 valueFormatter={(v) => formatHours(v)}
+                emptyLabel="Sem fechamentos suficientes para calcular tempo médio."
               />
             </ReportChartCard>
           </div>
 
-          <div className="space-y-2">
-            <h2 className="font-display text-sm font-black uppercase tracking-wider text-foreground">
-              <CheckCircle2 className="mr-1.5 inline-block text-primary" size={14} />
-              Ordens de serviço no período
-              <span className="ml-2 text-[11px] font-bold text-muted-foreground">
+          <section className="space-y-3 pb-8">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="font-display text-sm font-black uppercase tracking-[0.12em] text-slate-900">
+                <CheckCircle2 className="mr-1.5 inline-block text-primary" size={15} />
+                Ordens de serviço no período
+              </h2>
+              <span className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-600">
                 {rows.length} registros
               </span>
-            </h2>
+            </div>
             <div className="hidden lg:block">
               <ReportOrdersTable rows={rows} />
             </div>
             <div className="lg:hidden">
               <ReportOrdersMobileList rows={rows} />
             </div>
-          </div>
+          </section>
         </>
       )}
     </div>
