@@ -6,10 +6,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  CalendarClock,
   Check,
   ClipboardCheck,
   Cog,
+  FileText,
   HardHat,
+  MapPin,
+  Pencil,
   Plus,
   Search,
   Sparkles,
@@ -46,6 +50,7 @@ type Draft = {
   techId: string;
   noTech: boolean;
   type: ServiceType;
+  typeOther: string;
   priority: ServicePriority;
 };
 
@@ -75,6 +80,7 @@ const typeIcon: Record<ServiceType, typeof Cog> = {
   instalacao: Building2,
   visita: UserRound,
   emergencia: Zap,
+  outro: Pencil,
 };
 
 export function ServiceOrderWizard({
@@ -101,6 +107,7 @@ export function ServiceOrderWizard({
     techId: "",
     noTech: false,
     type: "mecanica",
+    typeOther: "",
     priority: "media",
   });
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) =>
@@ -123,7 +130,9 @@ export function ServiceOrderWizard({
       draft.title.trim().length >= 3,
       Boolean(draft.clientId),
       Boolean(draft.techId) || draft.noTech,
-      Boolean(draft.type) && Boolean(draft.priority),
+      Boolean(draft.type) &&
+        Boolean(draft.priority) &&
+        (draft.type !== "outro" || draft.typeOther.trim().length >= 3),
       true,
     ];
   }, [draft]);
@@ -139,6 +148,8 @@ export function ServiceOrderWizard({
           client_unit_id: draft.unitId || null,
           technician_id: draft.noTech ? null : draft.techId || null,
           service_type: draft.type,
+          service_type_other:
+            draft.type === "outro" ? draft.typeOther.trim() : null,
           priority: draft.priority,
           location: draft.location || null,
           scheduled_for: draft.scheduled ? new Date(draft.scheduled).toISOString() : null,
