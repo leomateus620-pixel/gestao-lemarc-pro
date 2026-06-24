@@ -91,19 +91,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/25a52341-c79e-4a82-a3eb-efa44f11b933/id-preview-682ab43e--3e87f42c-8a40-47f0-aab9-96fb71e5e78e.lovable.app-1781377709076.png",
+        content: "https://lemarcgestao.com/branding/lemarc-login-logo.png",
       },
+      { property: "og:image:alt", content: "Logo Gestão Lemarc" },
       {
         name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/25a52341-c79e-4a82-a3eb-efa44f11b933/id-preview-682ab43e--3e87f42c-8a40-47f0-aab9-96fb71e5e78e.lovable.app-1781377709076.png",
+        content: "https://lemarcgestao.com/branding/lemarc-login-logo.png",
       },
-      { name: "description", content: "Gestão de ordens de serviço." },
-      { property: "og:description", content: "Gestão de ordens de serviço." },
-      { name: "twitter:description", content: "Gestão de ordens de serviço." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/47b6e543-520c-44be-8df1-fe1557294730/id-preview-c29a14c9--3e87f42c-8a40-47f0-aab9-96fb71e5e78e.lovable.app-1782127156924.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/47b6e543-520c-44be-8df1-fe1557294730/id-preview-c29a14c9--3e87f42c-8a40-47f0-aab9-96fb71e5e78e.lovable.app-1782127156924.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
