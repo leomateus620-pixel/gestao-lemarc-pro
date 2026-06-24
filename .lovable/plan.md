@@ -1,30 +1,111 @@
-## Objetivo
-Conceder a role `admin` aos usuários mostrados no print, para que tenham acesso de visualização total do sistema.
+# Plano — Módulo Relatórios (produção real)
 
-## Observação
-A mensagem fala em "3 usuários", mas o print lista **4 e‑mails**. Vou tratar os 4 como administradores. Se algum não deve ser admin, me avise antes de aprovar.
+Reestrutura completa de `/relatorios` substituindo mocks por dados reais do Supabase, com filtros, KPIs, gráficos, tabela e exportação. Inclui sub-rota de relatório por cliente.
 
-## Usuários a promover
-- marciop.freddi@gmail.com
-- lemarcfino@gmail.com
-- lemarcmanutencao@gmail.com
-- eduardo.s.qt@gmail.com
+## 1. Migration — controle de cobrança
+Adicionar em `service_orders` (única migration):
+- `billing_status` enum `pending | ready | billed | cancelled` (default `pending`)
+- `billed_at timestamptz null`
+- `billing_notes text null`
+- `invoice_reference text null`
 
-Todos já existem em `public.profiles` e hoje não possuem nenhuma role atribuída em `public.user_roles`.
+Sem alterar RLS/grants existentes (a tabela já tem políticas).
 
-## Mudança (1 migration SQL)
-Inserir a role `admin` para os 4 `user_id` correspondentes em `public.user_roles`, com `ON CONFLICT (user_id, role) DO NOTHING` para ser idempotente.
+## 2. Camada server (segura, com `requireSupabaseAuth`)
+Novo `src/lib/api/reports.functions.ts`:
+- `getReportsOverview({ filters })` → KPIs agregados
+- `getReportSeries({ filters })` → séries para gráficos (por status, prioridade, cliente, técnico, tipo, evolução mensal)
+- `getReportOrders({ filters })` → linhas da tabela/exportação
+- `getClientReport({ clientId, filters })` → dados consolidados de 1 cliente
+- `updateBillingStatus({ id, billing_status, invoice_reference?, billing_notes? })`
 
-```sql
-INSERT INTO public.user_roles (user_id, role)
-VALUES
-  ('28326a48-46d4-4a26-942c-d087e6d05036', 'admin'),
-  ('f3a5b4f7-0522-4593-9b6b-635eb385828f', 'admin'),
-  ('80210d37-3ec8-4f0b-a6e5-f2b52abc1eb5', 'admin'),
-  ('fcfc6a61-ae65-48dd-aed5-03b4be0e2495', 'admin')
-ON CONFLICT (user_id, role) DO NOTHING;
-```
+Cada função filtra OS no Postgres (período, cliente, unidade, técnico, status, prioridade, tipo, `billing_status`, "somente com hour_rate"), respeita RLS (admin vê tudo via `has_role`) e devolve DTOs planos.
 
-## Fora de escopo
-- Não vou alterar políticas RLS, tabelas ou código de UI. O sistema já possui a função `public.has_role(uid, 'admin')` disponível para reforçar permissões de admin onde for necessário em iterações futuras.
-- Se o objetivo for também *exibir* dados de todos os usuários nas telas (ex.: lista de OS de outros operadores), isso exige ajustes nas policies/queries — posso planejar em separado se desejar.
+## 3. Lógica pura (testável, sem React)
+`src/lib/reports/`:
+- `filters.ts` — schema Zod dos filtros + serialização para query params
+- `metrics.ts` — `totalOrders`, `totalHours` (`worked_minutes/60`), `estimatedValue` (`min/60*hour_rate`), `avgLeadTime` (opened→closed), `completionRate`, `avgTicket`, agrupamentos (cliente, técnico, status, prioridade, tipo, mês)
+- `formatters.ts` — BRL, horas (`3h42`), datas pt-BR
+- `export.ts` — CSV (Blob + UTF-8 BOM) e HTML print-safe (`window.print`)
+
+Tratamento de nulos: `worked_minutes`/`hour_rate` nulos = 0; entidades nulas viram "Sem cliente/técnico/unidade".
+
+## 4. Hooks
+`src/hooks/useReports.ts` — `useReportsOverviewQuery`, `useReportSeriesQuery`, `useReportOrdersQuery`, `useClientReportQuery`, `useUpdateBillingStatus` (com `invalidateQueries`). Todos via `useServerFn` + `useSuspenseQuery`.
+
+## 5. Rotas
+- `src/routes/_app.relatorios.tsx` — dashboard principal (filtros via `validateSearch` + `zodValidator`, loader faz `ensureQueryData`)
+- `src/routes/_app.relatorios.cliente.$clientId.tsx` — relatório por cliente
+- `errorComponent` e `notFoundComponent` em ambas
+
+Search params: `period, from, to, clientId, unitId, technicianId, status, priority, serviceType, billingStatus, onlyWithRate`.
+
+## 6. Componentes (`src/components/reports/`)
+- `ReportsPageHeader` — título + ações (exportar, gerar por cliente)
+- `ReportsFilters` — sheet/drawer no mobile, barra colapsável no desktop; chips de filtros ativos; "Limpar filtros"
+- `ReportsKpiGrid` + `ReportKpiCard` — 6–8 KPIs compactos (label, valor, subtítulo, ícone, badge de alerta opcional)
+- `ReportChartCard` — wrapper glass para gráficos
+- `ReportBarChart`, `ReportStatusDonut`, `ReportTrendArea`, `ReportTopClients`, `ReportTopTechnicians` — Recharts (já no projeto)
+- `ReportOrdersTable` (desktop) + `ReportOrdersMobileList` (mobile cards)
+- `ReportExportActions` — Exportar CSV, Imprimir/PDF
+- `ClientReportDrawer` — picker de cliente + período, redireciona para `/relatorios/cliente/$clientId`
+- `BillingStatusBadge` + ação inline na tabela (marcar como `ready`/`billed`)
+- Skeletons e `EmptyState` reutilizando componentes existentes
+
+## 7. KPIs do dashboard
+OS no período · Concluídas · Em execução · Horas trabalhadas · Valor estimado (pré-cobrança) · Tempo médio (abertura→fechamento) · Taxa de conclusão · Aguardando cobrança (`billing_status = ready` ou OS `finished/approved` sem `billed_at`).
+
+## 8. Gráficos
+Desktop: grid 2 colunas, principal em destaque (evolução mensal de OS). Mobile: 1 coluna, barras horizontais compactas.
+Inclui: OS por status, por prioridade, por tipo de serviço, horas por técnico (top N), OS por cliente (top N), valor estimado por cliente, tempo médio por técnico, evolução mensal.
+
+## 9. Tabela / lista operacional
+Desktop: tabela com Nº, Cliente, Unidade, Técnico, Status, Prioridade, Tipo, Abertura, Fechamento, Tempo, Valor, Cobrança (badge + menu de ação).
+Mobile: cards compactos com mesmos campos essenciais.
+Paginação simples client-side (server já filtra).
+
+## 10. Exportação real
+- **CSV**: gera Blob com BOM, separador `;`, datas ISO, valores em BRL. Nome: `lemarc-relatorio-{periodo}-{timestamp}.csv`. Usa exatamente o conjunto filtrado.
+- **PDF/Imprimir**: rota oculta `/relatorios/print` OU window com `document.write` de HTML print-safe (logo, filtros aplicados, KPIs, tabela). Botão chama `window.print()`. Sem nova dependência.
+
+## 11. Relatório por cliente
+Rota `_app.relatorios.cliente.$clientId.tsx`:
+- Header com nome do cliente + período
+- KPIs do cliente (total OS, horas, valor, abertas, concluídas, aguardando cobrança)
+- Detalhamento por unidade (lista) e por técnico (barras)
+- Tabela de OS do cliente no período
+- Exportar CSV e Imprimir
+- Botão "Voltar para relatórios"
+
+## 12. Remoção de mocks
+- Excluir `src/lib/mock/reports.ts` (uso apenas em `_app.relatorios.tsx`, confirmado)
+- Nenhum botão com "mock"
+- Sem dados estáticos no módulo
+
+## 13. Identidade visual
+Mantém glass industrial, fundo grafite/azul, laranja Lemarc como destaque (linhas/CTA), tipografia atual. Cards menores e mais densos; hierarquia clara; sem rodapés genéricos ("Resumo Lemarc"). Cores semânticas via tokens existentes (`status-*`, `primary`).
+
+## 14. Responsividade
+Validar 360/375/390/414 (mobile) e 1024/1280/1366/1440 (desktop). `pb-24` para BottomNav. Sem overflow horizontal. Gráficos com `ResponsiveContainer`.
+
+## 15. Estados
+Skeletons para KPIs/gráficos/tabela; `EmptyState` quando sem OS ou sem resultados de filtro; `errorComponent` com botão "Tentar novamente" (`router.invalidate()`); botão "Limpar filtros" sempre visível quando há filtros ativos.
+
+## 16. Validação final
+- `npm run build` passa
+- `/relatorios` sem qualquer import de `mock/reports`
+- Filtros refletem em KPIs, gráficos, tabela e exportação
+- CSV abre no Excel com acentos corretos
+- Relatório por cliente abre via drawer e via URL direta
+- Admin vê todas as OS; não-admin vê apenas as suas (RLS atual)
+- BottomNav, AppShell, rotas existentes intactos
+
+## Ordem de implementação
+1. Migration `billing_status` + campos
+2. `reports.functions.ts` + `lib/reports/*` + types
+3. `useReports.ts`
+4. Componentes (`reports/*`)
+5. Rota `_app.relatorios.tsx` reescrita + remoção do mock
+6. Rota `_app.relatorios.cliente.$clientId.tsx`
+7. Exportação CSV + print
+8. Polimento visual + responsividade + build
