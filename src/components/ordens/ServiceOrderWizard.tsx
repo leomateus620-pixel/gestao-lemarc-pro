@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/app/GlassCard";
+import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import {
@@ -110,6 +111,13 @@ export function ServiceOrderWizard({
     if (step === 0) titleRef.current?.focus();
   }, [step]);
 
+  // Sempre rolar para o topo ao mudar de etapa, em ambos os sentidos.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  }, [step]);
+
   const validity = useMemo(() => {
     return [
       draft.title.trim().length >= 3,
@@ -161,7 +169,7 @@ export function ServiceOrderWizard({
     <div className="mt-2 space-y-5">
       <WizardStepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div className="overflow-hidden">
+      <div className="overflow-x-clip">
         <div
           className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
@@ -308,7 +316,7 @@ function StepFooter({
   onNext: () => void;
 }) {
   return (
-    <div className="sticky bottom-24 z-20 flex gap-3 pb-2">
+    <FormFlowActions>
       <Button
         type="button"
         variant="secondary"
@@ -334,7 +342,7 @@ function StepFooter({
             ? "Criar ordem de serviço"
             : "Continuar"}
       </button>
-    </div>
+    </FormFlowActions>
   );
 }
 

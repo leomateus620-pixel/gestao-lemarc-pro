@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Save } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
+import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,7 @@ function Edit() {
         <p className="text-sm text-rose-300">{(mut.error as Error).message}</p>
       )}
 
-      <div className="sticky bottom-24 z-20 flex gap-3 pb-2">
+      <FormFlowActions>
         <Button
           type="button"
           variant="secondary"
@@ -206,7 +207,7 @@ function Edit() {
         >
           <Save size={18} /> {mut.isPending ? "Salvando..." : "Salvar alterações"}
         </button>
-      </div>
+      </FormFlowActions>
     </div>
   );
 }

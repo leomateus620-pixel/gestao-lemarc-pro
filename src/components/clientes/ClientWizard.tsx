@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/app/GlassCard";
+import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { createCompany } from "@/lib/api/clients.functions";
 import { isValidCNPJ, maskCNPJ, onlyDigits } from "@/lib/cnpj";
 import { cn } from "@/lib/utils";
@@ -99,11 +100,17 @@ export function ClientWizard() {
   const isLast = step === STEPS.length - 1;
   const canNext = validity[step];
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  }, [step]);
+
   return (
     <div className="mt-2 space-y-5">
       <Stepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div className="overflow-hidden">
+      <div className="overflow-x-clip">
         <div
           className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
@@ -132,7 +139,7 @@ export function ClientWizard() {
         </p>
       )}
 
-      <div className="sticky bottom-24 z-20 flex gap-3 pb-2">
+      <FormFlowActions>
         <Button
           type="button"
           variant="secondary"
@@ -161,7 +168,7 @@ export function ClientWizard() {
               ? "Cadastrar empresa"
               : "Continuar"}
         </button>
-      </div>
+      </FormFlowActions>
     </div>
   );
 }
