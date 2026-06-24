@@ -22,6 +22,7 @@ import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
 import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes.$id'
+import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios.cliente.$clientId'
 import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
 
 const LoginRoute = LoginRouteImport.update({
@@ -88,6 +89,12 @@ const AppClientesIdRoute = AppClientesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppClientesRoute,
 } as any)
+const AppRelatoriosClienteClientIdRoute =
+  AppRelatoriosClienteClientIdRouteImport.update({
+    id: '/cliente/$clientId',
+    path: '/cliente/$clientId',
+    getParentRoute: () => AppRelatoriosRoute,
+  } as any)
 const AppClientesIdEditarRoute = AppClientesIdEditarRouteImport.update({
   id: '/editar',
   path: '/editar',
@@ -100,7 +107,7 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AppClientesRouteWithChildren
   '/colaboradores': typeof AppColaboradoresRoute
   '/dashboard': typeof AppDashboardRoute
-  '/relatorios': typeof AppRelatoriosRoute
+  '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
   '/ordens/$id': typeof AppOrdensIdRoute
@@ -108,13 +115,14 @@ export interface FileRoutesByFullPath {
   '/clientes/': typeof AppClientesIndexRoute
   '/ordens/': typeof AppOrdensIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/colaboradores': typeof AppColaboradoresRoute
   '/dashboard': typeof AppDashboardRoute
-  '/relatorios': typeof AppRelatoriosRoute
+  '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
   '/ordens/$id': typeof AppOrdensIdRoute
@@ -122,6 +130,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof AppClientesIndexRoute
   '/ordens': typeof AppOrdensIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,7 +140,7 @@ export interface FileRoutesById {
   '/_app/clientes': typeof AppClientesRouteWithChildren
   '/_app/colaboradores': typeof AppColaboradoresRoute
   '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/relatorios': typeof AppRelatoriosRoute
+  '/_app/relatorios': typeof AppRelatoriosRouteWithChildren
   '/_app/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/_app/clientes/novo': typeof AppClientesNovoRoute
   '/_app/ordens/$id': typeof AppOrdensIdRoute
@@ -139,6 +148,7 @@ export interface FileRoutesById {
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
   '/_app/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/_app/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/ordens/'
     | '/clientes/$id/editar'
+    | '/relatorios/cliente/$clientId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/ordens'
     | '/clientes/$id/editar'
+    | '/relatorios/cliente/$clientId'
   id:
     | '__root__'
     | '/'
@@ -186,6 +198,7 @@ export interface FileRouteTypes {
     | '/_app/clientes/'
     | '/_app/ordens/'
     | '/_app/clientes/$id/editar'
+    | '/_app/relatorios/cliente/$clientId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -287,6 +300,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppClientesRoute
     }
+    '/_app/relatorios/cliente/$clientId': {
+      id: '/_app/relatorios/cliente/$clientId'
+      path: '/cliente/$clientId'
+      fullPath: '/relatorios/cliente/$clientId'
+      preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
+      parentRoute: typeof AppRelatoriosRoute
+    }
     '/_app/clientes/$id/editar': {
       id: '/_app/clientes/$id/editar'
       path: '/editar'
@@ -325,11 +345,23 @@ const AppClientesRouteWithChildren = AppClientesRoute._addFileChildren(
   AppClientesRouteChildren,
 )
 
+interface AppRelatoriosRouteChildren {
+  AppRelatoriosClienteClientIdRoute: typeof AppRelatoriosClienteClientIdRoute
+}
+
+const AppRelatoriosRouteChildren: AppRelatoriosRouteChildren = {
+  AppRelatoriosClienteClientIdRoute: AppRelatoriosClienteClientIdRoute,
+}
+
+const AppRelatoriosRouteWithChildren = AppRelatoriosRoute._addFileChildren(
+  AppRelatoriosRouteChildren,
+)
+
 interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRouteWithChildren
   AppColaboradoresRoute: typeof AppColaboradoresRoute
   AppDashboardRoute: typeof AppDashboardRoute
-  AppRelatoriosRoute: typeof AppRelatoriosRoute
+  AppRelatoriosRoute: typeof AppRelatoriosRouteWithChildren
   AppOrdensIdRoute: typeof AppOrdensIdRoute
   AppOrdensNovaRoute: typeof AppOrdensNovaRoute
   AppOrdensIndexRoute: typeof AppOrdensIndexRoute
@@ -339,7 +371,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRouteWithChildren,
   AppColaboradoresRoute: AppColaboradoresRoute,
   AppDashboardRoute: AppDashboardRoute,
-  AppRelatoriosRoute: AppRelatoriosRoute,
+  AppRelatoriosRoute: AppRelatoriosRouteWithChildren,
   AppOrdensIdRoute: AppOrdensIdRoute,
   AppOrdensNovaRoute: AppOrdensNovaRoute,
   AppOrdensIndexRoute: AppOrdensIndexRoute,
