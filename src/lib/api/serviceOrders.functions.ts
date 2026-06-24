@@ -10,7 +10,7 @@ import type {
 
 const ORDER_SELECT = `
   id, number, title, description, client_id, technician_id,
-  service_type, priority, status, location, scheduled_for, client_unit_id,
+  service_type, service_type_other, priority, status, location, scheduled_for, client_unit_id,
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit),
@@ -59,6 +59,7 @@ type CreateInput = {
   client_unit_id?: string | null;
   technician_id?: string | null;
   service_type?: ServiceType | null;
+  service_type_other?: string | null;
   priority?: ServicePriority | null;
   location?: string | null;
   scheduled_for?: string | null;
@@ -77,6 +78,7 @@ export const createServiceOrder = createServerFn({ method: "POST" })
         client_unit_id: data.client_unit_id ?? null,
         technician_id: data.technician_id ?? null,
         service_type: data.service_type ?? null,
+        service_type_other: data.service_type_other ?? null,
         priority: data.priority ?? null,
         location: data.location ?? null,
         scheduled_for: data.scheduled_for ?? null,

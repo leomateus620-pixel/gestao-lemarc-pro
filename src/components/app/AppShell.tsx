@@ -105,7 +105,7 @@ export function AppShell({
           className={
             "lemarc-page-enter flex-1 px-4 pt-2 sm:px-6 lg:px-8 " +
             (fullscreenForm
-              ? "pb-[calc(env(safe-area-inset-bottom)+7rem)]"
+              ? "pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom)+6.5rem)]"
               : "pb-32")
           }
         >

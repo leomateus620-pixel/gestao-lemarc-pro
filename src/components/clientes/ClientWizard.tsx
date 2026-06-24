@@ -145,7 +145,7 @@ export function ClientWizard() {
           variant="secondary"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || mutation.isPending}
-          className="h-14 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
+          className="h-12 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40 sm:h-14"
         >
           <ArrowLeft size={16} /> Voltar
         </Button>
@@ -157,7 +157,7 @@ export function ClientWizard() {
             else setStep((s) => Math.min(STEPS.length - 1, s + 1));
           }}
           className={cn(
-            "lemarc-pressable flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40",
+            "lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40 sm:h-14",
             canNext && !mutation.isPending && "lemarc-orange-glow hover:-translate-y-0.5",
           )}
         >

@@ -6,10 +6,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  CalendarClock,
   Check,
   ClipboardCheck,
   Cog,
+  FileText,
   HardHat,
+  MapPin,
+  Pencil,
   Plus,
   Search,
   Sparkles,
@@ -46,6 +50,7 @@ type Draft = {
   techId: string;
   noTech: boolean;
   type: ServiceType;
+  typeOther: string;
   priority: ServicePriority;
 };
 
@@ -75,6 +80,7 @@ const typeIcon: Record<ServiceType, typeof Cog> = {
   instalacao: Building2,
   visita: UserRound,
   emergencia: Zap,
+  outro: Pencil,
 };
 
 export function ServiceOrderWizard({
@@ -101,6 +107,7 @@ export function ServiceOrderWizard({
     techId: "",
     noTech: false,
     type: "mecanica",
+    typeOther: "",
     priority: "media",
   });
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) =>
@@ -123,7 +130,9 @@ export function ServiceOrderWizard({
       draft.title.trim().length >= 3,
       Boolean(draft.clientId),
       Boolean(draft.techId) || draft.noTech,
-      Boolean(draft.type) && Boolean(draft.priority),
+      Boolean(draft.type) &&
+        Boolean(draft.priority) &&
+        (draft.type !== "outro" || draft.typeOther.trim().length >= 3),
       true,
     ];
   }, [draft]);
@@ -139,6 +148,8 @@ export function ServiceOrderWizard({
           client_unit_id: draft.unitId || null,
           technician_id: draft.noTech ? null : draft.techId || null,
           service_type: draft.type,
+          service_type_other:
+            draft.type === "outro" ? draft.typeOther.trim() : null,
           priority: draft.priority,
           location: draft.location || null,
           scheduled_for: draft.scheduled ? new Date(draft.scheduled).toISOString() : null,
@@ -322,7 +333,7 @@ function StepFooter({
         variant="secondary"
         onClick={onBack}
         disabled={step === 0 || loading}
-        className="h-14 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
+        className="h-12 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40 sm:h-14"
       >
         <ArrowLeft size={16} /> Voltar
       </Button>
@@ -331,7 +342,7 @@ function StepFooter({
         onClick={onNext}
         disabled={!canGoNext || loading}
         className={cn(
-          "lemarc-pressable flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40",
+          "lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40 sm:h-14",
           canGoNext && !loading && "lemarc-orange-glow hover:-translate-y-0.5 active:scale-[0.98]",
         )}
       >
@@ -408,13 +419,14 @@ function BasicInfoStep({
           />
         </div>
         <div className="space-y-1">
-          <FieldLabel>Previsão</FieldLabel>
+          <FieldLabel>Previsão de início</FieldLabel>
           <Input
             type="datetime-local"
             value={draft.scheduled}
             onChange={(e) => set("scheduled", e.target.value)}
-            className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+            className="h-12 rounded-xl border-white/15 bg-white/[0.09] text-foreground focus-visible:ring-primary/40 [color-scheme:dark]"
           />
+          <FieldHint>Quando a execução está prevista para começar.</FieldHint>
         </div>
       </div>
     </GlassCard>
@@ -812,7 +824,7 @@ function ServiceTypeStep({
       />
       <div className="space-y-2">
         <FieldLabel required>Tipo de serviço</FieldLabel>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {serviceTypes.map(([key, label]) => {
             const Icon = typeIcon[key];
             const active = draft.type === key;
@@ -822,9 +834,9 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("type", key)}
                 className={cn(
-                  "group flex flex-col items-start gap-2 rounded-xl border px-3 py-3 text-left transition",
+                  "group flex min-h-[88px] flex-col items-start gap-2 rounded-xl border px-3 py-3.5 text-left transition",
                   active
-                    ? "border-primary/50 bg-primary/10 text-foreground shadow-[0_8px_24px_-16px_hsl(var(--primary)/0.7)]"
+                    ? "border-primary/70 bg-primary/20 text-foreground shadow-[0_10px_28px_-14px_hsl(var(--primary)/0.8)] ring-1 ring-primary/60"
                     : "border-white/10 bg-white/[0.03] text-muted-foreground hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-foreground",
                 )}
               >
@@ -836,7 +848,7 @@ function ServiceTypeStep({
                 >
                   <Icon size={16} />
                 </span>
-                <span className="text-[12px] font-black uppercase tracking-[0.08em]">
+                <span className="text-[11px] font-black uppercase tracking-[0.08em] leading-tight">
                   {label}
                 </span>
               </button>
@@ -844,6 +856,20 @@ function ServiceTypeStep({
           })}
         </div>
       </div>
+
+      {draft.type === "outro" && (
+        <div className="space-y-1 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
+          <FieldLabel required>Descreva o tipo de serviço</FieldLabel>
+          <Input
+            value={draft.typeOther}
+            onChange={(e) => set("typeOther", e.target.value)}
+            placeholder="Ex.: Calibração de sensores de vazão"
+            className="h-12 rounded-xl border-white/15 bg-white/[0.09] focus-visible:ring-primary/40"
+            autoFocus
+          />
+          <FieldHint>Mínimo 3 caracteres. Este texto aparecerá na OS.</FieldHint>
+        </div>
+      )}
 
       <div className="space-y-2">
         <FieldLabel required>Prioridade</FieldLabel>
@@ -856,7 +882,7 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("priority", key)}
                 className={cn(
-                  "rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition",
+                  "min-h-12 rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition",
                   active ? priorityActive[key] : priorityTone[key],
                 )}
               >
@@ -883,57 +909,133 @@ function ReviewStep({
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
   const tech = technicians.find((t) => t.id === draft.techId);
+  const scheduledLabel = draft.scheduled
+    ? new Date(draft.scheduled).toLocaleString("pt-BR")
+    : "—";
+  const typeLabel =
+    draft.type === "outro"
+      ? draft.typeOther.trim() || "Outro"
+      : serviceTypeLabel[draft.type];
+  const priorityChip: Record<ServicePriority, string> = {
+    baixa: "border-white/20 bg-white/10 text-foreground",
+    media: "border-primary/60 bg-primary/20 text-primary",
+    alta: "border-amber-400/60 bg-amber-400/20 text-amber-200",
+    urgente: "border-rose-500/60 bg-rose-500/20 text-rose-200",
+  };
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
-      <StepHeader
-        eyebrow="Etapa 5 · Revisão"
-        title="Confira antes de criar"
-        description="Você ainda pode voltar e ajustar qualquer dado."
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ReviewBlock title="Dados iniciais">
-          <ReviewRow k="Título" v={draft.title || "—"} />
-          <ReviewRow k="Descrição" v={draft.description || "—"} />
-          <ReviewRow k="Local" v={draft.location || "—"} />
-          <ReviewRow
-            k="Previsão"
-            v={draft.scheduled ? new Date(draft.scheduled).toLocaleString("pt-BR") : "—"}
-          />
-        </ReviewBlock>
-        <ReviewBlock title="Cliente & técnico">
-          <ReviewRow k="Cliente" v={client?.name ?? "—"} />
-          <ReviewRow k="Unidade" v={client?.unit ?? "—"} />
-          <ReviewRow
-            k="Técnico"
-            v={draft.noTech ? "Sem técnico definido" : (tech?.full_name ?? "—")}
-          />
-          <ReviewRow k="Função" v={tech?.role ?? "—"} />
-        </ReviewBlock>
-        <ReviewBlock title="Serviço">
-          <ReviewRow k="Tipo" v={serviceTypeLabel[draft.type]} />
-          <ReviewRow k="Prioridade" v={priorityLabel[draft.priority]} />
-        </ReviewBlock>
-      </div>
-    </GlassCard>
-  );
-}
+    <div className="space-y-4">
+      <GlassCard className="lemarc-wizard-card space-y-4 p-5 sm:p-6">
+        <StepHeader
+          eyebrow="Etapa 5 · Revisão"
+          title="Confira antes de criar"
+          description="Você ainda pode voltar e ajustar qualquer dado."
+        />
+        <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-white/[0.04] to-transparent p-4 shadow-[0_18px_44px_-26px_rgba(0,0,0,0.7)]">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+            Título do serviço
+          </p>
+          <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-foreground sm:text-2xl">
+            {draft.title || "—"}
+          </h3>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white/15 bg-white/[0.07] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              {typeLabel}
+            </span>
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]",
+                priorityChip[draft.priority],
+              )}
+            >
+              Prioridade {priorityLabel[draft.priority]}
+            </span>
+          </div>
+        </div>
+      </GlassCard>
 
-function ReviewBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{title}</p>
-      <div className="mt-3 space-y-2">{children}</div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ReviewSection title="Dados iniciais" icon={FileText}>
+          <ReviewField label="Descrição">
+            {draft.description?.trim() || "—"}
+          </ReviewField>
+        </ReviewSection>
+
+        <ReviewSection title="Local e previsão" icon={MapPin}>
+          <ReviewField label="Local / setor">{draft.location || "—"}</ReviewField>
+          <ReviewField label="Previsão de início" icon={CalendarClock}>
+            {scheduledLabel}
+          </ReviewField>
+        </ReviewSection>
+
+        <ReviewSection title="Cliente e técnico" icon={Building2}>
+          <ReviewField label="Cliente">{client?.name ?? "—"}</ReviewField>
+          <ReviewField label="Unidade">{client?.unit ?? "—"}</ReviewField>
+          <ReviewField label="Técnico" icon={HardHat}>
+            {draft.noTech ? "Sem técnico definido" : (tech?.full_name ?? "—")}
+          </ReviewField>
+          <ReviewField label="Função">{tech?.role ?? "—"}</ReviewField>
+        </ReviewSection>
+
+        <ReviewSection title="Serviço e prioridade" icon={Sparkles}>
+          <ReviewField label="Tipo de serviço">{typeLabel}</ReviewField>
+          <ReviewField label="Prioridade">
+            <span
+              className={cn(
+                "inline-flex rounded-md border px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em]",
+                priorityChip[draft.priority],
+              )}
+            >
+              {priorityLabel[draft.priority]}
+            </span>
+          </ReviewField>
+        </ReviewSection>
+      </div>
     </div>
   );
 }
 
-function ReviewRow({ k, v }: { k: string; v: string }) {
+function ReviewSection({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: typeof Cog;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-        {k}
+    <div className="rounded-2xl border border-white/15 bg-white/[0.06] p-4 shadow-[0_12px_36px_-24px_rgba(0,0,0,0.6)]">
+      <div className="flex items-center gap-2">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
+          <Icon size={14} />
+        </span>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+          {title}
+        </p>
+      </div>
+      <div className="mt-3 space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function ReviewField({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon?: typeof Cog;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">
+        {Icon && <Icon size={11} />}
+        {label}
       </span>
-      <span className="max-w-[65%] text-right font-semibold text-foreground">{v}</span>
+      <span className="text-sm font-semibold leading-snug text-foreground">
+        {children}
+      </span>
     </div>
   );
 }
