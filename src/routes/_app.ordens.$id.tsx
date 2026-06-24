@@ -101,7 +101,11 @@ function OrdemDetalhe() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              {order.service_type ? serviceTypeLabel[order.service_type] : "Sem tipo"}
+              {order.service_type === "outro" && order.service_type_other
+                ? order.service_type_other
+                : order.service_type
+                  ? serviceTypeLabel[order.service_type]
+                  : "Sem tipo"}
             </p>
             <h1 className="mt-1 font-display text-xl font-black leading-tight text-foreground">
               OS #{order.number} · {order.title}
@@ -150,7 +154,7 @@ function OrdemDetalhe() {
           <MetaRow icon={HardHat}>{order.technician?.full_name ?? "Sem técnico"}</MetaRow>
           {order.scheduled_for && (
             <MetaRow icon={Clock}>
-              Previsto para {new Date(order.scheduled_for).toLocaleString("pt-BR")}
+              Previsão de início: {new Date(order.scheduled_for).toLocaleString("pt-BR")}
             </MetaRow>
           )}
         </div>
