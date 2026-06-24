@@ -214,8 +214,8 @@ export function ReportsFilters({
             <Button
               variant="ghost"
               className="flex-1"
-              onClick={() => {
-                navigate(setSearch, {
+              onClick={() =>
+                setSearch({
                   period: "month",
                   from: null,
                   to: null,
@@ -227,8 +227,8 @@ export function ReportsFilters({
                   serviceType: null,
                   billingStatus: null,
                   onlyWithRate: null,
-                });
-              }}
+                })
+              }
             >
               Limpar tudo
             </Button>
@@ -265,10 +265,6 @@ export function ReportsFilters({
       )}
     </div>
   );
-}
-
-function navigate(set: ReturnType<typeof useRouteSetter>, patch: Patch) {
-  set(patch);
 }
 
 function FilterSelect({
