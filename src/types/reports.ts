@@ -19,6 +19,7 @@ export type PeriodKey =
   | "month"
   | "quarter"
   | "year"
+  | "last30"
   | "all"
   | "custom";
 
@@ -34,6 +35,9 @@ export type ReportFilters = {
   serviceType?: ServiceType | null;
   billingStatus?: BillingStatus | null;
   onlyWithRate?: boolean | null;
+  onlyCompleted?: boolean | null;
+  onlyAwaitingBilling?: boolean | null;
+  onlyWithObservations?: boolean | null;
 };
 
 export type ReportOrderRow = {
@@ -59,6 +63,7 @@ export type ReportOrderRow = {
   billing_status: BillingStatus;
   billed_at: string | null;
   invoice_reference: string | null;
+  description: string | null;
 };
 
 export type ReportOverview = {
@@ -94,5 +99,73 @@ export type ClientReport = {
   byUnit: GroupBucket[];
   byTechnician: GroupBucket[];
   byStatus: GroupBucket[];
+  orders: ReportOrderRow[];
+};
+
+// ===== Managerial Report =====
+
+export type ManagerialSummary = {
+  totalOrders: number;
+  finished: number;
+  running: number;
+  pending: number;
+  review: number;
+  awaitingBilling: number;
+  totalHours: number;
+  avgLeadMinutes: number | null;
+  estimatedValue: number;
+  completionRate: number;
+  clientsInvolved: number;
+  techniciansInvolved: number;
+};
+
+export type StatusBreakdown = {
+  key: string;
+  label: string;
+  count: number;
+  percent: number;
+};
+
+export type ClientAggregate = {
+  id: string | null;
+  name: string;
+  orders: number;
+  finished: number;
+  pending: number;
+  hours: number;
+  estimatedValue: number;
+};
+
+export type TechnicianAggregate = {
+  id: string | null;
+  name: string;
+  orders: number;
+  finished: number;
+  hours: number;
+  avgLeadMinutes: number | null;
+  estimatedValue: number;
+};
+
+export type ServiceTypeAggregate = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+export type IncompleteCounters = {
+  withoutTechnician: number;
+  withoutHourRate: number;
+  withoutWorkedMinutes: number;
+  withoutClosedAt: number;
+};
+
+export type ManagerialReport = {
+  summary: ManagerialSummary;
+  byStatus: StatusBreakdown[];
+  topClients: ClientAggregate[];
+  topTechnicians: TechnicianAggregate[];
+  byServiceType: ServiceTypeAggregate[];
+  observations: ReportOrderRow[];
+  incomplete: IncompleteCounters;
   orders: ReportOrderRow[];
 };
