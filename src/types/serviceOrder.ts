@@ -17,7 +17,8 @@ export type ServiceType =
   | "montagem"
   | "instalacao"
   | "visita"
-  | "emergencia";
+  | "emergencia"
+  | "outro";
 
 export const serviceTypeLabel: Record<ServiceType, string> = {
   mecanica: "Manutenção Mecânica",
@@ -27,6 +28,7 @@ export const serviceTypeLabel: Record<ServiceType, string> = {
   instalacao: "Instalação",
   visita: "Visita Técnica",
   emergencia: "Emergência",
+  outro: "Outro",
 };
 
 export const priorityLabel: Record<ServicePriority, string> = {
@@ -66,6 +68,7 @@ export type ServiceOrder = {
   client_unit_id: string | null;
   technician_id: string | null;
   service_type: ServiceType | null;
+  service_type_other: string | null;
   priority: ServicePriority | null;
   status: ServiceOrderStatus;
   location: string | null;
