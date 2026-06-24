@@ -145,7 +145,7 @@ export function ClientWizard() {
           variant="secondary"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || mutation.isPending}
-          className="h-14 gap-2 rounded-2xl bg-white/[0.04] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
+          className="h-14 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40"
         >
           <ArrowLeft size={16} /> Voltar
         </Button>
@@ -210,7 +210,7 @@ function Stepper({
                 current
                   ? "border-primary/40 bg-primary/10"
                   : done
-                    ? "border-white/10 bg-white/[0.04]"
+                    ? "border-white/10 bg-white/[0.07]"
                     : "border-white/5 bg-transparent opacity-60",
               )}
             >
@@ -275,7 +275,7 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 }
 
 const inputCls =
-  "h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40";
+  "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
 
 function CompanyStep({
   draft,
@@ -396,7 +396,7 @@ function LocationStep({
         <Textarea
           value={draft.notes}
           onChange={(e) => set("notes", e.target.value)}
-          className="min-h-24 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+          className="min-h-24 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
         />
       </div>
     </GlassCard>

@@ -32,7 +32,7 @@ function EditPage() {
 }
 
 const inputCls =
-  "h-12 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40";
+  "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
 
 function Edit() {
   const { id } = Route.useParams();
@@ -163,7 +163,7 @@ function Edit() {
           <Textarea
             value={draft.notes}
             onChange={(e) => set("notes", e.target.value)}
-            className="min-h-24 rounded-xl border-white/10 bg-white/[0.04] focus-visible:ring-primary/40"
+            className="min-h-24 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
           />
         </div>
 
@@ -192,7 +192,7 @@ function Edit() {
           type="button"
           variant="secondary"
           onClick={() => navigate({ to: "/clientes/$id", params: { id } })}
-          className="h-14 rounded-2xl bg-white/[0.04] px-5"
+          className="h-14 rounded-2xl bg-white/[0.07] px-5"
         >
           Cancelar
         </Button>
