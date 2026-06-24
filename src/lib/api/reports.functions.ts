@@ -14,7 +14,7 @@ import type {
 } from "@/types/serviceOrder";
 
 const ROW_SELECT = `
-  id, number, title, status, priority, service_type, service_type_other,
+  id, number, title, description, status, priority, service_type, service_type_other,
   client_id, client_unit_id, technician_id,
   opened_at, closed_at, worked_minutes, hour_rate,
   billing_status, billed_at, invoice_reference,
@@ -48,6 +48,7 @@ function normalize(row: any): ReportOrderRow {
     billing_status: (row.billing_status ?? "pending") as BillingStatus,
     billed_at: row.billed_at ?? null,
     invoice_reference: row.invoice_reference ?? null,
+    description: row.description ?? null,
   };
 }
 
@@ -63,6 +64,10 @@ function applyFilters(query: any, filters: ReportFilters) {
   if (filters.serviceType) query = query.eq("service_type", filters.serviceType);
   if (filters.billingStatus) query = query.eq("billing_status", filters.billingStatus);
   if (filters.onlyWithRate) query = query.gt("hour_rate", 0);
+  if (filters.onlyCompleted) query = query.in("status", ["finished", "approved"]);
+  if (filters.onlyAwaitingBilling)
+    query = query.in("billing_status", ["pending", "ready"]).in("status", ["finished", "review", "approved"]);
+  if (filters.onlyWithObservations) query = query.not("description", "is", null);
   return query;
 }
 

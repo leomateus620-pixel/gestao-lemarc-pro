@@ -42,6 +42,7 @@ import {
 } from "@/components/reports/ReportOrdersTable";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { ClientReportDrawer } from "@/components/reports/ClientReportDrawer";
+import { ReportGenerateDialog } from "@/components/reports/ReportGenerateDialog";
 
 export const Route = createFileRoute("/_app/relatorios")({
   head: () => ({
@@ -98,6 +99,7 @@ function PageHeader() {
       </div>
       <Suspense fallback={null}>
         <div className="flex flex-wrap items-center gap-2">
+          <ReportGenerateDialog />
           <ClientReportDrawer />
         </div>
       </Suspense>

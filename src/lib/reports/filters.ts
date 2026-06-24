@@ -8,6 +8,7 @@ export const periodSchema = z.enum([
   "month",
   "quarter",
   "year",
+  "last30",
   "all",
   "custom",
 ]);
@@ -50,6 +51,9 @@ export const reportSearchSchema = z.object({
   serviceType: fallback(serviceTypeSchema.optional(), undefined).optional(),
   billingStatus: fallback(billingStatusSchema.optional(), undefined).optional(),
   onlyWithRate: fallback(z.boolean().optional(), undefined).optional(),
+  onlyCompleted: fallback(z.boolean().optional(), undefined).optional(),
+  onlyAwaitingBilling: fallback(z.boolean().optional(), undefined).optional(),
+  onlyWithObservations: fallback(z.boolean().optional(), undefined).optional(),
 });
 
 export type ReportSearch = z.infer<typeof reportSearchSchema>;
@@ -67,6 +71,9 @@ export function searchToFilters(search: ReportSearch): ReportFilters {
     serviceType: search.serviceType ?? null,
     billingStatus: search.billingStatus ?? null,
     onlyWithRate: search.onlyWithRate ?? null,
+    onlyCompleted: search.onlyCompleted ?? null,
+    onlyAwaitingBilling: search.onlyAwaitingBilling ?? null,
+    onlyWithObservations: search.onlyWithObservations ?? null,
   };
 }
 
@@ -76,6 +83,7 @@ export const PERIOD_OPTIONS: { key: ReportFilters["period"]; label: string }[] =
   { key: "month", label: "Mês" },
   { key: "quarter", label: "Trimestre" },
   { key: "year", label: "Ano" },
+  { key: "last30", label: "Últimos 30 dias" },
   { key: "all", label: "Tudo" },
   { key: "custom", label: "Personalizado" },
 ];
@@ -101,6 +109,9 @@ export function resolvePeriodRange(filters: ReportFilters): {
     case "week":
       from.setDate(from.getDate() - 7);
       break;
+    case "last30":
+      from.setDate(from.getDate() - 30);
+      break;
     case "month":
       from.setMonth(from.getMonth() - 1);
       break;
@@ -125,5 +136,8 @@ export function countActiveFilters(filters: ReportFilters): number {
   if (filters.serviceType) n++;
   if (filters.billingStatus) n++;
   if (filters.onlyWithRate) n++;
+  if (filters.onlyCompleted) n++;
+  if (filters.onlyAwaitingBilling) n++;
+  if (filters.onlyWithObservations) n++;
   return n;
 }

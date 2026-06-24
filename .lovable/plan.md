@@ -1,111 +1,80 @@
-# Plano — Módulo Relatórios (produção real)
+## Objetivo
 
-Reestrutura completa de `/relatorios` substituindo mocks por dados reais do Supabase, com filtros, KPIs, gráficos, tabela e exportação. Inclui sub-rota de relatório por cliente.
+Adicionar ao menu **Relatórios** uma funcionalidade real de geração de **Relatório Gerencial em PDF**, usando exclusivamente dados reais (OS, clientes, unidades, técnicos), com filtros, prévia e download. Sem mocks, com RLS preservada.
 
-## 1. Migration — controle de cobrança
-Adicionar em `service_orders` (única migration):
-- `billing_status` enum `pending | ready | billed | cancelled` (default `pending`)
-- `billed_at timestamptz null`
-- `billing_notes text null`
-- `invoice_reference text null`
+## Abordagem técnica
 
-Sem alterar RLS/grants existentes (a tabela já tem políticas).
+- **Geração do PDF**: HTML print-safe + `window.print()` (sem dependências novas). Será montada uma rota dedicada `/relatorios/imprimir` em layout próprio (sem sidebar/BottomNav), aplicando `@media print` para A4. O usuário usa "Salvar como PDF" do navegador. Nome sugerido aparece via `document.title`.
+  - Motivo: já temos infra de filtros + métricas; jsPDF/html2canvas adicionariam peso e renderização fraca de tabelas longas. Print-to-PDF entrega layout profissional e fiel, com paginação automática.
+- **Dados**: reaproveitar `getReportOrders` (já com `requireSupabaseAuth` + RLS). Adicionar campo `description` ao `ROW_SELECT` e ao tipo `ReportOrderRow` para a seção de observações.
+- **Métricas**: estender `src/lib/reports/metrics.ts` com agregações específicas do relatório gerencial (por status, por cliente, por técnico, por tipo de serviço, taxa de conclusão, tempo médio de fechamento, contagens de dados incompletos).
 
-## 2. Camada server (segura, com `requireSupabaseAuth`)
-Novo `src/lib/api/reports.functions.ts`:
-- `getReportsOverview({ filters })` → KPIs agregados
-- `getReportSeries({ filters })` → séries para gráficos (por status, prioridade, cliente, técnico, tipo, evolução mensal)
-- `getReportOrders({ filters })` → linhas da tabela/exportação
-- `getClientReport({ clientId, filters })` → dados consolidados de 1 cliente
-- `updateBillingStatus({ id, billing_status, invoice_reference?, billing_notes? })`
+## Estrutura de arquivos
 
-Cada função filtra OS no Postgres (período, cliente, unidade, técnico, status, prioridade, tipo, `billing_status`, "somente com hour_rate"), respeita RLS (admin vê tudo via `has_role`) e devolve DTOs planos.
+Novos:
+- `src/lib/reports/managerial.ts` — funções puras: agrega `ReportOrderRow[]` em um `ManagerialReport` (resumo executivo, distribuições, listas top, observações, incompletudes).
+- `src/components/reports/ReportGenerateButton.tsx` — botão de destaque no header de `/relatorios`.
+- `src/components/reports/ReportGenerateDialog.tsx` — modal com seletor de período (semana atual / mês atual / últimos 30 dias / personalizado), filtros opcionais (cliente, unidade, técnico, status, prioridade, tipo, somente concluídas, somente aguardando cobrança, somente com observações) e prévia resumida.
+- `src/components/reports/ReportPeriodSelector.tsx` — chips de período + date pickers.
+- `src/components/reports/ReportPreview.tsx` — cards de prévia (total OS, concluídas, horas, valor estimado, clientes/técnicos envolvidos) ou estado vazio.
+- `src/components/reports/print/ManagerialReportDocument.tsx` — layout do PDF (capa, resumo executivo, status, top clientes, top técnicos, tipos de serviço, observações, lista detalhada). CSS print-only.
+- `src/routes/_app.relatorios.imprimir.tsx` — rota de impressão; lê filtros dos search params (Zod), busca dados via `getReportOrders`, renderiza `ManagerialReportDocument`, dispara `window.print()` após hidratação. Layout próprio sem `AppShell`.
+- `src/styles/print.css` (ou bloco `@media print` colocalizado) — esconde nav, ajusta margens A4, evita quebras dentro de linhas de tabela.
 
-## 3. Lógica pura (testável, sem React)
-`src/lib/reports/`:
-- `filters.ts` — schema Zod dos filtros + serialização para query params
-- `metrics.ts` — `totalOrders`, `totalHours` (`worked_minutes/60`), `estimatedValue` (`min/60*hour_rate`), `avgLeadTime` (opened→closed), `completionRate`, `avgTicket`, agrupamentos (cliente, técnico, status, prioridade, tipo, mês)
-- `formatters.ts` — BRL, horas (`3h42`), datas pt-BR
-- `export.ts` — CSV (Blob + UTF-8 BOM) e HTML print-safe (`window.print`)
+Alterados:
+- `src/lib/api/reports.functions.ts` — incluir `description` no `ROW_SELECT` e no mapeamento `normalize`.
+- `src/types/reports.ts` — adicionar `description` ao `ReportOrderRow`; tipos `ManagerialReport`, `ManagerialSummary`, `ClientAggregate`, `TechnicianAggregate`, `ServiceTypeAggregate`, `IncompleteCounters`; flags de filtro `onlyCompleted`, `onlyAwaitingBilling`, `onlyWithObservations`.
+- `src/lib/reports/filters.ts` — Zod para os novos flags; serializador para search params da rota de impressão.
+- `src/routes/_app.relatorios.tsx` — colocar `ReportGenerateButton` no header.
 
-Tratamento de nulos: `worked_minutes`/`hour_rate` nulos = 0; entidades nulas viram "Sem cliente/técnico/unidade".
+## Conteúdo do PDF
 
-## 4. Hooks
-`src/hooks/useReports.ts` — `useReportsOverviewQuery`, `useReportSeriesQuery`, `useReportOrdersQuery`, `useClientReportQuery`, `useUpdateBillingStatus` (com `invalidateQueries`). Todos via `useServerFn` + `useSuspenseQuery`.
+1. **Capa/cabeçalho**: logo Lemarc, título "Relatório Gerencial de Ordens de Serviço", período, data/hora de geração, nome do usuário (de `profiles`/sessão), identificação do sistema.
+2. **Resumo executivo**: total OS, concluídas, em execução, pendentes, em revisão, aguardando cobrança, horas totais, tempo médio (somente OS com `opened_at` e `closed_at`), valor estimado (somente OS com `worked_minutes` e `hour_rate`), taxa de conclusão.
+3. **Análise por status**: tabela com contagem + % por status.
+4. **Top clientes**: nome, qtd OS, horas, valor estimado, concluídas, pendentes. Omite clientes sem dados.
+5. **Top técnicos**: nome, OS atribuídas, concluídas, horas, tempo médio, valor estimado. OS sem técnico agrupadas como "Sem técnico atribuído".
+6. **Tipos de serviço**: contagem por `service_type`; quando `service_type === 'outro'` exibe `service_type_other`.
+7. **Observações**: somente OS com `description` não vazia — número, cliente, técnico, status, prioridade, abertura, fechamento, observação. Fallback "Nenhuma observação registrada nas OS deste período."
+8. **Lista detalhada**: tabela com Nº, título, cliente, unidade, técnico, tipo, prioridade, status, abertura, início real (se disponível), fechamento, tempo trabalhado, valor estimado.
+9. **Nota de responsabilidade dos dados** ao rodapé: contagens de OS sem técnico, sem `hour_rate`, sem `worked_minutes`.
 
-## 5. Rotas
-- `src/routes/_app.relatorios.tsx` — dashboard principal (filtros via `validateSearch` + `zodValidator`, loader faz `ensureQueryData`)
-- `src/routes/_app.relatorios.cliente.$clientId.tsx` — relatório por cliente
-- `errorComponent` e `notFoundComponent` em ambas
+## Cálculos (puros, em `managerial.ts`)
 
-Search params: `period, from, to, clientId, unitId, technicianId, status, priority, serviceType, billingStatus, onlyWithRate`.
+- Horas: `sum(worked_minutes ?? 0) / 60`.
+- Valor estimado: `sum((worked_minutes/60) * hour_rate)` apenas quando ambos > 0.
+- Tempo médio: média de `(closed_at - opened_at)` em OS encerradas.
+- Taxa de conclusão: `concluídas / total`.
+- Top N (clientes/técnicos): ordenado por qtd OS, depois horas.
 
-## 6. Componentes (`src/components/reports/`)
-- `ReportsPageHeader` — título + ações (exportar, gerar por cliente)
-- `ReportsFilters` — sheet/drawer no mobile, barra colapsável no desktop; chips de filtros ativos; "Limpar filtros"
-- `ReportsKpiGrid` + `ReportKpiCard` — 6–8 KPIs compactos (label, valor, subtítulo, ícone, badge de alerta opcional)
-- `ReportChartCard` — wrapper glass para gráficos
-- `ReportBarChart`, `ReportStatusDonut`, `ReportTrendArea`, `ReportTopClients`, `ReportTopTechnicians` — Recharts (já no projeto)
-- `ReportOrdersTable` (desktop) + `ReportOrdersMobileList` (mobile cards)
-- `ReportExportActions` — Exportar CSV, Imprimir/PDF
-- `ClientReportDrawer` — picker de cliente + período, redireciona para `/relatorios/cliente/$clientId`
-- `BillingStatusBadge` + ação inline na tabela (marcar como `ready`/`billed`)
-- Skeletons e `EmptyState` reutilizando componentes existentes
+## Fluxo do usuário
 
-## 7. KPIs do dashboard
-OS no período · Concluídas · Em execução · Horas trabalhadas · Valor estimado (pré-cobrança) · Tempo médio (abertura→fechamento) · Taxa de conclusão · Aguardando cobrança (`billing_status = ready` ou OS `finished/approved` sem `billed_at`).
+1. Em `/relatorios`, clique em **Gerar relatório gerencial**.
+2. Dialog abre com período (semana/mês/30 dias/personalizado) + filtros.
+3. Prévia é atualizada via `useQuery` chamando `getReportOrders` (mesmo server fn já usado pelo dashboard, cache compartilhado).
+4. Se zero OS → mensagem e botão de download desabilitado.
+5. **Baixar PDF** → `window.open` em `/relatorios/imprimir?...searchParams` (nova aba). Lá a página renderiza o documento, ajusta `document.title` para `relatorio-gestao-lemarc-AAAA-MM-DD.pdf` e chama `window.print()` após carregamento; `afterprint` fecha a aba (opcional).
 
-## 8. Gráficos
-Desktop: grid 2 colunas, principal em destaque (evolução mensal de OS). Mobile: 1 coluna, barras horizontais compactas.
-Inclui: OS por status, por prioridade, por tipo de serviço, horas por técnico (top N), OS por cliente (top N), valor estimado por cliente, tempo médio por técnico, evolução mensal.
+## Segurança
 
-## 9. Tabela / lista operacional
-Desktop: tabela com Nº, Cliente, Unidade, Técnico, Status, Prioridade, Tipo, Abertura, Fechamento, Tempo, Valor, Cobrança (badge + menu de ação).
-Mobile: cards compactos com mesmos campos essenciais.
-Paginação simples client-side (server já filtra).
+- Toda busca via `getReportOrders` com `requireSupabaseAuth` (RLS).
+- Rota `/relatorios/imprimir` fica sob `_app` (área autenticada).
+- Nenhum dado sensível injetado pelo cliente; filtros validados por Zod.
+- Sem service role no client.
 
-## 10. Exportação real
-- **CSV**: gera Blob com BOM, separador `;`, datas ISO, valores em BRL. Nome: `lemarc-relatorio-{periodo}-{timestamp}.csv`. Usa exatamente o conjunto filtrado.
-- **PDF/Imprimir**: rota oculta `/relatorios/print` OU window com `document.write` de HTML print-safe (logo, filtros aplicados, KPIs, tabela). Botão chama `window.print()`. Sem nova dependência.
+## Responsividade & estilo
 
-## 11. Relatório por cliente
-Rota `_app.relatorios.cliente.$clientId.tsx`:
-- Header com nome do cliente + período
-- KPIs do cliente (total OS, horas, valor, abertas, concluídas, aguardando cobrança)
-- Detalhamento por unidade (lista) e por técnico (barras)
-- Tabela de OS do cliente no período
-- Exportar CSV e Imprimir
-- Botão "Voltar para relatórios"
+- Modal usa `Sheet` no mobile (`sm:max-w` no desktop), mantém glass industrial (azul/grafite/laranja).
+- Botão fixo no header de `/relatorios`, sem cobrir BottomNav.
+- PDF: fundo branco, tipografia legível, azul escuro nos títulos, laranja só em destaque pontual; tabelas com bordas finas; `page-break-inside: avoid` em linhas; `@page { size: A4; margin: 16mm }`.
 
-## 12. Remoção de mocks
-- Excluir `src/lib/mock/reports.ts` (uso apenas em `_app.relatorios.tsx`, confirmado)
-- Nenhum botão com "mock"
-- Sem dados estáticos no módulo
+## Validação
 
-## 13. Identidade visual
-Mantém glass industrial, fundo grafite/azul, laranja Lemarc como destaque (linhas/CTA), tipografia atual. Cards menores e mais densos; hierarquia clara; sem rodapés genéricos ("Resumo Lemarc"). Cores semânticas via tokens existentes (`status-*`, `primary`).
+- `npm run build` e lint focado nos arquivos alterados.
+- Teste manual: semana atual, mês atual, últimos 30 dias, personalizado, filtros por cliente/técnico, OS sem `worked_minutes`/sem `hour_rate`, período vazio, download e visualização do PDF em mobile/desktop.
 
-## 14. Responsividade
-Validar 360/375/390/414 (mobile) e 1024/1280/1366/1440 (desktop). `pb-24` para BottomNav. Sem overflow horizontal. Gráficos com `ResponsiveContainer`.
+## Não inclui
 
-## 15. Estados
-Skeletons para KPIs/gráficos/tabela; `EmptyState` quando sem OS ou sem resultados de filtro; `errorComponent` com botão "Tentar novamente" (`router.invalidate()`); botão "Limpar filtros" sempre visível quando há filtros ativos.
-
-## 16. Validação final
-- `npm run build` passa
-- `/relatorios` sem qualquer import de `mock/reports`
-- Filtros refletem em KPIs, gráficos, tabela e exportação
-- CSV abre no Excel com acentos corretos
-- Relatório por cliente abre via drawer e via URL direta
-- Admin vê todas as OS; não-admin vê apenas as suas (RLS atual)
-- BottomNav, AppShell, rotas existentes intactos
-
-## Ordem de implementação
-1. Migration `billing_status` + campos
-2. `reports.functions.ts` + `lib/reports/*` + types
-3. `useReports.ts`
-4. Componentes (`reports/*`)
-5. Rota `_app.relatorios.tsx` reescrita + remoção do mock
-6. Rota `_app.relatorios.cliente.$clientId.tsx`
-7. Exportação CSV + print
-8. Polimento visual + responsividade + build
+- Geração server-side de PDF (sem dependências novas).
+- Envio por e-mail / agendamento.
+- Persistência histórica dos relatórios gerados.
