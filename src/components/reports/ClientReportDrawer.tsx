@@ -42,22 +42,25 @@ export function ClientReportDrawer() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button className="h-10 gap-2 lemarc-orange-glow">
+        <Button className="lemarc-report-action-primary h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
           <FileText size={16} />
           Relatório por cliente
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full max-w-md border-white/10 bg-[#101a29] text-foreground"
+      >
         <SheetHeader>
-          <SheetTitle>Gerar relatório por cliente</SheetTitle>
+          <SheetTitle className="font-display text-white">Gerar relatório por cliente</SheetTitle>
         </SheetHeader>
         <div className="mt-4 space-y-4">
           <div>
-            <Label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+            <Label className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
               Cliente
             </Label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="mt-1.5 h-10 bg-secondary/50">
+              <SelectTrigger className="lemarc-report-control mt-1.5 h-11 rounded-xl font-semibold">
                 <SelectValue placeholder="Selecione um cliente" />
               </SelectTrigger>
               <SelectContent>
@@ -70,11 +73,11 @@ export function ClientReportDrawer() {
             </Select>
           </div>
           <div>
-            <Label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+            <Label className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
               Período
             </Label>
             <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
-              <SelectTrigger className="mt-1.5 h-10 bg-secondary/50">
+              <SelectTrigger className="lemarc-report-control mt-1.5 h-11 rounded-xl font-semibold">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -88,7 +91,11 @@ export function ClientReportDrawer() {
           </div>
         </div>
         <SheetFooter className="mt-6">
-          <Button className="w-full" disabled={!clientId} onClick={go}>
+          <Button
+            className="lemarc-report-action-primary h-11 w-full rounded-xl font-black"
+            disabled={!clientId}
+            onClick={go}
+          >
             Abrir relatório
           </Button>
         </SheetFooter>
