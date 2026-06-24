@@ -181,6 +181,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["service_priority"] | null
           scheduled_for: string | null
           service_type: Database["public"]["Enums"]["service_type"] | null
+          service_type_other: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
@@ -205,6 +206,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["service_priority"] | null
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          service_type_other?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
@@ -229,6 +231,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["service_priority"] | null
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          service_type_other?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
@@ -347,6 +350,7 @@ export type Database = {
         | "instalacao"
         | "visita"
         | "emergencia"
+        | "outro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -494,6 +498,7 @@ export const Constants = {
         "instalacao",
         "visita",
         "emergencia",
+        "outro",
       ],
     },
   },
