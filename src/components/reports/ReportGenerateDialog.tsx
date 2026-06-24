@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { FileDown, Loader2, Printer } from "lucide-react";
 import {
   Dialog,
@@ -375,23 +375,6 @@ function PreviewLoader({
   onClose: () => void;
 }) {
   return (
-    <SuspenseFallback>
-      <PreviewContent filters={filters} onClose={onClose} />
-    </SuspenseFallback>
-  );
-}
-
-function SuspenseFallback({ children }: { children: React.ReactNode }) {
-  return (
-    <PreviewSuspense>
-      {children}
-    </PreviewSuspense>
-  );
-}
-
-import { Suspense } from "react";
-function PreviewSuspense({ children }: { children: React.ReactNode }) {
-  return (
     <Suspense
       fallback={
         <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
@@ -399,7 +382,7 @@ function PreviewSuspense({ children }: { children: React.ReactNode }) {
         </div>
       }
     >
-      {children}
+      <PreviewContent filters={filters} onClose={onClose} />
     </Suspense>
   );
 }
