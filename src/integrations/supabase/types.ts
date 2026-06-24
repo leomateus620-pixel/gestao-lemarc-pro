@@ -166,6 +166,9 @@ export type Database = {
       service_orders: {
         Row: {
           approved_at: string | null
+          billed_at: string | null
+          billing_notes: string | null
+          billing_status: Database["public"]["Enums"]["billing_status"]
           client_id: string | null
           client_unit_id: string | null
           closed_at: string | null
@@ -175,6 +178,7 @@ export type Database = {
           finished_at: string | null
           hour_rate: number | null
           id: string
+          invoice_reference: string | null
           location: string | null
           number: number
           opened_at: string
@@ -191,6 +195,9 @@ export type Database = {
         }
         Insert: {
           approved_at?: string | null
+          billed_at?: string | null
+          billing_notes?: string | null
+          billing_status?: Database["public"]["Enums"]["billing_status"]
           client_id?: string | null
           client_unit_id?: string | null
           closed_at?: string | null
@@ -200,6 +207,7 @@ export type Database = {
           finished_at?: string | null
           hour_rate?: number | null
           id?: string
+          invoice_reference?: string | null
           location?: string | null
           number?: number
           opened_at?: string
@@ -216,6 +224,9 @@ export type Database = {
         }
         Update: {
           approved_at?: string | null
+          billed_at?: string | null
+          billing_notes?: string | null
+          billing_status?: Database["public"]["Enums"]["billing_status"]
           client_id?: string | null
           client_unit_id?: string | null
           closed_at?: string | null
@@ -225,6 +236,7 @@ export type Database = {
           finished_at?: string | null
           hour_rate?: number | null
           id?: string
+          invoice_reference?: string | null
           location?: string | null
           number?: number
           opened_at?: string
@@ -332,6 +344,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "operador"
+      billing_status: "pending" | "ready" | "billed" | "cancelled"
       service_order_status:
         | "pending"
         | "dispatched"
@@ -479,6 +492,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "operador"],
+      billing_status: ["pending", "ready", "billed", "cancelled"],
       service_order_status: [
         "pending",
         "dispatched",
