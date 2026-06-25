@@ -170,7 +170,7 @@ function Content() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <ReportsFilters
           filters={filters}
-          routePath="/_app/relatorios/cliente/$clientId"
+          routePath="/relatorios/cliente/$clientId"
           hideClient
         />
         <ReportExportActions

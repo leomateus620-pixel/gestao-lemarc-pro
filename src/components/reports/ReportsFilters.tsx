@@ -47,7 +47,7 @@ const ALL = "__all__";
 
 type Patch = Partial<ReportFilters>;
 
-function useRouteSetter(routePath: "/_app/relatorios" | "/_app/relatorios/cliente/$clientId") {
+function useRouteSetter(routePath: "/relatorios" | "/relatorios/cliente/$clientId") {
   const navigate = useNavigate();
   return (patch: Patch) =>
     navigate({
@@ -71,7 +71,7 @@ export function ReportsFilters({
   hideClient = false,
 }: {
   filters: ReportFilters;
-  routePath: "/_app/relatorios" | "/_app/relatorios/cliente/$clientId";
+  routePath: "/relatorios" | "/relatorios/cliente/$clientId";
   hideClient?: boolean;
 }) {
   const setSearch = useRouteSetter(routePath);

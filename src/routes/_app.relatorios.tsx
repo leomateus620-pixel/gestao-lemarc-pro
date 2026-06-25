@@ -207,7 +207,7 @@ function RelatoriosContent() {
     <div className="space-y-5">
       <div className="lemarc-report-card p-3 sm:p-3.5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <ReportsFilters filters={filters} routePath="/_app/relatorios" />
+          <ReportsFilters filters={filters} routePath="/relatorios" />
           <ReportExportActions
             rows={rows}
             title="Relatório operacional Lemarc"
