@@ -13,6 +13,7 @@ import {
 } from "@/types/serviceOrder";
 import { useUpdateBillingStatus } from "@/hooks/useReports";
 import { toast } from "sonner";
+import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,19 @@ function typeLabel(r: ReportOrderRow) {
   if (!r.service_type) return "—";
   if (r.service_type === "outro" && r.service_type_other) return r.service_type_other;
   return serviceTypeLabel[r.service_type];
+}
+
+function technicianNames(r: ReportOrderRow): string {
+  const techs = getReportRowTechnicians(r);
+  if (techs.length === 0) return "Sem técnico";
+  return techs.map((t) => t.name).join(", ");
+}
+
+function technicianCompact(r: ReportOrderRow): string {
+  const techs = getReportRowTechnicians(r);
+  if (techs.length === 0) return "Sem técnico";
+  if (techs.length <= 2) return techs.map((t) => t.name).join(", ");
+  return `${techs.slice(0, 2).map((t) => t.name).join(", ")} +${techs.length - 2}`;
 }
 
 function timeLabel(r: ReportOrderRow) {
@@ -135,7 +149,7 @@ export function ReportOrdersTable({ rows }: { rows: ReportOrderRow[] }) {
               <Th>OS</Th>
               <Th>Cliente</Th>
               <Th>Unidade</Th>
-              <Th>Técnico</Th>
+              <Th>Técnicos</Th>
               <Th>Status</Th>
               <Th>Prioridade</Th>
               <Th>Tipo</Th>
@@ -173,13 +187,23 @@ export function ReportOrdersTable({ rows }: { rows: ReportOrderRow[] }) {
                     </span>
                   </Td>
                   <Td>{r.client_unit_name ?? <Muted>—</Muted>}</Td>
-                  <Td className="max-w-[126px]">
-                    <span
-                      className="line-clamp-2 font-semibold text-slate-100"
-                      title={r.technician_name ?? "Sem técnico"}
-                    >
-                      {r.technician_name ?? <Muted>Sem técnico</Muted>}
-                    </span>
+                  <Td className="max-w-[150px]">
+                    {(() => {
+                      const techs = getReportRowTechnicians(r);
+                      const full = technicianNames(r);
+                      return (
+                        <span
+                          className="line-clamp-2 font-semibold text-slate-100"
+                          title={full}
+                        >
+                          {techs.length === 0 ? (
+                            <Muted>Sem técnico</Muted>
+                          ) : (
+                            technicianCompact(r)
+                          )}
+                        </span>
+                      );
+                    })()}
                   </Td>
                   <Td>
                     {st ? (
@@ -274,7 +298,7 @@ export function ReportOrdersMobileList({ rows }: { rows: ReportOrderRow[] }) {
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
               <MobileFact label="Cliente" value={r.client_name ?? "Sem cliente"} wide />
-              <MobileFact label="Técnico" value={r.technician_name ?? "Sem técnico"} />
+              <MobileFact label="Técnicos" value={technicianCompact(r)} />
               <MobileFact
                 label="Prioridade"
                 value={<ReportPriorityBadge priority={r.priority} />}

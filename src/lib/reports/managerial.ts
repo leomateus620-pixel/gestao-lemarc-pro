@@ -9,6 +9,10 @@ import type {
   TechnicianAggregate,
 } from "@/types/reports";
 import { serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
+import {
+  getReportRowTechnicians,
+  groupMinutesByTechnician,
+} from "@/lib/serviceOrders/technicians";
 
 const BILLING_AWAIT_STATUSES = new Set(["finished", "review", "approved"]);
 
@@ -71,7 +75,7 @@ function computeSummary(rows: ReportOrderRow[]): ManagerialSummary {
     }
 
     if (r.client_id) clientSet.add(r.client_id);
-    if (r.technician_id) techSet.add(r.technician_id);
+    for (const t of getReportRowTechnicians(r)) techSet.add(t.id);
   }
 
   const totalOrders = rows.length;
@@ -142,47 +146,19 @@ function computeTopClients(rows: ReportOrderRow[]): ClientAggregate[] {
 }
 
 function computeTopTechnicians(rows: ReportOrderRow[]): TechnicianAggregate[] {
-  const map = new Map<
-    string,
-    TechnicianAggregate & { _leadSum: number; _leadCount: number }
-  >();
-  for (const r of rows) {
-    const id = r.technician_id ?? "__none__";
-    const name = r.technician_id
-      ? (r.technician_name ?? "Técnico sem nome")
-      : "Sem técnico atribuído";
-    const value =
-      r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) > 0
-        ? (r.worked_minutes_effective / 60) * (r.hour_rate ?? 0)
-        : 0;
-    const cur = map.get(id);
-    if (cur) {
-      cur.orders++;
-      cur.hours += r.worked_minutes_effective / 60;
-      cur.estimatedValue += value;
-      if (r.status === "finished" || r.status === "approved") cur.finished++;
-      if (r.lead_time_minutes !== null) {
-        cur._leadSum += r.lead_time_minutes;
-        cur._leadCount++;
-      }
-    } else {
-      map.set(id, {
-        id: r.technician_id,
-        name,
-        orders: 1,
-        finished: r.status === "finished" || r.status === "approved" ? 1 : 0,
-        hours: r.worked_minutes_effective / 60,
-        avgLeadMinutes: null,
-        estimatedValue: value,
-        _leadSum: r.lead_time_minutes ?? 0,
-        _leadCount: r.lead_time_minutes !== null ? 1 : 0,
-      });
-    }
-  }
-  return Array.from(map.values())
-    .map(({ _leadSum, _leadCount, ...rest }) => ({
-      ...rest,
-      avgLeadMinutes: _leadCount > 0 ? Math.round(_leadSum / _leadCount) : null,
+  // Distributes hours across every technician assigned to the OS. The
+  // total across technicians can exceed total OS hours when multiple
+  // technicians collaborate on the same OS — this is intentional and
+  // surfaced as a note on the report.
+  return groupMinutesByTechnician(rows)
+    .map((b) => ({
+      id: b.id === "__none__" ? null : b.id,
+      name: b.id === "__none__" ? "Sem técnico atribuído" : b.name,
+      orders: b.orders,
+      finished: b.finished,
+      hours: Math.round((b.minutes / 60) * 100) / 100,
+      avgLeadMinutes: b.leadCount > 0 ? Math.round(b.leadSum / b.leadCount) : null,
+      estimatedValue: Math.round(b.estimatedValue * 100) / 100,
     }))
     .sort((a, b) => b.orders - a.orders || b.hours - a.hours)
     .slice(0, 15);
@@ -214,7 +190,7 @@ function computeIncomplete(rows: ReportOrderRow[]): IncompleteCounters {
   let withoutWorkedMinutes = 0;
   let withoutClosedAt = 0;
   for (const r of rows) {
-    if (!r.technician_id) withoutTechnician++;
+    if (getReportRowTechnicians(r).length === 0) withoutTechnician++;
     if ((r.hour_rate ?? 0) <= 0) withoutHourRate++;
     if (r.worked_minutes_effective <= 0) withoutWorkedMinutes++;
     if (!r.closed_at) withoutClosedAt++;

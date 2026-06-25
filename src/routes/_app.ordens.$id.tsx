@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,16 +10,36 @@ import {
   HardHat,
   MapPin,
   Pause,
+  Pencil,
   Play,
   Receipt,
   Send,
   Truck,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
 import { SectionHeader } from "@/components/app/SectionHeader";
 import { PrimaryCTA } from "@/components/app/operations";
-import { getServiceOrder, updateServiceOrderStatus } from "@/lib/api/serviceOrders.functions";
+import {
+  getServiceOrder,
+  setServiceOrderTechnicians,
+  updateServiceOrderStatus,
+} from "@/lib/api/serviceOrders.functions";
+import { useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   priorityLabel,
   serviceTypeLabel,
@@ -94,6 +114,7 @@ function OrdemDetalhe() {
 
   const action = flow[order.status];
   const missing = missingFields(order);
+  const technicians = getOrderTechnicians(order);
 
   return (
     <>
@@ -151,7 +172,13 @@ function OrdemDetalhe() {
             {order.client?.unit ? ` · ${order.client.unit}` : ""}
           </MetaRow>
           {order.location && <MetaRow icon={MapPin}>{order.location}</MetaRow>}
-          <MetaRow icon={HardHat}>{order.technician?.full_name ?? "Sem técnico"}</MetaRow>
+          <MetaRow icon={HardHat}>
+            {technicians.length === 0
+              ? "Sem técnico"
+              : technicians
+                  .map((t) => t.full_name)
+                  .join(", ")}
+          </MetaRow>
           {order.scheduled_for && (
             <MetaRow icon={Clock}>
               Previsão de início: {new Date(order.scheduled_for).toLocaleString("pt-BR")}
@@ -202,10 +229,189 @@ function OrdemDetalhe() {
         </p>
       </Section>
 
+      <Section title="Técnicos responsáveis" icon={HardHat}>
+        <TechniciansBlock order={order} />
+      </Section>
+
       <Section title="Linha do tempo" icon={Clock}>
         <Timeline order={order} />
       </Section>
     </>
+  );
+}
+
+function TechniciansBlock({ order }: { order: ServiceOrder }) {
+  const techs = getOrderTechnicians(order);
+  return (
+    <div className="space-y-3">
+      {techs.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Sem técnico definido.</p>
+      ) : (
+        <ul className="space-y-2">
+          {techs.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold text-foreground">
+                  {t.full_name}
+                </div>
+                {t.role && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {t.role}
+                  </div>
+                )}
+              </div>
+              {t.is_primary && (
+                <span className="rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-primary">
+                  Principal
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <EditTechniciansDialog order={order} />
+    </div>
+  );
+}
+
+function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const initial = useMemo(
+    () => getOrderTechnicians(order).map((t) => t.id),
+    [order],
+  );
+  const [selected, setSelected] = useState<string[]>(initial);
+  const { data: technicians } = useTechniciansQuery();
+  const fn = useServerFn(setServiceOrderTechnicians);
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => fn({ data: { id: order.id, technician_ids: selected } }),
+    onSuccess: () => {
+      toast.success("Técnicos atualizados");
+      queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
+      queryClient.invalidateQueries({ queryKey: ["report-orders"] });
+      setOpen(false);
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar"),
+  });
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return technicians;
+    return technicians.filter(
+      (t) =>
+        t.full_name.toLowerCase().includes(q) ||
+        (t.role ?? "").toLowerCase().includes(q),
+    );
+  }, [technicians, query]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setSelected(initial);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm" className="gap-2 rounded-xl">
+          <Pencil size={14} /> Editar técnicos
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Técnicos responsáveis</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {selected.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selected.map((id) => {
+                const t = technicians.find((x) => x.id === id);
+                if (!t) return null;
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-bold"
+                  >
+                    {t.full_name}
+                    <button
+                      type="button"
+                      aria-label={`Remover ${t.full_name}`}
+                      onClick={() => setSelected(selected.filter((x) => x !== id))}
+                      className="grid h-4 w-4 place-items-center rounded-full bg-primary/30 hover:bg-primary/50"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar técnico…"
+          />
+          <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+            {filtered.length === 0 && (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Nenhum técnico encontrado.
+              </p>
+            )}
+            {filtered.map((t) => {
+              const active = selected.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() =>
+                    setSelected(
+                      active
+                        ? selected.filter((x) => x !== t.id)
+                        : Array.from(new Set([...selected, t.id])),
+                    )
+                  }
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition",
+                    active
+                      ? "border-primary/50 bg-primary/10"
+                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-bold">{t.full_name}</div>
+                    {t.role && (
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {t.role}
+                      </div>
+                    )}
+                  </div>
+                  {active && (
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground">
+                      <CheckCircle2 size={12} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={mutation.isPending}>
+            Cancelar
+          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            {mutation.isPending ? "Salvando…" : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

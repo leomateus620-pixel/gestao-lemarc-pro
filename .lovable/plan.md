@@ -1,101 +1,120 @@
+## Objetivo
 
-## Diagnóstico
+Permitir vincular **vários técnicos** por OS, mantendo a OS única, com cálculo de horas distribuído por técnico em Relatórios, sem quebrar OS antigas (`technician_id` único) nem rotas existentes.
 
-Inspeção dos arquivos do menu Relatórios e da base real:
+## 1. Banco de dados (migration)
 
-**Banco (service_orders, 9 OS):**
-- `worked_minutes` → 0/9 preenchidos
-- `hour_rate` → 0/9 preenchidos
-- `started_at` → 8/9 preenchidos
-- `finished_at` → 6/9 preenchidos
-- `closed_at` → 6/9 preenchidos
+Nova tabela `public.service_order_technicians`:
 
-Ou seja: os indicadores estão **corretamente zerados** quando dependem de `worked_minutes` e `hour_rate`, porque nenhuma OS tem esses campos. O problema real é que (a) há fonte alternativa (`started_at`/`finished_at`) que não está sendo usada e (b) as mensagens não deixam claro o motivo do zero.
+```
+id uuid pk default gen_random_uuid()
+service_order_id uuid not null references service_orders(id) on delete cascade
+technician_id uuid not null references technicians(id) on delete cascade
+assigned_at timestamptz default now()
+assigned_by uuid null
+is_primary boolean default false
+created_at timestamptz default now()
+unique (service_order_id, technician_id)
+index (service_order_id), index (technician_id)
+```
 
-**Filtros / 404:**
-- `ReportsFilters` usa `useNavigate({ from: routePath })` com `replace: true` e updater de `search` que apaga chaves `null|undefined|""|false`. Quando a rota for `/_app/relatorios/cliente/$clientId`, navegar apenas com `search` pode disparar erro em modo strict (params perdidos).
-- `Input type="date"` grava `from`/`to` como ISO datetime (`new Date(value).toISOString()`) misturado com `slice(0,10)` para exibir — funciona, mas conflita com `ReportGenerateDialog` que grava `from`/`to` como `YYYY-MM-DD`. Resultado: parsing inconsistente entre as duas telas.
-- `resolvePeriodRange` faz `new Date(filters.from)` sem normalizar início/fim do dia → janela 1 dia mais curta no fuso BRT.
-- Não há validação de "data inicial > data final" em `ReportsFilters` (só no diálogo de relatório gerencial).
-- Período `month` é descrito como "Mês atual / últimos 30 dias", mas o cálculo usa `setMonth(-1)` (mês calendárico, não 30 dias).
-- `ClientReportDrawer.go()` só envia `search: { period }` — perde demais filtros, mas não causa 404; comportamento OK.
+GRANT `SELECT, INSERT, UPDATE, DELETE` para `authenticated`, `ALL` para `service_role`. RLS habilitada com policies que reaproveitam a permissão da OS pai (EXISTS em `service_orders` com o mesmo critério já usado lá — ver policies existentes via `supabase--read_query` antes de escrever).
 
-**Indicadores zerados / vagos:**
-- "Horas trabalhadas" e "Valor estimado" zeram porque `worked_minutes` é sempre nulo. Sem fallback de `started_at`/`finished_at`, ficam em 0 com legenda genérica.
-- "Ticket médio" depende de `estimated_value` por OS — sem `hour_rate`, fica em `—`.
-- "Tempo médio" usa `opened_at`/`closed_at`. Funciona, mas só 6 OS têm `closed_at`. OK.
-- Agrupamento por cliente já é por `client_id` (não por nome) — sem duplicação real; o que aparece no print são clientes com nomes parecidos, não duplicação.
+Backfill: para cada `service_orders` com `technician_id not null`, inserir vínculo com `is_primary = true`. `technician_id` é mantido por enquanto como compatibilidade (a aplicação passa a tratar a nova tabela como fonte primária).
 
-## Plano de correção (apenas frontend/server-fn, sem nova migration)
+## 2. Server functions (`reports.functions.ts`, `serviceOrders.functions.ts`)
 
-### 1. Períodos previsíveis e datas seguras (`src/lib/reports/filters.ts`)
+- Ampliar `ORDER_SELECT` / `ROW_SELECT` para incluir:
+  `assigned_technicians:service_order_technicians(technician_id, is_primary, technician:technicians(id, full_name, role))`
+- `normalize()` expõe `technicians: TechnicianLite[]` (fallback: se vazio e `technician_id` existir, derivar do join legado).
+- `createServiceOrder` recebe `technician_ids: string[]` (mantém `technician_id` opcional para compatibilidade) e, após inserir a OS, faz `insert` em lote em `service_order_technicians` (primeiro = `is_primary`). Mantém `technician_id` preenchido com o primário para legado.
+- Nova `setServiceOrderTechnicians({ id, technician_ids })` para edição: diff + insert/delete.
+- Filtro de técnico no relatório: trocar `query.eq("technician_id", id)` por filtro via `service_order_technicians` — usar `.in("id", subselect)` ou alterar o select para `service_order_technicians!inner(...).eq("technician_id", id)` e remover o filtro legado.
 
-- Padronizar `from`/`to` como `YYYY-MM-DD` em toda a aplicação (search params, inputs, server fn). Schema Zod passa a usar `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)` com `fallback` para `undefined`.
-- Reescrever `resolvePeriodRange`:
-  - `today`: hoje 00:00 → hoje 23:59:59.999.
-  - `week`: hoje − 7 dias 00:00 → agora.
-  - `month`: hoje − 30 dias 00:00 → agora (alinha com a label "últimos 30 dias"; renomear label para "Mês (30 dias)").
-  - `last30`: idem `month` (mantido para compatibilidade do diálogo gerencial).
-  - `quarter` / `year` / `today`: análogos com início do dia.
-  - `custom`: `from` → início do dia local; `to` → fim do dia local; se um dos dois faltar, ignorar o lado faltante; se `from > to`, retornar `{ from: null, to: null }` e a UI mostra erro.
-  - Conversão local → UTC ISO só na chamada Supabase.
-- Validar `from`/`to` no parser; valores fora do padrão caem para `undefined` em vez de quebrar.
+## 3. Types (`src/types/serviceOrder.ts`, `src/types/reports.ts`)
 
-### 2. Corrigir 404 / navegação dos filtros (`src/components/reports/ReportsFilters.tsx`)
+- `ServiceOrder.technicians: TechnicianLite[]` (substitui uso primário de `technician` único, que permanece para legado).
+- `ReportOrderRow.technicians: { id; name; is_primary }[]`; manter `technician_id`/`technician_name` para compatibilidade até remover usos.
+- Sem `any`. Types do Supabase serão regenerados após a migration.
 
-- Trocar `useNavigate({ from: routePath })` por `useNavigate()` chamado com `to: routePath` explícito e `params` opcionais (preserva params em rotas filhas).
-- Garantir `type="button"` em todos os `<Button>` dentro do `Sheet` (já são `<button>` shadcn, mas reforçar o atributo no botão "Aplicar" / "Limpar tudo" para evitar submit acidental).
-- `Sheet` "Aplicar" só fecha — não navega. "Limpar tudo" agora usa o mesmo `setSearch` patch (mantém URL como `/relatorios?period=month`).
-- Validar `from > to` em tempo real: ao detectar, mostra mensagem `"Período inválido. Verifique a data inicial e final."` abaixo dos inputs de data e **não** dispara navegação inválida (o estado vira `period: custom` sem aplicar range, query roda com fallback).
-- Inputs `type="date"` passam a salvar a string crua `YYYY-MM-DD` (sem `new Date().toISOString()`).
+## 4. Cálculo de horas
 
-### 3. Derivar horas reais quando `worked_minutes` for nulo (`src/lib/reports/metrics.ts`)
+Helpers em `src/lib/serviceOrders/metrics.ts`:
+- `getServiceOrderWorkedMinutes(order)` — já existe lógica equivalente em `computeOrderRow`; consolidar como função pura única reutilizada em ambos os módulos (reports/metrics e serviceOrders/metrics).
+- `groupMinutesByTechnician(rows)` — para cada OS, somar `worked_minutes_effective` em cada técnico vinculado (fallback: se sem vínculos, usar `technician_id` legado; se nenhum, ignorar para esse grupo).
 
-- `computeOrderRow` ganha fallback:
-  - Se `worked_minutes` nulo e `started_at` + `finished_at` existem → `derived_minutes = clamp((finished_at − started_at) / 60s, 0, 24h)`.
-  - Campo novo `worked_minutes_effective` (não substitui o real no banco, é só derivação no client/server fn).
-  - `estimated_value` continua `effective_minutes / 60 * hour_rate` (zera quando rate é nulo — comportamento honesto).
-- `ROW_SELECT` em `reports.functions.ts` passa a buscar `started_at`, `finished_at`.
-- `ReportOrderRow` ganha `worked_minutes_effective: number` (sempre número, 0 quando não há dados).
-- KPIs de horas e gráfico "Horas por técnico" passam a usar `worked_minutes_effective`.
+Regra clara:
+- **KPI "Horas totais"**: soma única por OS (não multiplica por técnicos).
+- **"Horas por técnico"**: soma da duração da OS para cada técnico vinculado (pode exceder o total — nota explicativa no card e no PDF).
 
-### 4. Mensagens de dados ausentes mais claras (`_app.relatorios.tsx`)
+## 5. Wizard de criação (`ServiceOrderWizard.tsx`)
 
-- "Horas trabalhadas": subtítulo dinâmico
-  - `> 0` derivado → "Calculado de start → finish quando worked_minutes ausente."
-  - `worked_minutes` populado → "Soma de worked_minutes informado."
-  - `0` → "Sem horas trabalhadas registradas no período."
-- "Valor estimado": quando todas as OS estão sem `hour_rate` → "Configure hour_rate nas OS para calcular valores." (com ícone `AlertTriangle` discreto).
-- "Ticket médio": "Sem OS concluída com hour_rate configurado." quando aplicável.
-- Gráficos "Horas por técnico" e "Valor estimado por cliente" já têm `emptyLabel` — atualizar texto para o mesmo padrão.
+Etapa "Técnico" passa de seleção única para múltipla:
+- Estado `selectedTechnicianIds: string[]` em vez de `technicianId`.
+- Lista com checkbox/chip selecionável, busca, "Cadastrar novo" auto-adiciona o recém-criado.
+- Área superior "Técnicos selecionados (N)" com chips removíveis.
+- Permite zero técnicos ("Sem técnico definido").
+- Impede duplicidade na UI (Set).
+- Revisão final lista todos os técnicos; fallback "Sem técnico definido".
+- Submit envia `technician_ids` ao server fn.
 
-### 5. Filtros aplicados refletem em tudo
+## 6. Edição da OS
 
-- `useReportOrdersQuery` já chaveia por todos os filtros (`filtersKey`). Sem alteração funcional, mas vou auditar para incluir `from`/`to` mesmo quando `period` ≠ `custom` (no momento já inclui).
-- Tabela de OS e exportação (`ReportExportActions`) continuam recebendo o mesmo array `rows` — nada a alterar; só conferir após mudança de tipos.
+Adicionar diálogo/seção em `_app.ordens.$id.tsx` para editar técnicos vinculados via `setServiceOrderTechnicians` (mutation + invalidate). Mantém o restante do fluxo.
 
-### 6. Validações defensivas
+## 7. Detalhe, cards e listagem
 
-- Em `computeOverview` / `computeSeries`: nunca dividir por zero (já protegido).
-- `new Date(opened_at)` continua, mas quando inválido pula a entrada (já há `Number.isNaN`).
-- `PERIOD_OPTIONS` reorganizado para refletir labels reais ("Hoje", "Semana", "Mês (30 dias)", "Últimos 30 dias", "Trimestre", "Ano", "Tudo", "Personalizado").
+- `_app.ordens.$id.tsx`: substituir bloco "Técnico" único por "Técnicos responsáveis" (lista com cargo, destaque do primário; vazio = "Sem técnico definido"). Fallback para `technician` legado quando `technicians` vazio.
+- `ServiceOrderCard.tsx`, `_app.ordens.index.tsx`, `_app.dashboard.tsx`: renderizar `technicians` como `"Nome1, Nome2 +N"` (helper `formatTechnicianList(technicians, max=2)`).
 
-### 7. Validação
+## 8. Menu Relatórios
 
-- `npm run build` (TanStack code-splitter + tsgo).
-- Playwright headless rápido: navegar `/relatorios`, alternar período (semana, mês, hoje, personalizado válido, personalizado inválido), aplicar filtro de cliente/status no Sheet, conferir que (a) não há 404, (b) URL fica `/relatorios?period=...`, (c) cards de horas mostram valor derivado de start/finish nas OS finalizadas.
-- Conferência manual de mobile (390px) via screenshot.
+- `ReportCharts.tsx`: gráfico/card "Horas por técnico" usa `groupMinutesByTechnician`; adicionar legenda discreta explicando a regra.
+- `ReportOrdersTable.tsx`: coluna "Técnico" → "Técnicos", lista compacta.
+- `ReportsFilters.tsx`: filtro por técnico continua igual no UI; backend já adaptado para usar a M2M.
+- `managerial.ts`: seção "Produtividade por técnico" usa a nova agregação (OS, horas distribuídas, OS concluídas, tempo médio). Nota: *"Horas por técnico consideram a duração total da OS para cada técnico vinculado."*
+- `ManagerialReportDocument.tsx`: mostrar nomes concatenados na tabela de OS.
+- `export.ts` (CSV): coluna `Técnicos` = `"Ricardo; Eduardo; Juan"`.
+- `getClientReport`: idem (lista todos os técnicos por OS).
+
+## 9. Compatibilidade
+
+Helper `getOrderTechnicians(order)`:
+1. `order.technicians` (M2M) se houver itens
+2. `order.technician` (legado) embrulhado em array
+3. `[]`
+
+Usado em todos os pontos de leitura (cards, detalhe, relatórios). Garante que OS antigas continuem visíveis.
+
+## 10. RLS e segurança
+
+Policies do `service_order_technicians` espelham `service_orders` via EXISTS no pai (sem service role no frontend, todas as fns usam `requireSupabaseAuth`).
+
+## 11. Validação
+
+- `bun run build` + lint dos arquivos alterados.
+- Teste manual via Playwright: criar OS com 0/1/3 técnicos; abrir detalhe; conferir card/lista; abrir `/relatorios`, validar "Horas por técnico" distribuídas, filtro por técnico, CSV e PDF.
+- Conferir OS antiga (apenas `technician_id`) ainda aparece e contabiliza.
 
 ## Arquivos afetados
 
-```text
-src/lib/reports/filters.ts             # períodos, parser de datas, validação
-src/lib/reports/metrics.ts             # fallback worked_minutes, tipos
-src/lib/api/reports.functions.ts       # SELECT inclui started_at/finished_at
-src/types/reports.ts                   # ReportOrderRow.worked_minutes_effective
-src/components/reports/ReportsFilters.tsx       # navegação + validação custom
-src/components/reports/ReportGenerateDialog.tsx # alinhar with from/to YYYY-MM-DD
-src/routes/_app.relatorios.tsx                  # subtítulos honestos dos KPIs
-```
+**Migration nova:** `supabase/migrations/<ts>_service_order_technicians.sql`
 
-Nenhuma rota, RLS, auth ou migration alterada. Nenhum mock reintroduzido.
+**Backend:**
+- `src/lib/api/serviceOrders.functions.ts`
+- `src/lib/api/reports.functions.ts`
+
+**Domínio/helpers:**
+- `src/types/serviceOrder.ts`, `src/types/reports.ts`
+- `src/lib/serviceOrders/metrics.ts` (novo helper consolidado)
+- `src/lib/reports/metrics.ts`, `src/lib/reports/managerial.ts`, `src/lib/reports/export.ts`
+- novo `src/lib/serviceOrders/technicians.ts` (helpers `getOrderTechnicians`, `formatTechnicianList`, `groupMinutesByTechnician`)
+
+**UI:**
+- `src/components/ordens/ServiceOrderWizard.tsx` (etapa Técnico + revisão + submit)
+- `src/components/app/ServiceOrderCard.tsx`
+- `src/routes/_app.ordens.$id.tsx` (detalhe + edição de técnicos)
+- `src/routes/_app.ordens.index.tsx`, `src/routes/_app.dashboard.tsx`
+- `src/components/reports/ReportOrdersTable.tsx`, `ReportCharts.tsx`, `ReportsFilters.tsx`, `ReportGenerateDialog.tsx`, `print/ManagerialReportDocument.tsx`
+
+**Não tocar:** rotas públicas, `client.ts`, types auto-gerados (regenerados pós-migration), `routeTree.gen.ts`.

@@ -51,6 +51,7 @@ export const statusLabel: Record<ServiceOrderStatus, string> = {
 
 export type ClientLite = { id: string; name: string; unit: string | null };
 export type TechnicianLite = { id: string; full_name: string; role: string | null };
+export type AssignedTechnician = TechnicianLite & { is_primary: boolean };
 export type ClientUnitLite = {
   id: string;
   name: string;
@@ -85,5 +86,12 @@ export type ServiceOrder = {
   updated_at: string;
   client: ClientLite | null;
   technician: TechnicianLite | null;
+  /**
+   * Many-to-many list of technicians assigned to the order. The legacy
+   * `technician` field is kept for back-compat — when this array is empty
+   * but `technician` exists, treat that single record as the primary
+   * technician (see `getOrderTechnicians`).
+   */
+  technicians: AssignedTechnician[];
   client_unit: ClientUnitLite | null;
 };

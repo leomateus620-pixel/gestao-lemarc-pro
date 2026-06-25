@@ -130,8 +130,9 @@ function OrdensList() {
       if (filtro === "incompletas" && !isIncomplete(o)) return false;
       if (q) {
         const needle = q.toLowerCase();
+        const techNames = (o.technicians ?? []).map((t) => t.full_name).join(" ");
         const hay =
-          `${o.number} ${o.title} ${o.client?.name ?? ""} ${o.technician?.full_name ?? ""}`.toLowerCase();
+          `${o.number} ${o.title} ${o.client?.name ?? ""} ${o.technician?.full_name ?? ""} ${techNames}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;

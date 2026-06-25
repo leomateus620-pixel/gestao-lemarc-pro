@@ -163,6 +163,51 @@ export type Database = {
         }
         Relationships: []
       }
+      service_order_technicians: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          id: string
+          is_primary: boolean
+          service_order_id: string
+          technician_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          service_order_id: string
+          technician_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          service_order_id?: string
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_technicians_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_technicians_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_orders: {
         Row: {
           approved_at: string | null

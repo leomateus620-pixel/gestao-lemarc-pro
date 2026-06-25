@@ -20,12 +20,26 @@ const ROW_SELECT = `
   billing_status, billed_at, invoice_reference,
   client:clients!service_orders_client_id_fkey(id, name, unit),
   technician:technicians!service_orders_technician_id_fkey(id, full_name),
-  client_unit:client_units!service_orders_client_unit_id_fkey(id, name)
+  client_unit:client_units!service_orders_client_unit_id_fkey(id, name),
+  assigned_technicians:service_order_technicians(
+    is_primary,
+    technician:technicians(id, full_name, role)
+  )
 `;
 
 function normalize(row: any): ReportOrderRow {
   const { estimated_value, lead_time_minutes, worked_minutes_effective, worked_minutes_source } =
     computeOrderRow(row);
+  const assigned = Array.isArray(row?.assigned_technicians) ? row.assigned_technicians : [];
+  const technicians = assigned
+    .filter((a: any) => a?.technician)
+    .map((a: any) => ({
+      id: a.technician.id as string,
+      name: a.technician.full_name as string,
+      role: (a.technician.role ?? null) as string | null,
+      is_primary: Boolean(a.is_primary),
+    }))
+    .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary));
   return {
     id: row.id,
     number: row.number,
@@ -40,6 +54,7 @@ function normalize(row: any): ReportOrderRow {
     client_unit_name: row.client_unit?.name ?? null,
     technician_id: row.technician_id,
     technician_name: row.technician?.full_name ?? null,
+    technicians,
     opened_at: row.opened_at,
     started_at: row.started_at ?? null,
     finished_at: row.finished_at ?? null,
@@ -63,7 +78,9 @@ function applyFilters(query: any, filters: ReportFilters) {
   if (range.to) query = query.lte("opened_at", range.to.toISOString());
   if (filters.clientId) query = query.eq("client_id", filters.clientId);
   if (filters.unitId) query = query.eq("client_unit_id", filters.unitId);
-  if (filters.technicianId) query = query.eq("technician_id", filters.technicianId);
+  // Technician filter is applied client-side after fetching, using the
+  // M2M assignments + legacy technician_id fallback, so historical OS
+  // that only have the legacy column are still considered.
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.priority) query = query.eq("priority", filters.priority);
   if (filters.serviceType) query = query.eq("service_type", filters.serviceType);
@@ -74,6 +91,17 @@ function applyFilters(query: any, filters: ReportFilters) {
     query = query.in("billing_status", ["pending", "ready"]).in("status", ["finished", "review", "approved"]);
   if (filters.onlyWithObservations) query = query.not("description", "is", null);
   return query;
+}
+
+function filterByTechnician(
+  rows: ReportOrderRow[],
+  technicianId: string | null | undefined,
+): ReportOrderRow[] {
+  if (!technicianId) return rows;
+  return rows.filter((r) => {
+    if (r.technicians.some((t) => t.id === technicianId)) return true;
+    return r.technician_id === technicianId;
+  });
 }
 
 const filtersInput = (data: { filters: ReportFilters }) => data;
@@ -89,7 +117,8 @@ export const getReportOrders = createServerFn({ method: "POST" })
     q = applyFilters(q, data.filters);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return (rows ?? []).map(normalize);
+    const normalized = (rows ?? []).map(normalize);
+    return filterByTechnician(normalized, data.filters.technicianId);
   });
 
 export const getClientReport = createServerFn({ method: "POST" })
@@ -104,7 +133,10 @@ export const getClientReport = createServerFn({ method: "POST" })
     q = applyFilters(q, { ...data.filters, clientId: data.clientId });
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    const orders = (rows ?? []).map(normalize);
+    const orders = filterByTechnician(
+      (rows ?? []).map(normalize),
+      data.filters.technicianId,
+    );
     const { data: client, error: cErr } = await context.supabase
       .from("clients")
       .select("id, name, unit")

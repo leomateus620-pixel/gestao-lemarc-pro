@@ -33,6 +33,10 @@ import {
   type ServiceOrderStatus,
   type ServicePriority,
 } from "@/types/serviceOrder";
+import {
+  formatTechnicianList,
+  getOrderTechnicians,
+} from "@/lib/serviceOrders/technicians";
 
 type CardAccent = "orange" | "blue" | "amber" | "green" | "red" | "steel";
 
@@ -84,7 +88,14 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
   });
   const missing = missingFields(order);
   const incomplete = isIncomplete(order);
-  const hasTechnician = Boolean(order.technician_id || order.technician?.full_name);
+  const orderTechs = getOrderTechnicians(order);
+  const hasTechnician = orderTechs.length > 0;
+  const technicianLabel = hasTechnician
+    ? formatTechnicianList(orderTechs, 2)
+    : "Sem técnico definido";
+  const technicianTitle = hasTechnician
+    ? orderTechs.map((t) => t.full_name).join(", ")
+    : "Sem técnico";
   const hasUnit = Boolean(order.client_unit_id || order.client_unit?.name || order.client?.unit);
   const hasClient = Boolean(order.client_id || order.client?.name);
   const unitName = order.client_unit?.name ?? order.client?.unit;
@@ -168,7 +179,7 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
               }}
               right={{
                 icon: HardHat,
-                value: order.technician?.full_name ?? "Sem técnico definido",
+                value: <span title={technicianTitle}>{technicianLabel}</span>,
                 pending: !hasTechnician,
               }}
             />

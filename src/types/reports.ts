@@ -54,6 +54,12 @@ export type ReportOrderRow = {
   client_unit_name: string | null;
   technician_id: string | null;
   technician_name: string | null;
+  /**
+   * Many-to-many technicians assigned to the order. Empty when the OS has
+   * no assignments — consumers should fall back to `technician_id` /
+   * `technician_name` (legacy single technician) when this is empty.
+   */
+  technicians: ReportTechnician[];
   opened_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -68,6 +74,13 @@ export type ReportOrderRow = {
   billed_at: string | null;
   invoice_reference: string | null;
   description: string | null;
+};
+
+export type ReportTechnician = {
+  id: string;
+  name: string;
+  role: string | null;
+  is_primary: boolean;
 };
 
 export type ReportOverview = {

@@ -10,6 +10,7 @@ import {
   serviceTypeLabel,
   statusLabel,
 } from "@/types/serviceOrder";
+import { groupMinutesByTechnician } from "@/lib/serviceOrders/technicians";
 
 const CLOSED_STATUSES = new Set(["finished", "approved", "cancelled"]);
 const PENDING_BILLING_STATUSES = new Set(["finished", "review", "approved"]);
@@ -155,13 +156,16 @@ export function computeSeries(rows: ReportOrderRow[]): ReportSeries {
     () => 1,
     "Sem cliente",
   ).slice(0, 8);
-  const byTechnicianHours = bucket(
-    rows,
-    (r) => r.technician_id,
-    (k) => rows.find((r) => r.technician_id === k)?.technician_name ?? "—",
-    (r) => r.worked_minutes_effective / 60,
-    "Sem técnico",
-  ).slice(0, 8);
+  // Multi-technician aware: each OS contributes its duration to every
+  // assigned technician. Falls back to the legacy single technician_id.
+  const byTechnicianHours: GroupBucket[] = groupMinutesByTechnician(rows)
+    .map((b) => ({
+      key: b.id,
+      label: b.id === "__none__" ? "Sem técnico" : b.name,
+      value: Math.round((b.minutes / 60) * 100) / 100,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
   const byClientValue = bucket(
     rows,
     (r) => r.client_id,
@@ -173,21 +177,13 @@ export function computeSeries(rows: ReportOrderRow[]): ReportSeries {
     .slice(0, 8);
 
   // Average lead time by technician (minutes)
-  const leadMap = new Map<string, { label: string; sum: number; count: number }>();
-  for (const r of rows) {
-    if (r.lead_time_minutes === null) continue;
-    const k = r.technician_id ?? "__none__";
-    const label = r.technician_name ?? "Sem técnico";
-    const cur = leadMap.get(k);
-    if (cur) {
-      cur.sum += r.lead_time_minutes;
-      cur.count++;
-    } else {
-      leadMap.set(k, { label, sum: r.lead_time_minutes, count: 1 });
-    }
-  }
-  const avgLeadByTechnician: GroupBucket[] = Array.from(leadMap.entries())
-    .map(([key, v]) => ({ key, label: v.label, value: Math.round(v.sum / v.count) }))
+  const avgLeadByTechnician: GroupBucket[] = groupMinutesByTechnician(rows)
+    .filter((b) => b.leadCount > 0)
+    .map((b) => ({
+      key: b.id,
+      label: b.id === "__none__" ? "Sem técnico" : b.name,
+      value: Math.round(b.leadSum / b.leadCount),
+    }))
     .sort((a, b) => a.value - b.value)
     .slice(0, 8);
 
@@ -233,11 +229,11 @@ export function groupByUnit(rows: ReportOrderRow[]): GroupBucket[] {
 }
 
 export function groupByTechnician(rows: ReportOrderRow[]): GroupBucket[] {
-  return bucket(
-    rows,
-    (r) => r.technician_id,
-    (k) => rows.find((r) => r.technician_id === k)?.technician_name ?? "—",
-    () => 1,
-    "Sem técnico",
-  );
+  return groupMinutesByTechnician(rows)
+    .map((b) => ({
+      key: b.id,
+      label: b.id === "__none__" ? "Sem técnico" : b.name,
+      value: b.orders,
+    }))
+    .sort((a, b) => b.value - a.value);
 }
