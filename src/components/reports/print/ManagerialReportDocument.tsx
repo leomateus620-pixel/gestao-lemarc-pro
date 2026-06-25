@@ -15,6 +15,7 @@ import type {
   ManagerialReport,
   ReportOrderRow,
 } from "@/types/reports";
+import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 
 type Props = {
   report: ManagerialReport;
@@ -183,6 +184,11 @@ export function ManagerialReportDocument({
             </tbody>
           </table>
         )}
+        <p className="muted" style={{ fontSize: 9, marginTop: 6 }}>
+          As horas por técnico consideram a duração total da OS para cada técnico
+          vinculado como responsável. Quando há mais de um técnico na mesma OS,
+          o total distribuído pode exceder o total geral de horas.
+        </p>
       </section>
 
       <section className="section">
@@ -251,7 +257,7 @@ export function ManagerialReportDocument({
                   <td>{r.number}</td>
                   <td>{r.title}</td>
                   <td>{r.client_name ?? "—"}{r.client_unit_name ? ` · ${r.client_unit_name}` : ""}</td>
-                  <td>{r.technician_name ?? "—"}</td>
+                  <td>{technicianNamesFor(r)}</td>
                   <td>{serviceTypeFor(r)}</td>
                   <td>{r.priority ? priorityLabel[r.priority] : "—"}</td>
                   <td>{statusLabel[r.status]}</td>
@@ -282,6 +288,12 @@ function serviceTypeFor(r: ReportOrderRow): string {
   if (!r.service_type) return "—";
   if (r.service_type === "outro" && r.service_type_other?.trim()) return r.service_type_other.trim();
   return serviceTypeLabel[r.service_type];
+}
+
+function technicianNamesFor(r: ReportOrderRow): string {
+  const techs = getReportRowTechnicians(r);
+  if (techs.length === 0) return "—";
+  return techs.map((t) => t.name).join(", ");
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
