@@ -113,13 +113,13 @@ function computeTopClients(rows: ReportOrderRow[]): ClientAggregate[] {
     const id = r.client_id ?? "__none__";
     const name = r.client_id ? (r.client_name ?? "Cliente sem nome") : "Sem cliente";
     const value =
-      (r.worked_minutes ?? 0) > 0 && (r.hour_rate ?? 0) > 0
-        ? ((r.worked_minutes ?? 0) / 60) * (r.hour_rate ?? 0)
+      r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) > 0
+        ? (r.worked_minutes_effective / 60) * (r.hour_rate ?? 0)
         : 0;
     const cur = map.get(id);
     if (cur) {
       cur.orders++;
-      cur.hours += (r.worked_minutes ?? 0) / 60;
+      cur.hours += r.worked_minutes_effective / 60;
       cur.estimatedValue += value;
       if (r.status === "finished" || r.status === "approved") cur.finished++;
       else if (r.status === "pending") cur.pending++;
@@ -130,7 +130,7 @@ function computeTopClients(rows: ReportOrderRow[]): ClientAggregate[] {
         orders: 1,
         finished: r.status === "finished" || r.status === "approved" ? 1 : 0,
         pending: r.status === "pending" ? 1 : 0,
-        hours: (r.worked_minutes ?? 0) / 60,
+        hours: r.worked_minutes_effective / 60,
         estimatedValue: value,
       });
     }
@@ -152,13 +152,13 @@ function computeTopTechnicians(rows: ReportOrderRow[]): TechnicianAggregate[] {
       ? (r.technician_name ?? "Técnico sem nome")
       : "Sem técnico atribuído";
     const value =
-      (r.worked_minutes ?? 0) > 0 && (r.hour_rate ?? 0) > 0
-        ? ((r.worked_minutes ?? 0) / 60) * (r.hour_rate ?? 0)
+      r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) > 0
+        ? (r.worked_minutes_effective / 60) * (r.hour_rate ?? 0)
         : 0;
     const cur = map.get(id);
     if (cur) {
       cur.orders++;
-      cur.hours += (r.worked_minutes ?? 0) / 60;
+      cur.hours += r.worked_minutes_effective / 60;
       cur.estimatedValue += value;
       if (r.status === "finished" || r.status === "approved") cur.finished++;
       if (r.lead_time_minutes !== null) {
@@ -171,7 +171,7 @@ function computeTopTechnicians(rows: ReportOrderRow[]): TechnicianAggregate[] {
         name,
         orders: 1,
         finished: r.status === "finished" || r.status === "approved" ? 1 : 0,
-        hours: (r.worked_minutes ?? 0) / 60,
+        hours: r.worked_minutes_effective / 60,
         avgLeadMinutes: null,
         estimatedValue: value,
         _leadSum: r.lead_time_minutes ?? 0,
@@ -216,7 +216,7 @@ function computeIncomplete(rows: ReportOrderRow[]): IncompleteCounters {
   for (const r of rows) {
     if (!r.technician_id) withoutTechnician++;
     if ((r.hour_rate ?? 0) <= 0) withoutHourRate++;
-    if ((r.worked_minutes ?? 0) <= 0) withoutWorkedMinutes++;
+    if (r.worked_minutes_effective <= 0) withoutWorkedMinutes++;
     if (!r.closed_at) withoutClosedAt++;
   }
   return { withoutTechnician, withoutHourRate, withoutWorkedMinutes, withoutClosedAt };
