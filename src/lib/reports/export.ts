@@ -8,13 +8,20 @@ import {
   statusLabel,
 } from "@/types/serviceOrder";
 import { formatCurrency, formatDateTime, formatHours } from "./formatters";
+import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
+
+function technicianCsv(r: ReportOrderRow): string {
+  const techs = getReportRowTechnicians(r);
+  if (techs.length === 0) return "Sem técnico";
+  return techs.map((t) => t.name).join("; ");
+}
 
 const CSV_HEADERS = [
   "Numero",
   "Titulo",
   "Cliente",
   "Unidade",
-  "Tecnico",
+  "Tecnicos",
   "Status",
   "Prioridade",
   "Tipo",
@@ -47,7 +54,7 @@ export function ordersToCsv(rows: ReportOrderRow[]): string {
         r.title,
         r.client_name ?? "Sem cliente",
         r.client_unit_name ?? "Sem unidade",
-        r.technician_name ?? "Sem técnico",
+        technicianCsv(r),
         statusLabel[r.status],
         r.priority ? priorityLabel[r.priority] : "—",
         type,
@@ -123,7 +130,7 @@ export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
         <td>${escapeHtml(r.title)}</td>
         <td>${escapeHtml(r.client_name ?? "—")}</td>
         <td>${escapeHtml(r.client_unit_name ?? "—")}</td>
-        <td>${escapeHtml(r.technician_name ?? "—")}</td>
+        <td>${escapeHtml(technicianCsv(r))}</td>
         <td>${statusLabel[r.status]}</td>
         <td>${escapeHtml(type)}</td>
         <td>${formatDateTime(r.opened_at)}</td>
