@@ -52,7 +52,7 @@ function useRouteSetter(routePath: "/_app/relatorios" | "/_app/relatorios/client
   return (patch: Patch) =>
     navigate({
       to: routePath,
-      params: (prev) => prev as never,
+      params: ((prev: Record<string, unknown>) => prev) as never,
       search: ((prev: Record<string, unknown>) => {
         const next: Record<string, unknown> = { ...prev, ...patch };
         for (const k of Object.keys(next)) {
