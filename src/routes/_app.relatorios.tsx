@@ -130,7 +130,6 @@ function RelatoriosContent() {
   const series = useMemo(() => computeSeries(rows), [rows]);
   const hasReportedMinutes = rows.some((r) => (r.worked_minutes ?? 0) > 0);
   const hasDerivedMinutes = rows.some((r) => r.worked_minutes_source === "derived");
-  const hasAnyMinutes = hasReportedMinutes || hasDerivedMinutes;
   const hasEstimatedValues = rows.some((r) => r.estimated_value > 0);
 
   const kpis: Kpi[] = [
