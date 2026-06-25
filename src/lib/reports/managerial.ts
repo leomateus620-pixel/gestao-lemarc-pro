@@ -48,9 +48,9 @@ function computeSummary(rows: ReportOrderRow[]): ManagerialSummary {
   const techSet = new Set<string>();
 
   for (const r of rows) {
-    totalMinutes += r.worked_minutes ?? 0;
-    if ((r.worked_minutes ?? 0) > 0 && (r.hour_rate ?? 0) > 0) {
-      estimatedValue += ((r.worked_minutes ?? 0) / 60) * (r.hour_rate ?? 0);
+    totalMinutes += r.worked_minutes_effective;
+    if (r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) > 0) {
+      estimatedValue += (r.worked_minutes_effective / 60) * (r.hour_rate ?? 0);
     }
     if (r.status === "finished" || r.status === "approved") finished++;
     else if (r.status === "running" || r.status === "transit" || r.status === "dispatched")
