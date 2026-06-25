@@ -15,14 +15,29 @@ const ORDER_SELECT = `
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit),
   technician:technicians!service_orders_technician_id_fkey(id, full_name, role),
-  client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state)
+  client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state),
+  assigned_technicians:service_order_technicians(
+    is_primary,
+    technician:technicians(id, full_name, role)
+  )
 `;
 
 function normalize(row: any): ServiceOrder {
+  const assigned = Array.isArray(row?.assigned_technicians) ? row.assigned_technicians : [];
+  const technicians = assigned
+    .filter((a: any) => a?.technician)
+    .map((a: any) => ({
+      id: a.technician.id,
+      full_name: a.technician.full_name,
+      role: a.technician.role ?? null,
+      is_primary: Boolean(a.is_primary),
+    }))
+    .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary));
   return {
     ...row,
     client: row.client ?? null,
     technician: row.technician ?? null,
+    technicians,
     client_unit: row.client_unit ?? null,
   } as ServiceOrder;
 }
@@ -58,6 +73,7 @@ type CreateInput = {
   client_id?: string | null;
   client_unit_id?: string | null;
   technician_id?: string | null;
+  technician_ids?: string[] | null;
   service_type?: ServiceType | null;
   service_type_other?: string | null;
   priority?: ServicePriority | null;
@@ -69,6 +85,9 @@ export const createServiceOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: CreateInput) => data)
   .handler(async ({ data, context }) => {
+    const ids = (data.technician_ids ?? []).filter(Boolean);
+    const uniqueIds = Array.from(new Set(ids));
+    const primaryId = uniqueIds[0] ?? data.technician_id ?? null;
     const { data: row, error } = await context.supabase
       .from("service_orders")
       .insert({
@@ -76,7 +95,7 @@ export const createServiceOrder = createServerFn({ method: "POST" })
         description: data.description ?? null,
         client_id: data.client_id ?? null,
         client_unit_id: data.client_unit_id ?? null,
-        technician_id: data.technician_id ?? null,
+        technician_id: primaryId,
         service_type: data.service_type ?? null,
         service_type_other: data.service_type_other ?? null,
         priority: data.priority ?? null,
@@ -88,7 +107,73 @@ export const createServiceOrder = createServerFn({ method: "POST" })
       .select(ORDER_SELECT)
       .single();
     if (error) throw new Error(error.message);
+    if (uniqueIds.length > 0) {
+      const links = uniqueIds.map((technician_id, idx) => ({
+        service_order_id: row.id,
+        technician_id,
+        assigned_by: context.userId,
+        is_primary: idx === 0,
+      }));
+      const { error: linkErr } = await (
+        context.supabase.from("service_order_technicians") as any
+      ).insert(links);
+      if (linkErr) {
+        // Rollback the order to keep the relation consistent.
+        await context.supabase.from("service_orders").delete().eq("id", row.id);
+        throw new Error(`Falha ao vincular técnicos: ${linkErr.message}`);
+      }
+      // Re-fetch so the response carries the new assignments.
+      const { data: full, error: refetchErr } = await context.supabase
+        .from("service_orders")
+        .select(ORDER_SELECT)
+        .eq("id", row.id)
+        .single();
+      if (refetchErr) throw new Error(refetchErr.message);
+      return normalize(full);
+    }
     return normalize(row);
+  });
+
+export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; technician_ids: string[] }) => data)
+  .handler(async ({ data, context }) => {
+    const ids = Array.from(new Set((data.technician_ids ?? []).filter(Boolean)));
+    const primaryId = ids[0] ?? null;
+
+    // Replace existing links with the new set.
+    const { error: delErr } = await context.supabase
+      .from("service_order_technicians")
+      .delete()
+      .eq("service_order_id", data.id);
+    if (delErr) throw new Error(delErr.message);
+
+    if (ids.length > 0) {
+      const links = ids.map((technician_id, idx) => ({
+        service_order_id: data.id,
+        technician_id,
+        assigned_by: context.userId,
+        is_primary: idx === 0,
+      }));
+      const { error: insErr } = await (
+        context.supabase.from("service_order_technicians") as any
+      ).insert(links);
+      if (insErr) throw new Error(insErr.message);
+    }
+
+    // Keep legacy single-technician column in sync with the new primary.
+    const { error: updErr } = await (context.supabase.from("service_orders") as any)
+      .update({ technician_id: primaryId })
+      .eq("id", data.id);
+    if (updErr) throw new Error(updErr.message);
+
+    const { data: full, error: refetchErr } = await context.supabase
+      .from("service_orders")
+      .select(ORDER_SELECT)
+      .eq("id", data.id)
+      .single();
+    if (refetchErr) throw new Error(refetchErr.message);
+    return normalize(full);
   });
 
 export const updateServiceOrderStatus = createServerFn({ method: "POST" })

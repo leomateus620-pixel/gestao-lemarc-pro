@@ -18,6 +18,7 @@ import {
   Search,
   Sparkles,
   UserRound,
+  X,
   Zap,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,7 @@ type Draft = {
   scheduled: string;
   clientId: string;
   unitId: string;
-  techId: string;
+  techIds: string[];
   noTech: boolean;
   type: ServiceType;
   typeOther: string;
@@ -104,7 +105,7 @@ export function ServiceOrderWizard({
     scheduled: "",
     clientId: initialClientId ?? "",
     unitId: initialUnitId ?? "",
-    techId: "",
+    techIds: [],
     noTech: false,
     type: "mecanica",
     typeOther: "",
@@ -129,7 +130,7 @@ export function ServiceOrderWizard({
     return [
       draft.title.trim().length >= 3,
       Boolean(draft.clientId),
-      Boolean(draft.techId) || draft.noTech,
+      draft.techIds.length > 0 || draft.noTech,
       Boolean(draft.type) &&
         Boolean(draft.priority) &&
         (draft.type !== "outro" || draft.typeOther.trim().length >= 3),
@@ -146,7 +147,7 @@ export function ServiceOrderWizard({
           description: draft.description || null,
           client_id: draft.clientId || null,
           client_unit_id: draft.unitId || null,
-          technician_id: draft.noTech ? null : draft.techId || null,
+          technician_ids: draft.noTech ? [] : draft.techIds,
           service_type: draft.type,
           service_type_other:
             draft.type === "outro" ? draft.typeOther.trim() : null,
@@ -206,7 +207,7 @@ export function ServiceOrderWizard({
               set={set}
               technicians={technicians}
               onCreated={(id) => {
-                set("techId", id);
+                set("techIds", Array.from(new Set([...draft.techIds, id])));
                 set("noTech", false);
               }}
             />
@@ -682,7 +683,7 @@ function TechnicianStep({
         type="button"
         onClick={() => {
           set("noTech", !draft.noTech);
-          if (!draft.noTech) set("techId", "");
+          if (!draft.noTech) set("techIds", []);
         }}
         className={cn(
           "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition",
@@ -716,6 +717,43 @@ function TechnicianStep({
         ]}
       />
 
+      {!draft.noTech && draft.techIds.length > 0 && (
+        <div className="rounded-xl border border-primary/30 bg-primary/[0.07] p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+              Técnicos selecionados
+            </p>
+            <span className="rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+              {draft.techIds.length} {draft.techIds.length === 1 ? "técnico" : "técnicos"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {draft.techIds.map((id) => {
+              const t = technicians.find((x) => x.id === id);
+              if (!t) return null;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-bold text-foreground"
+                >
+                  {t.full_name}
+                  <button
+                    type="button"
+                    aria-label={`Remover ${t.full_name}`}
+                    onClick={() =>
+                      set("techIds", draft.techIds.filter((x) => x !== id))
+                    }
+                    className="grid h-4 w-4 place-items-center rounded-full bg-primary/30 text-primary-foreground hover:bg-primary/50"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {mode === "select" ? (
         <div className="space-y-3">
           <div className="relative">
@@ -737,14 +775,18 @@ function TechnicianStep({
               </p>
             )}
             {filtered.map((t) => {
-              const active = draft.techId === t.id && !draft.noTech;
+              const active = draft.techIds.includes(t.id) && !draft.noTech;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => {
-                    set("techId", t.id);
                     set("noTech", false);
+                    if (active) {
+                      set("techIds", draft.techIds.filter((x) => x !== t.id));
+                    } else {
+                      set("techIds", Array.from(new Set([...draft.techIds, t.id])));
+                    }
                   }}
                   className={cn(
                     "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition",
@@ -908,7 +950,9 @@ function ReviewStep({
   technicians: { id: string; full_name: string; role: string | null }[];
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
-  const tech = technicians.find((t) => t.id === draft.techId);
+  const selectedTechs = draft.techIds
+    .map((id) => technicians.find((t) => t.id === id))
+    .filter((t): t is { id: string; full_name: string; role: string | null } => Boolean(t));
   const scheduledLabel = draft.scheduled
     ? new Date(draft.scheduled).toLocaleString("pt-BR")
     : "—";
@@ -970,10 +1014,29 @@ function ReviewStep({
         <ReviewSection title="Cliente e técnico" icon={Building2}>
           <ReviewField label="Cliente">{client?.name ?? "—"}</ReviewField>
           <ReviewField label="Unidade">{client?.unit ?? "—"}</ReviewField>
-          <ReviewField label="Técnico" icon={HardHat}>
-            {draft.noTech ? "Sem técnico definido" : (tech?.full_name ?? "—")}
+          <ReviewField label="Técnicos responsáveis" icon={HardHat}>
+            {draft.noTech || selectedTechs.length === 0 ? (
+              "Sem técnico definido"
+            ) : (
+              <span className="flex flex-col gap-1">
+                {selectedTechs.map((t, idx) => (
+                  <span key={t.id} className="leading-snug">
+                    {t.full_name}
+                    {t.role ? (
+                      <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                        · {t.role}
+                      </span>
+                    ) : null}
+                    {idx === 0 && selectedTechs.length > 1 ? (
+                      <span className="ml-1 rounded-full border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-primary">
+                        Principal
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </span>
+            )}
           </ReviewField>
-          <ReviewField label="Função">{tech?.role ?? "—"}</ReviewField>
         </ReviewSection>
 
         <ReviewSection title="Serviço e prioridade" icon={Sparkles}>
