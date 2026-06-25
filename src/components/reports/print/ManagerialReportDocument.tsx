@@ -257,7 +257,7 @@ export function ManagerialReportDocument({
                   <td>{statusLabel[r.status]}</td>
                   <td>{formatDate(r.opened_at)}</td>
                   <td>{r.closed_at ? formatDate(r.closed_at) : "—"}</td>
-                  <td>{(r.worked_minutes ?? 0) > 0 ? `${((r.worked_minutes ?? 0) / 60).toFixed(1)}h` : "—"}</td>
+                  <td>{r.worked_minutes_effective > 0 ? `${(r.worked_minutes_effective / 60).toFixed(1)}h` : "—"}</td>
                   <td>{r.estimated_value > 0 ? formatCurrency(r.estimated_value) : "—"}</td>
                 </tr>
               ))}

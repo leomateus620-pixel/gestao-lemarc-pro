@@ -55,8 +55,12 @@ export type ReportOrderRow = {
   technician_id: string | null;
   technician_name: string | null;
   opened_at: string;
+  started_at: string | null;
+  finished_at: string | null;
   closed_at: string | null;
   worked_minutes: number | null;
+  worked_minutes_effective: number;
+  worked_minutes_source: "reported" | "derived" | "none";
   hour_rate: number | null;
   estimated_value: number;
   lead_time_minutes: number | null;

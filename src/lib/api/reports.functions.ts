@@ -16,7 +16,7 @@ import type {
 const ROW_SELECT = `
   id, number, title, description, status, priority, service_type, service_type_other,
   client_id, client_unit_id, technician_id,
-  opened_at, closed_at, worked_minutes, hour_rate,
+  opened_at, started_at, finished_at, closed_at, worked_minutes, hour_rate,
   billing_status, billed_at, invoice_reference,
   client:clients!service_orders_client_id_fkey(id, name, unit),
   technician:technicians!service_orders_technician_id_fkey(id, full_name),
@@ -24,7 +24,8 @@ const ROW_SELECT = `
 `;
 
 function normalize(row: any): ReportOrderRow {
-  const { estimated_value, lead_time_minutes } = computeOrderRow(row);
+  const { estimated_value, lead_time_minutes, worked_minutes_effective, worked_minutes_source } =
+    computeOrderRow(row);
   return {
     id: row.id,
     number: row.number,
@@ -40,8 +41,12 @@ function normalize(row: any): ReportOrderRow {
     technician_id: row.technician_id,
     technician_name: row.technician?.full_name ?? null,
     opened_at: row.opened_at,
+    started_at: row.started_at ?? null,
+    finished_at: row.finished_at ?? null,
     closed_at: row.closed_at,
     worked_minutes: row.worked_minutes,
+    worked_minutes_effective,
+    worked_minutes_source,
     hour_rate: row.hour_rate,
     estimated_value,
     lead_time_minutes,

@@ -128,7 +128,8 @@ function RelatoriosContent() {
 
   const overview = useMemo(() => computeOverview(rows), [rows]);
   const series = useMemo(() => computeSeries(rows), [rows]);
-  const hasWorkedMinutes = rows.some((r) => (r.worked_minutes ?? 0) > 0);
+  const hasReportedMinutes = rows.some((r) => (r.worked_minutes ?? 0) > 0);
+  const hasDerivedMinutes = rows.some((r) => r.worked_minutes_source === "derived");
   const hasEstimatedValues = rows.some((r) => r.estimated_value > 0);
 
   const kpis: Kpi[] = [
@@ -142,7 +143,11 @@ function RelatoriosContent() {
     {
       label: "Horas trabalhadas",
       value: `${formatHoursDecimal(overview.totalHours * 60)}h`,
-      hint: hasWorkedMinutes ? "Soma de worked_minutes informado" : "Sem horas informadas",
+      hint: hasReportedMinutes
+        ? "Soma de worked_minutes informado nas OS."
+        : hasDerivedMinutes
+          ? "Derivado de start → finish (worked_minutes ausente)."
+          : "Sem horas trabalhadas registradas no período.",
       icon: Clock,
     },
     {

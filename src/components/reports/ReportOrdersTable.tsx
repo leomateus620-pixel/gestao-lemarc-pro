@@ -58,7 +58,7 @@ function timeLabel(r: ReportOrderRow) {
 
 function valueLabel(r: ReportOrderRow) {
   if (r.estimated_value > 0) return formatCurrency(r.estimated_value);
-  if ((r.worked_minutes ?? 0) > 0 && (r.hour_rate ?? 0) <= 0) return "Sem hour_rate";
+  if (r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) <= 0) return "Sem hour_rate";
   return "—";
 }
 

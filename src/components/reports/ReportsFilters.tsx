@@ -20,7 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { PERIOD_OPTIONS, countActiveFilters } from "@/lib/reports/filters";
+import {
+  PERIOD_OPTIONS,
+  countActiveFilters,
+  isCustomRangeInvalid,
+} from "@/lib/reports/filters";
 import type { ReportFilters, BillingStatus } from "@/types/reports";
 import {
   priorityLabel,
@@ -41,21 +45,22 @@ const BILLING_KEYS = Object.keys(billingStatusLabel) as BillingStatus[];
 
 const ALL = "__all__";
 
-type Patch = Partial<Record<keyof ReportFilters, ReportFilters[keyof ReportFilters]>>;
+type Patch = Partial<ReportFilters>;
 
 function useRouteSetter(routePath: "/_app/relatorios" | "/_app/relatorios/cliente/$clientId") {
-  const navigate = useNavigate({ from: routePath });
+  const navigate = useNavigate();
   return (patch: Patch) =>
     navigate({
-      search: (prev: Record<string, unknown>) => {
-        const next = { ...prev, ...patch };
-        // Strip nulls / undefined for cleaner URLs
-        Object.keys(next).forEach((k) => {
-          if (next[k] === null || next[k] === undefined || next[k] === "" || next[k] === false)
-            delete next[k];
-        });
+      to: routePath,
+      params: ((prev: Record<string, unknown>) => prev) as never,
+      search: ((prev: Record<string, unknown>) => {
+        const next: Record<string, unknown> = { ...prev, ...patch };
+        for (const k of Object.keys(next)) {
+          const v = next[k];
+          if (v === null || v === undefined || v === "" || v === false) delete next[k];
+        }
         return next;
-      },
+      }) as never,
       replace: true,
     });
 }
@@ -73,6 +78,7 @@ export function ReportsFilters({
   const [open, setOpen] = useState(false);
   const active = countActiveFilters(filters);
   const lookups = useReportLookupsQuery();
+  const customInvalid = isCustomRangeInvalid(filters);
 
   const units = useMemo(() => {
     if (!filters.clientId) return lookups.data.units;
@@ -98,23 +104,26 @@ export function ReportsFilters({
       </Select>
 
       {filters.period === "custom" && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Input
-            type="date"
-            className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
-            value={filters.from?.slice(0, 10) ?? ""}
-            onChange={(e) =>
-              setSearch({ from: e.target.value ? new Date(e.target.value).toISOString() : null })
-            }
-          />
-          <Input
-            type="date"
-            className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
-            value={filters.to?.slice(0, 10) ?? ""}
-            onChange={(e) =>
-              setSearch({ to: e.target.value ? new Date(e.target.value).toISOString() : null })
-            }
-          />
+        <div className="flex flex-col gap-1">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Input
+              type="date"
+              className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
+              value={filters.from ?? ""}
+              onChange={(e) => setSearch({ from: e.target.value || null })}
+            />
+            <Input
+              type="date"
+              className="lemarc-report-control h-11 w-full rounded-xl font-semibold sm:w-[150px]"
+              value={filters.to ?? ""}
+              onChange={(e) => setSearch({ to: e.target.value || null })}
+            />
+          </div>
+          {customInvalid && (
+            <p className="text-[11px] font-bold text-destructive">
+              Período inválido. Verifique a data inicial e final.
+            </p>
+          )}
         </div>
       )}
 
@@ -209,6 +218,7 @@ export function ReportsFilters({
           </div>
           <SheetFooter className="mt-6 flex-row gap-2">
             <Button
+              type="button"
               variant="ghost"
               className="lemarc-report-action flex-1 rounded-xl"
               onClick={() =>
@@ -230,6 +240,7 @@ export function ReportsFilters({
               Limpar tudo
             </Button>
             <Button
+              type="button"
               className="lemarc-report-action-primary flex-1 rounded-xl font-black"
               onClick={() => setOpen(false)}
             >
