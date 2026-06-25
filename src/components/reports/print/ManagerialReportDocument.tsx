@@ -220,7 +220,7 @@ export function ManagerialReportDocument({
                 #{o.number} · {o.title} <span className="pill">{statusLabel[o.status]}</span>
               </div>
               <div className="muted" style={{ fontSize: 9, marginBottom: 4 }}>
-                {o.client_name ?? "Sem cliente"} · {o.technician_name ?? "Sem técnico"} ·{" "}
+                {o.client_name ?? "Sem cliente"} · {technicianNamesFor(o)} ·{" "}
                 {o.priority ? priorityLabel[o.priority] : "—"} · Aberta {formatDate(o.opened_at)}
                 {o.closed_at ? ` · Fechada ${formatDate(o.closed_at)}` : ""}
               </div>
