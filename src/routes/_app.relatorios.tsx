@@ -241,7 +241,10 @@ function RelatoriosContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <ReportChartCard title="Horas por técnico" subtitle="Top 8 colaboradores">
+            <ReportChartCard
+              title="Horas por técnico"
+              subtitle="Top 8 · contabiliza a duração total da OS para cada técnico vinculado"
+            >
               <HorizontalBarList
                 data={series.byTechnicianHours}
                 valueFormatter={(v) => `${formatHoursDecimal(v * 60)}h`}
