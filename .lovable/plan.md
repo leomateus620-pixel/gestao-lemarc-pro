@@ -1,80 +1,101 @@
-## Objetivo
 
-Adicionar ao menu **Relatórios** uma funcionalidade real de geração de **Relatório Gerencial em PDF**, usando exclusivamente dados reais (OS, clientes, unidades, técnicos), com filtros, prévia e download. Sem mocks, com RLS preservada.
+## Diagnóstico
 
-## Abordagem técnica
+Inspeção dos arquivos do menu Relatórios e da base real:
 
-- **Geração do PDF**: HTML print-safe + `window.print()` (sem dependências novas). Será montada uma rota dedicada `/relatorios/imprimir` em layout próprio (sem sidebar/BottomNav), aplicando `@media print` para A4. O usuário usa "Salvar como PDF" do navegador. Nome sugerido aparece via `document.title`.
-  - Motivo: já temos infra de filtros + métricas; jsPDF/html2canvas adicionariam peso e renderização fraca de tabelas longas. Print-to-PDF entrega layout profissional e fiel, com paginação automática.
-- **Dados**: reaproveitar `getReportOrders` (já com `requireSupabaseAuth` + RLS). Adicionar campo `description` ao `ROW_SELECT` e ao tipo `ReportOrderRow` para a seção de observações.
-- **Métricas**: estender `src/lib/reports/metrics.ts` com agregações específicas do relatório gerencial (por status, por cliente, por técnico, por tipo de serviço, taxa de conclusão, tempo médio de fechamento, contagens de dados incompletos).
+**Banco (service_orders, 9 OS):**
+- `worked_minutes` → 0/9 preenchidos
+- `hour_rate` → 0/9 preenchidos
+- `started_at` → 8/9 preenchidos
+- `finished_at` → 6/9 preenchidos
+- `closed_at` → 6/9 preenchidos
 
-## Estrutura de arquivos
+Ou seja: os indicadores estão **corretamente zerados** quando dependem de `worked_minutes` e `hour_rate`, porque nenhuma OS tem esses campos. O problema real é que (a) há fonte alternativa (`started_at`/`finished_at`) que não está sendo usada e (b) as mensagens não deixam claro o motivo do zero.
 
-Novos:
-- `src/lib/reports/managerial.ts` — funções puras: agrega `ReportOrderRow[]` em um `ManagerialReport` (resumo executivo, distribuições, listas top, observações, incompletudes).
-- `src/components/reports/ReportGenerateButton.tsx` — botão de destaque no header de `/relatorios`.
-- `src/components/reports/ReportGenerateDialog.tsx` — modal com seletor de período (semana atual / mês atual / últimos 30 dias / personalizado), filtros opcionais (cliente, unidade, técnico, status, prioridade, tipo, somente concluídas, somente aguardando cobrança, somente com observações) e prévia resumida.
-- `src/components/reports/ReportPeriodSelector.tsx` — chips de período + date pickers.
-- `src/components/reports/ReportPreview.tsx` — cards de prévia (total OS, concluídas, horas, valor estimado, clientes/técnicos envolvidos) ou estado vazio.
-- `src/components/reports/print/ManagerialReportDocument.tsx` — layout do PDF (capa, resumo executivo, status, top clientes, top técnicos, tipos de serviço, observações, lista detalhada). CSS print-only.
-- `src/routes/_app.relatorios.imprimir.tsx` — rota de impressão; lê filtros dos search params (Zod), busca dados via `getReportOrders`, renderiza `ManagerialReportDocument`, dispara `window.print()` após hidratação. Layout próprio sem `AppShell`.
-- `src/styles/print.css` (ou bloco `@media print` colocalizado) — esconde nav, ajusta margens A4, evita quebras dentro de linhas de tabela.
+**Filtros / 404:**
+- `ReportsFilters` usa `useNavigate({ from: routePath })` com `replace: true` e updater de `search` que apaga chaves `null|undefined|""|false`. Quando a rota for `/_app/relatorios/cliente/$clientId`, navegar apenas com `search` pode disparar erro em modo strict (params perdidos).
+- `Input type="date"` grava `from`/`to` como ISO datetime (`new Date(value).toISOString()`) misturado com `slice(0,10)` para exibir — funciona, mas conflita com `ReportGenerateDialog` que grava `from`/`to` como `YYYY-MM-DD`. Resultado: parsing inconsistente entre as duas telas.
+- `resolvePeriodRange` faz `new Date(filters.from)` sem normalizar início/fim do dia → janela 1 dia mais curta no fuso BRT.
+- Não há validação de "data inicial > data final" em `ReportsFilters` (só no diálogo de relatório gerencial).
+- Período `month` é descrito como "Mês atual / últimos 30 dias", mas o cálculo usa `setMonth(-1)` (mês calendárico, não 30 dias).
+- `ClientReportDrawer.go()` só envia `search: { period }` — perde demais filtros, mas não causa 404; comportamento OK.
 
-Alterados:
-- `src/lib/api/reports.functions.ts` — incluir `description` no `ROW_SELECT` e no mapeamento `normalize`.
-- `src/types/reports.ts` — adicionar `description` ao `ReportOrderRow`; tipos `ManagerialReport`, `ManagerialSummary`, `ClientAggregate`, `TechnicianAggregate`, `ServiceTypeAggregate`, `IncompleteCounters`; flags de filtro `onlyCompleted`, `onlyAwaitingBilling`, `onlyWithObservations`.
-- `src/lib/reports/filters.ts` — Zod para os novos flags; serializador para search params da rota de impressão.
-- `src/routes/_app.relatorios.tsx` — colocar `ReportGenerateButton` no header.
+**Indicadores zerados / vagos:**
+- "Horas trabalhadas" e "Valor estimado" zeram porque `worked_minutes` é sempre nulo. Sem fallback de `started_at`/`finished_at`, ficam em 0 com legenda genérica.
+- "Ticket médio" depende de `estimated_value` por OS — sem `hour_rate`, fica em `—`.
+- "Tempo médio" usa `opened_at`/`closed_at`. Funciona, mas só 6 OS têm `closed_at`. OK.
+- Agrupamento por cliente já é por `client_id` (não por nome) — sem duplicação real; o que aparece no print são clientes com nomes parecidos, não duplicação.
 
-## Conteúdo do PDF
+## Plano de correção (apenas frontend/server-fn, sem nova migration)
 
-1. **Capa/cabeçalho**: logo Lemarc, título "Relatório Gerencial de Ordens de Serviço", período, data/hora de geração, nome do usuário (de `profiles`/sessão), identificação do sistema.
-2. **Resumo executivo**: total OS, concluídas, em execução, pendentes, em revisão, aguardando cobrança, horas totais, tempo médio (somente OS com `opened_at` e `closed_at`), valor estimado (somente OS com `worked_minutes` e `hour_rate`), taxa de conclusão.
-3. **Análise por status**: tabela com contagem + % por status.
-4. **Top clientes**: nome, qtd OS, horas, valor estimado, concluídas, pendentes. Omite clientes sem dados.
-5. **Top técnicos**: nome, OS atribuídas, concluídas, horas, tempo médio, valor estimado. OS sem técnico agrupadas como "Sem técnico atribuído".
-6. **Tipos de serviço**: contagem por `service_type`; quando `service_type === 'outro'` exibe `service_type_other`.
-7. **Observações**: somente OS com `description` não vazia — número, cliente, técnico, status, prioridade, abertura, fechamento, observação. Fallback "Nenhuma observação registrada nas OS deste período."
-8. **Lista detalhada**: tabela com Nº, título, cliente, unidade, técnico, tipo, prioridade, status, abertura, início real (se disponível), fechamento, tempo trabalhado, valor estimado.
-9. **Nota de responsabilidade dos dados** ao rodapé: contagens de OS sem técnico, sem `hour_rate`, sem `worked_minutes`.
+### 1. Períodos previsíveis e datas seguras (`src/lib/reports/filters.ts`)
 
-## Cálculos (puros, em `managerial.ts`)
+- Padronizar `from`/`to` como `YYYY-MM-DD` em toda a aplicação (search params, inputs, server fn). Schema Zod passa a usar `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)` com `fallback` para `undefined`.
+- Reescrever `resolvePeriodRange`:
+  - `today`: hoje 00:00 → hoje 23:59:59.999.
+  - `week`: hoje − 7 dias 00:00 → agora.
+  - `month`: hoje − 30 dias 00:00 → agora (alinha com a label "últimos 30 dias"; renomear label para "Mês (30 dias)").
+  - `last30`: idem `month` (mantido para compatibilidade do diálogo gerencial).
+  - `quarter` / `year` / `today`: análogos com início do dia.
+  - `custom`: `from` → início do dia local; `to` → fim do dia local; se um dos dois faltar, ignorar o lado faltante; se `from > to`, retornar `{ from: null, to: null }` e a UI mostra erro.
+  - Conversão local → UTC ISO só na chamada Supabase.
+- Validar `from`/`to` no parser; valores fora do padrão caem para `undefined` em vez de quebrar.
 
-- Horas: `sum(worked_minutes ?? 0) / 60`.
-- Valor estimado: `sum((worked_minutes/60) * hour_rate)` apenas quando ambos > 0.
-- Tempo médio: média de `(closed_at - opened_at)` em OS encerradas.
-- Taxa de conclusão: `concluídas / total`.
-- Top N (clientes/técnicos): ordenado por qtd OS, depois horas.
+### 2. Corrigir 404 / navegação dos filtros (`src/components/reports/ReportsFilters.tsx`)
 
-## Fluxo do usuário
+- Trocar `useNavigate({ from: routePath })` por `useNavigate()` chamado com `to: routePath` explícito e `params` opcionais (preserva params em rotas filhas).
+- Garantir `type="button"` em todos os `<Button>` dentro do `Sheet` (já são `<button>` shadcn, mas reforçar o atributo no botão "Aplicar" / "Limpar tudo" para evitar submit acidental).
+- `Sheet` "Aplicar" só fecha — não navega. "Limpar tudo" agora usa o mesmo `setSearch` patch (mantém URL como `/relatorios?period=month`).
+- Validar `from > to` em tempo real: ao detectar, mostra mensagem `"Período inválido. Verifique a data inicial e final."` abaixo dos inputs de data e **não** dispara navegação inválida (o estado vira `period: custom` sem aplicar range, query roda com fallback).
+- Inputs `type="date"` passam a salvar a string crua `YYYY-MM-DD` (sem `new Date().toISOString()`).
 
-1. Em `/relatorios`, clique em **Gerar relatório gerencial**.
-2. Dialog abre com período (semana/mês/30 dias/personalizado) + filtros.
-3. Prévia é atualizada via `useQuery` chamando `getReportOrders` (mesmo server fn já usado pelo dashboard, cache compartilhado).
-4. Se zero OS → mensagem e botão de download desabilitado.
-5. **Baixar PDF** → `window.open` em `/relatorios/imprimir?...searchParams` (nova aba). Lá a página renderiza o documento, ajusta `document.title` para `relatorio-gestao-lemarc-AAAA-MM-DD.pdf` e chama `window.print()` após carregamento; `afterprint` fecha a aba (opcional).
+### 3. Derivar horas reais quando `worked_minutes` for nulo (`src/lib/reports/metrics.ts`)
 
-## Segurança
+- `computeOrderRow` ganha fallback:
+  - Se `worked_minutes` nulo e `started_at` + `finished_at` existem → `derived_minutes = clamp((finished_at − started_at) / 60s, 0, 24h)`.
+  - Campo novo `worked_minutes_effective` (não substitui o real no banco, é só derivação no client/server fn).
+  - `estimated_value` continua `effective_minutes / 60 * hour_rate` (zera quando rate é nulo — comportamento honesto).
+- `ROW_SELECT` em `reports.functions.ts` passa a buscar `started_at`, `finished_at`.
+- `ReportOrderRow` ganha `worked_minutes_effective: number` (sempre número, 0 quando não há dados).
+- KPIs de horas e gráfico "Horas por técnico" passam a usar `worked_minutes_effective`.
 
-- Toda busca via `getReportOrders` com `requireSupabaseAuth` (RLS).
-- Rota `/relatorios/imprimir` fica sob `_app` (área autenticada).
-- Nenhum dado sensível injetado pelo cliente; filtros validados por Zod.
-- Sem service role no client.
+### 4. Mensagens de dados ausentes mais claras (`_app.relatorios.tsx`)
 
-## Responsividade & estilo
+- "Horas trabalhadas": subtítulo dinâmico
+  - `> 0` derivado → "Calculado de start → finish quando worked_minutes ausente."
+  - `worked_minutes` populado → "Soma de worked_minutes informado."
+  - `0` → "Sem horas trabalhadas registradas no período."
+- "Valor estimado": quando todas as OS estão sem `hour_rate` → "Configure hour_rate nas OS para calcular valores." (com ícone `AlertTriangle` discreto).
+- "Ticket médio": "Sem OS concluída com hour_rate configurado." quando aplicável.
+- Gráficos "Horas por técnico" e "Valor estimado por cliente" já têm `emptyLabel` — atualizar texto para o mesmo padrão.
 
-- Modal usa `Sheet` no mobile (`sm:max-w` no desktop), mantém glass industrial (azul/grafite/laranja).
-- Botão fixo no header de `/relatorios`, sem cobrir BottomNav.
-- PDF: fundo branco, tipografia legível, azul escuro nos títulos, laranja só em destaque pontual; tabelas com bordas finas; `page-break-inside: avoid` em linhas; `@page { size: A4; margin: 16mm }`.
+### 5. Filtros aplicados refletem em tudo
 
-## Validação
+- `useReportOrdersQuery` já chaveia por todos os filtros (`filtersKey`). Sem alteração funcional, mas vou auditar para incluir `from`/`to` mesmo quando `period` ≠ `custom` (no momento já inclui).
+- Tabela de OS e exportação (`ReportExportActions`) continuam recebendo o mesmo array `rows` — nada a alterar; só conferir após mudança de tipos.
 
-- `npm run build` e lint focado nos arquivos alterados.
-- Teste manual: semana atual, mês atual, últimos 30 dias, personalizado, filtros por cliente/técnico, OS sem `worked_minutes`/sem `hour_rate`, período vazio, download e visualização do PDF em mobile/desktop.
+### 6. Validações defensivas
 
-## Não inclui
+- Em `computeOverview` / `computeSeries`: nunca dividir por zero (já protegido).
+- `new Date(opened_at)` continua, mas quando inválido pula a entrada (já há `Number.isNaN`).
+- `PERIOD_OPTIONS` reorganizado para refletir labels reais ("Hoje", "Semana", "Mês (30 dias)", "Últimos 30 dias", "Trimestre", "Ano", "Tudo", "Personalizado").
 
-- Geração server-side de PDF (sem dependências novas).
-- Envio por e-mail / agendamento.
-- Persistência histórica dos relatórios gerados.
+### 7. Validação
+
+- `npm run build` (TanStack code-splitter + tsgo).
+- Playwright headless rápido: navegar `/relatorios`, alternar período (semana, mês, hoje, personalizado válido, personalizado inválido), aplicar filtro de cliente/status no Sheet, conferir que (a) não há 404, (b) URL fica `/relatorios?period=...`, (c) cards de horas mostram valor derivado de start/finish nas OS finalizadas.
+- Conferência manual de mobile (390px) via screenshot.
+
+## Arquivos afetados
+
+```text
+src/lib/reports/filters.ts             # períodos, parser de datas, validação
+src/lib/reports/metrics.ts             # fallback worked_minutes, tipos
+src/lib/api/reports.functions.ts       # SELECT inclui started_at/finished_at
+src/types/reports.ts                   # ReportOrderRow.worked_minutes_effective
+src/components/reports/ReportsFilters.tsx       # navegação + validação custom
+src/components/reports/ReportGenerateDialog.tsx # alinhar with from/to YYYY-MM-DD
+src/routes/_app.relatorios.tsx                  # subtítulos honestos dos KPIs
+```
+
+Nenhuma rota, RLS, auth ou migration alterada. Nenhum mock reintroduzido.

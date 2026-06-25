@@ -39,10 +39,15 @@ export const serviceTypeSchema = z.enum([
 
 export const billingStatusSchema = z.enum(["pending", "ready", "billed", "cancelled"]);
 
+const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional();
+
 export const reportSearchSchema = z.object({
   period: fallback(periodSchema, "month").default("month"),
-  from: fallback(z.string().optional(), undefined).optional(),
-  to: fallback(z.string().optional(), undefined).optional(),
+  from: fallback(dateStringSchema, undefined).optional(),
+  to: fallback(dateStringSchema, undefined).optional(),
   clientId: fallback(z.string().optional(), undefined).optional(),
   unitId: fallback(z.string().optional(), undefined).optional(),
   technicianId: fallback(z.string().optional(), undefined).optional(),
@@ -79,14 +84,33 @@ export function searchToFilters(search: ReportSearch): ReportFilters {
 
 export const PERIOD_OPTIONS: { key: ReportFilters["period"]; label: string }[] = [
   { key: "today", label: "Hoje" },
-  { key: "week", label: "Semana" },
-  { key: "month", label: "Mês" },
-  { key: "quarter", label: "Trimestre" },
-  { key: "year", label: "Ano" },
+  { key: "week", label: "Semana (7 dias)" },
+  { key: "month", label: "Mês (30 dias)" },
   { key: "last30", label: "Últimos 30 dias" },
+  { key: "quarter", label: "Trimestre (90 dias)" },
+  { key: "year", label: "Ano (365 dias)" },
   { key: "all", label: "Tudo" },
   { key: "custom", label: "Personalizado" },
 ];
+
+function parseLocalDate(s: string | null | undefined): Date | null {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return Number.isFinite(dt.getTime()) ? dt : null;
+}
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
 
 export function resolvePeriodRange(filters: ReportFilters): {
   from: Date | null;
@@ -95,9 +119,12 @@ export function resolvePeriodRange(filters: ReportFilters): {
   const now = new Date();
   if (filters.period === "all") return { from: null, to: null };
   if (filters.period === "custom") {
+    const f = parseLocalDate(filters.from);
+    const t = parseLocalDate(filters.to);
+    if (f && t && f.getTime() > t.getTime()) return { from: null, to: null };
     return {
-      from: filters.from ? new Date(filters.from) : null,
-      to: filters.to ? new Date(filters.to) : null,
+      from: f ? startOfDay(f) : null,
+      to: t ? endOfDay(t) : null,
     };
   }
   const to = new Date(now);
@@ -108,21 +135,30 @@ export function resolvePeriodRange(filters: ReportFilters): {
       break;
     case "week":
       from.setDate(from.getDate() - 7);
+      from.setHours(0, 0, 0, 0);
       break;
     case "last30":
-      from.setDate(from.getDate() - 30);
-      break;
     case "month":
-      from.setMonth(from.getMonth() - 1);
+      from.setDate(from.getDate() - 30);
+      from.setHours(0, 0, 0, 0);
       break;
     case "quarter":
-      from.setMonth(from.getMonth() - 3);
+      from.setDate(from.getDate() - 90);
+      from.setHours(0, 0, 0, 0);
       break;
     case "year":
-      from.setFullYear(from.getFullYear() - 1);
+      from.setDate(from.getDate() - 365);
+      from.setHours(0, 0, 0, 0);
       break;
   }
   return { from, to };
+}
+
+export function isCustomRangeInvalid(filters: ReportFilters): boolean {
+  if (filters.period !== "custom") return false;
+  const f = parseLocalDate(filters.from);
+  const t = parseLocalDate(filters.to);
+  return !!(f && t && f.getTime() > t.getTime());
 }
 
 export function countActiveFilters(filters: ReportFilters): number {
