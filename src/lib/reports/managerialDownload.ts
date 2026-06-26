@@ -882,24 +882,6 @@ function technicianNamesFor(row: ReportOrderRow) {
   return technicians.map((t) => t.name).join(", ");
 }
 
-function cleanPdfText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .replace(/[áàãâäÁÀÃÂÄ]/g, (m) => (m === m.toUpperCase() ? "A" : "a"))
-    .replace(/[éèêëÉÈÊË]/g, (m) => (m === m.toUpperCase() ? "E" : "e"))
-    .replace(/[íìîïÍÌÎÏ]/g, (m) => (m === m.toUpperCase() ? "I" : "i"))
-    .replace(/[óòõôöÓÒÕÔÖ]/g, (m) => (m === m.toUpperCase() ? "O" : "o"))
-    .replace(/[úùûüÚÙÛÜ]/g, (m) => (m === m.toUpperCase() ? "U" : "u"))
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ç/g, "c")
-    .replace(/Ç/g, "C")
-    .replace(/\u00a0/g, " ")
-    .replace(/[–—]/g, "-")
-    .replace(/·/g, "-")
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'");
-}
-
 function serviceTypeFor(row: ReportOrderRow) {
   if (row.service_type === "outro" && row.service_type_other) return row.service_type_other;
   return row.service_type ? serviceTypeLabel[row.service_type] : "—";
