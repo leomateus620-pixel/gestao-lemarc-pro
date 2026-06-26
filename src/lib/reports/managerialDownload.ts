@@ -155,9 +155,10 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   const drawHeader = () => {
     const top = margin;
     if (isFirstPage) {
-      drawLogoMark(margin, top, 34, 14);
+      const logoH = 10;
+      const logoW = drawLogo(margin, top + 2, logoH);
       // Company info block (right of logo)
-      const infoX = margin + 38;
+      const infoX = margin + logoW + 6;
       txt(LEMARC_COMPANY.legalName, infoX, top + 4, {
         size: 8.5,
         style: "bold",
@@ -215,13 +216,15 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
       y = top + headerHeightFull;
       isFirstPage = false;
     } else {
-      drawLogoMark(margin, top, 22, 8);
-      txt(LEMARC_COMPANY.legalName, margin + 32, top + 3.5, {
+      const logoH = 6;
+      const logoW = drawLogo(margin, top + 1, logoH);
+      const infoX = margin + logoW + 4;
+      txt(LEMARC_COMPANY.legalName, infoX, top + 3.5, {
         size: 7.5,
         style: "bold",
         color: LEMARC_COLORS.navy,
       });
-      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, margin + 32, top + 7, {
+      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, infoX, top + 7, {
         size: 6.5,
         color: LEMARC_COLORS.slate,
       });
