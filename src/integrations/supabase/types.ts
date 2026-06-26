@@ -362,6 +362,7 @@ export type Database = {
           number: number
           opened_at: string
           priority: Database["public"]["Enums"]["service_priority"] | null
+          requester_name: string | null
           scheduled_for: string | null
           service_type: Database["public"]["Enums"]["service_type"] | null
           service_type_other: string | null
@@ -391,6 +392,7 @@ export type Database = {
           number?: number
           opened_at?: string
           priority?: Database["public"]["Enums"]["service_priority"] | null
+          requester_name?: string | null
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           service_type_other?: string | null
@@ -420,6 +422,7 @@ export type Database = {
           number?: number
           opened_at?: string
           priority?: Database["public"]["Enums"]["service_priority"] | null
+          requester_name?: string | null
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           service_type_other?: string | null

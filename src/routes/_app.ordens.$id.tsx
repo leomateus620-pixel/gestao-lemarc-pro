@@ -23,6 +23,7 @@ import {
   Receipt,
   Send,
   Truck,
+  UserRound,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -194,6 +195,9 @@ function OrdemDetalhe() {
               ? "Sem técnico"
               : technicians.map((t) => t.full_name).join(", ")}
           </MetaRow>
+          {order.requester_name && (
+            <MetaRow icon={UserRound}>Solicitado por {order.requester_name}</MetaRow>
+          )}
           {order.scheduled_for && (
             <MetaRow icon={Clock}>
               Previsão de início: {new Date(order.scheduled_for).toLocaleString("pt-BR")}
