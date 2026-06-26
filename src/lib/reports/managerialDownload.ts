@@ -57,6 +57,7 @@ export function downloadHtmlFile(filename: string, html: string) {
 export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInput) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  const logoDataUrl = await loadLemarcLogoDataUrl();
   const margin = 14;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
