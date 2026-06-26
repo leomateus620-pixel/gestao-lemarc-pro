@@ -9,7 +9,7 @@ import {
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ManagerialReport, ReportOrderRow } from "@/types/reports";
 import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
-import { LEMARC_COLORS, LEMARC_COMPANY } from "@/lib/reports/lemarcBrand";
+import { LEMARC_COLORS, LEMARC_COMPANY, LEMARC_LOGO_ASPECT, LEMARC_LOGO_URL } from "@/lib/reports/lemarcBrand";
 import {
   PENDING_LABELS,
   formatFechamento,
@@ -54,9 +54,30 @@ export function downloadHtmlFile(filename: string, html: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+let cachedLogoDataUrl: string | null = null;
+async function loadLemarcLogoDataUrl(): Promise<string | null> {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+  try {
+    const res = await fetch(LEMARC_LOGO_URL);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    cachedLogoDataUrl = dataUrl;
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInput) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  const logoDataUrl = await loadLemarcLogoDataUrl();
   const margin = 14;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -117,12 +138,27 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
     return x + h + 2 + Math.max(w - h - 2, 22);
   };
 
+  const drawLogo = (x: number, yy: number, targetHeight: number) => {
+    const w = targetHeight * LEMARC_LOGO_ASPECT;
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, "PNG", x, yy, w, targetHeight, undefined, "FAST");
+        return w;
+      } catch {
+        // fall through to typographic fallback
+      }
+    }
+    drawLogoMark(x, yy, w, targetHeight);
+    return w;
+  };
+
   const drawHeader = () => {
     const top = margin;
     if (isFirstPage) {
-      drawLogoMark(margin, top, 34, 14);
+      const logoH = 10;
+      const logoW = drawLogo(margin, top + 2, logoH);
       // Company info block (right of logo)
-      const infoX = margin + 38;
+      const infoX = margin + logoW + 6;
       txt(LEMARC_COMPANY.legalName, infoX, top + 4, {
         size: 8.5,
         style: "bold",
@@ -180,13 +216,15 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
       y = top + headerHeightFull;
       isFirstPage = false;
     } else {
-      drawLogoMark(margin, top, 22, 8);
-      txt(LEMARC_COMPANY.legalName, margin + 32, top + 3.5, {
+      const logoH = 6;
+      const logoW = drawLogo(margin, top + 1, logoH);
+      const infoX = margin + logoW + 4;
+      txt(LEMARC_COMPANY.legalName, infoX, top + 3.5, {
         size: 7.5,
         style: "bold",
         color: LEMARC_COLORS.navy,
       });
-      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, margin + 32, top + 7, {
+      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, infoX, top + 7, {
         size: 6.5,
         color: LEMARC_COLORS.slate,
       });

@@ -26,3 +26,9 @@ export const LEMARC_COLORS = {
   red: [185, 28, 28] as [number, number, number],
   ink: [15, 23, 42] as [number, number, number],
 } as const;
+
+import lemarcLogoAsset from "@/assets/lemarc-logo.png.asset.json";
+
+export const LEMARC_LOGO_URL = lemarcLogoAsset.url;
+// Aspect ratio width / height of the official horizontal logo (~5.25:1).
+export const LEMARC_LOGO_ASPECT = 1600 / 305;
