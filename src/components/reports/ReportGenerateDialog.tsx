@@ -34,6 +34,9 @@ import {
 import { useReportLookupsQuery, useReportOrdersQuery } from "@/hooks/useReports";
 import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
 import { buildManagerialReport, describePeriod } from "@/lib/reports/managerial";
+import { downloadManagerialReportPdf } from "@/lib/reports/managerialDownload";
+import { useAuth } from "@/components/app/AuthContext";
+import { reportSearchSchema, searchToFilters } from "@/lib/reports/filters";
 
 const STATUS_KEYS = Object.keys(statusLabel) as ServiceOrderStatus[];
 const PRIORITY_KEYS = Object.keys(priorityLabel) as ServicePriority[];
@@ -120,7 +123,12 @@ export function ReportGenerateDialog() {
 }
 
 function DialogBody({ onClose }: { onClose: () => void }) {
-  const [filters, setFilters] = useState<ReportFilters>(() => defaultFilters());
+  const initialFilters = useMemo(() => {
+    if (typeof window === "undefined") return defaultFilters();
+    const raw = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+    return searchToFilters(reportSearchSchema.parse(raw));
+  }, []);
+  const [filters, setFilters] = useState<ReportFilters>(initialFilters);
   const update = (patch: Partial<ReportFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
@@ -393,11 +401,23 @@ function PreviewLoader({ filters, onClose }: { filters: ReportFilters; onClose: 
 
 function PreviewContent({ filters, onClose }: { filters: ReportFilters; onClose: () => void }) {
   const { data: rows } = useReportOrdersQuery(filters);
+  const { displayName } = useAuth();
   const report = useMemo(() => buildManagerialReport(rows), [rows]);
   const periodLabel = describePeriod(filters);
   const empty = rows.length === 0;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    const generatedAt = new Date();
+    await downloadManagerialReportPdf({
+      report,
+      periodLabel,
+      generatedAt,
+      authorName: displayName ?? null,
+    });
+    onClose();
+  };
+
+  const handlePreview = () => {
     const url = buildPrintUrl(filters);
     window.open(url, "_blank", "noopener");
     onClose();
@@ -428,12 +448,14 @@ function PreviewContent({ filters, onClose }: { filters: ReportFilters; onClose:
         <Button variant="outline" className="lemarc-report-action rounded-xl" onClick={onClose}>
           Cancelar
         </Button>
+        <Button variant="secondary" className="lemarc-report-action gap-2 rounded-xl" onClick={handlePreview}>
+          <Printer size={15} /> Visualizar
+        </Button>
         <Button
           onClick={handleGenerate}
-          disabled={empty}
           className="lemarc-report-action-primary gap-2 rounded-xl font-black"
         >
-          <Printer size={15} /> Gerar PDF
+          <FileDown size={15} /> Baixar PDF
         </Button>
       </DialogFooter>
     </section>
