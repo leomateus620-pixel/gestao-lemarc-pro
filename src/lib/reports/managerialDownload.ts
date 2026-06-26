@@ -54,6 +54,26 @@ export function downloadHtmlFile(filename: string, html: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+let cachedLogoDataUrl: string | null = null;
+async function loadLemarcLogoDataUrl(): Promise<string | null> {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+  try {
+    const res = await fetch(LEMARC_LOGO_URL);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    cachedLogoDataUrl = dataUrl;
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInput) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
