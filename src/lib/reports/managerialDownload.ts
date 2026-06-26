@@ -9,7 +9,7 @@ import {
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ManagerialReport, ReportOrderRow } from "@/types/reports";
 import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
-import { LEMARC_COLORS, LEMARC_COMPANY } from "@/lib/reports/lemarcBrand";
+import { LEMARC_COLORS, LEMARC_COMPANY, LEMARC_LOGO_ASPECT, LEMARC_LOGO_URL } from "@/lib/reports/lemarcBrand";
 import {
   PENDING_LABELS,
   formatFechamento,
