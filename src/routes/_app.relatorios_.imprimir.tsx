@@ -78,7 +78,7 @@ function PrintPage() {
           <PrintActions />
         </Suspense>
       </div>
-      <div className="mx-auto max-w-[900px] rounded border border-slate-200 bg-white p-4 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div className="mx-auto max-w-[900px] overflow-x-auto rounded border border-slate-200 bg-white p-4 shadow-sm print:max-w-none print:overflow-visible print:border-0 print:p-0 print:shadow-none">
         <Suspense fallback={<PrintLoading />}>
           <PrintBody />
         </Suspense>
