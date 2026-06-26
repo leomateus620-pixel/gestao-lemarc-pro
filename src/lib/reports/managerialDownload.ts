@@ -9,6 +9,18 @@ import {
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ManagerialReport, ReportOrderRow } from "@/types/reports";
 import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
+import { LEMARC_COLORS, LEMARC_COMPANY } from "@/lib/reports/lemarcBrand";
+import {
+  PENDING_LABELS,
+  formatFechamento,
+  formatHorasAgregado,
+  formatTempo,
+  formatValor,
+  formatValorAgregado,
+  isOpenOrder,
+  sanitizePdfText,
+  statusBadgeColor,
+} from "@/lib/reports/labels";
 
 type ManagerialReportHtmlInput = {
   report: ManagerialReport;
@@ -45,90 +57,13 @@ export function downloadHtmlFile(filename: string, html: string) {
 export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInput) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const margin = 12;
+  const margin = 14;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - margin * 2;
-  let y = margin;
-
-  const addPageIfNeeded = (height: number) => {
-    if (y + height <= pageHeight - margin) return;
-    doc.addPage();
-    y = margin;
-  };
-
-  const text = (
-    value: string,
-    x: number,
-    yy: number,
-    options?: {
-      maxWidth?: number;
-      size?: number;
-      style?: "normal" | "bold";
-      color?: [number, number, number];
-    },
-  ) => {
-    doc.setFont("helvetica", options?.style ?? "normal");
-    doc.setFontSize(options?.size ?? 9);
-    const [r, g, b] = options?.color ?? [15, 23, 42];
-    doc.setTextColor(r, g, b);
-    doc.text(cleanPdfText(value), x, yy, { maxWidth: options?.maxWidth });
-  };
-
-  const section = (title: string) => {
-    addPageIfNeeded(12);
-    y += y === margin ? 0 : 6;
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.2);
-    text(title.toUpperCase(), margin, y, { size: 9, style: "bold", color: [11, 37, 69] });
-    y += 2.5;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
-  };
-
-  const table = (headers: string[], rows: string[][], widths: number[], emptyText: string) => {
-    if (rows.length === 0) {
-      addPageIfNeeded(8);
-      text(emptyText, margin, y, { size: 8, color: [100, 116, 139] });
-      y += 6;
-      return;
-    }
-
-    const drawHeader = () => {
-      addPageIfNeeded(8);
-      let x = margin;
-      for (let i = 0; i < headers.length; i++) {
-        doc.setDrawColor(226, 232, 240);
-        doc.rect(x, y, widths[i], 7, "S");
-        text(headers[i], x + 1.5, y + 4.6, { size: 7, style: "bold", color: [11, 37, 69] });
-        x += widths[i];
-      }
-      y += 7;
-    };
-
-    drawHeader();
-    for (const row of rows) {
-      const wrapped = row.map(
-        (cell, i) =>
-          doc.splitTextToSize(cleanPdfText(cell), Math.max(8, widths[i] - 3)) as string[],
-      );
-      const rowHeight = Math.max(7, Math.max(...wrapped.map((lines) => lines.length)) * 4 + 3);
-      if (y + rowHeight > pageHeight - margin) {
-        doc.addPage();
-        y = margin;
-        drawHeader();
-      }
-      let x = margin;
-      doc.setDrawColor(226, 232, 240);
-      for (let i = 0; i < row.length; i++) {
-        doc.rect(x, y, widths[i], rowHeight);
-        text(wrapped[i].join("\n"), x + 1.5, y + 4.4, { size: 7, maxWidth: widths[i] - 3 });
-        x += widths[i];
-      }
-      y += rowHeight;
-    }
-    y += 2;
-  };
+  const footerReserve = 14;
+  const headerHeightFull = 38;
+  const headerHeightCompact = 18;
 
   const { report, periodLabel, generatedAt, authorName } = input;
   const {
@@ -142,24 +77,270 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
     orders,
   } = report;
 
-  doc.setDrawColor(11, 37, 69);
-  doc.setLineWidth(0.6);
-  text("GESTÃO LEMARC", margin, y, { size: 8, style: "bold", color: [234, 88, 12] });
-  text("Relatório Gerencial de Ordens de Serviço", margin, y + 7, {
-    size: 15,
-    style: "bold",
-    color: [11, 37, 69],
-  });
-  text(periodLabel, margin, y + 13, { size: 9, color: [100, 116, 139] });
-  text(`Gerado em ${formatDateTime(generatedAt.toISOString())}`, pageWidth - margin - 55, y + 3, {
-    size: 7,
-    color: [71, 85, 105],
-  });
-  if (authorName)
-    text(`Por ${authorName}`, pageWidth - margin - 55, y + 8, { size: 7, color: [71, 85, 105] });
-  doc.line(margin, y + 17, pageWidth - margin, y + 17);
-  y += 25;
+  const generatedAtLabel = formatDateTime(generatedAt.toISOString());
 
+  let y = margin;
+  let isFirstPage = true;
+
+  const txt = (
+    value: string,
+    x: number,
+    yy: number,
+    options?: {
+      maxWidth?: number;
+      size?: number;
+      style?: "normal" | "bold";
+      color?: readonly [number, number, number];
+      align?: "left" | "right" | "center";
+    },
+  ) => {
+    doc.setFont("helvetica", options?.style ?? "normal");
+    doc.setFontSize(options?.size ?? 9);
+    const [r, g, b] = options?.color ?? LEMARC_COLORS.ink;
+    doc.setTextColor(r, g, b);
+    doc.text(sanitizePdfText(value), x, yy, {
+      maxWidth: options?.maxWidth,
+      align: options?.align,
+    });
+  };
+
+  const drawLogoMark = (x: number, yy: number, w: number, h: number) => {
+    // Typographic fallback mark — orange square with "L" + "GESTÃO LEMARC" beside.
+    doc.setFillColor(...LEMARC_COLORS.orange);
+    doc.roundedRect(x, yy, h, h, 1.2, 1.2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(h * 2.2);
+    doc.setTextColor(255, 255, 255);
+    doc.text("L", x + h / 2, yy + h * 0.72, { align: "center" });
+    txt("GESTÃO", x + h + 2, yy + h * 0.42, { size: 7.5, style: "bold", color: LEMARC_COLORS.slate });
+    txt("LEMARC", x + h + 2, yy + h * 0.85, { size: 11, style: "bold", color: LEMARC_COLORS.navy });
+    return x + h + 2 + Math.max(w - h - 2, 22);
+  };
+
+  const drawHeader = () => {
+    const top = margin;
+    if (isFirstPage) {
+      drawLogoMark(margin, top, 34, 14);
+      // Company info block (right of logo)
+      const infoX = margin + 38;
+      txt(LEMARC_COMPANY.legalName, infoX, top + 4, {
+        size: 8.5,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      txt(`${LEMARC_COMPANY.address} · ${LEMARC_COMPANY.city}`, infoX, top + 8, {
+        size: 7.5,
+        color: LEMARC_COLORS.slate,
+      });
+      txt(`Fone: ${LEMARC_COMPANY.phone} · ${LEMARC_COMPANY.email}`, infoX, top + 11.5, {
+        size: 7.5,
+        color: LEMARC_COLORS.slate,
+      });
+      txt(`CNPJ: ${LEMARC_COMPANY.cnpj}`, infoX, top + 15, {
+        size: 7.5,
+        color: LEMARC_COLORS.slate,
+      });
+      // Right meta column
+      txt("Gerado em", pageWidth - margin, top + 4, {
+        size: 6.5,
+        color: LEMARC_COLORS.slateSoft,
+        align: "right",
+      });
+      txt(generatedAtLabel, pageWidth - margin, top + 8, {
+        size: 8,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+        align: "right",
+      });
+      if (authorName) {
+        txt(`Por ${authorName}`, pageWidth - margin, top + 12, {
+          size: 7,
+          color: LEMARC_COLORS.slate,
+          align: "right",
+        });
+      }
+      // Orange separator
+      doc.setDrawColor(...LEMARC_COLORS.orange);
+      doc.setLineWidth(0.8);
+      doc.line(margin, top + 19, pageWidth - margin, top + 19);
+      // Title bar
+      txt("RELATÓRIO GERENCIAL DE ORDENS DE SERVIÇO", margin, top + 26, {
+        size: 13,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      txt(`Período: ${periodLabel}`, margin, top + 31, {
+        size: 8.5,
+        color: LEMARC_COLORS.slate,
+      });
+      // Thin under-bar
+      doc.setDrawColor(...LEMARC_COLORS.border);
+      doc.setLineWidth(0.2);
+      doc.line(margin, top + 34, pageWidth - margin, top + 34);
+      y = top + headerHeightFull;
+      isFirstPage = false;
+    } else {
+      drawLogoMark(margin, top, 22, 8);
+      txt(LEMARC_COMPANY.legalName, margin + 26, top + 3.5, {
+        size: 7.5,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, margin + 26, top + 7, {
+        size: 6.5,
+        color: LEMARC_COLORS.slate,
+      });
+      txt("Relatório Gerencial de OS", pageWidth - margin, top + 3.5, {
+        size: 7.5,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+        align: "right",
+      });
+      txt(`Período: ${periodLabel}`, pageWidth - margin, top + 7, {
+        size: 6.5,
+        color: LEMARC_COLORS.slate,
+        align: "right",
+      });
+      doc.setDrawColor(...LEMARC_COLORS.orange);
+      doc.setLineWidth(0.5);
+      doc.line(margin, top + 11, pageWidth - margin, top + 11);
+      y = top + headerHeightCompact;
+    }
+  };
+
+  const addPageIfNeeded = (height: number) => {
+    if (y + height <= pageHeight - margin - footerReserve) return;
+    doc.addPage();
+    drawHeader();
+  };
+
+  const section = (title: string) => {
+    addPageIfNeeded(14);
+    y += 4;
+    txt(title.toUpperCase(), margin, y, {
+      size: 9,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+    });
+    y += 2;
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 5;
+  };
+
+  const drawStatusBadge = (
+    status: ReportOrderRow["status"],
+    x: number,
+    yy: number,
+    height = 4.6,
+  ) => {
+    const label = sanitizePdfText(statusLabel[status]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    const w = doc.getTextWidth(label) + 4;
+    const [r, g, b] = statusBadgeColor(status);
+    doc.setFillColor(r, g, b);
+    doc.roundedRect(x, yy - height + 1, w, height, 1, 1, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.text(label, x + w / 2, yy - 0.3, { align: "center" });
+    return w;
+  };
+
+  type Col = {
+    label: string;
+    width: number;
+    align?: "left" | "right" | "center";
+    badge?: boolean;
+  };
+
+  const table = (
+    cols: Col[],
+    rows: (string | { status: ReportOrderRow["status"]; label?: string })[][],
+    emptyText: string,
+  ) => {
+    if (rows.length === 0) {
+      addPageIfNeeded(8);
+      txt(emptyText, margin, y + 3, { size: 8, color: LEMARC_COLORS.slateSoft });
+      y += 7;
+      return;
+    }
+    const drawTableHeader = () => {
+      addPageIfNeeded(8);
+      let x = margin;
+      doc.setFillColor(...LEMARC_COLORS.bgSoft);
+      doc.rect(margin, y, contentWidth, 7, "F");
+      doc.setDrawColor(...LEMARC_COLORS.border);
+      doc.line(margin, y + 7, margin + contentWidth, y + 7);
+      for (const c of cols) {
+        txt(c.label, x + (c.align === "right" ? c.width - 1.5 : 1.5), y + 4.7, {
+          size: 7,
+          style: "bold",
+          color: LEMARC_COLORS.navy,
+          align: c.align === "right" ? "right" : "left",
+        });
+        x += c.width;
+      }
+      y += 7;
+    };
+    drawTableHeader();
+    let zebra = false;
+    for (const row of rows) {
+      const wrapped = row.map((cell, i) => {
+        if (typeof cell === "string") {
+          return doc.splitTextToSize(
+            sanitizePdfText(cell),
+            Math.max(8, cols[i].width - 3),
+          ) as string[];
+        }
+        return [cell.label ?? statusLabel[cell.status]];
+      });
+      const rowHeight = Math.max(6.5, Math.max(...wrapped.map((l) => l.length)) * 3.6 + 3);
+      if (y + rowHeight > pageHeight - margin - footerReserve) {
+        doc.addPage();
+        drawHeader();
+        drawTableHeader();
+        zebra = false;
+      }
+      if (zebra) {
+        doc.setFillColor(...LEMARC_COLORS.zebra);
+        doc.rect(margin, y, contentWidth, rowHeight, "F");
+      }
+      doc.setDrawColor(...LEMARC_COLORS.borderSoft);
+      doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+      let x = margin;
+      for (let i = 0; i < row.length; i++) {
+        const cell = row[i];
+        const c = cols[i];
+        if (typeof cell === "object" && c.badge) {
+          drawStatusBadge(cell.status, x + 1.5, y + rowHeight / 2 + 1.2);
+        } else {
+          const value = wrapped[i].join("\n");
+          const tx =
+            c.align === "right" ? x + c.width - 1.5 : c.align === "center" ? x + c.width / 2 : x + 1.5;
+          txt(value, tx, y + 3.8, {
+            size: 7,
+            maxWidth: c.width - 3,
+            align: c.align ?? "left",
+            color: LEMARC_COLORS.ink,
+          });
+        }
+        x += c.width;
+      }
+      y += rowHeight;
+      zebra = !zebra;
+    }
+    // outer border
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y - 1 - (rows.length === 0 ? 0 : 0), 0, 0);
+    y += 2;
+  };
+
+  // ===== Render =====
+  drawHeader();
+
+  // ----- Resumo executivo -----
   section("Resumo executivo");
   const kpis = [
     ["Total de OS", formatNumber(summary.totalOrders)],
@@ -168,137 +349,302 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
     ["Pendentes", formatNumber(summary.pending)],
     ["Em revisão", formatNumber(summary.review)],
     ["Aguardando cobrança", formatNumber(summary.awaitingBilling)],
-    ["Horas trabalhadas", `${summary.totalHours.toFixed(1)}h`],
-    ["Tempo médio", summary.avgLeadMinutes !== null ? formatHours(summary.avgLeadMinutes) : "-"],
-    ["Valor estimado", formatCurrency(summary.estimatedValue)],
+    [
+      "Horas trabalhadas",
+      summary.totalHours > 0
+        ? `${summary.totalHours.toFixed(1).replace(".", ",")}h`
+        : PENDING_LABELS.awaitingClose,
+    ],
+    [
+      "Tempo médio",
+      summary.avgLeadMinutes !== null
+        ? formatHours(summary.avgLeadMinutes)
+        : PENDING_LABELS.awaitingClose,
+    ],
+    [
+      "Valor apurado",
+      summary.estimatedValue > 0
+        ? formatCurrency(summary.estimatedValue)
+        : PENDING_LABELS.awaitingValue,
+    ],
     ["Taxa de conclusão", formatPercent(summary.completionRate)],
     ["Clientes envolvidos", formatNumber(summary.clientsInvolved)],
     ["Técnicos envolvidos", formatNumber(summary.techniciansInvolved)],
   ];
+  const cols = 4;
+  const gap = 2.5;
+  const boxW = (contentWidth - gap * (cols - 1)) / cols;
+  const boxH = 13;
   for (let i = 0; i < kpis.length; i++) {
-    const col = i % 4;
-    const row = Math.floor(i / 4);
-    const boxW = (contentWidth - 6) / 4;
-    const x = margin + col * (boxW + 2);
-    const boxY = y + row * 14;
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(x, boxY, boxW, 11.5);
-    text(kpis[i][0], x + 1.5, boxY + 4, { size: 6.5, style: "bold", color: [100, 116, 139] });
-    text(kpis[i][1], x + 1.5, boxY + 9, { size: 10, style: "bold", color: [11, 37, 69] });
+    const col = i % cols;
+    const rowIdx = Math.floor(i / cols);
+    const x = margin + col * (boxW + gap);
+    const boxY = y + rowIdx * (boxH + gap);
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, boxY, boxW, boxH, 1.2, 1.2, "FD");
+    txt(kpis[i][0], x + 2, boxY + 4, {
+      size: 6.5,
+      style: "bold",
+      color: LEMARC_COLORS.slateSoft,
+    });
+    const value = kpis[i][1];
+    const isPending =
+      value === PENDING_LABELS.awaitingValue || value === PENDING_LABELS.awaitingClose;
+    txt(value, x + 2, boxY + 10, {
+      size: isPending ? 8 : 11,
+      style: "bold",
+      color: isPending ? LEMARC_COLORS.slateSoft : LEMARC_COLORS.navy,
+      maxWidth: boxW - 4,
+    });
   }
-  y += 45;
+  y += Math.ceil(kpis.length / cols) * (boxH + gap) + 2;
 
+  // ----- Análise por status -----
   section("Análise por status");
-  table(
-    ["Status", "Qtd", "%"],
-    byStatus.map((s) => [s.label, formatNumber(s.count), formatPercent(s.percent)]),
-    [110, 35, 35],
-    "Sem dados.",
-  );
+  if (byStatus.length === 0) {
+    txt("Sem dados.", margin, y + 3, { size: 8, color: LEMARC_COLORS.slateSoft });
+    y += 6;
+  } else {
+    const barWidth = contentWidth - 95;
+    for (const s of byStatus) {
+      addPageIfNeeded(8);
+      txt(s.label, margin, y + 4, { size: 8, color: LEMARC_COLORS.ink });
+      txt(formatNumber(s.count), margin + 70, y + 4, {
+        size: 8,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+        align: "right",
+      });
+      // bar
+      const barX = margin + 75;
+      doc.setFillColor(...LEMARC_COLORS.bgSoft);
+      doc.roundedRect(barX, y + 1.5, barWidth, 3.5, 0.6, 0.6, "F");
+      const fill = Math.max(0.5, Math.min(barWidth, barWidth * (s.percent || 0)));
+      doc.setFillColor(...LEMARC_COLORS.navy);
+      doc.roundedRect(barX, y + 1.5, fill, 3.5, 0.6, 0.6, "F");
+      txt(formatPercent(s.percent), pageWidth - margin, y + 4, {
+        size: 7.5,
+        color: LEMARC_COLORS.slate,
+        align: "right",
+      });
+      y += 7;
+    }
+  }
 
+  // ----- Top clientes -----
   section("Top clientes");
+  const clientsHaveOpen = orders.some((o) => isOpenOrder(o));
   table(
-    ["Cliente", "OS", "Concl.", "Pend.", "Horas", "Valor est."],
+    [
+      { label: "Cliente", width: 60 },
+      { label: "OS", width: 14, align: "right" },
+      { label: "Concl.", width: 16, align: "right" },
+      { label: "Pend.", width: 16, align: "right" },
+      { label: "Horas", width: 26, align: "right" },
+      { label: "Valor apurado", width: contentWidth - 60 - 14 - 16 - 16 - 26, align: "right" },
+    ],
     topClients.map((c) => [
       c.name,
       formatNumber(c.orders),
       formatNumber(c.finished),
       formatNumber(c.pending),
-      `${c.hours.toFixed(1)}h`,
-      c.estimatedValue > 0 ? formatCurrency(c.estimatedValue) : "-",
+      formatHorasAgregado(c.hours, c.pending > 0 || clientsHaveOpen),
+      formatValorAgregado(c.estimatedValue, c.pending > 0 || clientsHaveOpen),
     ]),
-    [58, 18, 24, 22, 24, 34],
     "Nenhum cliente envolvido no período.",
   );
 
+  // ----- Produtividade por técnico -----
   section("Produtividade por técnico");
   table(
-    ["Técnico", "OS", "Concl.", "Horas", "Tempo médio", "Valor est."],
+    [
+      { label: "Técnico", width: 60 },
+      { label: "OS", width: 14, align: "right" },
+      { label: "Concl.", width: 16, align: "right" },
+      { label: "Horas", width: 24, align: "right" },
+      { label: "Tempo médio", width: 28, align: "right" },
+      { label: "Valor apurado", width: contentWidth - 60 - 14 - 16 - 24 - 28, align: "right" },
+    ],
     topTechnicians.map((t) => [
       t.name,
       formatNumber(t.orders),
       formatNumber(t.finished),
-      `${t.hours.toFixed(1)}h`,
-      t.avgLeadMinutes !== null ? formatHours(t.avgLeadMinutes) : "-",
-      t.estimatedValue > 0 ? formatCurrency(t.estimatedValue) : "-",
+      formatHorasAgregado(t.hours, t.orders > t.finished),
+      t.avgLeadMinutes !== null ? formatHours(t.avgLeadMinutes) : PENDING_LABELS.awaitingClose,
+      formatValorAgregado(t.estimatedValue, t.orders > t.finished),
     ]),
-    [58, 18, 24, 24, 28, 28],
     "Nenhum técnico envolvido no período.",
   );
 
+  // ----- Tipos de serviço -----
   section("Tipos de serviço");
   table(
-    ["Tipo", "Qtd"],
+    [
+      { label: "Tipo", width: contentWidth - 30 },
+      { label: "Qtd", width: 30, align: "right" },
+    ],
     byServiceType.map((s) => [s.label, formatNumber(s.count)]),
-    [140, 40],
     "Sem tipos registrados.",
   );
 
+  // ----- Observações das OS -----
   section("Observações das OS");
   if (observations.length === 0) {
-    text("Nenhuma observação registrada nas OS deste período.", margin, y, {
+    txt("Nenhuma observação registrada nas OS deste período.", margin, y + 3, {
       size: 8,
-      color: [100, 116, 139],
+      color: LEMARC_COLORS.slateSoft,
     });
-    y += 6;
+    y += 7;
   } else {
     for (const row of observations.slice(0, 20)) {
-      const desc = cleanPdfText(row.description ?? "");
-      const lines = doc.splitTextToSize(desc, contentWidth - 4) as string[];
-      addPageIfNeeded(Math.min(28, lines.length * 4 + 12));
-      doc.setDrawColor(226, 232, 240);
-      const h = Math.max(12, Math.min(30, lines.length * 4 + 10));
-      doc.rect(margin, y, contentWidth, h);
-      text(`#${row.number} - ${row.title} (${statusLabel[row.status]})`, margin + 2, y + 4.5, {
-        size: 7.5,
+      const desc = sanitizePdfText(row.description ?? "");
+      const lines = doc.splitTextToSize(desc, contentWidth - 6) as string[];
+      const visibleLines = lines.slice(0, 6);
+      const h = Math.max(20, visibleLines.length * 3.6 + 16);
+      addPageIfNeeded(h + 2);
+      doc.setDrawColor(...LEMARC_COLORS.border);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, h, 1.5, 1.5, "FD");
+      // accent left bar
+      doc.setFillColor(...LEMARC_COLORS.orange);
+      doc.rect(margin, y, 1.4, h, "F");
+      txt(`OS #${row.number} — ${row.title}`, margin + 3.5, y + 4.5, {
+        size: 8.5,
         style: "bold",
-        color: [11, 37, 69],
+        color: LEMARC_COLORS.navy,
+        maxWidth: contentWidth - 50,
       });
-      text(
-        `${row.client_name ?? "Sem cliente"} - ${technicianNamesFor(row)} - Aberta ${formatDate(row.opened_at)}`,
-        margin + 2,
+      drawStatusBadge(row.status, pageWidth - margin - 28, y + 5.2);
+      txt(
+        `Cliente: ${row.client_name ?? PENDING_LABELS.noClient}${row.client_unit_name ? " · " + row.client_unit_name : ""}`,
+        margin + 3.5,
         y + 8.5,
-        { size: 6.8, color: [100, 116, 139] },
+        { size: 7, color: LEMARC_COLORS.slate, maxWidth: contentWidth - 6 },
       );
-      text(lines.slice(0, 5).join("\n"), margin + 2, y + 13, {
-        size: 7,
-        maxWidth: contentWidth - 4,
+      txt(
+        `Técnico: ${technicianNamesFor(row)} · Aberta em ${formatDate(row.opened_at)} · ${isOpenOrder(row) ? PENDING_LABELS.awaitingFinalization : "Fechada em " + formatDate(row.closed_at)}`,
+        margin + 3.5,
+        y + 11.5,
+        { size: 7, color: LEMARC_COLORS.slate, maxWidth: contentWidth - 6 },
+      );
+      txt(visibleLines.join("\n"), margin + 3.5, y + 15, {
+        size: 7.5,
+        maxWidth: contentWidth - 6,
+        color: LEMARC_COLORS.ink,
       });
       y += h + 2;
     }
   }
 
+  // ----- Lista detalhada de OS -----
   section("Lista detalhada de OS");
   table(
-    ["Nº", "Título", "Cliente", "Técnico", "Status", "Abertura", "Tempo", "Valor est."],
+    [
+      { label: "Nº", width: 11, align: "right" },
+      { label: "Título", width: 36 },
+      { label: "Cliente", width: 36 },
+      { label: "Técnico(s)", width: 30 },
+      { label: "Status", width: 22, badge: true },
+      { label: "Abertura", width: 17, align: "right" },
+      { label: "Fechamento", width: 19, align: "right" },
+      { label: "Tempo", width: 15, align: "right" },
+      {
+        label: "Valor",
+        width: contentWidth - 11 - 36 - 36 - 30 - 22 - 17 - 19 - 15,
+        align: "right",
+      },
+    ],
     orders.map((r) => [
       String(r.number),
       r.title,
-      `${r.client_name ?? "-"}${r.client_unit_name ? ` - ${r.client_unit_name}` : ""}`,
+      `${r.client_name ?? "—"}${r.client_unit_name ? ` · ${r.client_unit_name}` : ""}`,
       technicianNamesFor(r),
-      statusLabel[r.status],
+      { status: r.status },
       formatDate(r.opened_at),
-      r.worked_minutes_effective > 0 ? formatHours(r.worked_minutes_effective) : "-",
-      r.estimated_value > 0 ? formatCurrency(r.estimated_value) : "-",
+      formatFechamento(r),
+      formatTempo(r),
+      formatValor(r),
     ]),
-    [12, 36, 32, 30, 22, 18, 14, 22],
     "Nenhuma OS no período.",
   );
 
+  // ----- Pontos de atenção cadastral -----
   section("Pontos de atenção cadastral");
-  table(
-    ["Sem técnico", "Sem valor/hora", "Sem horas", "Sem fechamento"],
-    [
-      [
-        formatNumber(incomplete.withoutTechnician),
-        formatNumber(incomplete.withoutHourRate),
-        formatNumber(incomplete.withoutWorkedMinutes),
-        formatNumber(incomplete.withoutClosedAt),
-      ],
-    ],
-    [45, 45, 45, 45],
-    "Sem pontos de atenção.",
-  );
+  const attentionItems = [
+    {
+      label: "Sem técnico",
+      value: incomplete.withoutTechnician,
+      hint: "Atribua um técnico responsável para acompanhar a execução.",
+    },
+    {
+      label: "Sem valor/hora",
+      value: incomplete.withoutHourRate,
+      hint: "Cadastre o valor/hora na finalização para permitir apuração financeira.",
+    },
+    {
+      label: "Sem horas registradas",
+      value: incomplete.withoutWorkedMinutes,
+      hint: "Aponte o tempo trabalhado para apurar mão de obra.",
+    },
+    {
+      label: "Sem fechamento",
+      value: incomplete.withoutClosedAt,
+      hint: "Finalize a OS para liberar o relatório e a cobrança.",
+    },
+  ];
+  const aw = (contentWidth - gap * (attentionItems.length - 1)) / attentionItems.length;
+  for (let i = 0; i < attentionItems.length; i++) {
+    const a = attentionItems[i];
+    const x = margin + i * (aw + gap);
+    addPageIfNeeded(26);
+    const isWarn = a.value > 0;
+    doc.setDrawColor(...(isWarn ? LEMARC_COLORS.orangeSoft : LEMARC_COLORS.border));
+    doc.setFillColor(...(isWarn ? [255, 247, 237] as [number, number, number] : [255, 255, 255] as [number, number, number]));
+    doc.roundedRect(x, y, aw, 24, 1.5, 1.5, "FD");
+    txt(a.label, x + 2, y + 4.5, {
+      size: 7,
+      style: "bold",
+      color: LEMARC_COLORS.slate,
+    });
+    txt(formatNumber(a.value), x + 2, y + 12, {
+      size: 16,
+      style: "bold",
+      color: isWarn ? LEMARC_COLORS.orange : LEMARC_COLORS.navy,
+    });
+    txt(a.hint, x + 2, y + 17, {
+      size: 6.5,
+      color: LEMARC_COLORS.slate,
+      maxWidth: aw - 4,
+    });
+  }
+  y += 26;
+
+  // ----- Footer on every page -----
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    const fy = pageHeight - 8;
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setLineWidth(0.2);
+    doc.line(margin, fy - 4, pageWidth - margin, fy - 4);
+    txt(
+      `${LEMARC_COMPANY.legalName} · CNPJ ${LEMARC_COMPANY.cnpj} · ${LEMARC_COMPANY.phoneShort}`,
+      margin,
+      fy,
+      { size: 6.8, color: LEMARC_COLORS.slate },
+    );
+    txt(`Gerado em ${generatedAtLabel}`, margin, fy + 3.5, {
+      size: 6.5,
+      color: LEMARC_COLORS.slateSoft,
+    });
+    txt(`Página ${p} de ${totalPages}`, pageWidth - margin, fy + 3.5, {
+      size: 6.8,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+      align: "right",
+    });
+  }
 
   doc.save(buildManagerialReportFilename(periodLabel, generatedAt).replace(/\.html$/i, ".pdf"));
 }
