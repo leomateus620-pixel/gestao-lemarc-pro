@@ -414,7 +414,6 @@ function PreviewContent({ filters, onClose }: { filters: ReportFilters; onClose:
       generatedAt,
       authorName: displayName ?? null,
     });
-    onClose();
   };
 
   const handlePreview = () => {
