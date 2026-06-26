@@ -57,7 +57,17 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
     y = margin;
   };
 
-  const text = (value: string, x: number, yy: number, options?: { maxWidth?: number; size?: number; style?: "normal" | "bold"; color?: [number, number, number] }) => {
+  const text = (
+    value: string,
+    x: number,
+    yy: number,
+    options?: {
+      maxWidth?: number;
+      size?: number;
+      style?: "normal" | "bold";
+      color?: [number, number, number];
+    },
+  ) => {
     doc.setFont("helvetica", options?.style ?? "normal");
     doc.setFontSize(options?.size ?? 9);
     const [r, g, b] = options?.color ?? [15, 23, 42];
@@ -98,7 +108,10 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
 
     drawHeader();
     for (const row of rows) {
-      const wrapped = row.map((cell, i) => doc.splitTextToSize(cleanPdfText(cell), Math.max(8, widths[i] - 3)) as string[]);
+      const wrapped = row.map(
+        (cell, i) =>
+          doc.splitTextToSize(cleanPdfText(cell), Math.max(8, widths[i] - 3)) as string[],
+      );
       const rowHeight = Math.max(7, Math.max(...wrapped.map((lines) => lines.length)) * 4 + 3);
       if (y + rowHeight > pageHeight - margin) {
         doc.addPage();
@@ -118,15 +131,32 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   };
 
   const { report, periodLabel, generatedAt, authorName } = input;
-  const { summary, byStatus, topClients, topTechnicians, byServiceType, observations, incomplete, orders } = report;
+  const {
+    summary,
+    byStatus,
+    topClients,
+    topTechnicians,
+    byServiceType,
+    observations,
+    incomplete,
+    orders,
+  } = report;
 
   doc.setDrawColor(11, 37, 69);
   doc.setLineWidth(0.6);
   text("GESTÃO LEMARC", margin, y, { size: 8, style: "bold", color: [234, 88, 12] });
-  text("Relatório Gerencial de Ordens de Serviço", margin, y + 7, { size: 15, style: "bold", color: [11, 37, 69] });
+  text("Relatório Gerencial de Ordens de Serviço", margin, y + 7, {
+    size: 15,
+    style: "bold",
+    color: [11, 37, 69],
+  });
   text(periodLabel, margin, y + 13, { size: 9, color: [100, 116, 139] });
-  text(`Gerado em ${formatDateTime(generatedAt.toISOString())}`, pageWidth - margin - 55, y + 3, { size: 7, color: [71, 85, 105] });
-  if (authorName) text(`Por ${authorName}`, pageWidth - margin - 55, y + 8, { size: 7, color: [71, 85, 105] });
+  text(`Gerado em ${formatDateTime(generatedAt.toISOString())}`, pageWidth - margin - 55, y + 3, {
+    size: 7,
+    color: [71, 85, 105],
+  });
+  if (authorName)
+    text(`Por ${authorName}`, pageWidth - margin - 55, y + 8, { size: 7, color: [71, 85, 105] });
   doc.line(margin, y + 17, pageWidth - margin, y + 17);
   y += 25;
 
@@ -159,12 +189,24 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   y += 45;
 
   section("Análise por status");
-  table(["Status", "Qtd", "%"], byStatus.map((s) => [s.label, formatNumber(s.count), formatPercent(s.percent)]), [110, 35, 35], "Sem dados.");
+  table(
+    ["Status", "Qtd", "%"],
+    byStatus.map((s) => [s.label, formatNumber(s.count), formatPercent(s.percent)]),
+    [110, 35, 35],
+    "Sem dados.",
+  );
 
   section("Top clientes");
   table(
     ["Cliente", "OS", "Concl.", "Pend.", "Horas", "Valor est."],
-    topClients.map((c) => [c.name, formatNumber(c.orders), formatNumber(c.finished), formatNumber(c.pending), `${c.hours.toFixed(1)}h`, c.estimatedValue > 0 ? formatCurrency(c.estimatedValue) : "-"]),
+    topClients.map((c) => [
+      c.name,
+      formatNumber(c.orders),
+      formatNumber(c.finished),
+      formatNumber(c.pending),
+      `${c.hours.toFixed(1)}h`,
+      c.estimatedValue > 0 ? formatCurrency(c.estimatedValue) : "-",
+    ]),
     [58, 18, 24, 22, 24, 34],
     "Nenhum cliente envolvido no período.",
   );
@@ -172,17 +214,32 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   section("Produtividade por técnico");
   table(
     ["Técnico", "OS", "Concl.", "Horas", "Tempo médio", "Valor est."],
-    topTechnicians.map((t) => [t.name, formatNumber(t.orders), formatNumber(t.finished), `${t.hours.toFixed(1)}h`, t.avgLeadMinutes !== null ? formatHours(t.avgLeadMinutes) : "-", t.estimatedValue > 0 ? formatCurrency(t.estimatedValue) : "-"]),
+    topTechnicians.map((t) => [
+      t.name,
+      formatNumber(t.orders),
+      formatNumber(t.finished),
+      `${t.hours.toFixed(1)}h`,
+      t.avgLeadMinutes !== null ? formatHours(t.avgLeadMinutes) : "-",
+      t.estimatedValue > 0 ? formatCurrency(t.estimatedValue) : "-",
+    ]),
     [58, 18, 24, 24, 28, 28],
     "Nenhum técnico envolvido no período.",
   );
 
   section("Tipos de serviço");
-  table(["Tipo", "Qtd"], byServiceType.map((s) => [s.label, formatNumber(s.count)]), [140, 40], "Sem tipos registrados.");
+  table(
+    ["Tipo", "Qtd"],
+    byServiceType.map((s) => [s.label, formatNumber(s.count)]),
+    [140, 40],
+    "Sem tipos registrados.",
+  );
 
   section("Observações das OS");
   if (observations.length === 0) {
-    text("Nenhuma observação registrada nas OS deste período.", margin, y, { size: 8, color: [100, 116, 139] });
+    text("Nenhuma observação registrada nas OS deste período.", margin, y, {
+      size: 8,
+      color: [100, 116, 139],
+    });
     y += 6;
   } else {
     for (const row of observations.slice(0, 20)) {
@@ -192,9 +249,21 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
       doc.setDrawColor(226, 232, 240);
       const h = Math.max(12, Math.min(30, lines.length * 4 + 10));
       doc.rect(margin, y, contentWidth, h);
-      text(`#${row.number} - ${row.title} (${statusLabel[row.status]})`, margin + 2, y + 4.5, { size: 7.5, style: "bold", color: [11, 37, 69] });
-      text(`${row.client_name ?? "Sem cliente"} - ${technicianNamesFor(row)} - Aberta ${formatDate(row.opened_at)}`, margin + 2, y + 8.5, { size: 6.8, color: [100, 116, 139] });
-      text(lines.slice(0, 5).join("\n"), margin + 2, y + 13, { size: 7, maxWidth: contentWidth - 4 });
+      text(`#${row.number} - ${row.title} (${statusLabel[row.status]})`, margin + 2, y + 4.5, {
+        size: 7.5,
+        style: "bold",
+        color: [11, 37, 69],
+      });
+      text(
+        `${row.client_name ?? "Sem cliente"} - ${technicianNamesFor(row)} - Aberta ${formatDate(row.opened_at)}`,
+        margin + 2,
+        y + 8.5,
+        { size: 6.8, color: [100, 116, 139] },
+      );
+      text(lines.slice(0, 5).join("\n"), margin + 2, y + 13, {
+        size: 7,
+        maxWidth: contentWidth - 4,
+      });
       y += h + 2;
     }
   }
@@ -219,7 +288,14 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   section("Pontos de atenção cadastral");
   table(
     ["Sem técnico", "Sem valor/hora", "Sem horas", "Sem fechamento"],
-    [[formatNumber(incomplete.withoutTechnician), formatNumber(incomplete.withoutHourRate), formatNumber(incomplete.withoutWorkedMinutes), formatNumber(incomplete.withoutClosedAt)]],
+    [
+      [
+        formatNumber(incomplete.withoutTechnician),
+        formatNumber(incomplete.withoutHourRate),
+        formatNumber(incomplete.withoutWorkedMinutes),
+        formatNumber(incomplete.withoutClosedAt),
+      ],
+    ],
     [45, 45, 45, 45],
     "Sem pontos de atenção.",
   );
@@ -233,7 +309,16 @@ export function buildManagerialReportHtml({
   generatedAt,
   authorName,
 }: ManagerialReportHtmlInput) {
-  const { summary, byStatus, topClients, topTechnicians, byServiceType, observations, incomplete, orders } = report;
+  const {
+    summary,
+    byStatus,
+    topClients,
+    topTechnicians,
+    byServiceType,
+    observations,
+    incomplete,
+    orders,
+  } = report;
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -278,7 +363,11 @@ export function buildManagerialReportHtml({
 
     <section class="section">
       <h2>Análise por status</h2>
-      ${table(["Status", "Qtd", "%"], byStatus.map((s) => [s.label, formatNumber(s.count), formatPercent(s.percent)]), "Sem dados.")}
+      ${table(
+        ["Status", "Qtd", "%"],
+        byStatus.map((s) => [s.label, formatNumber(s.count), formatPercent(s.percent)]),
+        "Sem dados.",
+      )}
     </section>
 
     <section class="section">
@@ -316,7 +405,11 @@ export function buildManagerialReportHtml({
 
     <section class="section">
       <h2>Tipos de serviço</h2>
-      ${table(["Tipo", "Qtd"], byServiceType.map((s) => [s.label, formatNumber(s.count)]), "Sem tipos registrados.")}
+      ${table(
+        ["Tipo", "Qtd"],
+        byServiceType.map((s) => [s.label, formatNumber(s.count)]),
+        "Sem tipos registrados.",
+      )}
     </section>
 
     <section class="section">
@@ -331,7 +424,19 @@ export function buildManagerialReportHtml({
     <section class="section">
       <h2>Lista detalhada de OS</h2>
       ${table(
-        ["Nº", "Título", "Cliente", "Técnico", "Tipo", "Prior.", "Status", "Abertura", "Fechamento", "Tempo", "Valor est."],
+        [
+          "Nº",
+          "Título",
+          "Cliente",
+          "Técnico",
+          "Tipo",
+          "Prior.",
+          "Status",
+          "Abertura",
+          "Fechamento",
+          "Tempo",
+          "Valor est.",
+        ],
         orders.map((r) => [
           String(r.number),
           r.title,

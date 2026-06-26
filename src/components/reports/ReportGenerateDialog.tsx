@@ -447,7 +447,11 @@ function PreviewContent({ filters, onClose }: { filters: ReportFilters; onClose:
         <Button variant="outline" className="lemarc-report-action rounded-xl" onClick={onClose}>
           Cancelar
         </Button>
-        <Button variant="secondary" className="lemarc-report-action gap-2 rounded-xl" onClick={handlePreview}>
+        <Button
+          variant="secondary"
+          className="lemarc-report-action gap-2 rounded-xl"
+          onClick={handlePreview}
+        >
           <Printer size={15} /> Visualizar
         </Button>
         <Button

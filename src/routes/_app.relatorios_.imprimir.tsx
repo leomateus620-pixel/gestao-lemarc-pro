@@ -72,9 +72,12 @@ function PrintPage() {
     <div className="min-h-dvh bg-white p-3 sm:p-6 print:p-0">
       <div className="no-print mx-auto mb-4 flex max-w-[900px] items-center justify-between gap-2">
         <div className="text-xs font-semibold text-slate-600">
-          Pré-visualização do relatório gerencial. Baixe o arquivo ou use o botão para imprimir/salvar como PDF.
+          Pré-visualização do relatório gerencial. Baixe o arquivo ou use o botão para
+          imprimir/salvar como PDF.
         </div>
-        <Suspense fallback={<div className="text-xs font-semibold text-slate-500">Preparando ações…</div>}>
+        <Suspense
+          fallback={<div className="text-xs font-semibold text-slate-500">Preparando ações…</div>}
+        >
           <PrintActions />
         </Suspense>
       </div>
