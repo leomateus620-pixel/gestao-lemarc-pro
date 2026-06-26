@@ -1050,6 +1050,9 @@ function ReviewStep({
         <ReviewSection title="Cliente e técnico" icon={Building2}>
           <ReviewField label="Cliente">{client?.name ?? "Não informado"}</ReviewField>
           <ReviewField label="Unidade">{unitLabel}</ReviewField>
+          <ReviewField label="Solicitante" icon={UserRound}>
+            {draft.requesterName.trim() || "Não informado"}
+          </ReviewField>
           <ReviewField label="Técnicos responsáveis" icon={HardHat}>
             {draft.noTech || selectedTechs.length === 0 ? (
               "Sem técnico definido"
