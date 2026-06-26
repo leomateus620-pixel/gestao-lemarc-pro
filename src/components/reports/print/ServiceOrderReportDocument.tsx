@@ -101,6 +101,9 @@ export function ServiceOrderReportDocument({
             <span className="k">Responsável:</span>{" "}
             {techs.find((t) => t.is_primary)?.full_name ?? techs[0]?.full_name ?? "—"}
           </div>
+          <div>
+            <span className="k">Solicitante:</span> {order.requester_name ?? "—"}
+          </div>
           <div style={{ gridColumn: "1 / span 2" }}>
             <span className="k">Técnicos envolvidos:</span>{" "}
             {techs.length ? techs.map((t) => t.full_name).join(", ") : "—"}
