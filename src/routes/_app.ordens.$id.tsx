@@ -23,6 +23,7 @@ import {
   Receipt,
   Send,
   Truck,
+  UserRound,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
