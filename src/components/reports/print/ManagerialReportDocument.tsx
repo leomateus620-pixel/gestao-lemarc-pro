@@ -16,6 +16,7 @@ import type {
   ReportOrderRow,
 } from "@/types/reports";
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
+import lemarcLogo from "@/assets/lemarc-logo.png.asset.json";
 
 type Props = {
   report: ManagerialReport;
@@ -65,12 +66,12 @@ export function ManagerialReportDocument({
     <div className="lemarc-pdf">
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
       <header className="cover">
-        <div>
-          <div className="accent" style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase" }}>
-            Gestão Lemarc
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <img src={lemarcLogo.url} alt="Lemarc Industrial" style={{ height: 44, width: "auto" }} />
+          <div>
           <h1 className="title">Relatório Gerencial de Ordens de Serviço</h1>
           <div className="muted" style={{ marginTop: 4 }}>{periodLabel}</div>
+          </div>
         </div>
         <div className="meta">
           <div>Gerado em {formatDateTime(generatedAt.toISOString())}</div>
