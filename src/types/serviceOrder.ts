@@ -50,8 +50,17 @@ export const statusLabel: Record<ServiceOrderStatus, string> = {
 };
 
 export type ClientLite = { id: string; name: string; unit: string | null };
-export type TechnicianLite = { id: string; full_name: string; role: string | null };
-export type AssignedTechnician = TechnicianLite & { is_primary: boolean };
+export type TechnicianLite = {
+  id: string;
+  full_name: string;
+  role: string | null;
+  hourly_rate_cents?: number | null;
+};
+export type AssignedTechnician = TechnicianLite & {
+  is_primary: boolean;
+  /** Função do técnico nesta OS (técnico, auxiliar, responsável…). */
+  assignment_role?: string | null;
+};
 export type ClientUnitLite = {
   id: string;
   name: string;
