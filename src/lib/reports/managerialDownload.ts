@@ -542,16 +542,16 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   table(
     [
       { label: "Nº", width: 9, align: "right" },
-      { label: "Título", width: 28 },
-      { label: "Cliente", width: 26 },
+      { label: "Título", width: 26 },
+      { label: "Cliente", width: 24 },
       { label: "Técnico(s)", width: 22 },
       { label: "Status", width: 20, badge: true },
-      { label: "Abertura", width: 14, align: "right" },
-      { label: "Fechamento", width: 14, align: "right" },
+      { label: "Abertura", width: 16, align: "right" },
+      { label: "Fechamento", width: 16, align: "right" },
       { label: "Tempo", width: 22, align: "right" },
       {
         label: "Valor",
-        width: contentWidth - 9 - 28 - 26 - 22 - 20 - 14 - 14 - 22,
+        width: contentWidth - 9 - 26 - 24 - 22 - 20 - 16 - 16 - 22,
         align: "right",
       },
     ],
