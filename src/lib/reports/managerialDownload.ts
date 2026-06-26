@@ -181,12 +181,12 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
       isFirstPage = false;
     } else {
       drawLogoMark(margin, top, 22, 8);
-      txt(LEMARC_COMPANY.legalName, margin + 26, top + 3.5, {
+      txt(LEMARC_COMPANY.legalName, margin + 32, top + 3.5, {
         size: 7.5,
         style: "bold",
         color: LEMARC_COLORS.navy,
       });
-      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, margin + 26, top + 7, {
+      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, margin + 32, top + 7, {
         size: 6.5,
         color: LEMARC_COLORS.slate,
       });
