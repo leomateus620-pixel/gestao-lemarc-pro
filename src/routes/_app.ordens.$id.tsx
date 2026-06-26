@@ -1,9 +1,16 @@
 import { Suspense, useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Building2,
+  Calculator,
   CheckCircle2,
   Clock,
   FileText,
@@ -12,6 +19,7 @@ import {
   Pause,
   Pencil,
   Play,
+  Printer,
   Receipt,
   Send,
   Truck,
@@ -27,6 +35,11 @@ import {
   setServiceOrderTechnicians,
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
+import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
+import { displacementTypeLabel } from "@/types/financials";
+import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
+import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import {
@@ -70,7 +83,10 @@ export const Route = createFileRoute("/_app/ordens/$id")({
   ),
 });
 
-const flow: Record<ServiceOrderStatus, { label: string; next: ServiceOrderStatus | null; icon: typeof Truck }> = {
+const flow: Record<
+  ServiceOrderStatus,
+  { label: string; next: ServiceOrderStatus | null; icon: typeof Truck }
+> = {
   pending: { label: "Despachar OS", next: "dispatched", icon: Send },
   dispatched: { label: "Iniciar deslocamento", next: "transit", icon: Truck },
   transit: { label: "Iniciar serviço", next: "running", icon: Play },
@@ -115,6 +131,7 @@ function OrdemDetalhe() {
   const action = flow[order.status];
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
 
   return (
     <>
@@ -175,9 +192,7 @@ function OrdemDetalhe() {
           <MetaRow icon={HardHat}>
             {technicians.length === 0
               ? "Sem técnico"
-              : technicians
-                  .map((t) => t.full_name)
-                  .join(", ")}
+              : technicians.map((t) => t.full_name).join(", ")}
           </MetaRow>
           {order.scheduled_for && (
             <MetaRow icon={Clock}>
@@ -194,16 +209,30 @@ function OrdemDetalhe() {
           </p>
           <h2 className="font-display text-lg font-black text-foreground">{action.label}</h2>
           <div className="mt-3">
-            <PrimaryCTA
-              onClick={() => action.next && mutation.mutate(action.next)}
-              icon={action.icon}
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? "Atualizando..." : action.label}
-            </PrimaryCTA>
+            {action.next === "finished" ? (
+              <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
+                Finalizar OS (apuração)
+              </PrimaryCTA>
+            ) : (
+              <PrimaryCTA
+                onClick={() => action.next && mutation.mutate(action.next)}
+                icon={action.icon}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? "Atualizando..." : action.label}
+              </PrimaryCTA>
+            )}
           </div>
         </GlassCard>
       )}
+
+      <FinalizeServiceOrderDialog
+        order={order}
+        open={finalizeOpen}
+        onOpenChange={setFinalizeOpen}
+      />
+
+      <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />
 
       {missing.length > 0 && (
         <Section title="Pendências de cadastro" icon={FileText}>
@@ -254,13 +283,9 @@ function TechniciansBlock({ order }: { order: ServiceOrder }) {
               className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5"
             >
               <div className="min-w-0">
-                <div className="truncate text-sm font-bold text-foreground">
-                  {t.full_name}
-                </div>
+                <div className="truncate text-sm font-bold text-foreground">{t.full_name}</div>
                 {t.role && (
-                  <div className="truncate text-[11px] text-muted-foreground">
-                    {t.role}
-                  </div>
+                  <div className="truncate text-[11px] text-muted-foreground">{t.role}</div>
                 )}
               </div>
               {t.is_primary && (
@@ -280,10 +305,7 @@ function TechniciansBlock({ order }: { order: ServiceOrder }) {
 function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const initial = useMemo(
-    () => getOrderTechnicians(order).map((t) => t.id),
-    [order],
-  );
+  const initial = useMemo(() => getOrderTechnicians(order).map((t) => t.id), [order]);
   const [selected, setSelected] = useState<string[]>(initial);
   const { data: technicians } = useTechniciansQuery();
   const fn = useServerFn(setServiceOrderTechnicians);
@@ -297,17 +319,14 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
       queryClient.invalidateQueries({ queryKey: ["report-orders"] });
       setOpen(false);
     },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Falha ao salvar"),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Falha ao salvar"),
   });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return technicians;
     return technicians.filter(
-      (t) =>
-        t.full_name.toLowerCase().includes(q) ||
-        (t.role ?? "").toLowerCase().includes(q),
+      (t) => t.full_name.toLowerCase().includes(q) || (t.role ?? "").toLowerCase().includes(q),
     );
   }, [technicians, query]);
 
@@ -387,9 +406,7 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
                   <div className="min-w-0">
                     <div className="truncate font-bold">{t.full_name}</div>
                     {t.role && (
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {t.role}
-                      </div>
+                      <div className="truncate text-[11px] text-muted-foreground">{t.role}</div>
                     )}
                   </div>
                   {active && (
@@ -420,6 +437,104 @@ function MetaRow({ icon: Icon, children }: { icon: typeof Building2; children: R
     <div className="flex items-center gap-2">
       <Icon size={13} className="shrink-0 text-primary" />
       <span className="truncate">{children}</span>
+    </div>
+  );
+}
+
+function FinancialBlock({ order, onEdit }: { order: ServiceOrder; onEdit: () => void }) {
+  const fetcher = useServerFn(getOrderFinancials);
+  const { data } = useQuery({
+    queryKey: ["order-financials", order.id],
+    queryFn: () => fetcher({ data: { orderId: order.id } }),
+    staleTime: 30_000,
+  });
+  if (!data || !data.financials) return null;
+  const f = data.financials;
+  const entries = data.entries;
+  return (
+    <>
+      <Section title="Resumo financeiro" icon={Receipt}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Kpi label="Total horas" value={formatHHmm(f.total_labor_minutes)} />
+          <Kpi label="Mão de obra" value={formatBRL(f.total_labor_cents)} />
+          <Kpi
+            label="Deslocamento"
+            value={formatBRL(f.displacement_total_cents)}
+            hint={displacementTypeLabel[f.displacement_type]}
+          />
+          <Kpi label="Total geral" value={formatBRL(f.grand_total_cents)} highlight />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" className="gap-1.5" onClick={onEdit}>
+            <Pencil size={13} /> Editar apuração
+          </Button>
+          <Button asChild variant="secondary" size="sm" className="gap-1.5">
+            <Link to="/ordens/$id/imprimir" params={{ id: order.id }}>
+              <Printer size={13} /> Gerar relatório
+            </Link>
+          </Button>
+        </div>
+      </Section>
+      <Section title="Apuração de horas" icon={Calculator}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-[10px] uppercase text-muted-foreground">
+              <tr>
+                <th className="py-1 text-left">Técnico</th>
+                <th className="py-1 text-left">Função</th>
+                <th className="py-1 text-left">Data</th>
+                <th className="py-1 text-left">Entrada</th>
+                <th className="py-1 text-left">Saída</th>
+                <th className="py-1 text-right">Horas</th>
+                <th className="py-1 text-right">R$/h</th>
+                <th className="py-1 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e: (typeof entries)[number]) => (
+                <tr key={e.id} className="border-t border-white/5">
+                  <td className="py-1.5">{e.technician?.full_name ?? "—"}</td>
+                  <td>{e.role ?? "—"}</td>
+                  <td>{e.work_date}</td>
+                  <td>{e.start_time.slice(0, 5)}</td>
+                  <td>{e.end_time.slice(0, 5)}</td>
+                  <td className="text-right tabular-nums">{formatHHmm(e.duration_minutes)}</td>
+                  <td className="text-right tabular-nums">{formatBRL(e.hourly_rate_cents)}</td>
+                  <td className="text-right tabular-nums">{formatBRL(e.subtotal_cents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  hint,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-3 ${
+        highlight
+          ? "border-primary/50 bg-primary/15 text-primary"
+          : "border-white/10 bg-white/[0.04]"
+      }`}
+    >
+      <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-black tabular-nums">{value}</div>
+      {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }
@@ -455,9 +570,7 @@ function Timeline({ order }: { order: ServiceOrder }) {
         <li
           key={e.label}
           className={`flex items-center gap-3 rounded-2xl border p-3 ${
-            e.iso
-              ? "border-primary/35 bg-primary/10"
-              : "border-border bg-secondary/35"
+            e.iso ? "border-primary/35 bg-primary/10" : "border-border bg-secondary/35"
           }`}
         >
           <div

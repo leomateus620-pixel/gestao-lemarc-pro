@@ -24,6 +24,7 @@ import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes.$id'
 import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios.cliente.$clientId'
+import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
 import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
 
 const LoginRoute = LoginRouteImport.update({
@@ -101,6 +102,11 @@ const AppRelatoriosClienteClientIdRoute =
     path: '/cliente/$clientId',
     getParentRoute: () => AppRelatoriosRoute,
   } as any)
+const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
+  id: '/imprimir',
+  path: '/imprimir',
+  getParentRoute: () => AppOrdensIdRoute,
+} as any)
 const AppClientesIdEditarRoute = AppClientesIdEditarRouteImport.update({
   id: '/editar',
   path: '/editar',
@@ -116,12 +122,13 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
-  '/ordens/$id': typeof AppOrdensIdRoute
+  '/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/ordens/nova': typeof AppOrdensNovaRoute
   '/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
   '/clientes/': typeof AppClientesIndexRoute
   '/ordens/': typeof AppOrdensIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRoutesByTo {
@@ -132,12 +139,13 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
-  '/ordens/$id': typeof AppOrdensIdRoute
+  '/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/ordens/nova': typeof AppOrdensNovaRoute
   '/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
   '/clientes': typeof AppClientesIndexRoute
   '/ordens': typeof AppOrdensIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRoutesById {
@@ -151,12 +159,13 @@ export interface FileRoutesById {
   '/_app/relatorios': typeof AppRelatoriosRouteWithChildren
   '/_app/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/_app/clientes/novo': typeof AppClientesNovoRoute
-  '/_app/ordens/$id': typeof AppOrdensIdRoute
+  '/_app/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/_app/ordens/nova': typeof AppOrdensNovaRoute
   '/_app/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
   '/_app/clientes/$id/editar': typeof AppClientesIdEditarRoute
+  '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/_app/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRouteTypes {
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/ordens/'
     | '/clientes/$id/editar'
+    | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/ordens'
     | '/clientes/$id/editar'
+    | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
   id:
     | '__root__'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/_app/clientes/'
     | '/_app/ordens/'
     | '/_app/clientes/$id/editar'
+    | '/_app/ordens/$id/imprimir'
     | '/_app/relatorios/cliente/$clientId'
   fileRoutesById: FileRoutesById
 }
@@ -326,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
       parentRoute: typeof AppRelatoriosRoute
     }
+    '/_app/ordens/$id/imprimir': {
+      id: '/_app/ordens/$id/imprimir'
+      path: '/imprimir'
+      fullPath: '/ordens/$id/imprimir'
+      preLoaderRoute: typeof AppOrdensIdImprimirRouteImport
+      parentRoute: typeof AppOrdensIdRoute
+    }
     '/_app/clientes/$id/editar': {
       id: '/_app/clientes/$id/editar'
       path: '/editar'
@@ -378,12 +397,24 @@ const AppRelatoriosRouteWithChildren = AppRelatoriosRoute._addFileChildren(
   AppRelatoriosRouteChildren,
 )
 
+interface AppOrdensIdRouteChildren {
+  AppOrdensIdImprimirRoute: typeof AppOrdensIdImprimirRoute
+}
+
+const AppOrdensIdRouteChildren: AppOrdensIdRouteChildren = {
+  AppOrdensIdImprimirRoute: AppOrdensIdImprimirRoute,
+}
+
+const AppOrdensIdRouteWithChildren = AppOrdensIdRoute._addFileChildren(
+  AppOrdensIdRouteChildren,
+)
+
 interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRouteWithChildren
   AppColaboradoresRoute: typeof AppColaboradoresRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppRelatoriosRoute: typeof AppRelatoriosRouteWithChildren
-  AppOrdensIdRoute: typeof AppOrdensIdRoute
+  AppOrdensIdRoute: typeof AppOrdensIdRouteWithChildren
   AppOrdensNovaRoute: typeof AppOrdensNovaRoute
   AppOrdensIndexRoute: typeof AppOrdensIndexRoute
 }
@@ -393,7 +424,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppColaboradoresRoute: AppColaboradoresRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppRelatoriosRoute: AppRelatoriosRouteWithChildren,
-  AppOrdensIdRoute: AppOrdensIdRoute,
+  AppOrdensIdRoute: AppOrdensIdRouteWithChildren,
   AppOrdensNovaRoute: AppOrdensNovaRoute,
   AppOrdensIndexRoute: AppOrdensIndexRoute,
 }
@@ -408,13 +439,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

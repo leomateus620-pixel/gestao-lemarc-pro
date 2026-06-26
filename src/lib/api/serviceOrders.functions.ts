@@ -14,11 +14,11 @@ const ORDER_SELECT = `
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit),
-  technician:technicians!service_orders_technician_id_fkey(id, full_name, role),
+  technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
   client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state),
   assigned_technicians:service_order_technicians(
-    is_primary,
-    technician:technicians(id, full_name, role)
+    is_primary, role,
+    technician:technicians(id, full_name, role, hourly_rate_cents)
   )
 `;
 
@@ -30,6 +30,8 @@ function normalize(row: any): ServiceOrder {
       id: a.technician.id,
       full_name: a.technician.full_name,
       role: a.technician.role ?? null,
+      hourly_rate_cents: a.technician.hourly_rate_cents ?? null,
+      assignment_role: a.role ?? null,
       is_primary: Boolean(a.is_primary),
     }))
     .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary));
@@ -251,12 +253,17 @@ export const createClient = createServerFn({ method: "POST" })
 export const listTechnicians = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as any)
       .from("technicians")
-      .select("id, full_name, role")
+      .select("id, full_name, role, hourly_rate_cents")
       .order("full_name");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []) as Array<{
+      id: string;
+      full_name: string;
+      role: string | null;
+      hourly_rate_cents: number | null;
+    }>;
   });
 
 export const createTechnician = createServerFn({ method: "POST" })

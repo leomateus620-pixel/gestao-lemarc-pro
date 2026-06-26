@@ -163,6 +163,137 @@ export type Database = {
         }
         Relationships: []
       }
+      service_order_financials: {
+        Row: {
+          created_at: string
+          displacement_count: number
+          displacement_km_total: number
+          displacement_notes: string | null
+          displacement_rate_cents: number
+          displacement_total_cents: number
+          displacement_type: Database["public"]["Enums"]["displacement_type"]
+          finalized_at: string | null
+          finalized_by: string | null
+          grand_total_cents: number
+          materials_total_cents: number
+          notes: string | null
+          service_order_id: string
+          total_labor_cents: number
+          total_labor_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          displacement_count?: number
+          displacement_km_total?: number
+          displacement_notes?: string | null
+          displacement_rate_cents?: number
+          displacement_total_cents?: number
+          displacement_type?: Database["public"]["Enums"]["displacement_type"]
+          finalized_at?: string | null
+          finalized_by?: string | null
+          grand_total_cents?: number
+          materials_total_cents?: number
+          notes?: string | null
+          service_order_id: string
+          total_labor_cents?: number
+          total_labor_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          displacement_count?: number
+          displacement_km_total?: number
+          displacement_notes?: string | null
+          displacement_rate_cents?: number
+          displacement_total_cents?: number
+          displacement_type?: Database["public"]["Enums"]["displacement_type"]
+          finalized_at?: string | null
+          finalized_by?: string | null
+          grand_total_cents?: number
+          materials_total_cents?: number
+          notes?: string | null
+          service_order_id?: string
+          total_labor_cents?: number
+          total_labor_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_financials_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: true
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_order_labor_entries: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_minutes: number
+          end_time: string
+          hourly_rate_cents: number
+          id: string
+          role: string | null
+          service_order_id: string
+          start_time: string
+          subtotal_cents: number
+          technician_id: string | null
+          updated_at: string
+          work_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_minutes: number
+          end_time: string
+          hourly_rate_cents: number
+          id?: string
+          role?: string | null
+          service_order_id: string
+          start_time: string
+          subtotal_cents: number
+          technician_id?: string | null
+          updated_at?: string
+          work_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number
+          end_time?: string
+          hourly_rate_cents?: number
+          id?: string
+          role?: string | null
+          service_order_id?: string
+          start_time?: string
+          subtotal_cents?: number
+          technician_id?: string | null
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_labor_entries_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_labor_entries_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_order_technicians: {
         Row: {
           assigned_at: string
@@ -170,6 +301,7 @@ export type Database = {
           created_at: string
           id: string
           is_primary: boolean
+          role: string | null
           service_order_id: string
           technician_id: string
         }
@@ -179,6 +311,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          role?: string | null
           service_order_id: string
           technician_id: string
         }
@@ -188,6 +321,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          role?: string | null
           service_order_id?: string
           technician_id?: string
         }
@@ -325,6 +459,7 @@ export type Database = {
           created_at: string
           created_by: string
           full_name: string
+          hourly_rate_cents: number | null
           id: string
           phone: string | null
           role: string | null
@@ -335,6 +470,7 @@ export type Database = {
           created_at?: string
           created_by: string
           full_name: string
+          hourly_rate_cents?: number | null
           id?: string
           phone?: string | null
           role?: string | null
@@ -345,6 +481,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           full_name?: string
+          hourly_rate_cents?: number | null
           id?: string
           phone?: string | null
           role?: string | null
@@ -390,6 +527,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "operador"
       billing_status: "pending" | "ready" | "billed" | "cancelled"
+      displacement_type: "none" | "per_km" | "fixed"
       service_order_status:
         | "pending"
         | "dispatched"
@@ -538,6 +676,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "operador"],
       billing_status: ["pending", "ready", "billed", "cancelled"],
+      displacement_type: ["none", "per_km", "fixed"],
       service_order_status: [
         "pending",
         "dispatched",
