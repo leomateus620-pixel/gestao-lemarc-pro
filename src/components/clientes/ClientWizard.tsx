@@ -56,11 +56,9 @@ export function ClientWizard() {
     notes: "",
     units: [],
   });
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) =>
-    setDraft((d) => ({ ...d, [k]: v }));
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  const cnpjOk =
-    !draft.cnpj.trim() || isValidCNPJ(draft.cnpj);
+  const cnpjOk = !draft.cnpj.trim() || isValidCNPJ(draft.cnpj);
 
   const validity = useMemo(
     () => [
@@ -134,9 +132,7 @@ export function ClientWizard() {
       </div>
 
       {mutation.isError && (
-        <p className="text-sm text-rose-300">
-          {(mutation.error as Error).message}
-        </p>
+        <p className="text-sm text-rose-300">{(mutation.error as Error).message}</p>
       )}
 
       <FormFlowActions>
@@ -145,7 +141,7 @@ export function ClientWizard() {
           variant="secondary"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || mutation.isPending}
-          className="h-12 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40 sm:h-14"
+          className="lemarc-secondary-action h-12 gap-2 rounded-2xl px-5 font-bold hover:bg-white/[0.08] disabled:opacity-45 sm:h-14"
         >
           <ArrowLeft size={16} /> Voltar
         </Button>
@@ -157,16 +153,12 @@ export function ClientWizard() {
             else setStep((s) => Math.min(STEPS.length - 1, s + 1));
           }}
           className={cn(
-            "lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40 sm:h-14",
+            "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-display text-sm font-black uppercase tracking-wider transition disabled:opacity-55 sm:h-14",
             canNext && !mutation.isPending && "lemarc-orange-glow hover:-translate-y-0.5",
           )}
         >
           {isLast ? <ClipboardCheck size={18} /> : <ArrowRight size={18} />}
-          {mutation.isPending
-            ? "Salvando..."
-            : isLast
-              ? "Cadastrar empresa"
-              : "Continuar"}
+          {mutation.isPending ? "Salvando..." : isLast ? "Cadastrar empresa" : "Continuar"}
         </button>
       </FormFlowActions>
     </div>
@@ -176,7 +168,7 @@ export function ClientWizard() {
 function Slot({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="px-1"
+      className="px-1 pb-2"
       style={{ flex: `0 0 ${100 / STEPS.length}%`, width: `${100 / STEPS.length}%` }}
     >
       {children}
@@ -194,8 +186,8 @@ function Stepper({
   onJump: (i: number) => void;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card p-3 sm:p-4">
-      <div className="flex items-center gap-1.5 sm:gap-3">
+    <GlassCard className="lemarc-wizard-card p-2.5 sm:p-4">
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
         {STEPS.map((label, i) => {
           const done = i < step;
           const current = i === step;
@@ -205,31 +197,32 @@ function Stepper({
               type="button"
               onClick={() => onJump(i)}
               disabled={i > step}
+              aria-current={current ? "step" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:cursor-not-allowed",
+                "flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-not-allowed disabled:opacity-100 sm:px-3",
                 current
-                  ? "border-primary/40 bg-primary/10"
+                  ? "border-primary bg-primary/18 text-white shadow-[0_12px_26px_-18px_hsl(var(--primary)/0.9)]"
                   : done
-                    ? "border-white/10 bg-white/[0.07]"
-                    : "border-white/5 bg-transparent opacity-60",
+                    ? "border-emerald-300/35 bg-emerald-500/13 text-white"
+                    : "border-white/10 bg-white/[0.035] text-slate-300/85",
               )}
             >
               <span
                 className={cn(
-                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-black",
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]",
                   current
                     ? "bg-primary text-primary-foreground"
                     : done
-                      ? "bg-emerald-500/20 text-emerald-300"
-                      : "bg-white/5 text-muted-foreground",
+                      ? "bg-emerald-400/22 text-emerald-100"
+                      : "bg-white/[0.08] text-slate-300",
                 )}
               >
                 {done && validity[i] ? <Check size={14} /> : i + 1}
               </span>
               <span
                 className={cn(
-                  "hidden truncate text-[11px] font-black uppercase tracking-[0.14em] sm:block",
-                  current ? "text-foreground" : "text-muted-foreground",
+                  "hidden min-w-0 truncate text-[10px] font-black uppercase tracking-[0.1em] sm:block lg:text-[11px]",
+                  current ? "text-white" : done ? "text-emerald-50" : "text-slate-300",
                 )}
               >
                 {label}
@@ -257,17 +250,17 @@ function StepHeader({
   return (
     <div>
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
-      <h2 className="mt-1 font-display text-xl font-black leading-tight text-foreground sm:text-2xl">
+      <h2 className="mt-1 font-display text-xl font-black leading-tight text-white sm:text-2xl">
         {title}
       </h2>
-      {description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
+      {description && <p className="lemarc-form-help mt-1.5 text-sm font-medium">{description}</p>}
     </div>
   );
 }
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.16em]">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
@@ -275,7 +268,9 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 }
 
 const inputCls =
-  "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
+  "lemarc-form-control h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70";
+const textareaCls =
+  "lemarc-form-control min-h-24 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70";
 
 function CompanyStep({
   draft,
@@ -293,7 +288,7 @@ function CompanyStep({
         title="Dados da empresa"
         description="Identificação principal e segmento de atuação."
       />
-      <div className="space-y-1">
+      <div className="space-y-2">
         <Label required>Nome da empresa</Label>
         <Input
           value={draft.name}
@@ -303,7 +298,7 @@ function CompanyStep({
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label>CNPJ</Label>
           <Input
             value={maskCNPJ(draft.cnpj)}
@@ -312,10 +307,12 @@ function CompanyStep({
             className={cn(inputCls, !cnpjOk && "border-rose-500/50 focus-visible:ring-rose-500/40")}
           />
           {!cnpjOk && (
-            <p className="mt-1 text-[11px] text-rose-300">CNPJ inválido. Verifique os dígitos.</p>
+            <p className="mt-1 rounded-lg border border-rose-300/35 bg-rose-500/12 px-3 py-2 text-[11px] font-bold text-rose-100">
+              CNPJ inválido. Verifique os dígitos.
+            </p>
           )}
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label>Segmento</Label>
           <Input
             value={draft.segment}
@@ -344,11 +341,15 @@ function LocationStep({
         description="Endereço principal e contato de referência."
       />
       <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label required>Cidade</Label>
-          <Input value={draft.city} onChange={(e) => set("city", e.target.value)} className={inputCls} />
+          <Input
+            value={draft.city}
+            onChange={(e) => set("city", e.target.value)}
+            className={inputCls}
+          />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label required>UF</Label>
           <Input
             value={draft.state}
@@ -358,7 +359,7 @@ function LocationStep({
           />
         </div>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <Label>Endereço completo</Label>
         <Input
           value={draft.address}
@@ -368,11 +369,15 @@ function LocationStep({
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label>Telefone</Label>
-          <Input value={draft.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} />
+          <Input
+            value={draft.phone}
+            onChange={(e) => set("phone", e.target.value)}
+            className={inputCls}
+          />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label>E-mail</Label>
           <Input
             type="email"
@@ -382,7 +387,7 @@ function LocationStep({
           />
         </div>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <Label>Responsável principal</Label>
         <Input
           value={draft.responsible_name}
@@ -391,12 +396,12 @@ function LocationStep({
           className={inputCls}
         />
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <Label>Observações internas</Label>
         <Textarea
           value={draft.notes}
           onChange={(e) => set("notes", e.target.value)}
-          className="min-h-24 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+          className={textareaCls}
         />
       </div>
     </GlassCard>
@@ -453,9 +458,9 @@ function UnitsStep({
       />
 
       {draft.units.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-6 text-center">
+        <div className="lemarc-form-panel rounded-2xl border-dashed p-6 text-center">
           <Building2 size={26} className="mx-auto text-primary" />
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="lemarc-form-help mt-2 text-sm font-semibold">
             Nenhuma unidade adicionada ainda.
           </p>
         </div>
@@ -463,20 +468,17 @@ function UnitsStep({
 
       <div className="space-y-3">
         {draft.units.map((u, idx) => (
-          <div
-            key={idx}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
-          >
+          <div key={idx} className="lemarc-review-card rounded-2xl p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-[11px] font-black text-primary">
                   {idx + 1}
                 </span>
-                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
                   Unidade {idx + 1}
                 </span>
                 {u.is_primary && (
-                  <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  <span className="flex items-center gap-1 rounded-md border border-amber-300/35 bg-amber-400/18 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100">
                     <Star size={10} /> Principal
                   </span>
                 )}
@@ -486,7 +488,7 @@ function UnitsStep({
                   <button
                     type="button"
                     onClick={() => setPrimary(idx)}
-                    className="rounded-lg p-2 text-muted-foreground transition hover:bg-white/5 hover:text-amber-300"
+                    className="rounded-lg p-2 text-slate-300 transition hover:bg-white/[0.07] hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                     title="Marcar como principal"
                   >
                     <Star size={14} />
@@ -495,7 +497,7 @@ function UnitsStep({
                 <button
                   type="button"
                   onClick={() => removeUnit(idx)}
-                  className="rounded-lg p-2 text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-300"
+                  className="rounded-lg p-2 text-slate-300 transition hover:bg-rose-500/12 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/60"
                   title="Remover"
                 >
                   <Trash2 size={14} />
@@ -503,7 +505,7 @@ function UnitsStep({
               </div>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label required>Nome</Label>
                 <Input
                   value={u.name}
@@ -511,7 +513,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Setor</Label>
                 <Input
                   value={u.sector ?? ""}
@@ -520,7 +522,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Cidade</Label>
                 <Input
                   value={u.city ?? ""}
@@ -528,7 +530,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>UF</Label>
                 <Input
                   value={u.state ?? ""}
@@ -538,7 +540,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>Endereço</Label>
                 <Input
                   value={u.address ?? ""}
@@ -546,7 +548,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Responsável</Label>
                 <Input
                   value={u.responsible_name ?? ""}
@@ -554,7 +556,7 @@ function UnitsStep({
                   className={inputCls}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Telefone</Label>
                 <Input
                   value={u.phone ?? ""}
@@ -571,7 +573,7 @@ function UnitsStep({
         type="button"
         onClick={addUnit}
         variant="secondary"
-        className="h-12 w-full gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] text-foreground hover:bg-white/[0.05]"
+        className="lemarc-secondary-action h-12 w-full gap-2 rounded-xl border-dashed font-black uppercase tracking-wider hover:bg-white/[0.08]"
       >
         <Plus size={16} /> Adicionar unidade
       </Button>
@@ -580,6 +582,9 @@ function UnitsStep({
 }
 
 function ReviewStep({ draft }: { draft: Draft }) {
+  const empty = "Não informado";
+  const cityState = [draft.city, draft.state].filter(Boolean).join(" / ");
+
   return (
     <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
       <StepHeader
@@ -587,22 +592,36 @@ function ReviewStep({ draft }: { draft: Draft }) {
         title="Confira antes de cadastrar"
         description="Você ainda pode voltar e ajustar qualquer informação."
       />
+      <div className="lemarc-summary-panel rounded-2xl p-4 sm:p-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Empresa</p>
+        <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+          {draft.name || empty}
+        </h3>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100">
+            {draft.cnpj ? maskCNPJ(draft.cnpj) : "CNPJ não informado"}
+          </span>
+          <span className="rounded-full border border-primary/50 bg-primary/18 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
+            {draft.segment || "Segmento não informado"}
+          </span>
+        </div>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Block title="Empresa">
-          <Row k="Nome" v={draft.name || "—"} />
-          <Row k="CNPJ" v={draft.cnpj ? maskCNPJ(draft.cnpj) : "—"} />
-          <Row k="Segmento" v={draft.segment || "—"} />
+        <Block title="Empresa" icon={Building2}>
+          <Row k="Nome" v={draft.name || empty} />
+          <Row k="CNPJ" v={draft.cnpj ? maskCNPJ(draft.cnpj) : empty} />
+          <Row k="Segmento" v={draft.segment || empty} />
         </Block>
-        <Block title="Localização & contato">
-          <Row k="Cidade/UF" v={[draft.city, draft.state].filter(Boolean).join(" / ") || "—"} />
-          <Row k="Endereço" v={draft.address || "—"} />
-          <Row k="Telefone" v={draft.phone || "—"} />
-          <Row k="E-mail" v={draft.email || "—"} />
-          <Row k="Responsável" v={draft.responsible_name || "—"} />
+        <Block title="Localização & contato" icon={MapPin}>
+          <Row k="Cidade/UF" v={cityState || empty} />
+          <Row k="Endereço" v={draft.address || empty} />
+          <Row k="Telefone" v={draft.phone || empty} />
+          <Row k="E-mail" v={draft.email || empty} />
+          <Row k="Responsável" v={draft.responsible_name || empty} />
         </Block>
-        <Block title={`Unidades (${draft.units.length})`}>
+        <Block title={`Unidades (${draft.units.length})`} icon={Building2}>
           {draft.units.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma unidade adicionada.</p>
+            <p className="text-sm font-semibold text-slate-300">Nenhuma unidade adicionada.</p>
           ) : (
             draft.units.map((u, i) => (
               <div
@@ -610,11 +629,11 @@ function ReviewStep({ draft }: { draft: Draft }) {
                 className="flex items-center justify-between border-b border-white/5 py-1.5 last:border-0"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-foreground">
+                  <div className="truncate text-sm font-black text-white">
                     {u.name}
-                    {u.is_primary && <span className="ml-2 text-[10px] text-amber-300">★</span>}
+                    {u.is_primary && <span className="ml-2 text-[10px] text-amber-100">★</span>}
                   </div>
-                  <div className="truncate text-[11px] text-muted-foreground">
+                  <div className="truncate text-[11px] font-semibold text-slate-300">
                     {[u.sector, u.city, u.state].filter(Boolean).join(" · ")}
                   </div>
                 </div>
@@ -627,10 +646,23 @@ function ReviewStep({ draft }: { draft: Draft }) {
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: typeof Building2;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{title}</p>
+    <div className="lemarc-review-card rounded-2xl p-4">
+      <div className="flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg border border-primary/30 bg-primary/18 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+          <Icon size={14} />
+        </span>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{title}</p>
+      </div>
       <div className="mt-3 space-y-2">{children}</div>
     </div>
   );
@@ -639,13 +671,8 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-        {k}
-      </span>
-      <span className="max-w-[65%] text-right font-semibold text-foreground">{v}</span>
+      <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">{k}</span>
+      <span className="max-w-[65%] text-right font-bold text-white">{v}</span>
     </div>
   );
 }
-
-// re-export icon to silence unused warnings in some refactors
-export const __icons = { MapPin };

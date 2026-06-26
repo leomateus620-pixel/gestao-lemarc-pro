@@ -38,12 +38,16 @@ export function AppShell({
     <div className="lemarc-app-bg min-h-dvh">
       <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col">
         <header className="sticky top-0 z-30 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md sm:px-6 lg:px-8">
-          <div className="lemarc-liquid rounded-2xl px-3 py-2.5">
+          <div
+            className={
+              (fullscreenForm ? "lemarc-form-topbar" : "lemarc-liquid") + " rounded-2xl px-3 py-2.5"
+            }
+          >
             <div className="flex min-w-0 items-center gap-3">
               {back ? (
                 <button
                   onClick={() => router.history.back()}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-foreground lemarc-pressable"
+                  className="lemarc-pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   aria-label="Voltar"
                 >
                   <ChevronLeft size={21} />
@@ -60,10 +64,10 @@ export function AppShell({
                 </Link>
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate font-display text-[15px] font-black uppercase tracking-wide text-foreground">
+                <div className="truncate font-display text-[15px] font-black uppercase tracking-wide text-white drop-shadow-sm">
                   {isHome ? "Gestão Lemarc" : title}
                 </div>
-                <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
                   {isHome ? "Central de operação" : role === "gestor" ? "Gestor" : "Campo"} ·{" "}
                   {firstName}
                 </div>
@@ -82,17 +86,17 @@ export function AppShell({
                 <img
                   src={avatarUrl}
                   alt={displayName}
-                  className="size-9 shrink-0 rounded-full border border-white/15 object-cover"
+                  className="size-9 shrink-0 rounded-full border border-white/25 object-cover shadow-[0_8px_18px_-12px_rgba(0,0,0,0.85)]"
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <span className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/15 text-[11px] font-black uppercase text-primary">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/45 bg-primary/18 text-[11px] font-black uppercase text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                   {firstName.slice(0, 2)}
                 </span>
               )}
               <button
                 onClick={handleSignOut}
-                className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition hover:text-foreground lemarc-pressable"
+                className="lemarc-pressable grid size-9 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                 aria-label="Sair"
                 title="Sair"
               >
@@ -105,7 +109,7 @@ export function AppShell({
           className={
             "lemarc-page-enter flex-1 px-4 pt-2 sm:px-6 lg:px-8 " +
             (fullscreenForm
-              ? "pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom)+6.5rem)]"
+              ? "pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)]"
               : "pb-32")
           }
         >

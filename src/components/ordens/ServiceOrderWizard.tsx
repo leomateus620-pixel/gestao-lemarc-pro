@@ -61,16 +61,20 @@ const serviceTypes = Object.entries(serviceTypeLabel) as [ServiceType, string][]
 const priorities = Object.entries(priorityLabel) as [ServicePriority, string][];
 
 const priorityTone: Record<ServicePriority, string> = {
-  baixa: "border-white/10 bg-white/[0.07] text-foreground hover:bg-white/[0.07]",
-  media: "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
-  alta: "border-amber-400/40 bg-amber-400/15 text-amber-200 hover:bg-amber-400/20",
-  urgente: "border-rose-500/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/20",
+  baixa:
+    "border-slate-300/25 bg-slate-950/35 text-slate-100 hover:border-slate-200/40 hover:bg-white/[0.08]",
+  media:
+    "border-primary/45 bg-primary/14 text-orange-100 hover:border-primary/70 hover:bg-primary/20",
+  alta: "border-amber-300/45 bg-amber-400/14 text-amber-100 hover:border-amber-300/70 hover:bg-amber-400/20",
+  urgente:
+    "border-rose-300/45 bg-rose-500/14 text-rose-100 hover:border-rose-300/70 hover:bg-rose-500/20",
 };
 const priorityActive: Record<ServicePriority, string> = {
-  baixa: "border-white/30 bg-white/15 text-foreground shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
-  media: "border-primary bg-primary text-primary-foreground shadow-[0_8px_24px_-12px_hsl(var(--primary)/0.8)]",
-  alta: "border-amber-400 bg-amber-400 text-amber-950 shadow-[0_8px_24px_-12px_rgba(251,191,36,0.7)]",
-  urgente: "border-rose-500 bg-rose-500 text-white shadow-[0_8px_24px_-12px_rgba(244,63,94,0.7)]",
+  baixa: "border-slate-100/50 bg-white/18 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
+  media:
+    "border-primary bg-primary text-primary-foreground shadow-[0_12px_28px_-14px_hsl(var(--primary)/0.92)]",
+  alta: "border-amber-300 bg-amber-300 text-slate-950 shadow-[0_12px_28px_-14px_rgba(251,191,36,0.85)]",
+  urgente: "border-rose-400 bg-rose-500 text-white shadow-[0_12px_28px_-14px_rgba(244,63,94,0.85)]",
 };
 
 const typeIcon: Record<ServiceType, typeof Cog> = {
@@ -111,8 +115,7 @@ export function ServiceOrderWizard({
     typeOther: "",
     priority: "media",
   });
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) =>
-    setDraft((d) => ({ ...d, [k]: v }));
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -149,8 +152,7 @@ export function ServiceOrderWizard({
           client_unit_id: draft.unitId || null,
           technician_ids: draft.noTech ? [] : draft.techIds,
           service_type: draft.type,
-          service_type_other:
-            draft.type === "outro" ? draft.typeOther.trim() : null,
+          service_type_other: draft.type === "outro" ? draft.typeOther.trim() : null,
           priority: draft.priority,
           location: draft.location || null,
           scheduled_for: draft.scheduled ? new Date(draft.scheduled).toISOString() : null,
@@ -216,7 +218,7 @@ export function ServiceOrderWizard({
             <ServiceTypeStep draft={draft} set={set} />
           </StepSlot>
           <StepSlot>
-            <ReviewStep draft={draft} clients={clients} technicians={technicians} />
+            <ReviewStep draft={draft} clients={clients} units={units} technicians={technicians} />
           </StepSlot>
         </div>
       </div>
@@ -242,7 +244,7 @@ export function ServiceOrderWizard({
 function StepSlot({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="px-1"
+      className="px-1 pb-2"
       style={{ flex: `0 0 ${100 / STEPS.length}%`, width: `${100 / STEPS.length}%` }}
     >
       {children}
@@ -260,8 +262,8 @@ function WizardStepper({
   onJump: (i: number) => void;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card p-3 sm:p-4">
-      <div className="flex items-center gap-1.5 sm:gap-3">
+    <GlassCard className="lemarc-wizard-card p-2.5 sm:p-4">
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
         {STEPS.map((label, i) => {
           const done = i < step;
           const current = i === step;
@@ -272,31 +274,32 @@ function WizardStepper({
               type="button"
               onClick={() => onJump(i)}
               disabled={!enabled}
+              aria-current={current ? "step" : undefined}
               className={cn(
-                "group flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:cursor-not-allowed",
+                "group flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-not-allowed disabled:opacity-100 sm:px-3",
                 current
-                  ? "border-primary/40 bg-primary/10"
+                  ? "border-primary bg-primary/18 text-white shadow-[0_12px_26px_-18px_hsl(var(--primary)/0.9)]"
                   : done
-                    ? "border-white/10 bg-white/[0.07]"
-                    : "border-white/5 bg-transparent opacity-60",
+                    ? "border-emerald-300/35 bg-emerald-500/13 text-white"
+                    : "border-white/10 bg-white/[0.035] text-slate-300/85",
               )}
             >
               <span
                 className={cn(
-                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-black",
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]",
                   current
                     ? "bg-primary text-primary-foreground"
                     : done
-                      ? "bg-emerald-500/20 text-emerald-300"
-                      : "bg-white/5 text-muted-foreground",
+                      ? "bg-emerald-400/22 text-emerald-100"
+                      : "bg-white/[0.08] text-slate-300",
                 )}
               >
                 {done && validity[i] ? <Check size={14} /> : i + 1}
               </span>
               <span
                 className={cn(
-                  "hidden truncate text-[11px] font-black uppercase tracking-[0.14em] sm:block",
-                  current ? "text-foreground" : "text-muted-foreground",
+                  "hidden min-w-0 truncate text-[10px] font-black uppercase tracking-[0.1em] sm:block lg:text-[11px]",
+                  current ? "text-white" : done ? "text-emerald-50" : "text-slate-300",
                 )}
               >
                 {label}
@@ -334,7 +337,7 @@ function StepFooter({
         variant="secondary"
         onClick={onBack}
         disabled={step === 0 || loading}
-        className="h-12 gap-2 rounded-2xl bg-white/[0.07] px-5 text-foreground hover:bg-white/[0.08] disabled:opacity-40 sm:h-14"
+        className="lemarc-secondary-action h-12 gap-2 rounded-2xl px-5 font-bold hover:bg-white/[0.08] disabled:opacity-45 sm:h-14"
       >
         <ArrowLeft size={16} /> Voltar
       </Button>
@@ -343,16 +346,12 @@ function StepFooter({
         onClick={onNext}
         disabled={!canGoNext || loading}
         className={cn(
-          "lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground transition disabled:opacity-40 sm:h-14",
+          "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-display text-sm font-black uppercase tracking-wider transition disabled:opacity-55 sm:h-14",
           canGoNext && !loading && "lemarc-orange-glow hover:-translate-y-0.5 active:scale-[0.98]",
         )}
       >
         {isLast ? <ClipboardCheck size={18} /> : <ArrowRight size={18} />}
-        {loading
-          ? "Criando OS..."
-          : isLast
-            ? "Criar ordem de serviço"
-            : "Continuar"}
+        {loading ? "Criando OS..." : isLast ? "Criar ordem de serviço" : "Continuar"}
       </button>
     </FormFlowActions>
   );
@@ -360,7 +359,7 @@ function StepFooter({
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.16em]">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
@@ -368,8 +367,15 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 }
 
 function FieldHint({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1.5 text-[11px] text-muted-foreground/80">{children}</p>;
+  return <p className="lemarc-form-help mt-1.5 text-[11px] font-medium">{children}</p>;
 }
+
+const inputCls =
+  "lemarc-form-control h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70";
+const textareaCls =
+  "lemarc-form-control min-h-32 rounded-xl text-sm leading-relaxed focus-visible:ring-2 focus-visible:ring-primary/70";
+const searchIconCls =
+  "pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300";
 
 /* ---------------- Step 1 ---------------- */
 
@@ -383,49 +389,49 @@ function BasicInfoStep({
   titleRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-6 p-5 pb-8 sm:p-6 sm:pb-8">
       <StepHeader
         eyebrow="Etapa 1 · Dados iniciais"
         title="Conte o essencial da OS"
         description="Quanto melhor o contexto, mais ágil a execução em campo."
       />
-      <div className="space-y-1">
+      <div className="space-y-2">
         <FieldLabel required>Título do serviço</FieldLabel>
         <Input
           ref={titleRef}
           value={draft.title}
           onChange={(e) => set("title", e.target.value)}
           placeholder="Ex.: Manutenção preventiva do compressor 02"
-          className="h-14 rounded-xl border-white/10 bg-white/[0.07] text-base font-semibold text-foreground placeholder:text-white/55 focus-visible:ring-primary/40"
+          className={cn(inputCls, "h-14 text-base font-semibold")}
         />
         <FieldHint>Mínimo 3 caracteres. Use um título curto e específico.</FieldHint>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <FieldLabel>Descrição inicial</FieldLabel>
         <Textarea
           value={draft.description}
           onChange={(e) => set("description", e.target.value)}
           placeholder="Sintomas, escopo, ferramentas, EPI necessário…"
-          className="min-h-32 rounded-xl border-white/10 bg-white/[0.07] text-sm leading-relaxed focus-visible:ring-primary/40"
+          className={textareaCls}
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <FieldLabel>Local / setor</FieldLabel>
           <Input
             value={draft.location}
             onChange={(e) => set("location", e.target.value)}
             placeholder="Ex.: Casa de máquinas"
-            className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+            className={inputCls}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <FieldLabel>Previsão de início</FieldLabel>
           <Input
             type="datetime-local"
             value={draft.scheduled}
             onChange={(e) => set("scheduled", e.target.value)}
-            className="h-12 rounded-xl border-white/15 bg-white/[0.09] text-foreground focus-visible:ring-primary/40 [color-scheme:dark]"
+            className={cn(inputCls, "[color-scheme:dark]")}
           />
           <FieldHint>Quando a execução está prevista para começar.</FieldHint>
         </div>
@@ -460,8 +466,7 @@ function ClientStep({
     const q = query.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) || (c.unit ?? "").toLowerCase().includes(q),
+      (c) => c.name.toLowerCase().includes(q) || (c.unit ?? "").toLowerCase().includes(q),
     );
   }, [clients, query]);
 
@@ -483,7 +488,7 @@ function ClientStep({
   });
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 2 · Cliente"
         title="Para quem é esta ordem?"
@@ -501,20 +506,17 @@ function ClientStep({
       {mode === "select" ? (
         <div className="space-y-3">
           <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
+            <Search size={15} className={searchIconCls} />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar cliente ou unidade…"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] pl-10 focus-visible:ring-primary/40"
+              className={cn(inputCls, "pl-10")}
             />
           </div>
-          <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+          <div className="lemarc-form-panel max-h-[min(22rem,52vh)] space-y-1.5 overflow-y-auto rounded-2xl p-1.5 pr-2">
             {filtered.length === 0 && (
-              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
                 Nenhum cliente encontrado. Use “Cadastrar novo”.
               </p>
             )}
@@ -529,20 +531,22 @@ function ClientStep({
                     set("unitId", "");
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition",
+                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     active
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
+                      ? "lemarc-choice-card-active"
+                      : "lemarc-choice-card hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07]",
                   )}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-foreground">{c.name}</div>
+                    <div className="truncate text-sm font-black text-white">{c.name}</div>
                     {c.unit && (
-                      <div className="truncate text-[11px] text-muted-foreground">{c.unit}</div>
+                      <div className="truncate text-[11px] font-semibold text-slate-300">
+                        {c.unit}
+                      </div>
                     )}
                   </div>
                   {active && (
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
                       <Check size={14} />
                     </span>
                   )}
@@ -552,7 +556,7 @@ function ClientStep({
           </div>
 
           {draft.clientId && selectedUnits.length > 0 && (
-            <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="lemarc-form-panel space-y-2 rounded-2xl p-3">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
                 Unidade do cliente
               </p>
@@ -561,10 +565,10 @@ function ClientStep({
                   type="button"
                   onClick={() => set("unitId", "")}
                   className={cn(
-                    "rounded-lg border px-3 py-2 text-left text-[11px] font-bold transition",
+                    "rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     draft.unitId === ""
-                      ? "border-primary/50 bg-primary/10 text-foreground"
-                      : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]",
+                      ? "lemarc-choice-card-active text-white"
+                      : "lemarc-choice-card text-slate-300 hover:border-white/25 hover:text-white",
                   )}
                 >
                   Sem unidade específica
@@ -577,15 +581,15 @@ function ClientStep({
                       type="button"
                       onClick={() => set("unitId", u.id)}
                       className={cn(
-                        "rounded-lg border px-3 py-2 text-left text-[11px] font-bold transition",
+                        "rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                         active
-                          ? "border-primary/50 bg-primary/10 text-foreground"
-                          : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]",
+                          ? "lemarc-choice-card-active text-white"
+                          : "lemarc-choice-card text-slate-300 hover:border-white/25 hover:text-white",
                       )}
                     >
                       <div className="truncate">{u.name}</div>
                       {u.sector && (
-                        <div className="truncate text-[10px] text-muted-foreground/80">
+                        <div className="truncate text-[10px] font-semibold text-slate-400">
                           {u.sector}
                         </div>
                       )}
@@ -597,30 +601,30 @@ function ClientStep({
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="space-y-1">
+        <div className="lemarc-form-panel space-y-4 rounded-2xl p-4">
+          <div className="space-y-2">
             <FieldLabel required>Nome do cliente</FieldLabel>
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Razão social ou nome fantasia"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+              className={inputCls}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <FieldLabel>Unidade (opcional)</FieldLabel>
             <Input
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
               placeholder="Ex.: Filial Campinas"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+              className={inputCls}
             />
           </div>
           <Button
             type="button"
             onClick={() => clientMutation.mutate()}
             disabled={!newName.trim() || clientMutation.isPending}
-            className="h-12 w-full gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-black uppercase tracking-wider"
           >
             <Plus size={16} />
             {clientMutation.isPending ? "Salvando..." : "Salvar e selecionar"}
@@ -655,8 +659,7 @@ function TechnicianStep({
     const q = query.trim().toLowerCase();
     if (!q) return technicians;
     return technicians.filter(
-      (t) =>
-        t.full_name.toLowerCase().includes(q) || (t.role ?? "").toLowerCase().includes(q),
+      (t) => t.full_name.toLowerCase().includes(q) || (t.role ?? "").toLowerCase().includes(q),
     );
   }, [technicians, query]);
 
@@ -672,7 +675,7 @@ function TechnicianStep({
   });
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 3 · Técnico"
         title="Quem vai executar?"
@@ -686,22 +689,22 @@ function TechnicianStep({
           if (!draft.noTech) set("techIds", []);
         }}
         className={cn(
-          "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition",
+          "flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
           draft.noTech
-            ? "border-primary/40 bg-primary/10"
-            : "border-dashed border-white/15 bg-white/[0.02] hover:bg-white/[0.05]",
+            ? "lemarc-choice-card-active"
+            : "lemarc-form-panel border-dashed hover:border-white/30 hover:bg-white/[0.06]",
         )}
       >
         <div>
-          <div className="text-sm font-bold text-foreground">Sem técnico definido</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-sm font-black text-white">Sem técnico definido</div>
+          <div className="text-[11px] font-semibold text-slate-300">
             Atribuir depois, pelo painel da OS.
           </div>
         </div>
         <span
           className={cn(
             "grid h-6 w-6 place-items-center rounded-full",
-            draft.noTech ? "bg-primary text-primary-foreground" : "bg-white/5 text-muted-foreground",
+            draft.noTech ? "bg-primary text-primary-foreground" : "bg-white/[0.08] text-slate-300",
           )}
         >
           {draft.noTech && <Check size={14} />}
@@ -718,12 +721,12 @@ function TechnicianStep({
       />
 
       {!draft.noTech && draft.techIds.length > 0 && (
-        <div className="rounded-xl border border-primary/30 bg-primary/[0.07] p-3">
+        <div className="lemarc-review-card rounded-2xl p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
               Técnicos selecionados
             </p>
-            <span className="rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+            <span className="rounded-full border border-primary/50 bg-primary/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
               {draft.techIds.length} {draft.techIds.length === 1 ? "técnico" : "técnicos"}
             </span>
           </div>
@@ -734,16 +737,19 @@ function TechnicianStep({
               return (
                 <span
                   key={id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-bold text-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-primary/20 px-2.5 py-1 text-[11px] font-black text-white shadow-[0_8px_18px_-14px_hsl(var(--primary)/0.8)]"
                 >
                   {t.full_name}
                   <button
                     type="button"
                     aria-label={`Remover ${t.full_name}`}
                     onClick={() =>
-                      set("techIds", draft.techIds.filter((x) => x !== id))
+                      set(
+                        "techIds",
+                        draft.techIds.filter((x) => x !== id),
+                      )
                     }
-                    className="grid h-4 w-4 place-items-center rounded-full bg-primary/30 text-primary-foreground hover:bg-primary/50"
+                    className="grid h-4 w-4 place-items-center rounded-full bg-primary/45 text-primary-foreground hover:bg-primary/70"
                   >
                     <X size={10} />
                   </button>
@@ -757,20 +763,17 @@ function TechnicianStep({
       {mode === "select" ? (
         <div className="space-y-3">
           <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
+            <Search size={15} className={searchIconCls} />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar técnico ou função…"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] pl-10 focus-visible:ring-primary/40"
+              className={cn(inputCls, "pl-10")}
             />
           </div>
-          <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+          <div className="lemarc-form-panel max-h-[min(22rem,52vh)] space-y-1.5 overflow-y-auto rounded-2xl p-1.5 pr-2">
             {filtered.length === 0 && (
-              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
                 Nenhum técnico encontrado.
               </p>
             )}
@@ -783,28 +786,31 @@ function TechnicianStep({
                   onClick={() => {
                     set("noTech", false);
                     if (active) {
-                      set("techIds", draft.techIds.filter((x) => x !== t.id));
+                      set(
+                        "techIds",
+                        draft.techIds.filter((x) => x !== t.id),
+                      );
                     } else {
                       set("techIds", Array.from(new Set([...draft.techIds, t.id])));
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition",
+                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     active
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
+                      ? "lemarc-choice-card-active"
+                      : "lemarc-choice-card hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07]",
                   )}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-foreground">
-                      {t.full_name}
-                    </div>
+                    <div className="truncate text-sm font-black text-white">{t.full_name}</div>
                     {t.role && (
-                      <div className="truncate text-[11px] text-muted-foreground">{t.role}</div>
+                      <div className="truncate text-[11px] font-semibold text-slate-300">
+                        {t.role}
+                      </div>
                     )}
                   </div>
                   {active && (
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
                       <Check size={14} />
                     </span>
                   )}
@@ -814,30 +820,30 @@ function TechnicianStep({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="space-y-1">
+        <div className="lemarc-form-panel space-y-4 rounded-2xl p-4">
+          <div className="space-y-2">
             <FieldLabel required>Nome do técnico</FieldLabel>
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Nome completo"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+              className={inputCls}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <FieldLabel>Função (opcional)</FieldLabel>
             <Input
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
               placeholder="Ex.: Eletricista industrial"
-              className="h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
+              className={inputCls}
             />
           </div>
           <Button
             type="button"
             onClick={() => techMutation.mutate()}
             disabled={!newName.trim() || techMutation.isPending}
-            className="h-12 w-full gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-black uppercase tracking-wider"
           >
             <Plus size={16} />
             {techMutation.isPending ? "Salvando..." : "Salvar e selecionar"}
@@ -876,16 +882,23 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("type", key)}
                 className={cn(
-                  "group flex min-h-[88px] flex-col items-start gap-2 rounded-xl border px-3 py-3.5 text-left transition",
+                  "group relative flex min-h-[92px] flex-col items-start gap-2 rounded-xl border px-3 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                   active
-                    ? "border-primary/70 bg-primary/20 text-foreground shadow-[0_10px_28px_-14px_hsl(var(--primary)/0.8)] ring-1 ring-primary/60"
-                    : "border-white/10 bg-white/[0.03] text-muted-foreground hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-foreground",
+                    ? "lemarc-choice-card-active text-white"
+                    : "lemarc-choice-card text-slate-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07] hover:text-white",
                 )}
               >
+                {active && (
+                  <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
+                    <Check size={12} />
+                  </span>
+                )}
                 <span
                   className={cn(
                     "grid h-9 w-9 place-items-center rounded-lg",
-                    active ? "bg-primary text-primary-foreground" : "bg-white/5 text-foreground",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white/[0.08] text-slate-100",
                   )}
                 >
                   <Icon size={16} />
@@ -900,13 +913,13 @@ function ServiceTypeStep({
       </div>
 
       {draft.type === "outro" && (
-        <div className="space-y-1 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
+        <div className="lemarc-form-panel space-y-2 rounded-2xl p-4">
           <FieldLabel required>Descreva o tipo de serviço</FieldLabel>
           <Input
             value={draft.typeOther}
             onChange={(e) => set("typeOther", e.target.value)}
             placeholder="Ex.: Calibração de sensores de vazão"
-            className="h-12 rounded-xl border-white/15 bg-white/[0.09] focus-visible:ring-primary/40"
+            className={inputCls}
             autoFocus
           />
           <FieldHint>Mínimo 3 caracteres. Este texto aparecerá na OS.</FieldHint>
@@ -924,11 +937,14 @@ function ServiceTypeStep({
                 type="button"
                 onClick={() => set("priority", key)}
                 className={cn(
-                  "min-h-12 rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition",
+                  "min-h-12 rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                   active ? priorityActive[key] : priorityTone[key],
                 )}
               >
-                {label}
+                <span className="inline-flex items-center justify-center gap-2">
+                  {active && <Check size={13} />}
+                  {label}
+                </span>
               </button>
             );
           })}
@@ -943,28 +959,32 @@ function ServiceTypeStep({
 function ReviewStep({
   draft,
   clients,
+  units,
   technicians,
 }: {
   draft: Draft;
   clients: { id: string; name: string; unit: string | null }[];
+  units: { id: string; client_id: string; name: string; sector: string | null }[];
   technicians: { id: string; full_name: string; role: string | null }[];
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
+  const unit = units.find((u) => u.id === draft.unitId);
   const selectedTechs = draft.techIds
     .map((id) => technicians.find((t) => t.id === id))
     .filter((t): t is { id: string; full_name: string; role: string | null } => Boolean(t));
   const scheduledLabel = draft.scheduled
     ? new Date(draft.scheduled).toLocaleString("pt-BR")
-    : "—";
+    : "Sem previsão definida";
+  const unitLabel = unit
+    ? [unit.name, unit.sector].filter(Boolean).join(" · ")
+    : client?.unit || "Não informado";
   const typeLabel =
-    draft.type === "outro"
-      ? draft.typeOther.trim() || "Outro"
-      : serviceTypeLabel[draft.type];
+    draft.type === "outro" ? draft.typeOther.trim() || "Outro" : serviceTypeLabel[draft.type];
   const priorityChip: Record<ServicePriority, string> = {
-    baixa: "border-white/20 bg-white/10 text-foreground",
-    media: "border-primary/60 bg-primary/20 text-primary",
-    alta: "border-amber-400/60 bg-amber-400/20 text-amber-200",
-    urgente: "border-rose-500/60 bg-rose-500/20 text-rose-200",
+    baixa: "border-slate-200/25 bg-white/10 text-slate-100",
+    media: "border-primary/70 bg-primary/22 text-orange-100",
+    alta: "border-amber-300/70 bg-amber-400/22 text-amber-100",
+    urgente: "border-rose-300/70 bg-rose-500/22 text-rose-100",
   };
   return (
     <div className="space-y-4">
@@ -974,15 +994,15 @@ function ReviewStep({
           title="Confira antes de criar"
           description="Você ainda pode voltar e ajustar qualquer dado."
         />
-        <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-white/[0.04] to-transparent p-4 shadow-[0_18px_44px_-26px_rgba(0,0,0,0.7)]">
+        <div className="lemarc-summary-panel rounded-2xl p-4 sm:p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
             Título do serviço
           </p>
-          <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-foreground sm:text-2xl">
-            {draft.title || "—"}
+          <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+            {draft.title || "Não informado"}
           </h3>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/15 bg-white/[0.07] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100">
               {typeLabel}
             </span>
             <span
@@ -1000,20 +1020,20 @@ function ReviewStep({
       <div className="grid gap-3 sm:grid-cols-2">
         <ReviewSection title="Dados iniciais" icon={FileText}>
           <ReviewField label="Descrição">
-            {draft.description?.trim() || "—"}
+            {draft.description?.trim() || "Não informado"}
           </ReviewField>
         </ReviewSection>
 
         <ReviewSection title="Local e previsão" icon={MapPin}>
-          <ReviewField label="Local / setor">{draft.location || "—"}</ReviewField>
+          <ReviewField label="Local / setor">{draft.location || "Não informado"}</ReviewField>
           <ReviewField label="Previsão de início" icon={CalendarClock}>
             {scheduledLabel}
           </ReviewField>
         </ReviewSection>
 
         <ReviewSection title="Cliente e técnico" icon={Building2}>
-          <ReviewField label="Cliente">{client?.name ?? "—"}</ReviewField>
-          <ReviewField label="Unidade">{client?.unit ?? "—"}</ReviewField>
+          <ReviewField label="Cliente">{client?.name ?? "Não informado"}</ReviewField>
+          <ReviewField label="Unidade">{unitLabel}</ReviewField>
           <ReviewField label="Técnicos responsáveis" icon={HardHat}>
             {draft.noTech || selectedTechs.length === 0 ? (
               "Sem técnico definido"
@@ -1023,7 +1043,7 @@ function ReviewStep({
                   <span key={t.id} className="leading-snug">
                     {t.full_name}
                     {t.role ? (
-                      <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                      <span className="ml-1 text-[11px] font-semibold text-slate-300">
                         · {t.role}
                       </span>
                     ) : null}
@@ -1067,14 +1087,12 @@ function ReviewSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/[0.06] p-4 shadow-[0_12px_36px_-24px_rgba(0,0,0,0.6)]">
+    <div className="lemarc-review-card rounded-2xl p-4">
       <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
+        <span className="grid h-8 w-8 place-items-center rounded-lg border border-primary/30 bg-primary/18 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
           <Icon size={14} />
         </span>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-          {title}
-        </p>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{title}</p>
       </div>
       <div className="mt-3 space-y-3">{children}</div>
     </div>
@@ -1092,13 +1110,11 @@ function ReviewField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">
+      <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
         {Icon && <Icon size={11} />}
         {label}
       </span>
-      <span className="text-sm font-semibold leading-snug text-foreground">
-        {children}
-      </span>
+      <span className="text-sm font-bold leading-relaxed text-white">{children}</span>
     </div>
   );
 }
@@ -1117,12 +1133,10 @@ function StepHeader({
   return (
     <div>
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
-      <h2 className="mt-1 font-display text-xl font-black leading-tight text-foreground sm:text-2xl">
+      <h2 className="mt-1 font-display text-xl font-black leading-tight text-white sm:text-2xl">
         {title}
       </h2>
-      {description && (
-        <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
-      )}
+      {description && <p className="lemarc-form-help mt-1.5 text-sm font-medium">{description}</p>}
     </div>
   );
 }
@@ -1137,7 +1151,7 @@ function Segmented<T extends string>({
   items: { value: T; label: string }[];
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/[0.07] p-1">
+    <div className="lemarc-form-panel grid grid-cols-2 gap-1 rounded-2xl p-1">
       {items.map((it) => {
         const active = value === it.value;
         return (
@@ -1146,10 +1160,10 @@ function Segmented<T extends string>({
             type="button"
             onClick={() => onChange(it.value)}
             className={cn(
-              "rounded-lg px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition",
+              "rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               active
-                ? "bg-primary text-primary-foreground shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.8)]"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-primary text-primary-foreground shadow-[0_8px_22px_-12px_hsl(var(--primary)/0.9)]"
+                : "text-slate-300 hover:bg-white/[0.07] hover:text-white",
             )}
           >
             {it.label}
