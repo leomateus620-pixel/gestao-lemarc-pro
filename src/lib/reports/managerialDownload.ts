@@ -541,17 +541,17 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
   section("Lista detalhada de OS");
   table(
     [
-      { label: "Nº", width: 11, align: "right" },
-      { label: "Título", width: 36 },
-      { label: "Cliente", width: 36 },
-      { label: "Técnico(s)", width: 30 },
-      { label: "Status", width: 22, badge: true },
-      { label: "Abertura", width: 17, align: "right" },
-      { label: "Fechamento", width: 19, align: "right" },
-      { label: "Tempo", width: 15, align: "right" },
+      { label: "Nº", width: 9, align: "right" },
+      { label: "Título", width: 28 },
+      { label: "Cliente", width: 26 },
+      { label: "Técnico(s)", width: 22 },
+      { label: "Status", width: 20, badge: true },
+      { label: "Abertura", width: 14, align: "right" },
+      { label: "Fechamento", width: 14, align: "right" },
+      { label: "Tempo", width: 22, align: "right" },
       {
         label: "Valor",
-        width: contentWidth - 11 - 36 - 36 - 30 - 22 - 17 - 19 - 15,
+        width: contentWidth - 9 - 28 - 26 - 22 - 20 - 14 - 14 - 22,
         align: "right",
       },
     ],
