@@ -35,7 +35,7 @@ import {
 } from "@/components/reports/ReportOrdersTable";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 
-export const Route = createFileRoute("/_app/relatorios/cliente/$clientId")({
+export const Route = createFileRoute("/_app/relatorios_/cliente/$clientId")({
   head: () => ({ meta: [{ title: "Relatório por cliente — Gestão Lemarc" }] }),
   validateSearch: zodValidator(reportSearchSchema),
   component: ClientReportPage,

@@ -42,6 +42,7 @@ const BILLING_KEYS = Object.keys(billingStatusLabel) as BillingStatus[];
 const ALL = "__all__";
 
 const QUICK_PERIODS: { key: PeriodKey; label: string; hint: string }[] = [
+  { key: "today", label: "Hoje", hint: "OS do dia" },
   { key: "week", label: "Semana atual", hint: "Últimos 7 dias" },
   { key: "month", label: "Mês atual", hint: "Últimos 30 dias" },
   { key: "last30", label: "Últimos 30 dias", hint: "Janela móvel" },
@@ -141,7 +142,7 @@ function PeriodPicker({
   return (
     <section>
       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Período</div>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {QUICK_PERIODS.map((p) => {
           const active = filters.period === p.key;
           return (

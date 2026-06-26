@@ -9,7 +9,7 @@ import { useAuth } from "@/components/app/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 
-export const Route = createFileRoute("/_app/relatorios/imprimir")({
+export const Route = createFileRoute("/_app/relatorios_/imprimir")({
   head: () => ({ meta: [{ title: "Relatório gerencial — Gestão Lemarc" }] }),
   validateSearch: zodValidator(reportSearchSchema),
   staticData: { hideBottomNav: true },

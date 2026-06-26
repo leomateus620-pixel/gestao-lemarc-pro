@@ -18,12 +18,12 @@ import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradore
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
 import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
-import { Route as AppRelatoriosImprimirRouteImport } from './routes/_app.relatorios.imprimir'
+import { Route as AppRelatoriosImprimirRouteImport } from './routes/_app.relatorios_.imprimir'
 import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
 import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes.$id'
-import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios.cliente.$clientId'
+import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
 import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
 import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
 
@@ -72,9 +72,9 @@ const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
   getParentRoute: () => AppClientesRoute,
 } as any)
 const AppRelatoriosImprimirRoute = AppRelatoriosImprimirRouteImport.update({
-  id: '/imprimir',
-  path: '/imprimir',
-  getParentRoute: () => AppRelatoriosRoute,
+  id: '/relatorios_/imprimir',
+  path: '/relatorios/imprimir',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppOrdensNovaRoute = AppOrdensNovaRouteImport.update({
   id: '/ordens/nova',
@@ -98,9 +98,9 @@ const AppClientesIdRoute = AppClientesIdRouteImport.update({
 } as any)
 const AppRelatoriosClienteClientIdRoute =
   AppRelatoriosClienteClientIdRouteImport.update({
-    id: '/cliente/$clientId',
-    path: '/cliente/$clientId',
-    getParentRoute: () => AppRelatoriosRoute,
+    id: '/relatorios_/cliente/$clientId',
+    path: '/relatorios/cliente/$clientId',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
   id: '/imprimir',
@@ -119,7 +119,7 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AppClientesRouteWithChildren
   '/colaboradores': typeof AppColaboradoresRoute
   '/dashboard': typeof AppDashboardRoute
-  '/relatorios': typeof AppRelatoriosRouteWithChildren
+  '/relatorios': typeof AppRelatoriosRoute
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
   '/ordens/$id': typeof AppOrdensIdRouteWithChildren
@@ -136,7 +136,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/colaboradores': typeof AppColaboradoresRoute
   '/dashboard': typeof AppDashboardRoute
-  '/relatorios': typeof AppRelatoriosRouteWithChildren
+  '/relatorios': typeof AppRelatoriosRoute
   '/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/clientes/novo': typeof AppClientesNovoRoute
   '/ordens/$id': typeof AppOrdensIdRouteWithChildren
@@ -156,17 +156,17 @@ export interface FileRoutesById {
   '/_app/clientes': typeof AppClientesRouteWithChildren
   '/_app/colaboradores': typeof AppColaboradoresRoute
   '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/relatorios': typeof AppRelatoriosRouteWithChildren
+  '/_app/relatorios': typeof AppRelatoriosRoute
   '/_app/clientes/$id': typeof AppClientesIdRouteWithChildren
   '/_app/clientes/novo': typeof AppClientesNovoRoute
   '/_app/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/_app/ordens/nova': typeof AppOrdensNovaRoute
-  '/_app/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
+  '/_app/relatorios_/imprimir': typeof AppRelatoriosImprimirRoute
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
   '/_app/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
-  '/_app/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/_app/relatorios_/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,12 +217,12 @@ export interface FileRouteTypes {
     | '/_app/clientes/novo'
     | '/_app/ordens/$id'
     | '/_app/ordens/nova'
-    | '/_app/relatorios/imprimir'
+    | '/_app/relatorios_/imprimir'
     | '/_app/clientes/'
     | '/_app/ordens/'
     | '/_app/clientes/$id/editar'
     | '/_app/ordens/$id/imprimir'
-    | '/_app/relatorios/cliente/$clientId'
+    | '/_app/relatorios_/cliente/$clientId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -296,12 +296,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIndexRouteImport
       parentRoute: typeof AppClientesRoute
     }
-    '/_app/relatorios/imprimir': {
-      id: '/_app/relatorios/imprimir'
-      path: '/imprimir'
+    '/_app/relatorios_/imprimir': {
+      id: '/_app/relatorios_/imprimir'
+      path: '/relatorios/imprimir'
       fullPath: '/relatorios/imprimir'
       preLoaderRoute: typeof AppRelatoriosImprimirRouteImport
-      parentRoute: typeof AppRelatoriosRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/ordens/nova': {
       id: '/_app/ordens/nova'
@@ -331,12 +331,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppClientesRoute
     }
-    '/_app/relatorios/cliente/$clientId': {
-      id: '/_app/relatorios/cliente/$clientId'
-      path: '/cliente/$clientId'
+    '/_app/relatorios_/cliente/$clientId': {
+      id: '/_app/relatorios_/cliente/$clientId'
+      path: '/relatorios/cliente/$clientId'
       fullPath: '/relatorios/cliente/$clientId'
       preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
-      parentRoute: typeof AppRelatoriosRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/ordens/$id/imprimir': {
       id: '/_app/ordens/$id/imprimir'
@@ -383,20 +383,6 @@ const AppClientesRouteWithChildren = AppClientesRoute._addFileChildren(
   AppClientesRouteChildren,
 )
 
-interface AppRelatoriosRouteChildren {
-  AppRelatoriosImprimirRoute: typeof AppRelatoriosImprimirRoute
-  AppRelatoriosClienteClientIdRoute: typeof AppRelatoriosClienteClientIdRoute
-}
-
-const AppRelatoriosRouteChildren: AppRelatoriosRouteChildren = {
-  AppRelatoriosImprimirRoute: AppRelatoriosImprimirRoute,
-  AppRelatoriosClienteClientIdRoute: AppRelatoriosClienteClientIdRoute,
-}
-
-const AppRelatoriosRouteWithChildren = AppRelatoriosRoute._addFileChildren(
-  AppRelatoriosRouteChildren,
-)
-
 interface AppOrdensIdRouteChildren {
   AppOrdensIdImprimirRoute: typeof AppOrdensIdImprimirRoute
 }
@@ -413,20 +399,24 @@ interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRouteWithChildren
   AppColaboradoresRoute: typeof AppColaboradoresRoute
   AppDashboardRoute: typeof AppDashboardRoute
-  AppRelatoriosRoute: typeof AppRelatoriosRouteWithChildren
+  AppRelatoriosRoute: typeof AppRelatoriosRoute
   AppOrdensIdRoute: typeof AppOrdensIdRouteWithChildren
   AppOrdensNovaRoute: typeof AppOrdensNovaRoute
+  AppRelatoriosImprimirRoute: typeof AppRelatoriosImprimirRoute
   AppOrdensIndexRoute: typeof AppOrdensIndexRoute
+  AppRelatoriosClienteClientIdRoute: typeof AppRelatoriosClienteClientIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRouteWithChildren,
   AppColaboradoresRoute: AppColaboradoresRoute,
   AppDashboardRoute: AppDashboardRoute,
-  AppRelatoriosRoute: AppRelatoriosRouteWithChildren,
+  AppRelatoriosRoute: AppRelatoriosRoute,
   AppOrdensIdRoute: AppOrdensIdRouteWithChildren,
   AppOrdensNovaRoute: AppOrdensNovaRoute,
+  AppRelatoriosImprimirRoute: AppRelatoriosImprimirRoute,
   AppOrdensIndexRoute: AppOrdensIndexRoute,
+  AppRelatoriosClienteClientIdRoute: AppRelatoriosClienteClientIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
