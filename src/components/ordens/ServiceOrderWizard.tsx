@@ -50,6 +50,7 @@ type Draft = {
   unitId: string;
   techIds: string[];
   noTech: boolean;
+  requesterName: string;
   type: ServiceType;
   typeOther: string;
   priority: ServicePriority;
@@ -111,6 +112,7 @@ export function ServiceOrderWizard({
     unitId: initialUnitId ?? "",
     techIds: [],
     noTech: false,
+    requesterName: "",
     type: "mecanica",
     typeOther: "",
     priority: "media",
@@ -133,7 +135,7 @@ export function ServiceOrderWizard({
     return [
       draft.title.trim().length >= 3,
       Boolean(draft.clientId),
-      draft.techIds.length > 0 || draft.noTech,
+      (draft.techIds.length > 0 || draft.noTech) && draft.requesterName.trim().length >= 2,
       Boolean(draft.type) &&
         Boolean(draft.priority) &&
         (draft.type !== "outro" || draft.typeOther.trim().length >= 3),
@@ -155,6 +157,7 @@ export function ServiceOrderWizard({
           service_type_other: draft.type === "outro" ? draft.typeOther.trim() : null,
           priority: draft.priority,
           location: draft.location || null,
+          requester_name: draft.requesterName.trim() || null,
           scheduled_for: draft.scheduled ? new Date(draft.scheduled).toISOString() : null,
         },
       }),
