@@ -82,6 +82,7 @@ export type ServiceOrder = {
   priority: ServicePriority | null;
   status: ServiceOrderStatus;
   location: string | null;
+  requester_name: string | null;
   scheduled_for: string | null;
   opened_at: string;
   started_at: string | null;
