@@ -138,6 +138,20 @@ export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInp
     return x + h + 2 + Math.max(w - h - 2, 22);
   };
 
+  const drawLogo = (x: number, yy: number, targetHeight: number) => {
+    const w = targetHeight * LEMARC_LOGO_ASPECT;
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, "PNG", x, yy, w, targetHeight, undefined, "FAST");
+        return w;
+      } catch {
+        // fall through to typographic fallback
+      }
+    }
+    drawLogoMark(x, yy, w, targetHeight);
+    return w;
+  };
+
   const drawHeader = () => {
     const top = margin;
     if (isFirstPage) {
