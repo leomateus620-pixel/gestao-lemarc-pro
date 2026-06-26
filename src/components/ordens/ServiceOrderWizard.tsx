@@ -680,10 +680,23 @@ function TechnicianStep({
   return (
     <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
       <StepHeader
-        eyebrow="Etapa 3 · Técnico"
-        title="Quem vai executar?"
-        description="Você pode atribuir um técnico agora ou deixar para definir depois."
+        eyebrow="Etapa 3 · Solicitante e técnico"
+        title="Quem pediu e quem vai executar?"
+        description="Informe quem solicitou esta OS e, se quiser, já atribua o técnico responsável."
       />
+
+      <div className="lemarc-form-panel space-y-2 rounded-2xl p-4">
+        <FieldLabel required>Solicitante da OS</FieldLabel>
+        <Input
+          value={draft.requesterName}
+          onChange={(e) => set("requesterName", e.target.value.slice(0, 120))}
+          placeholder="Nome de quem solicitou o serviço"
+          className={inputCls}
+          maxLength={120}
+          autoComplete="off"
+        />
+        <FieldHint>Pessoa responsável pela abertura desta OS no cliente.</FieldHint>
+      </div>
 
       <button
         type="button"
