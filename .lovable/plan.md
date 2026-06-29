@@ -1,37 +1,22 @@
-# Adicionar "Solicitante" na Etapa 3 da Nova OS
+# Corrigir "permission denied for function has_role"
 
-## O que muda
-Hoje a Etapa 3 ("Técnico") só pede o executor. Vou adicionar um campo **Solicitante** (nome em texto livre), **obrigatório** para avançar, persistido junto à OS e exibido na Revisão, no detalhe da OS, nos relatórios/impressão.
+## Causa
+Na correção de segurança anterior, revoguei `EXECUTE` da função `public.has_role` para `authenticated` e `anon`. Mesmo sendo `SECURITY DEFINER`, o Postgres verifica a permissão de **EXECUTE do chamador** antes de invocar a função. Como todas as políticas RLS (clientes, OSs, técnicos, etc.) chamam `has_role(auth.uid(), 'admin')`, qualquer query do app passou a falhar com `permission denied for function has_role` — daí o "Algo deu errado".
 
-## Backend
-- **Migração**: adicionar coluna `requester_name text` em `public.service_orders` (nullable no banco para não quebrar registros antigos; obrigatoriedade fica no formulário/validação).
-- Sem novas policies/tabelas; coluna simples.
+## Correção
+Migração curta restaurando o `EXECUTE` para os roles que executam políticas RLS:
 
-## Server function
-- `src/lib/api/serviceOrders.functions.ts`
-  - Incluir `requester_name` no `ORDER_SELECT`.
-  - Aceitar `requester_name` em `CreateInput` e no `insert`.
-  - Adicionar `updateServiceOrderRequester` (ou estender o update já existente) para permitir edição posterior. (Apenas se houver patch genérico; senão fica só na criação por enquanto.)
-- `src/types/serviceOrder.ts`: adicionar `requester_name: string | null`.
+```sql
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role) TO authenticated, anon;
+```
 
-## Wizard (Etapa 3)
-- `src/components/ordens/ServiceOrderWizard.tsx`:
-  - Estender o `draft` com `requesterName: string`.
-  - Em `TechnicianStep`, adicionar bloco no topo "Solicitante da OS" com `<Input>` (nome, max 120, trim), helper text "Quem solicitou esta OS".
-  - Atualizar `validity[2]` para exigir `requesterName.trim().length >= 2` (além das regras atuais de técnico, se houver).
-  - Atualizar `StepHeader` para refletir os dois subtemas ou manter eyebrow "Etapa 3 · Técnico & Solicitante".
-  - Passar `requester_name` no payload do `createServiceOrder`.
+`service_role` já tem acesso e segue inalterado.
 
-## Revisão e leitura
-- `ReviewStep`: mostrar "Solicitante: <nome>".
-- `src/routes/_app.ordens.$id.tsx` (detalhe): exibir o solicitante na ficha.
-- `src/components/reports/print/ServiceOrderReportDocument.tsx` e `ManagerialReportDocument`: incluir solicitante na ficha quando disponível.
-- `ReportOrderRow`/relatórios: incluir `requester_name` se já houver projeção da OS.
+## Sobre o aviso de segurança original
+O linter sinaliza "SECURITY DEFINER executável por usuário autenticado" como `warn`. No nosso caso, isso é **intencional e necessário**: `has_role` é a função canônica usada dentro das políticas RLS (padrão recomendado da Supabase). Ela apenas verifica se o `_user_id` informado possui um determinado papel — não expõe nem altera dados. Após restaurar o GRANT, vou marcar essa finding como **ignored** no scanner, explicando que é um falso positivo para esse uso.
+
+A outra correção (políticas de `service_order_technicians` restritas a `authenticated` em vez de `public`) permanece em vigor — esta migração não a desfaz.
 
 ## Validação
-- `tsgo` para tipos.
-- Conferir manualmente no preview que a Etapa 3 só avança com solicitante preenchido e que o nome aparece na Revisão e no detalhe da OS após criar.
-
-## Não inclui
-- Cadastro reutilizável de solicitantes (tabela própria, contatos por unidade) — pode ser proposto depois.
-- Edição em massa de OSs antigas (ficam com solicitante vazio).
+- Reabrir o app e confirmar que dashboard, listagens de OS e clientes carregam normalmente.
+- Verificar no console que `permission denied for function has_role` desaparece.
