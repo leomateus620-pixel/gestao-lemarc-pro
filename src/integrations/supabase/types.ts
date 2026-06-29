@@ -568,37 +568,111 @@ export type Database = {
         }
         Relationships: []
       }
-      technicians: {
+      technician_rate_history: {
         Row: {
           created_at: string
-          created_by: string
-          full_name: string
+          created_by: string | null
+          hourly_rate_100_cents: number | null
+          hourly_rate_50_cents: number | null
           hourly_rate_cents: number | null
           id: string
+          notes: string | null
+          starts_at: string
+          technician_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hourly_rate_100_cents?: number | null
+          hourly_rate_50_cents?: number | null
+          hourly_rate_cents?: number | null
+          id?: string
+          notes?: string | null
+          starts_at?: string
+          technician_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hourly_rate_100_cents?: number | null
+          hourly_rate_50_cents?: number | null
+          hourly_rate_cents?: number | null
+          id?: string
+          notes?: string | null
+          starts_at?: string
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_rate_history_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technicians: {
+        Row: {
+          active: boolean
+          cpf: string | null
+          created_at: string
+          created_by: string
+          default_availability: string | null
+          email: string | null
+          full_name: string
+          hourly_rate_100_cents: number | null
+          hourly_rate_50_cents: number | null
+          hourly_rate_cents: number | null
+          id: string
+          internal_notes: string | null
+          kind: string | null
           phone: string | null
+          pricing_notes: string | null
           role: string | null
+          specialty: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          active?: boolean
+          cpf?: string | null
           created_at?: string
           created_by: string
+          default_availability?: string | null
+          email?: string | null
           full_name: string
+          hourly_rate_100_cents?: number | null
+          hourly_rate_50_cents?: number | null
           hourly_rate_cents?: number | null
           id?: string
+          internal_notes?: string | null
+          kind?: string | null
           phone?: string | null
+          pricing_notes?: string | null
           role?: string | null
+          specialty?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          active?: boolean
+          cpf?: string | null
           created_at?: string
           created_by?: string
+          default_availability?: string | null
+          email?: string | null
           full_name?: string
+          hourly_rate_100_cents?: number | null
+          hourly_rate_50_cents?: number | null
           hourly_rate_cents?: number | null
           id?: string
+          internal_notes?: string | null
+          kind?: string | null
           phone?: string | null
+          pricing_notes?: string | null
           role?: string | null
+          specialty?: string | null
           updated_at?: string
           user_id?: string | null
         }
