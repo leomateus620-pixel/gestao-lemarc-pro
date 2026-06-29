@@ -15,7 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { TechnicianInput } from "@/lib/api/serviceOrders.functions";
 import type { TechnicianLite } from "@/types/serviceOrder";
 import { cn } from "@/lib/utils";
-import { centsToInput, formatCurrency, parseCurrencyInput } from "./format";
+import {
+  centsToInput,
+  formatCpf,
+  formatCurrency,
+  formatPhone,
+  parseCurrencyInput,
+} from "./format";
 
 const steps = ["Dados", "Operação", "Valor/hora", "Acesso", "Revisão"] as const;
 
@@ -150,7 +156,8 @@ export function CollaboratorForm({
               <Field label="Telefone">
                 <Input
                   value={draft.phone}
-                  onChange={(event) => set("phone", event.target.value)}
+                  onChange={(event) => set("phone", formatPhone(event.target.value))}
+                  inputMode="tel"
                   className="lemarc-form-control h-12 rounded-xl"
                   placeholder="(55) 99999-0000"
                 />
@@ -159,6 +166,8 @@ export function CollaboratorForm({
                 <Input
                   value={draft.email}
                   onChange={(event) => set("email", event.target.value)}
+                  type="email"
+                  inputMode="email"
                   className="lemarc-form-control h-12 rounded-xl"
                   placeholder="nome@lemarc.com.br"
                 />
@@ -166,7 +175,8 @@ export function CollaboratorForm({
               <Field label="CPF opcional">
                 <Input
                   value={draft.cpf}
-                  onChange={(event) => set("cpf", event.target.value)}
+                  onChange={(event) => set("cpf", formatCpf(event.target.value))}
+                  inputMode="numeric"
                   className="lemarc-form-control h-12 rounded-xl"
                   placeholder="000.000.000-00"
                 />
@@ -295,24 +305,39 @@ export function CollaboratorForm({
 
         {step === 3 && (
           <div className="space-y-5">
-            <StepTitle icon={ShieldCheck} label="Acesso" title="Vínculo com usuário do sistema" />
-            <Field label="ID do usuário vinculado">
-              <Input
-                value={draft.userId}
-                onChange={(event) => set("userId", event.target.value)}
-                className="lemarc-form-control h-12 rounded-xl"
-                placeholder="UUID do usuário, se já existir"
-              />
-            </Field>
+            <StepTitle
+              icon={ShieldCheck}
+              label="Acesso (opcional)"
+              title="Vincular usuário do sistema"
+            />
             <div className="lemarc-form-panel rounded-2xl p-4">
               <p className="text-sm font-black text-white">
-                Cadastro interno sem login continua permitido.
+                Etapa opcional — pode salvar sem vincular usuário.
               </p>
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
-                O campo fica preparado para o futuro portal do técnico, sem expor valor/hora em
-                telas de campo nesta etapa.
+                Use este campo apenas quando o colaborador já tiver login no sistema. O ID do
+                usuário é gerado automaticamente no cadastro de acesso e fica preparado para o
+                futuro portal do técnico.
               </p>
             </div>
+            <details className="rounded-2xl border border-white/[0.1] bg-white/[0.035] p-4">
+              <summary className="cursor-pointer text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
+                Avançado · Vincular usuário existente
+              </summary>
+              <div className="mt-3 space-y-2">
+                <Field label="ID do usuário (UUID)">
+                  <Input
+                    value={draft.userId}
+                    onChange={(event) => set("userId", event.target.value)}
+                    className="lemarc-form-control h-12 rounded-xl font-mono text-[12px]"
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                  />
+                </Field>
+                <p className="text-[11px] font-semibold text-slate-400">
+                  Deixe em branco se não houver login criado para este colaborador.
+                </p>
+              </div>
+            </details>
           </div>
         )}
 
