@@ -2,6 +2,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listClients, listServiceOrders, listTechnicians } from "@/lib/api/serviceOrders.functions";
 import { listTechnicianLaborHistory } from "@/lib/api/financials.functions";
+import type { TechnicianLite } from "@/types/serviceOrder";
 
 export function useServiceOrdersQuery() {
   const fetcher = useServerFn(listServiceOrders);
@@ -30,7 +31,7 @@ export function useTechniciansQuery() {
   return useSuspenseQuery(
     queryOptions({
       queryKey: ["technicians"],
-      queryFn: () => fetcher(),
+      queryFn: () => fetcher() as Promise<TechnicianLite[]>,
       staleTime: 60_000,
     }),
   );
