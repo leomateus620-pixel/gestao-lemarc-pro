@@ -15,7 +15,7 @@ import type {
   CollaboratorSummary,
 } from "@/lib/serviceOrders/collaborators";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatMinutes, formatShortDate, initials } from "./format";
+import { formatCurrency, formatMinutes, formatShortDate, initials, toTitleCase } from "./format";
 
 const statusClass: Record<CollaboratorOperationalStatus, string> = {
   "Em campo": "border-primary/45 bg-primary/16 text-primary",
@@ -28,6 +28,9 @@ const statusClass: Record<CollaboratorOperationalStatus, string> = {
 export function CollaboratorIslandRow({ collaborator }: { collaborator: CollaboratorSummary }) {
   const [expanded, setExpanded] = useState(false);
   const latest = collaborator.history[0];
+  const displayName = toTitleCase(collaborator.name) || collaborator.name;
+  const displayRole = collaborator.role?.trim() || "Sem função";
+  const hasRate = (collaborator.hourlyRateCents ?? 0) > 0;
 
   return (
     <article
@@ -40,34 +43,43 @@ export function CollaboratorIslandRow({ collaborator }: { collaborator: Collabor
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="grid w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/70 md:grid-cols-[auto_1.25fr_0.8fr_0.85fr_0.75fr_0.7fr_1.1fr_auto]"
+        className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/70 md:grid-cols-[auto_minmax(0,1.4fr)_auto_auto_auto_auto_minmax(0,1fr)_auto]"
         aria-expanded={expanded}
       >
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-primary/35 bg-primary/14 font-display text-xs font-black uppercase text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
-          {initials(collaborator.name)}
+        <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/35 bg-primary/14 font-display text-[11px] font-black uppercase text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+          {initials(displayName)}
         </span>
 
         <span className="min-w-0">
           <span className="block truncate font-display text-[15px] font-black leading-tight text-white">
-            {collaborator.name}
+            {displayName}
           </span>
-          <span className="mt-1 block truncate text-[11px] font-bold text-slate-400 md:hidden">
-            {collaborator.role ?? "Sem função"} · {collaborator.status}
+          <span className="mt-0.5 hidden truncate text-[12px] font-semibold text-slate-300 md:block">
+            {displayRole}
           </span>
-          <span className="mt-1 block truncate text-[11px] font-black text-slate-200 md:hidden">
-            {formatMinutes(collaborator.hoursMonthMinutes)} mês · {collaborator.ordersOpen} OS
-            abertas
+          <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 md:hidden">
+            <MobileStatusPill status={collaborator.status} />
+            <span className="truncate text-[11px] font-semibold text-slate-300">{displayRole}</span>
           </span>
-        </span>
-
-        <span className="hidden min-w-0 truncate text-xs font-bold text-slate-300 md:block">
-          {collaborator.role ?? "Sem função"}
+          <span className="mt-1 block truncate text-[11px] font-bold tabular-nums text-slate-200 md:hidden">
+            {formatMinutes(collaborator.hoursMonthRealMinutes)} mês ·{" "}
+            {collaborator.ordersOpen} OS abertas
+            {!hasRate && " · R$/h a definir"}
+          </span>
         </span>
 
         <StatusPill status={collaborator.status} />
 
-        <Metric label="R$/h" value={formatCurrency(collaborator.hourlyRateCents)} />
-        <Metric label="Horas mês" value={formatMinutes(collaborator.hoursMonthMinutes)} />
+        <RatePill cents={collaborator.hourlyRateCents} />
+        <Metric
+          label="Horas mês"
+          value={formatMinutes(collaborator.hoursMonthRealMinutes)}
+          hint={
+            collaborator.hoursMonthEstimatedMinutes > 0
+              ? `+${formatMinutes(collaborator.hoursMonthEstimatedMinutes)} est.`
+              : undefined
+          }
+        />
         <Metric label="OS abertas" value={String(collaborator.ordersOpen)} />
 
         <span className="hidden min-w-0 truncate text-[11px] font-semibold text-slate-400 md:block">
@@ -90,22 +102,36 @@ export function CollaboratorIslandRow({ collaborator }: { collaborator: Collabor
       >
         <div className="min-h-0 overflow-hidden">
           <div className="mt-4 border-t border-white/[0.08] pt-4">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              <ExpandedMetric
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] font-semibold text-slate-300">
+              <RulerItem
                 label="Valor mês"
-                value={formatCurrency(collaborator.valueMonthCents)}
+                value={formatCurrency(
+                  collaborator.valueMonthCentsReal > 0
+                    ? collaborator.valueMonthCentsReal
+                    : null,
+                )}
+                hint={
+                  collaborator.valueMonthCentsEstimated > 0
+                    ? `est. ${formatCurrency(collaborator.valueMonthCentsEstimated)}`
+                    : undefined
+                }
               />
-              <ExpandedMetric label="OS concluídas" value={String(collaborator.servicesMonth)} />
-              <ExpandedMetric label="Hoje" value={`${collaborator.ordersToday} OS`} />
-              <ExpandedMetric
+              <RulerItem label="OS concluídas" value={String(collaborator.servicesMonth)} />
+              <RulerItem label="Hoje" value={`${collaborator.ordersToday} OS`} />
+              <RulerItem
                 label="Especialidade"
                 value={collaborator.specialty ?? "Não informada"}
               />
-              <ExpandedMetric
-                label="Último atendimento"
+              <RulerItem
+                label="Último"
                 value={latest ? latestLabel(latest) : "Sem histórico"}
               />
-            </div>
+              {collaborator.hasEstimatedFallback && !collaborator.hasLaborEntries && (
+                <li className="rounded-full border border-amber-300/40 bg-amber-400/12 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-amber-100">
+                  Sem apontamento individual
+                </li>
+              )}
+            </ul>
 
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lemarc-smart-scroll">
               <ActionLink to="/colaboradores/$id" params={{ id: collaborator.id }} icon={UserRound}>
@@ -149,7 +175,7 @@ function StatusPill({ status }: { status: CollaboratorOperationalStatus }) {
   return (
     <span
       className={cn(
-        "hidden w-fit rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] md:inline-flex",
+        "hidden w-fit rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] md:inline-flex",
         statusClass[status],
       )}
     >
@@ -158,25 +184,79 @@ function StatusPill({ status }: { status: CollaboratorOperationalStatus }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function MobileStatusPill({ status }: { status: CollaboratorOperationalStatus }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em]",
+        statusClass[status],
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+function RatePill({ cents }: { cents: number | null }) {
+  const defined = (cents ?? 0) > 0;
+  return (
+    <span
+      className={cn(
+        "hidden min-w-0 md:block",
+      )}
+    >
+      <span className="lemarc-technical-label block">R$/h</span>
+      <span
+        className={cn(
+          "mt-0.5 inline-flex items-center rounded-md border px-1.5 py-0.5 font-display text-[12px] font-black tabular-nums",
+          defined
+            ? "border-white/10 bg-white/[0.04] text-white"
+            : "border-amber-300/40 bg-amber-400/12 text-amber-100",
+        )}
+      >
+        {defined ? formatCurrency(cents) : "A definir"}
+      </span>
+    </span>
+  );
+}
+
+function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <span className="hidden min-w-0 md:block">
       <span className="lemarc-technical-label block">{label}</span>
       <span className="mt-0.5 block truncate font-display text-[13px] font-black tabular-nums text-white">
         {value}
       </span>
+      {hint && (
+        <span className="block truncate text-[10px] font-bold tabular-nums text-amber-200/80">
+          {hint}
+        </span>
+      )}
     </span>
   );
 }
 
-function ExpandedMetric({ label, value }: { label: string; value: string }) {
+function RulerItem({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
-    <div className="lemarc-compact-metric">
-      <span className="lemarc-technical-label block">{label}</span>
-      <span className="mt-1 block truncate font-display text-sm font-black text-white tabular-nums">
+    <li className="flex min-w-0 items-baseline gap-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
+        {label}
+      </span>
+      <span className="truncate font-display text-[13px] font-black tabular-nums text-white">
         {value}
       </span>
-    </div>
+      {hint && (
+        <span className="text-[10px] font-bold tabular-nums text-amber-200/85">{hint}</span>
+      )}
+    </li>
   );
 }
 

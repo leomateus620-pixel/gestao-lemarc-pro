@@ -57,8 +57,12 @@ export type CollaboratorSummary = {
   ordersOpen: number;
   ordersToday: number;
   hoursMonthMinutes: number;
+  hoursMonthRealMinutes: number;
+  hoursMonthEstimatedMinutes: number;
   servicesMonth: number;
   valueMonthCents: number | null;
+  valueMonthCentsReal: number;
+  valueMonthCentsEstimated: number;
   history: CollaboratorHistoryItem[];
   hasLaborEntries: boolean;
   hasEstimatedFallback: boolean;
@@ -74,8 +78,12 @@ export type CollaboratorDashboard = {
     available: number;
     inTransit: number;
     hoursMonthMinutes: number;
+    hoursMonthRealMinutes: number;
+    hoursMonthEstimatedMinutes: number;
     completedMonth: number;
     valueMonthCents: number | null;
+    valueMonthCentsReal: number;
+    valueMonthCentsEstimated: number;
   };
 };
 
@@ -262,9 +270,11 @@ export function buildCollaboratorOperationalDashboard({
           isSameDay(order.opened_at, now) ||
           isSameDay(order.updated_at, now)),
     ).length;
-    const hoursMonthMinutes =
-      monthEntries.reduce((total, entry) => total + Math.max(0, entry.duration_minutes), 0) +
-      fallbackMonthMinutes;
+    const hoursMonthRealMinutes = monthEntries.reduce(
+      (total, entry) => total + Math.max(0, entry.duration_minutes),
+      0,
+    );
+    const hoursMonthMinutes = hoursMonthRealMinutes + fallbackMonthMinutes;
     const valueMonthCents = monthValueFromEntries + fallbackMonthValue;
 
     return {
@@ -291,8 +301,12 @@ export function buildCollaboratorOperationalDashboard({
       ordersOpen,
       ordersToday,
       hoursMonthMinutes,
+      hoursMonthRealMinutes,
+      hoursMonthEstimatedMinutes: fallbackMonthMinutes,
       servicesMonth,
       valueMonthCents: valueMonthCents > 0 ? valueMonthCents : null,
+      valueMonthCentsReal: monthValueFromEntries,
+      valueMonthCentsEstimated: fallbackMonthValue,
       history: [...laborHistoryItems, ...fallbackHistoryItems].sort(sortHistoryDesc).slice(0, 4),
       hasLaborEntries: laborEntries.length > 0,
       hasEstimatedFallback:
@@ -319,11 +333,27 @@ export function buildCollaboratorOperationalDashboard({
         (total, collaborator) => total + collaborator.hoursMonthMinutes,
         0,
       ),
+      hoursMonthRealMinutes: collaborators.reduce(
+        (total, collaborator) => total + collaborator.hoursMonthRealMinutes,
+        0,
+      ),
+      hoursMonthEstimatedMinutes: collaborators.reduce(
+        (total, collaborator) => total + collaborator.hoursMonthEstimatedMinutes,
+        0,
+      ),
       completedMonth: collaborators.reduce(
         (total, collaborator) => total + collaborator.servicesMonth,
         0,
       ),
       valueMonthCents: kpiValue > 0 ? kpiValue : null,
+      valueMonthCentsReal: collaborators.reduce(
+        (total, collaborator) => total + collaborator.valueMonthCentsReal,
+        0,
+      ),
+      valueMonthCentsEstimated: collaborators.reduce(
+        (total, collaborator) => total + collaborator.valueMonthCentsEstimated,
+        0,
+      ),
     },
   };
 }

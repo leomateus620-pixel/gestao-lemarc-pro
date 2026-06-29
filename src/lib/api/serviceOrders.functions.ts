@@ -7,6 +7,7 @@ import type {
   ServiceOrderStatus,
   ServicePriority,
   ServiceType,
+  TechnicianLite,
 } from "@/types/serviceOrder";
 
 const ORDER_SELECT = `
@@ -48,7 +49,7 @@ export type TechnicianInput = {
 
 export type TechnicianUpdateInput = TechnicianInput & { id: string };
 
-function normalizeTechnician(row: any) {
+function normalizeTechnician(row: any): TechnicianLite {
   return {
     id: row.id,
     full_name: row.full_name,
