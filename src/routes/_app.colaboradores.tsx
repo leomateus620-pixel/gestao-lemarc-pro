@@ -1,10 +1,12 @@
-import { Suspense, useMemo, type CSSProperties, type ReactNode } from "react";
+import { Suspense, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   ArrowUpRight,
   Briefcase,
   CalendarClock,
+  ChevronDown,
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
@@ -18,6 +20,7 @@ import {
   UserRound,
   Users,
   Wrench,
+  type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { useAuth } from "@/components/app/AuthContext";
@@ -29,6 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useServiceOrdersQuery,
   useTechnicianLaborHistoryQuery,
@@ -50,6 +54,8 @@ export const Route = createFileRoute("/_app/colaboradores")({
   component: MaisPage,
 });
 
+type AccountTab = "profile" | "settings" | "session";
+
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -67,6 +73,13 @@ const statusStyles: Record<CollaboratorOperationalStatus, string> = {
   "Em campo": "border-primary/40 bg-primary/14 text-primary",
 };
 
+const statusRank: Record<CollaboratorOperationalStatus, number> = {
+  "Em campo": 0,
+  "Em deslocamento": 1,
+  Alocado: 2,
+  Disponível: 3,
+};
+
 function MaisPage() {
   return (
     <AppShell title="Mais">
@@ -79,11 +92,14 @@ function MaisPage() {
 
 function MaisContent() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { displayName, email, avatarUrl, signOut } = useAuth();
   const { role } = useRole();
   const { data: orders } = useServiceOrdersQuery();
   const { data: technicians } = useTechniciansQuery();
   const { data: laborHistory } = useTechnicianLaborHistoryQuery();
+  const [accountTab, setAccountTab] = useState<AccountTab>("profile");
+  const [refreshing, setRefreshing] = useState(false);
 
   const dashboard = useMemo(
     () =>
@@ -95,11 +111,43 @@ function MaisContent() {
     [laborHistory, orders, technicians],
   );
 
+  const collaborators = useMemo(
+    () =>
+      [...dashboard.collaborators].sort((a, b) => {
+        const rank = statusRank[a.status] - statusRank[b.status];
+        if (rank !== 0) return rank;
+        return (
+          b.ordersOpen - a.ordersOpen ||
+          b.hoursMonthMinutes - a.hoursMonthMinutes ||
+          a.name.localeCompare(b.name)
+        );
+      }),
+    [dashboard.collaborators],
+  );
+
   const firstName = displayName.split(" ")[0] || "Operação";
-  const openOrders = dashboard.collaborators.reduce((total, item) => total + item.ordersOpen, 0);
+  const openOrders = collaborators.reduce((total, item) => total + item.ordersOpen, 0);
 
   function scrollTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openAccount(tab: AccountTab) {
+    setAccountTab(tab);
+    scrollTo("conta");
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["service-orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["technicians"] }),
+        queryClient.invalidateQueries({ queryKey: ["technician-labor-history"] }),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function handleSignOut() {
@@ -108,7 +156,7 @@ function MaisContent() {
   }
 
   return (
-    <>
+    <div className="mx-auto max-w-6xl">
       <MoreHero
         firstName={firstName}
         displayName={displayName}
@@ -120,55 +168,32 @@ function MaisContent() {
         monthHours={dashboard.kpis.hoursMonthMinutes}
       />
 
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <ActionTile
-          icon={Users}
-          label="Colaboradores"
-          description="Equipe, disponibilidade, horas e histórico de OS."
-          meta={`${dashboard.kpis.total} no cadastro`}
-          accent="orange"
-          onClick={() => scrollTo("colaboradores")}
-        />
-        <ActionTile
-          icon={UserRound}
-          label="Perfil"
-          description="Dados da conta autenticada e contexto atual."
-          meta={displayName}
-          accent="blue"
-          onClick={() => scrollTo("perfil")}
-        />
-        <ActionTile
-          icon={Settings}
-          label="Configurações"
-          description="Preferências disponíveis para a operação."
-          meta={role === "gestor" ? "Gestor" : "Campo"}
-          accent="steel"
-          onClick={() => scrollTo("configuracoes")}
-        />
-        <ContextModeTile />
-        <ActionTile
-          icon={LogOut}
-          label="Encerrar sessão"
-          description="Finaliza o acesso neste dispositivo."
-          meta="Conta"
-          accent="red"
-          onClick={handleSignOut}
-        />
-      </section>
+      <MoreNavigation
+        collaboratorCount={dashboard.kpis.total}
+        onCollaborators={() => scrollTo("colaboradores")}
+        onProfile={() => openAccount("profile")}
+        onSettings={() => openAccount("settings")}
+        onSession={() => openAccount("session")}
+      />
 
-      <CollaboratorsSection dashboard={dashboard} />
+      <CollaboratorsPanel
+        collaborators={collaborators}
+        kpis={dashboard.kpis}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
-      <section id="perfil" className="mt-6 grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <ProfilePanel
-          displayName={displayName}
-          email={email}
-          avatarUrl={avatarUrl}
-          role={role}
-          collaborators={dashboard.kpis.total}
-        />
-        <SettingsPanel role={role} onSignOut={handleSignOut} />
-      </section>
-    </>
+      <AccountPreferencesPanel
+        value={accountTab}
+        onChange={setAccountTab}
+        displayName={displayName}
+        email={email}
+        avatarUrl={avatarUrl}
+        role={role}
+        collaborators={dashboard.kpis.total}
+        onSignOut={handleSignOut}
+      />
+    </div>
   );
 }
 
@@ -192,65 +217,97 @@ function MoreHero({
   monthHours: number;
 }) {
   return (
-    <section className="group relative mt-2 overflow-hidden rounded-3xl border border-white/[0.11] bg-[#0a0f1d] text-white shadow-[0_30px_70px_-34px_rgba(0,0,0,0.95)]">
+    <KineticPanel
+      as="section"
+      className="mt-2 overflow-hidden rounded-[1.45rem] border border-white/[0.14] bg-[#09111f] text-white shadow-[0_28px_60px_-36px_rgba(0,0,0,0.95)]"
+      accent="orange"
+      maxRotate={1.4}
+      lift={-1.5}
+    >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 opacity-[0.055]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,.65) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.55) 1px, transparent 1px)",
-          backgroundSize: "34px 34px",
+            "linear-gradient(rgba(255,255,255,.72) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.62) 1px, transparent 1px)",
+          backgroundSize: "30px 30px",
+          maskImage: "linear-gradient(120deg, black, transparent 78%)",
         }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-28 size-72 rounded-full bg-primary/[0.09] blur-3xl"
+        className="absolute bottom-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-primary/65 to-transparent"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-32 -left-20 size-80 rounded-full bg-sky-400/[0.055] blur-3xl"
-      />
-
-      <div className="relative grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
+      <div className="relative z-[1] grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_16px_var(--primary)]" />
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/90">
-              Central operacional complementar
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/90">
+              Central operacional
             </span>
           </div>
-          <h1 className="mt-4 font-display text-3xl font-black leading-none tracking-tight sm:text-4xl">
-            Mais
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300">
-            Central de apoio para equipe, conta e preferências. Aqui o cadastro de técnicos conversa
-            com as OS, horas apontadas e valores apurados.
-          </p>
-
-          <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            <HeroStat icon={HardHat} label="Colaboradores" value={collaborators} />
-            <HeroStat icon={ClipboardList} label="OS abertas" value={openOrders} />
-            <HeroStat icon={Clock3} label="Horas no mês" value={formatMinutesShort(monthHours)} />
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-white/[0.045] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-          <div className="flex items-center gap-3">
-            <Avatar name={displayName} src={avatarUrl} size="lg" />
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <p className="truncate font-display text-base font-black">{displayName}</p>
-              <p className="truncate text-xs font-medium text-slate-300">
-                {email ?? "E-mail não informado"}
+              <h1 className="font-display text-3xl font-black leading-none tracking-tight">Mais</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+                Central operacional da equipe, conta e preferências.
               </p>
             </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <InfoChip label="Contexto" value={role === "gestor" ? "Gestor" : "Campo"} />
-            <InfoChip label="Conta" value={firstName} />
+            <div className="hidden shrink-0 sm:block">
+              <UserChip
+                displayName={displayName}
+                email={email}
+                avatarUrl={avatarUrl}
+                role={role}
+                firstName={firstName}
+              />
+            </div>
           </div>
         </div>
+
+        <div className="grid gap-2 sm:grid-cols-3 lg:w-[26rem]">
+          <HeroStat icon={HardHat} label="Colaboradores" value={collaborators} />
+          <HeroStat icon={ClipboardList} label="OS abertas" value={openOrders} />
+          <HeroStat icon={Clock3} label="Horas no mês" value={formatMinutesShort(monthHours)} />
+        </div>
+
+        <div className="sm:hidden">
+          <UserChip
+            displayName={displayName}
+            email={email}
+            avatarUrl={avatarUrl}
+            role={role}
+            firstName={firstName}
+          />
+        </div>
       </div>
-    </section>
+    </KineticPanel>
+  );
+}
+
+function UserChip({
+  displayName,
+  email,
+  avatarUrl,
+  role,
+  firstName,
+}: {
+  displayName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  role: string;
+  firstName: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/[0.09] bg-white/[0.045] p-2 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+      <Avatar name={displayName} src={avatarUrl} size="sm" />
+      <div className="min-w-0">
+        <p className="truncate text-xs font-black text-white">{firstName}</p>
+        <p className="max-w-[13rem] truncate text-[10px] font-medium text-slate-400">
+          {email ?? (role === "gestor" ? "Gestor" : "Campo")}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -259,169 +316,360 @@ function HeroStat({
   label,
   value,
 }: {
-  icon: typeof HardHat;
+  icon: LucideIcon;
   label: string;
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.075] bg-white/[0.04] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.09)]">
+    <div className="rounded-2xl border border-white/[0.075] bg-white/[0.038] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.09)]">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+        <span className="text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
           {label}
         </span>
-        <Icon size={14} className="text-primary" />
+        <Icon size={13} className="text-primary" />
       </div>
-      <p className="mt-2 font-display text-2xl font-black leading-none tabular-nums">{value}</p>
+      <p className="mt-1.5 font-display text-xl font-black leading-none tabular-nums text-white">
+        {value}
+      </p>
     </div>
   );
 }
 
-function CollaboratorsSection({
-  dashboard,
+function MoreNavigation({
+  collaboratorCount,
+  onCollaborators,
+  onProfile,
+  onSettings,
+  onSession,
 }: {
-  dashboard: ReturnType<typeof buildCollaboratorOperationalDashboard>;
+  collaboratorCount: number;
+  onCollaborators: () => void;
+  onProfile: () => void;
+  onSettings: () => void;
+  onSession: () => void;
 }) {
   return (
-    <section id="colaboradores" className="mt-6 scroll-mt-24">
-      <div className="mb-3 flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-            Dados operacionais conectados
-          </p>
-          <h2 className="mt-1 font-display text-xl font-black text-[color:var(--on-app-bg)]">
-            Colaboradores
-          </h2>
-        </div>
-        <p className="max-w-xl text-xs font-medium leading-relaxed text-[color:var(--on-app-bg-muted)]">
-          Disponibilidade derivada das OS vinculadas; horas e valores vêm dos apontamentos
-          financeiros, com fallback para OS finalizadas quando houver dados legados.
-        </p>
+    <nav
+      aria-label="Navegação do menu Mais"
+      className="mt-3 rounded-[1.35rem] border border-[color:var(--on-app-bg)]/10 bg-white/55 p-2 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.5)] backdrop-blur-md"
+    >
+      <div className="grid gap-2 sm:grid-cols-4">
+        <MoreNavButton
+          icon={HardHat}
+          label="Colaboradores"
+          detail={`${collaboratorCount} no cadastro`}
+          active
+          onClick={onCollaborators}
+        />
+        <MoreNavButton
+          icon={IdCard}
+          label="Perfil e conta"
+          detail="Usuário atual"
+          onClick={onProfile}
+        />
+        <MoreNavButton
+          icon={SlidersHorizontal}
+          label="Configurações"
+          detail="Preferências"
+          onClick={onSettings}
+        />
+        <MoreNavButton icon={LogOut} label="Sessão" detail="Acesso seguro" onClick={onSession} />
       </div>
+    </nav>
+  );
+}
 
-      <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <KpiTile icon={Users} label="Total" value={dashboard.kpis.total} />
-        <KpiTile icon={Activity} label="Em campo" value={dashboard.kpis.inField} tone="orange" />
-        <KpiTile
-          icon={ShieldCheck}
-          label="Disponíveis"
-          value={dashboard.kpis.available}
-          tone="green"
-        />
-        <KpiTile
-          icon={CalendarClock}
-          label="Deslocamento"
-          value={dashboard.kpis.inTransit}
-          tone="blue"
-        />
-        <KpiTile
-          icon={Clock3}
-          label="Horas no mês"
-          value={formatMinutesShort(dashboard.kpis.hoursMonthMinutes)}
-          tone="steel"
-        />
-        <KpiTile
-          icon={Briefcase}
-          label="Serviços no mês"
-          value={dashboard.kpis.completedMonth}
-          tone="amber"
-        />
-      </div>
-
-      {dashboard.collaborators.length === 0 ? (
-        <EmptyCollaborators />
-      ) : (
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
-          {dashboard.collaborators.map((collaborator) => (
-            <CollaboratorCard key={collaborator.id} collaborator={collaborator} />
-          ))}
-        </div>
+function MoreNavButton({
+  icon: Icon,
+  label,
+  detail,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  detail: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "lemarc-pressable flex min-h-[4.25rem] items-center gap-3 rounded-2xl border px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+        active
+          ? "border-primary/35 bg-[linear-gradient(135deg,rgba(255,122,24,0.18),rgba(10,17,31,0.92))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_-24px_rgba(255,122,24,0.75)]"
+          : "border-[color:var(--on-app-bg)]/10 bg-white/65 text-[color:var(--on-app-bg)] hover:border-primary/30 hover:bg-white",
       )}
+    >
+      <span
+        className={cn(
+          "grid size-10 shrink-0 place-items-center rounded-xl border",
+          active
+            ? "border-primary/40 bg-primary/18 text-primary"
+            : "border-[color:var(--on-app-bg)]/10 bg-[color:var(--on-app-bg)]/5 text-[color:var(--on-app-bg)]",
+        )}
+      >
+        <Icon size={17} strokeWidth={2.2} />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-display text-[12px] font-black uppercase tracking-[0.11em]">
+          {label}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block truncate text-[10px] font-semibold",
+            active ? "text-slate-300" : "text-[color:var(--on-app-bg-muted)]",
+          )}
+        >
+          {detail}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function CollaboratorsPanel({
+  collaborators,
+  kpis,
+  onRefresh,
+  refreshing,
+}: {
+  collaborators: CollaboratorSummary[];
+  kpis: ReturnType<typeof buildCollaboratorOperationalDashboard>["kpis"];
+  onRefresh: () => Promise<void>;
+  refreshing: boolean;
+}) {
+  const [listOpen, setListOpen] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const visibleLimit = 4;
+  const visibleCollaborators = showAll ? collaborators : collaborators.slice(0, visibleLimit);
+  const hasMore = collaborators.length > visibleLimit;
+
+  return (
+    <section id="colaboradores" className="mt-5 scroll-mt-24">
+      <PremiumSection className="p-3 sm:p-4" accent="orange">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="grid size-9 place-items-center rounded-xl border border-primary/30 bg-primary/12 text-primary">
+                <HardHat size={16} />
+              </span>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                  Equipe técnica
+                </p>
+                <h2 className="font-display text-xl font-black text-foreground">Colaboradores</h2>
+              </div>
+            </div>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Status, OS, horas e valores são derivados dos técnicos cadastrados, OS vinculadas e
+              apontamentos financeiros reais.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <PanelButton icon={Activity} onClick={() => void onRefresh()} disabled={refreshing}>
+              {refreshing ? "Atualizando" : "Atualizar dados"}
+            </PanelButton>
+            <PanelButton
+              icon={listOpen ? ChevronDown : ChevronRight}
+              onClick={() => setListOpen((v) => !v)}
+            >
+              {listOpen ? "Ocultar lista" : "Ver colaboradores"}
+            </PanelButton>
+          </div>
+        </div>
+
+        <OperationalKpis kpis={kpis} />
+
+        {listOpen && (
+          <>
+            {collaborators.length === 0 ? (
+              <EmptyCollaborators />
+            ) : (
+              <div className="mt-4">
+                <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    {showAll
+                      ? `${collaborators.length} colaboradores`
+                      : `Resumo com ${visibleCollaborators.length} de ${collaborators.length}`}
+                  </p>
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAll((value) => !value)}
+                      className="lemarc-pressable rounded-full border border-white/[0.12] bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-primary hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    >
+                      {showAll ? "Recolher" : "Ver todos"}
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {visibleCollaborators.map((collaborator) => (
+                    <CollaboratorCard key={collaborator.id} collaborator={collaborator} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </PremiumSection>
     </section>
   );
 }
 
-function CollaboratorCard({ collaborator }: { collaborator: CollaboratorSummary }) {
+function OperationalKpis({
+  kpis,
+}: {
+  kpis: ReturnType<typeof buildCollaboratorOperationalDashboard>["kpis"];
+}) {
+  const items = [
+    { icon: Users, label: "Total", value: kpis.total, tone: "steel" as const },
+    { icon: Activity, label: "Em campo", value: kpis.inField, tone: "orange" as const },
+    { icon: ShieldCheck, label: "Disponíveis", value: kpis.available, tone: "green" as const },
+    { icon: CalendarClock, label: "Deslocamento", value: kpis.inTransit, tone: "blue" as const },
+    {
+      icon: Clock3,
+      label: "Horas no mês",
+      value: formatMinutesShort(kpis.hoursMonthMinutes),
+      tone: "steel" as const,
+    },
+    {
+      icon: Briefcase,
+      label: "Serviços no mês",
+      value: kpis.completedMonth,
+      tone: "amber" as const,
+    },
+  ];
+
   return (
-    <KineticSurface className="p-4 sm:p-5">
-      <div className="flex items-start gap-3">
-        <Avatar name={collaborator.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 truncate font-display text-base font-black leading-tight text-foreground">
-              {collaborator.name}
-            </h3>
-            <span
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]",
-                statusStyles[collaborator.status],
-              )}
-            >
-              {collaborator.status}
-            </span>
+    <div className="mt-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lemarc-smart-scroll sm:grid sm:grid-cols-3 xl:grid-cols-6">
+      {items.map((item) => (
+        <KpiTile key={item.label} {...item} />
+      ))}
+    </div>
+  );
+}
+
+function CollaboratorCard({ collaborator }: { collaborator: CollaboratorSummary }) {
+  const latest = collaborator.history[0];
+  const accent =
+    collaborator.status === "Em campo" || collaborator.status === "Em deslocamento"
+      ? "orange"
+      : "steel";
+
+  return (
+    <article
+      className="group relative overflow-hidden rounded-[1.35rem] border border-white/[0.12] bg-[linear-gradient(145deg,oklch(0.265_0.047_252/0.96),oklch(0.13_0.036_252/0.93))] p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_22px_48px_-32px_rgba(0,0,0,0.9)] transition duration-200 hover:border-white/[0.18] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.17),0_28px_56px_-34px_rgba(0,0,0,0.95)]"
+      style={surfaceVars(accent)}
+    >
+      <div className="absolute bottom-4 left-0 top-4 w-[3px] rounded-r-full bg-[var(--lemarc-card-accent)] shadow-[0_0_18px_var(--lemarc-card-glow)]" />
+      <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+      <div className="relative">
+        <div className="flex items-start gap-3">
+          <Avatar name={collaborator.name} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h3 className="truncate font-display text-[15px] font-black leading-tight text-white">
+                {collaborator.name}
+              </h3>
+              <StatusBadge status={collaborator.status} />
+            </div>
+            <p className="mt-1 truncate text-xs font-medium text-slate-400">
+              {collaborator.role ?? "Função não informada"} · {collaborator.internalCode}
+            </p>
           </div>
-          <p className="mt-1 text-xs font-medium text-muted-foreground">
-            {collaborator.role ?? "Função não informada"} · {collaborator.internalCode}
-          </p>
+          <Link
+            to="/ordens"
+            search={{
+              status: "todas",
+              period: "all",
+              from: "",
+              to: "",
+              filtro: "none",
+              q: collaborator.name,
+            }}
+            className="lemarc-pressable grid size-9 shrink-0 place-items-center rounded-xl border border-white/[0.1] bg-white/[0.055] text-primary hover:border-primary/45 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            aria-label={`Ver OS de ${collaborator.name}`}
+          >
+            <ArrowUpRight size={16} />
+          </Link>
         </div>
-        <Link
-          to="/ordens"
-          search={{
-            status: "todas",
-            period: "all",
-            from: "",
-            to: "",
-            filtro: "none",
-            q: collaborator.name,
-          }}
-          className="lemarc-pressable grid size-10 shrink-0 place-items-center rounded-xl border border-white/[0.09] bg-white/[0.055] text-primary hover:border-primary/45 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-          aria-label={`Ver OS de ${collaborator.name}`}
-        >
-          <ArrowUpRight size={17} />
-        </Link>
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <MiniMetric label="OS abertas" value={collaborator.ordersOpen} />
-        <MiniMetric label="OS hoje" value={collaborator.ordersToday} />
-        <MiniMetric label="Horas mês" value={formatMinutesShort(collaborator.hoursMonthMinutes)} />
-        <MiniMetric label="Serviços" value={collaborator.servicesMonth} />
-        <MiniMetric label="Valor" value={formatCurrencyOrPending(collaborator.valueMonthCents)} />
-      </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <CompactMetric label="OS abertas" value={emptyAwareNumber(collaborator.ordersOpen)} />
+          <CompactMetric
+            label="Horas mês"
+            value={
+              collaborator.hoursMonthMinutes > 0
+                ? formatMinutesShort(collaborator.hoursMonthMinutes)
+                : "Sem horas"
+            }
+          />
+          <CompactMetric label="Serviços" value={emptyAwareNumber(collaborator.servicesMonth)} />
+          <CompactMetric
+            label="Valor"
+            value={formatCurrencyCompact(collaborator.valueMonthCents)}
+            muted={!collaborator.valueMonthCents}
+          />
+        </div>
 
-      <Accordion type="single" collapsible className="mt-4">
-        <AccordionItem value="history" className="border-white/[0.075]">
-          <AccordionTrigger className="py-3 text-left font-display text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground hover:no-underline data-[state=open]:text-foreground">
-            Histórico resumido
-          </AccordionTrigger>
-          <AccordionContent className="pb-0">
-            {collaborator.history.length > 0 ? (
-              <div className="space-y-2">
-                {collaborator.history.map((item) => (
-                  <HistoryRow key={item.id} item={item} />
-                ))}
-              </div>
-            ) : (
-              <InlineEmpty
-                title="Sem histórico recente"
-                text="Nenhuma OS finalizada ou apontamento de horas vinculado a este colaborador ainda."
-              />
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </KineticSurface>
+        <Accordion type="single" collapsible className="mt-3">
+          <AccordionItem value="history" className="border-white/[0.08]">
+            <AccordionTrigger className="min-h-11 rounded-2xl border border-white/[0.075] bg-white/[0.035] px-3 py-2 text-left hover:no-underline data-[state=open]:border-primary/35 data-[state=open]:bg-primary/10 [&>svg]:text-primary">
+              <span className="min-w-0">
+                <span className="block font-display text-[11px] font-black uppercase tracking-[0.15em] text-slate-200">
+                  Histórico
+                </span>
+                <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-400">
+                  {latest
+                    ? `${latest.orderNumber ? `OS #${latest.orderNumber}` : "OS"} · ${latest.clientName}`
+                    : "Sem histórico apurado no período."}
+                </span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="pb-0 pt-2">
+              <CollaboratorHistory collaborator={collaborator} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+    </article>
+  );
+}
+
+function CollaboratorHistory({ collaborator }: { collaborator: CollaboratorSummary }) {
+  if (collaborator.history.length === 0) {
+    return (
+      <CompactEmpty
+        icon={Clock3}
+        title="Sem histórico apurado no período."
+        text="Quando houver OS finalizada ou apontamento de horas, o resumo aparece aqui."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {collaborator.history.map((item) => (
+        <HistoryRow key={item.id} item={item} />
+      ))}
+    </div>
   );
 }
 
 function HistoryRow({ item }: { item: CollaboratorHistoryItem }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-display text-sm font-black text-foreground">
+          <p className="truncate font-display text-sm font-black text-white">
             {item.orderNumber ? `OS #${item.orderNumber}` : "OS"} · {item.title}
           </p>
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">
             {item.clientName}
             {item.unitName ? ` · ${item.unitName}` : ""} · {item.serviceLabel}
           </p>
@@ -429,7 +677,7 @@ function HistoryRow({ item }: { item: CollaboratorHistoryItem }) {
         <Link
           to="/ordens/$id"
           params={{ id: item.orderId }}
-          className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-primary hover:border-primary/40"
+          className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-primary hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           aria-label={`Abrir OS ${item.orderNumber ?? item.orderId}`}
         >
           <ChevronRight size={15} />
@@ -445,7 +693,7 @@ function HistoryRow({ item }: { item: CollaboratorHistoryItem }) {
         <HistoryChip icon={ClipboardList}>{item.source}</HistoryChip>
       </div>
       {item.description && (
-        <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground/85">
+        <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-400">
           {item.description}
         </p>
       )}
@@ -453,189 +701,205 @@ function HistoryRow({ item }: { item: CollaboratorHistoryItem }) {
   );
 }
 
-function ProfilePanel({
+function AccountPreferencesPanel({
+  value,
+  onChange,
   displayName,
   email,
   avatarUrl,
   role,
   collaborators,
+  onSignOut,
 }: {
+  value: AccountTab;
+  onChange: (value: AccountTab) => void;
   displayName: string;
   email: string | null;
   avatarUrl: string | null;
   role: string;
   collaborators: number;
+  onSignOut: () => Promise<void>;
 }) {
   return (
-    <KineticSurface className="p-5">
-      <PanelHeader icon={IdCard} eyebrow="Perfil" title="Conta e contexto" />
-      <div className="mt-4 flex items-center gap-3">
-        <Avatar name={displayName} src={avatarUrl} size="lg" />
-        <div className="min-w-0">
-          <p className="truncate font-display text-lg font-black text-foreground">{displayName}</p>
-          <p className="truncate text-sm text-muted-foreground">
-            {email ?? "E-mail não informado"}
+    <section id="conta" className="mt-5 scroll-mt-24">
+      <PremiumSection className="p-3 sm:p-4" accent="blue">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+              Conta e preferências
+            </p>
+            <h2 className="mt-1 font-display text-xl font-black text-foreground">
+              Perfil, configuração e sessão
+            </h2>
+          </div>
+          <p className="max-w-xl text-xs font-medium leading-relaxed text-muted-foreground">
+            Ações de conta ficam concentradas em um único painel para não competir com a operação
+            dos colaboradores.
           </p>
         </div>
-      </div>
-      <div className="mt-5 grid gap-2 sm:grid-cols-3">
-        <InfoChip label="Visualização" value={role === "gestor" ? "Gestor" : "Campo"} />
-        <InfoChip label="Equipe" value={`${collaborators} colaboradores`} />
-        <InfoChip label="Sessão" value="Autenticada" />
-      </div>
-    </KineticSurface>
+
+        <Tabs value={value} onValueChange={(next) => onChange(next as AccountTab)} className="mt-4">
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-1">
+            <AccountTabTrigger value="profile" icon={IdCard}>
+              Perfil
+            </AccountTabTrigger>
+            <AccountTabTrigger value="settings" icon={SlidersHorizontal}>
+              Preferências
+            </AccountTabTrigger>
+            <AccountTabTrigger value="session" icon={LogOut}>
+              Sessão
+            </AccountTabTrigger>
+          </TabsList>
+
+          <TabsContent value="profile" className="mt-3">
+            <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar name={displayName} src={avatarUrl} size="lg" />
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-lg font-black text-foreground">
+                      {displayName}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {email ?? "E-mail não informado"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <InfoChip label="Contexto" value={role === "gestor" ? "Gestor" : "Campo"} />
+                <InfoChip label="Equipe" value={`${collaborators} colaboradores`} />
+                <InfoChip label="Sessão" value="Autenticada" />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-3">
+            <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                <div className="min-w-0">
+                  <p className="font-display text-sm font-black text-foreground">
+                    Modo de visualização
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Alterna o contexto de navegação entre gestor e campo.
+                  </p>
+                </div>
+                <RoleSwitcher />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <InfoChip label="Tema" value="Industrial Lemarc" />
+                <InfoChip label="Navegação" value="Desktop e mobile" />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="session" className="mt-3">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                <p className="font-display text-sm font-black text-foreground">Sessão ativa</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Encerre o acesso deste dispositivo quando finalizar a operação.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void onSignOut()}
+                className="lemarc-pressable flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.055] px-4 font-display text-xs font-black uppercase tracking-[0.14em] text-slate-100 hover:border-rose-300/35 hover:bg-rose-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
+              >
+                <LogOut size={16} />
+                Encerrar sessão
+              </button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </PremiumSection>
+    </section>
   );
 }
 
-function SettingsPanel({ role, onSignOut }: { role: string; onSignOut: () => void }) {
-  return (
-    <KineticSurface id="configuracoes" className="scroll-mt-24 p-5">
-      <PanelHeader icon={SlidersHorizontal} eyebrow="Configurações" title="Preferências ativas" />
-      <div className="mt-4 space-y-3">
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.075] bg-white/[0.035] p-3">
-          <div className="min-w-0">
-            <p className="font-display text-sm font-black text-foreground">Modo de visualização</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Contexto atual: {role === "gestor" ? "gestor" : "campo"}.
-            </p>
-          </div>
-          <RoleSwitcher />
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <InfoChip label="Tema" value="Industrial Lemarc" />
-          <InfoChip label="Navegação" value="Desktop e mobile" />
-        </div>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="lemarc-pressable flex w-full items-center justify-between rounded-2xl border border-rose-300/25 bg-rose-400/10 px-4 py-3 text-left text-rose-100 hover:border-rose-300/45 hover:bg-rose-400/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
-        >
-          <span className="flex items-center gap-2 font-display text-xs font-black uppercase tracking-[0.14em]">
-            <LogOut size={16} />
-            Encerrar sessão
-          </span>
-          <ChevronRight size={16} />
-        </button>
-      </div>
-    </KineticSurface>
-  );
-}
-
-function ActionTile({
+function AccountTabTrigger({
+  value,
   icon: Icon,
-  label,
-  description,
-  meta,
-  accent,
-  onClick,
+  children,
 }: {
-  icon: typeof Users;
-  label: string;
-  description: string;
-  meta: string;
-  accent: "orange" | "blue" | "steel" | "red";
-  onClick: () => void;
+  value: AccountTab;
+  icon: LucideIcon;
+  children: ReactNode;
 }) {
-  const tone = toneConfig[accent];
-  const physics = usePhysicsCard<HTMLButtonElement>({
-    maxRotate: 2.6,
-    mobileMaxRotate: 0.6,
-    lift: -2,
-    perspective: 1300,
+  return (
+    <TabsTrigger
+      value={value}
+      className="min-h-10 rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_12px_26px_-18px_var(--primary)]"
+    >
+      <Icon size={14} className="mr-1.5" />
+      {children}
+    </TabsTrigger>
+  );
+}
+
+function KineticPanel({
+  as = "div",
+  children,
+  className,
+  accent = "orange",
+  maxRotate = 2,
+  lift = -2,
+}: {
+  as?: "div" | "section";
+  children: ReactNode;
+  className?: string;
+  accent?: keyof typeof toneConfig;
+  maxRotate?: number;
+  lift?: number;
+}) {
+  const physics = usePhysicsCard<HTMLDivElement>({
+    maxRotate,
+    mobileMaxRotate: 0.4,
+    lift,
+    perspective: 1400,
   });
+  const Component = as;
 
   return (
-    <button
+    <Component
       ref={physics.ref}
-      type="button"
-      onClick={onClick}
-      className="lemarc-kinetic-card group relative min-h-[9.25rem] overflow-hidden rounded-[1.4rem] border border-white/[0.075] bg-[linear-gradient(145deg,oklch(0.27_0.045_252/0.93),oklch(0.14_0.036_252/0.9))] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.11),0_18px_42px_-28px_rgba(0,0,0,0.85)] outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      style={
-        {
-          ...physics.style,
-          "--lemarc-card-accent": tone.accent,
-          "--lemarc-card-glow": tone.glow,
-        } as CSSProperties
-      }
+      className={cn("lemarc-kinetic-card relative", className)}
+      style={{ ...physics.style, ...surfaceVars(accent) }}
       data-kinetic-active={physics.active}
       {...physics.handlers}
     >
       <div className="lemarc-card-glare" aria-hidden />
-      <div className="relative flex h-full flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <span className="lemarc-icon-orb grid size-11 place-items-center rounded-2xl">
-            <Icon size={19} />
-          </span>
-          <ChevronRight
-            size={17}
-            className="text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground"
-          />
-        </div>
-        <div className="mt-4 min-w-0">
-          <p className="font-display text-sm font-black uppercase tracking-[0.12em] text-foreground">
-            {label}
-          </p>
-          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        </div>
-        <p className="mt-auto pt-3 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-          {meta}
-        </p>
-      </div>
-    </button>
+      {children}
+    </Component>
   );
 }
 
-function ContextModeTile() {
-  const { role } = useRole();
-  return (
-    <KineticSurface className="min-h-[9.25rem] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <span className="lemarc-icon-orb grid size-11 place-items-center rounded-2xl">
-          <ShieldCheck size={19} />
-        </span>
-        <RoleSwitcher />
-      </div>
-      <p className="mt-4 font-display text-sm font-black uppercase tracking-[0.12em] text-foreground">
-        Modo de visualização
-      </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-        Alterna o contexto de navegação entre gestor e campo.
-      </p>
-      <p className="mt-3 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-        {role === "gestor" ? "Gestor" : "Campo"}
-      </p>
-    </KineticSurface>
-  );
-}
-
-function KineticSurface({
+function PremiumSection({
   children,
   className,
-  id,
+  accent = "orange",
 }: {
   children: ReactNode;
   className?: string;
-  id?: string;
+  accent?: keyof typeof toneConfig;
 }) {
-  const physics = usePhysicsCard<HTMLDivElement>({
-    maxRotate: 2.4,
-    mobileMaxRotate: 0.55,
-    lift: -2,
-    perspective: 1300,
-  });
-
   return (
     <div
-      id={id}
-      ref={physics.ref}
-      className={cn("lemarc-kinetic-card lemarc-card-shell", className)}
-      style={physics.style}
-      data-kinetic-active={physics.active}
-      {...physics.handlers}
+      className={cn(
+        "relative overflow-hidden rounded-[1.45rem] border border-white/[0.13] bg-[linear-gradient(145deg,oklch(0.29_0.046_252/0.94),oklch(0.13_0.036_252/0.91))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_28px_64px_-42px_rgba(0,0,0,0.92)]",
+        className,
+      )}
+      style={surfaceVars(accent)}
     >
-      <div className="lemarc-card-glare" aria-hidden />
+      <div
+        aria-hidden
+        className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/24 to-transparent"
+      />
+      <div
+        aria-hidden
+        className="absolute bottom-0 left-0 top-0 w-[3px] bg-[var(--lemarc-card-accent)] opacity-80 shadow-[0_0_20px_var(--lemarc-card-glow)]"
+      />
       <div className="relative z-[1]">{children}</div>
     </div>
   );
@@ -647,37 +911,47 @@ function KpiTile({
   value,
   tone = "steel",
 }: {
-  icon: typeof Users;
+  icon: LucideIcon;
   label: string;
   value: ReactNode;
-  tone?: "orange" | "blue" | "steel" | "amber" | "green";
+  tone?: keyof typeof toneConfig;
 }) {
   const config = toneConfig[tone];
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[linear-gradient(145deg,oklch(0.27_0.045_252/0.93),oklch(0.15_0.036_252/0.9))] p-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_15px_32px_-24px_rgba(0,0,0,0.85)]">
-      <div
-        aria-hidden
-        className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full"
-        style={{ background: config.accent, boxShadow: `0 0 18px ${config.glow}` }}
-      />
+    <div className="min-w-[8.75rem] rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.09)]">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+        <span className="truncate text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
           {label}
         </span>
-        <Icon size={15} style={{ color: config.accent }} />
+        <Icon size={14} style={{ color: config.accent }} />
       </div>
-      <p className="mt-2 font-display text-2xl font-black leading-none tabular-nums">{value}</p>
+      <p className="mt-1.5 truncate font-display text-xl font-black leading-none text-white tabular-nums">
+        {value}
+      </p>
     </div>
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: ReactNode }) {
+function CompactMetric({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: ReactNode;
+  muted?: boolean;
+}) {
   return (
-    <div className="min-h-[4.25rem] rounded-2xl border border-white/[0.065] bg-white/[0.032] p-2.5">
-      <p className="text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2">
+      <p className="truncate text-[9px] font-black uppercase tracking-[0.11em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 break-words font-display text-sm font-black leading-tight text-foreground tabular-nums">
+      <p
+        className={cn(
+          "mt-1 truncate font-display text-[13px] font-black leading-tight tabular-nums",
+          muted ? "text-slate-400" : "text-white",
+        )}
+      >
         {value}
       </p>
     </div>
@@ -686,8 +960,8 @@ function MiniMetric({ label, value }: { label: string; value: ReactNode }) {
 
 function InfoChip({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/[0.075] bg-white/[0.035] px-3 py-2">
-      <p className="truncate text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
+      <p className="truncate text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
         {label}
       </p>
       <p className="mt-1 truncate text-xs font-bold text-foreground">{value}</p>
@@ -695,34 +969,49 @@ function InfoChip({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function HistoryChip({ icon: Icon, children }: { icon: typeof Clock3; children: ReactNode }) {
+function StatusBadge({ status }: { status: CollaboratorOperationalStatus }) {
   return (
-    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-white/[0.075] bg-white/[0.035] px-2 text-[10px] font-bold text-muted-foreground">
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]",
+        statusStyles[status],
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+function HistoryChip({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-white/[0.075] bg-white/[0.035] px-2 text-[10px] font-bold text-slate-400">
       <Icon size={12} className="text-primary" />
       {children}
     </span>
   );
 }
 
-function PanelHeader({
+function PanelButton({
   icon: Icon,
-  eyebrow,
-  title,
+  children,
+  onClick,
+  disabled,
 }: {
-  icon: typeof Users;
-  eyebrow: string;
-  title: string;
+  icon: LucideIcon;
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="lemarc-icon-orb grid size-11 place-items-center rounded-2xl">
-        <Icon size={19} />
-      </span>
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
-        <h2 className="mt-1 font-display text-lg font-black text-foreground">{title}</h2>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-2xl border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+    >
+      <Icon size={14} />
+      {children}
+    </button>
   );
 }
 
@@ -733,16 +1022,21 @@ function Avatar({
 }: {
   name: string;
   src?: string | null;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
 }) {
-  const classes = size === "lg" ? "size-14 text-sm" : "size-12 text-xs";
+  const classes = {
+    sm: "size-9 text-[10px] rounded-xl",
+    md: "size-11 text-xs rounded-2xl",
+    lg: "size-14 text-sm rounded-2xl",
+  }[size];
+
   if (src) {
     return (
       <img
         src={src}
         alt={name}
         className={cn(
-          "shrink-0 rounded-2xl border border-white/20 object-cover shadow-[0_12px_26px_-18px_rgba(0,0,0,0.9)]",
+          "shrink-0 border border-white/20 object-cover shadow-[0_12px_26px_-18px_rgba(0,0,0,0.9)]",
           classes,
         )}
         referrerPolicy="no-referrer"
@@ -753,7 +1047,7 @@ function Avatar({
   return (
     <span
       className={cn(
-        "lemarc-icon-orb grid shrink-0 place-items-center rounded-2xl font-display font-black uppercase",
+        "grid shrink-0 place-items-center border border-primary/35 bg-primary/14 font-display font-black uppercase text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_12px_24px_-18px_var(--primary)]",
         classes,
       )}
     >
@@ -762,11 +1056,24 @@ function Avatar({
   );
 }
 
-function InlineEmpty({ title, text }: { title: string; text: string }) {
+function CompactEmpty({
+  icon: Icon,
+  title,
+  text,
+}: {
+  icon: LucideIcon;
+  title: string;
+  text: string;
+}) {
   return (
-    <div className="rounded-2xl border border-dashed border-white/[0.11] bg-white/[0.025] p-4 text-center">
-      <p className="font-display text-sm font-black text-foreground">{title}</p>
-      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">{text}</p>
+    <div className="flex items-start gap-3 rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.025] p-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-primary">
+        <Icon size={15} />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-display text-sm font-black text-white">{title}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-slate-400">{text}</span>
+      </span>
     </div>
   );
 }
@@ -774,41 +1081,34 @@ function InlineEmpty({ title, text }: { title: string; text: string }) {
 function EmptyCollaborators() {
   return (
     <div className="mt-4">
-      <KineticSurface className="p-6 text-center">
-        <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
-          <Users size={24} />
-        </div>
-        <h3 className="mt-4 font-display text-lg font-black text-foreground">
-          Nenhum colaborador cadastrado
-        </h3>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
-          Assim que técnicos forem adicionados ao cadastro, este painel passa a exibir status,
-          horas, serviços e valores apurados.
-        </p>
-      </KineticSurface>
+      <CompactEmpty
+        icon={Users}
+        title="Nenhum colaborador cadastrado"
+        text="Assim que técnicos forem adicionados ao cadastro, este painel exibirá status, horas, serviços e valores apurados."
+      />
     </div>
   );
 }
 
 function MaisSkeleton() {
   return (
-    <div className="mt-2 space-y-4">
-      <div className="relative min-h-[18rem] overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0a0f1d] p-5">
+    <div className="mx-auto max-w-6xl space-y-3">
+      <div className="relative mt-2 min-h-[13rem] overflow-hidden rounded-[1.45rem] border border-white/[0.08] bg-[#0a0f1d] p-5">
         <div className="lemarc-shimmer absolute inset-0 opacity-20" />
-        <div className="relative space-y-4">
+        <div className="relative space-y-3">
           <div className="h-3 w-44 rounded-full bg-white/[0.08]" />
-          <div className="h-10 w-28 rounded-xl bg-white/[0.08]" />
-          <div className="h-4 w-full max-w-lg rounded-full bg-white/[0.06]" />
+          <div className="h-8 w-24 rounded-xl bg-white/[0.08]" />
+          <div className="h-4 w-full max-w-md rounded-full bg-white/[0.06]" />
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="h-20 rounded-2xl bg-white/[0.05]" />
-            <div className="h-20 rounded-2xl bg-white/[0.05]" />
-            <div className="h-20 rounded-2xl bg-white/[0.05]" />
+            <div className="h-16 rounded-2xl bg-white/[0.05]" />
+            <div className="h-16 rounded-2xl bg-white/[0.05]" />
+            <div className="h-16 rounded-2xl bg-white/[0.05]" />
           </div>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="h-36 rounded-[1.4rem] bg-white/[0.35]" />
+      <div className="grid gap-2 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-16 rounded-2xl bg-white/[0.35]" />
         ))}
       </div>
     </div>
@@ -818,7 +1118,7 @@ function MaisSkeleton() {
 function MaisError({ error }: { error: Error }) {
   return (
     <AppShell title="Mais">
-      <KineticSurface className="mt-2 p-6 text-center">
+      <PremiumSection className="mx-auto mt-2 max-w-3xl p-6 text-center" accent="red">
         <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-rose-300/30 bg-rose-400/10 text-rose-200">
           <Activity size={24} />
         </div>
@@ -831,7 +1131,7 @@ function MaisError({ error }: { error: Error }) {
         <p className="mx-auto mt-3 max-w-lg rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs text-muted-foreground">
           {error.message}
         </p>
-      </KineticSurface>
+      </PremiumSection>
     </AppShell>
   );
 }
@@ -839,6 +1139,15 @@ function MaisError({ error }: { error: Error }) {
 function formatCurrencyOrPending(valueCents: number | null) {
   if (!valueCents || valueCents <= 0) return "Valor ainda não apurado";
   return currency.format(valueCents / 100);
+}
+
+function formatCurrencyCompact(valueCents: number | null) {
+  if (!valueCents || valueCents <= 0) return "A apurar";
+  return currency.format(valueCents / 100);
+}
+
+function emptyAwareNumber(value: number) {
+  return value > 0 ? value : "Nenhuma";
 }
 
 function formatDate(value: string) {
@@ -858,6 +1167,14 @@ function initials(name: string) {
     .slice(0, 2)
     .join("");
   return letters || "LM";
+}
+
+function surfaceVars(accent: keyof typeof toneConfig): CSSProperties {
+  const tone = toneConfig[accent];
+  return {
+    "--lemarc-card-accent": tone.accent,
+    "--lemarc-card-glow": tone.glow,
+  } as CSSProperties;
 }
 
 const toneConfig = {
