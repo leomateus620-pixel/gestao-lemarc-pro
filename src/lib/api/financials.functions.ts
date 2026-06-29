@@ -21,6 +21,51 @@ const LABOR_SELECT = `
   technician:technicians(id, full_name, role)
 `;
 
+const TECHNICIAN_HISTORY_SELECT = `
+  id, service_order_id, technician_id, role, work_date, start_time, end_time,
+  duration_minutes, hourly_rate_cents, subtotal_cents, description,
+  service_order:service_orders!service_order_labor_entries_service_order_id_fkey(
+    id, number, title, status, opened_at, started_at, finished_at, closed_at,
+    service_type, service_type_other,
+    client:clients!service_orders_client_id_fkey(id, name, unit),
+    client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state)
+  )
+`;
+
+export type TechnicianLaborHistoryRow = {
+  id: string;
+  service_order_id: string;
+  technician_id: string | null;
+  role: string | null;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  hourly_rate_cents: number;
+  subtotal_cents: number;
+  description: string | null;
+  service_order: {
+    id: string;
+    number: number;
+    title: string;
+    status: string;
+    opened_at: string;
+    started_at: string | null;
+    finished_at: string | null;
+    closed_at: string | null;
+    service_type: string | null;
+    service_type_other: string | null;
+    client: { id: string; name: string; unit: string | null } | null;
+    client_unit: {
+      id: string;
+      name: string;
+      sector: string | null;
+      city: string | null;
+      state: string | null;
+    } | null;
+  } | null;
+};
+
 function normalizeLabor(row: any): LaborEntry {
   return {
     id: row.id,
@@ -39,6 +84,38 @@ function normalizeLabor(row: any): LaborEntry {
           id: row.technician.id,
           full_name: row.technician.full_name,
           role: row.technician.role ?? null,
+        }
+      : null,
+  };
+}
+
+function normalizeTechnicianHistory(row: any): TechnicianLaborHistoryRow {
+  return {
+    id: row.id,
+    service_order_id: row.service_order_id,
+    technician_id: row.technician_id ?? null,
+    role: row.role ?? null,
+    work_date: row.work_date,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    duration_minutes: row.duration_minutes ?? 0,
+    hourly_rate_cents: row.hourly_rate_cents ?? 0,
+    subtotal_cents: row.subtotal_cents ?? 0,
+    description: row.description ?? null,
+    service_order: row.service_order
+      ? {
+          id: row.service_order.id,
+          number: row.service_order.number,
+          title: row.service_order.title,
+          status: row.service_order.status,
+          opened_at: row.service_order.opened_at,
+          started_at: row.service_order.started_at ?? null,
+          finished_at: row.service_order.finished_at ?? null,
+          closed_at: row.service_order.closed_at ?? null,
+          service_type: row.service_order.service_type ?? null,
+          service_type_other: row.service_order.service_type_other ?? null,
+          client: row.service_order.client ?? null,
+          client_unit: row.service_order.client_unit ?? null,
         }
       : null,
   };
@@ -88,6 +165,20 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
       entries: (labor.data ?? []).map(normalizeLabor),
       financials: normalizeFinancials(fin.data),
     };
+  });
+
+export const listTechnicianLaborHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as any;
+    const { data, error } = await sb
+      .from("service_order_labor_entries")
+      .select(TECHNICIAN_HISTORY_SELECT)
+      .order("work_date", { ascending: false })
+      .order("start_time", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(normalizeTechnicianHistory);
   });
 
 function validateInput(input: FinalizeOrderInput) {
