@@ -23,6 +23,7 @@ import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
 import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes.$id'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
 import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
 import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
@@ -96,6 +97,12 @@ const AppClientesIdRoute = AppClientesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppClientesRoute,
 } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppRelatoriosClienteClientIdRoute =
   AppRelatoriosClienteClientIdRouteImport.update({
     id: '/relatorios_/cliente/$clientId',
@@ -130,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,6 +155,7 @@ export interface FileRoutesByTo {
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,6 +176,7 @@ export interface FileRoutesById {
   '/_app/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/_app/relatorios_/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
+    | '/lovable/email/queue/process'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
+    | '/lovable/email/queue/process'
   id:
     | '__root__'
     | '/'
@@ -223,12 +235,14 @@ export interface FileRouteTypes {
     | '/_app/clientes/$id/editar'
     | '/_app/ordens/$id/imprimir'
     | '/_app/relatorios_/cliente/$clientId'
+    | '/lovable/email/queue/process'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -331,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppClientesRoute
     }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/relatorios_/cliente/$clientId': {
       id: '/_app/relatorios_/cliente/$clientId'
       path: '/relatorios/cliente/$clientId'
@@ -425,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
