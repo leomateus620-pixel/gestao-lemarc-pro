@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Supabase generated types lag behind incremental migrations in this app. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
@@ -21,6 +22,80 @@ const ORDER_SELECT = `
     technician:technicians(id, full_name, role, hourly_rate_cents)
   )
 `;
+
+const TECHNICIAN_FULL_SELECT =
+  "id, full_name, role, phone, email, cpf, specialty, active, kind, default_availability, hourly_rate_cents, hourly_rate_50_cents, hourly_rate_100_cents, pricing_notes, internal_notes, user_id, created_by, created_at, updated_at";
+const TECHNICIAN_LEGACY_SELECT =
+  "id, full_name, role, phone, hourly_rate_cents, user_id, created_by, created_at, updated_at";
+
+export type TechnicianInput = {
+  full_name: string;
+  role?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  cpf?: string | null;
+  specialty?: string | null;
+  active?: boolean | null;
+  kind?: string | null;
+  default_availability?: string | null;
+  hourly_rate_cents?: number | null;
+  hourly_rate_50_cents?: number | null;
+  hourly_rate_100_cents?: number | null;
+  pricing_notes?: string | null;
+  internal_notes?: string | null;
+  user_id?: string | null;
+};
+
+export type TechnicianUpdateInput = TechnicianInput & { id: string };
+
+function normalizeTechnician(row: any) {
+  return {
+    id: row.id,
+    full_name: row.full_name,
+    role: row.role ?? null,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    cpf: row.cpf ?? null,
+    specialty: row.specialty ?? null,
+    active: row.active ?? true,
+    kind: row.kind ?? null,
+    default_availability: row.default_availability ?? null,
+    hourly_rate_cents: row.hourly_rate_cents ?? null,
+    hourly_rate_50_cents: row.hourly_rate_50_cents ?? null,
+    hourly_rate_100_cents: row.hourly_rate_100_cents ?? null,
+    pricing_notes: row.pricing_notes ?? null,
+    internal_notes: row.internal_notes ?? null,
+    user_id: row.user_id ?? null,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+  };
+}
+
+function legacyTechnicianPayload(data: TechnicianInput) {
+  return {
+    full_name: data.full_name,
+    role: data.role ?? null,
+    phone: data.phone ?? null,
+    hourly_rate_cents: data.hourly_rate_cents ?? null,
+    user_id: data.user_id ?? null,
+  };
+}
+
+function fullTechnicianPayload(data: TechnicianInput) {
+  return {
+    ...legacyTechnicianPayload(data),
+    email: data.email ?? null,
+    cpf: data.cpf ?? null,
+    specialty: data.specialty ?? null,
+    active: data.active ?? true,
+    kind: data.kind ?? null,
+    default_availability: data.default_availability ?? null,
+    hourly_rate_50_cents: data.hourly_rate_50_cents ?? null,
+    hourly_rate_100_cents: data.hourly_rate_100_cents ?? null,
+    pricing_notes: data.pricing_notes ?? null,
+    internal_notes: data.internal_notes ?? null,
+  };
+}
 
 function normalize(row: any): ServiceOrder {
   const assigned = Array.isArray(row?.assigned_technicians) ? row.assigned_technicians : [];
@@ -255,28 +330,81 @@ export const createClient = createServerFn({ method: "POST" })
 export const listTechnicians = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await (context.supabase as any)
-      .from("technicians")
-      .select("id, full_name, role, hourly_rate_cents")
-      .order("full_name");
-    if (error) throw new Error(error.message);
-    return (data ?? []) as Array<{
-      id: string;
-      full_name: string;
-      role: string | null;
-      hourly_rate_cents: number | null;
-    }>;
+    const sb = context.supabase as any;
+    const full = await sb.from("technicians").select(TECHNICIAN_FULL_SELECT).order("full_name");
+    if (!full.error) return (full.data ?? []).map(normalizeTechnician);
+
+    const legacy = await sb.from("technicians").select(TECHNICIAN_LEGACY_SELECT).order("full_name");
+    if (legacy.error) throw new Error(legacy.error.message);
+    return (legacy.data ?? []).map(normalizeTechnician);
   });
 
 export const createTechnician = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { full_name: string; role?: string | null }) => data)
+  .inputValidator((data: TechnicianInput) => data)
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const sb = context.supabase as any;
+    const payload = {
+      ...fullTechnicianPayload(data),
+      created_by: context.userId,
+    };
+    const full = await sb
       .from("technicians")
-      .insert({ full_name: data.full_name, role: data.role ?? null, created_by: context.userId })
-      .select("id, full_name, role")
+      .insert(payload)
+      .select(TECHNICIAN_FULL_SELECT)
       .single();
-    if (error) throw new Error(error.message);
-    return row;
+    if (!full.error) return normalizeTechnician(full.data);
+
+    const legacy = await sb
+      .from("technicians")
+      .insert({ ...legacyTechnicianPayload(data), created_by: context.userId })
+      .select(TECHNICIAN_LEGACY_SELECT)
+      .single();
+    if (legacy.error) throw new Error(legacy.error.message);
+    return normalizeTechnician(legacy.data);
+  });
+
+export const updateTechnician = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: TechnicianUpdateInput) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const before = await sb
+      .from("technicians")
+      .select(TECHNICIAN_FULL_SELECT)
+      .eq("id", data.id)
+      .maybeSingle();
+    const priorRate = before.error ? null : (before.data?.hourly_rate_cents ?? null);
+
+    const { id, ...values } = data;
+    const full = await sb
+      .from("technicians")
+      .update(fullTechnicianPayload(values))
+      .eq("id", id)
+      .select(TECHNICIAN_FULL_SELECT)
+      .single();
+
+    if (!full.error) {
+      if (priorRate !== data.hourly_rate_cents) {
+        await sb.from("technician_rate_history").insert({
+          technician_id: id,
+          hourly_rate_cents: data.hourly_rate_cents ?? null,
+          hourly_rate_50_cents: data.hourly_rate_50_cents ?? null,
+          hourly_rate_100_cents: data.hourly_rate_100_cents ?? null,
+          starts_at: new Date().toISOString(),
+          notes: data.pricing_notes ?? null,
+          created_by: context.userId,
+        });
+      }
+      return normalizeTechnician(full.data);
+    }
+
+    const legacy = await sb
+      .from("technicians")
+      .update(legacyTechnicianPayload(values))
+      .eq("id", id)
+      .select(TECHNICIAN_LEGACY_SELECT)
+      .single();
+    if (legacy.error) throw new Error(legacy.error.message);
+    return normalizeTechnician(legacy.data);
   });

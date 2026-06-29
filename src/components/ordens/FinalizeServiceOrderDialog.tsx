@@ -271,6 +271,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
       queryClient.invalidateQueries({ queryKey: ["order-financials", order.id] });
+      queryClient.invalidateQueries({ queryKey: ["technician-labor-history"] });
+      queryClient.invalidateQueries({ queryKey: ["technicians"] });
       queryClient.invalidateQueries({ queryKey: ["report-orders"] });
       onOpenChange(false);
     },
