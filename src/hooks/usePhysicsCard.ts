@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEventHandler } from "react";
+import type { CSSProperties, PointerEvent, PointerEventHandler } from "react";
 
 type PhysicsState = {
   rotateX: number;
@@ -33,6 +33,10 @@ function prefersReducedMotion() {
   );
 }
 
+function isCoarsePointer<T extends HTMLElement>(event: PointerEvent<T>) {
+  return event.pointerType === "touch" || event.pointerType === "pen";
+}
+
 export function usePhysicsCard<T extends HTMLElement = HTMLElement>({
   disabled = false,
   maxRotate = 8,
@@ -48,11 +52,12 @@ export function usePhysicsCard<T extends HTMLElement = HTMLElement>({
       const element = ref.current;
       if (!element || disabled || prefersReducedMotion()) return;
 
+      if (isCoarsePointer(event)) return;
+
       const rect = element.getBoundingClientRect();
       const pointerX = (event.clientX - rect.left) / rect.width;
       const pointerY = (event.clientY - rect.top) / rect.height;
-      const isCoarse = event.pointerType === "touch" || event.pointerType === "pen";
-      const rotate = isCoarse ? mobileMaxRotate : maxRotate;
+      const rotate = maxRotate;
 
       setState((current) => ({
         rotateX: (0.5 - pointerY) * rotate,
@@ -63,24 +68,39 @@ export function usePhysicsCard<T extends HTMLElement = HTMLElement>({
         pressed: current.pressed,
       }));
     },
-    [disabled, maxRotate, mobileMaxRotate],
+    [disabled, maxRotate],
   );
 
-  const onPointerEnter = useCallback<PointerEventHandler<T>>(() => {
-    if (disabled || prefersReducedMotion()) return;
-    setState((current) => ({ ...current, hover: true }));
-  }, [disabled]);
+  const onPointerEnter = useCallback<PointerEventHandler<T>>(
+    (event) => {
+      if (disabled || prefersReducedMotion()) return;
+      if (isCoarsePointer(event)) return;
+      setState((current) => ({ ...current, hover: true }));
+    },
+    [disabled],
+  );
 
   const onPointerLeave = useCallback<PointerEventHandler<T>>(() => {
     setState(neutralState);
   }, []);
 
-  const onPointerDown = useCallback<PointerEventHandler<T>>(() => {
-    if (disabled || prefersReducedMotion()) return;
-    setState((current) => ({ ...current, pressed: true }));
-  }, [disabled]);
+  const onPointerDown = useCallback<PointerEventHandler<T>>(
+    (event) => {
+      if (disabled || prefersReducedMotion()) return;
+      if (isCoarsePointer(event)) {
+        setState({ ...neutralState, hover: true, pressed: true });
+        return;
+      }
+      setState((current) => ({ ...current, pressed: true }));
+    },
+    [disabled],
+  );
 
-  const onPointerUp = useCallback<PointerEventHandler<T>>(() => {
+  const onPointerUp = useCallback<PointerEventHandler<T>>((event) => {
+    if (isCoarsePointer(event)) {
+      setState(neutralState);
+      return;
+    }
     setState((current) => ({ ...current, pressed: false }));
   }, []);
 

@@ -9,8 +9,8 @@ const items = [
 ] as const;
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[env(safe-area-inset-bottom)]">
-      <div className="lemarc-liquid mx-auto mb-3 grid w-full max-w-md grid-cols-5 gap-1 rounded-3xl p-1.5 shadow-2xl sm:max-w-2xl lg:max-w-3xl">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.25rem)]">
+      <div className="lemarc-bottom-nav-shell mx-auto mb-2 grid w-full max-w-md grid-cols-5 gap-1 rounded-3xl p-1.5 sm:max-w-2xl lg:max-w-3xl">
         {items.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
