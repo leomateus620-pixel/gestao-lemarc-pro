@@ -1,7 +1,10 @@
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listClients, listServiceOrders, listTechnicians } from "@/lib/api/serviceOrders.functions";
-import { listTechnicianLaborHistory } from "@/lib/api/financials.functions";
+import {
+  listServiceOrderFinancialSummaries,
+  listTechnicianLaborHistory,
+} from "@/lib/api/financials.functions";
 import type { TechnicianLite } from "@/types/serviceOrder";
 
 export function useServiceOrdersQuery() {
@@ -42,6 +45,17 @@ export function useTechnicianLaborHistoryQuery() {
   return useSuspenseQuery(
     queryOptions({
       queryKey: ["technician-labor-history"],
+      queryFn: () => fetcher(),
+      staleTime: 30_000,
+    }),
+  );
+}
+
+export function useServiceOrderFinancialSummariesQuery() {
+  const fetcher = useServerFn(listServiceOrderFinancialSummaries);
+  return useSuspenseQuery(
+    queryOptions({
+      queryKey: ["service-order-financial-summaries"],
       queryFn: () => fetcher(),
       staleTime: 30_000,
     }),

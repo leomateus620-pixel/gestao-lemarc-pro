@@ -167,6 +167,15 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
     };
   });
 
+export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as any;
+    const { data, error } = await sb.from("service_order_financials").select("*");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(normalizeFinancials).filter(Boolean) as OrderFinancials[];
+  });
+
 export const listTechnicianLaborHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
