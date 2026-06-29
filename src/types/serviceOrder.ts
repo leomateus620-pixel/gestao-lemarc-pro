@@ -55,6 +55,20 @@ export type TechnicianLite = {
   full_name: string;
   role: string | null;
   hourly_rate_cents?: number | null;
+  phone?: string | null;
+  email?: string | null;
+  cpf?: string | null;
+  specialty?: string | null;
+  active?: boolean | null;
+  hourly_rate_50_cents?: number | null;
+  hourly_rate_100_cents?: number | null;
+  pricing_notes?: string | null;
+  internal_notes?: string | null;
+  default_availability?: string | null;
+  kind?: string | null;
+  user_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 export type AssignedTechnician = TechnicianLite & {
   is_primary: boolean;

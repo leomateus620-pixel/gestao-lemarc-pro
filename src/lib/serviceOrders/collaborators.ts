@@ -14,7 +14,8 @@ export type CollaboratorOperationalStatus =
   | "Disponível"
   | "Alocado"
   | "Em deslocamento"
-  | "Em campo";
+  | "Em campo"
+  | "Inativo";
 
 export type CollaboratorHistoryItem = {
   id: string;
@@ -36,8 +37,22 @@ export type CollaboratorSummary = {
   id: string;
   name: string;
   role: string | null;
+  specialty: string | null;
+  phone: string | null;
+  email: string | null;
+  cpf: string | null;
+  active: boolean;
+  kind: string | null;
+  defaultAvailability: string | null;
+  userId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  internalNotes: string | null;
+  pricingNotes: string | null;
   internalCode: string;
   hourlyRateCents: number | null;
+  hourlyRate50Cents: number | null;
+  hourlyRate100Cents: number | null;
   status: CollaboratorOperationalStatus;
   ordersOpen: number;
   ordersToday: number;
@@ -53,6 +68,8 @@ export type CollaboratorDashboard = {
   collaborators: CollaboratorSummary[];
   kpis: {
     total: number;
+    active: number;
+    inactive: number;
     inField: number;
     available: number;
     inTransit: number;
@@ -104,8 +121,19 @@ function latestOperationalDate(order: ServiceOrder) {
   );
 }
 
-function orderHasTechnician(order: ServiceOrder, technicianId: string) {
+export function orderHasTechnician(order: ServiceOrder, technicianId: string) {
   return getOrderTechnicians(order).some((technician) => technician.id === technicianId);
+}
+
+export function collaboratorOrdersFor(orders: ServiceOrder[], technicianId: string) {
+  return orders.filter((order) => orderHasTechnician(order, technicianId));
+}
+
+export function collaboratorLaborFor(
+  laborHistory: TechnicianLaborHistoryRow[],
+  technicianId: string,
+) {
+  return laborHistory.filter((entry) => entry.technician_id === technicianId);
 }
 
 function serviceLabel(type: ServiceType | string | null, other?: string | null) {
@@ -191,6 +219,7 @@ export function buildCollaboratorOperationalDashboard({
   now?: Date;
 }): CollaboratorDashboard {
   const collaborators = technicians.map((technician) => {
+    const active = technician.active !== false;
     const assignedOrders = orders.filter((order) => orderHasTechnician(order, technician.id));
     const laborEntries = laborHistory.filter((entry) => entry.technician_id === technician.id);
     const orderIdsWithEntries = new Set(laborEntries.map((entry) => entry.service_order_id));
@@ -242,9 +271,23 @@ export function buildCollaboratorOperationalDashboard({
       id: technician.id,
       name: technician.full_name,
       role: technician.role,
+      specialty: technician.specialty ?? null,
+      phone: technician.phone ?? null,
+      email: technician.email ?? null,
+      cpf: technician.cpf ?? null,
+      active,
+      kind: technician.kind ?? null,
+      defaultAvailability: technician.default_availability ?? null,
+      userId: technician.user_id ?? null,
+      createdAt: technician.created_at ?? null,
+      updatedAt: technician.updated_at ?? null,
+      internalNotes: technician.internal_notes ?? null,
+      pricingNotes: technician.pricing_notes ?? null,
       internalCode: `COL-${technician.id.slice(0, 6).toUpperCase()}`,
       hourlyRateCents: technician.hourly_rate_cents ?? null,
-      status: deriveStatus(assignedOrders),
+      hourlyRate50Cents: technician.hourly_rate_50_cents ?? null,
+      hourlyRate100Cents: technician.hourly_rate_100_cents ?? null,
+      status: active ? deriveStatus(assignedOrders) : "Inativo",
       ordersOpen,
       ordersToday,
       hoursMonthMinutes,
@@ -265,6 +308,8 @@ export function buildCollaboratorOperationalDashboard({
     collaborators,
     kpis: {
       total: collaborators.length,
+      active: collaborators.filter((collaborator) => collaborator.active).length,
+      inactive: collaborators.filter((collaborator) => !collaborator.active).length,
       inField: collaborators.filter((collaborator) => collaborator.status === "Em campo").length,
       available: collaborators.filter((collaborator) => collaborator.status === "Disponível")
         .length,

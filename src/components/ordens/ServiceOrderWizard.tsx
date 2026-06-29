@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -36,6 +36,7 @@ import {
 import {
   priorityLabel,
   serviceTypeLabel,
+  type TechnicianLite,
   type ServicePriority,
   type ServiceType,
 } from "@/types/serviceOrder";
@@ -648,7 +649,7 @@ function TechnicianStep({
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-  technicians: { id: string; full_name: string; role: string | null }[];
+  technicians: TechnicianLite[];
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -657,17 +658,22 @@ function TechnicianStep({
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("");
+  const activeTechnicians = useMemo(
+    () => technicians.filter((technician) => technician.active !== false),
+    [technicians],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return technicians;
-    return technicians.filter(
+    if (!q) return activeTechnicians;
+    return activeTechnicians.filter(
       (t) => t.full_name.toLowerCase().includes(q) || (t.role ?? "").toLowerCase().includes(q),
     );
-  }, [technicians, query]);
+  }, [activeTechnicians, query]);
 
   const techMutation = useMutation({
-    mutationFn: () => createTec({ data: { full_name: newName, role: newRole || null } }),
+    mutationFn: () =>
+      createTec({ data: { full_name: newName, role: newRole || null, active: true } }),
     onSuccess: (row) => {
       onCreated(row.id);
       setNewName("");
@@ -788,6 +794,11 @@ function TechnicianStep({
             />
           </div>
           <div className="lemarc-form-panel max-h-[min(22rem,52vh)] space-y-1.5 overflow-y-auto rounded-2xl p-1.5 pr-2">
+            {technicians.length > activeTechnicians.length && (
+              <p className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-bold text-amber-100">
+                Colaboradores inativos ficam ocultos na criação de novas OS.
+              </p>
+            )}
             {filtered.length === 0 && (
               <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
                 Nenhum técnico encontrado.
@@ -981,13 +992,13 @@ function ReviewStep({
   draft: Draft;
   clients: { id: string; name: string; unit: string | null }[];
   units: { id: string; client_id: string; name: string; sector: string | null }[];
-  technicians: { id: string; full_name: string; role: string | null }[];
+  technicians: TechnicianLite[];
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
   const unit = units.find((u) => u.id === draft.unitId);
   const selectedTechs = draft.techIds
     .map((id) => technicians.find((t) => t.id === id))
-    .filter((t): t is { id: string; full_name: string; role: string | null } => Boolean(t));
+    .filter((t): t is TechnicianLite => Boolean(t));
   const scheduledLabel = draft.scheduled
     ? new Date(draft.scheduled).toLocaleString("pt-BR")
     : "Sem previsão definida";

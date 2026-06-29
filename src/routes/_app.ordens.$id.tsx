@@ -326,13 +326,18 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Falha ao salvar"),
   });
 
+  const selectableTechnicians = useMemo(
+    () => technicians.filter((t) => t.active !== false || selected.includes(t.id)),
+    [selected, technicians],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return technicians;
-    return technicians.filter(
+    if (!q) return selectableTechnicians;
+    return selectableTechnicians.filter(
       (t) => t.full_name.toLowerCase().includes(q) || (t.role ?? "").toLowerCase().includes(q),
     );
-  }, [technicians, query]);
+  }, [selectableTechnicians, query]);
 
   return (
     <Dialog
@@ -382,6 +387,11 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
             placeholder="Buscar técnico…"
           />
           <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+            {technicians.length > selectableTechnicians.length && (
+              <p className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-bold text-amber-100">
+                Colaboradores inativos ficam ocultos, exceto quando já estão vinculados a esta OS.
+              </p>
+            )}
             {filtered.length === 0 && (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                 Nenhum técnico encontrado.
