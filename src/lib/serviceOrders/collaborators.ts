@@ -57,8 +57,12 @@ export type CollaboratorSummary = {
   ordersOpen: number;
   ordersToday: number;
   hoursMonthMinutes: number;
+  hoursMonthRealMinutes: number;
+  hoursMonthEstimatedMinutes: number;
   servicesMonth: number;
   valueMonthCents: number | null;
+  valueMonthCentsReal: number;
+  valueMonthCentsEstimated: number;
   history: CollaboratorHistoryItem[];
   hasLaborEntries: boolean;
   hasEstimatedFallback: boolean;
@@ -74,8 +78,12 @@ export type CollaboratorDashboard = {
     available: number;
     inTransit: number;
     hoursMonthMinutes: number;
+    hoursMonthRealMinutes: number;
+    hoursMonthEstimatedMinutes: number;
     completedMonth: number;
     valueMonthCents: number | null;
+    valueMonthCentsReal: number;
+    valueMonthCentsEstimated: number;
   };
 };
 
