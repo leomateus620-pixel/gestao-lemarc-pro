@@ -1,114 +1,70 @@
+## Objetivo
 
-# Revisão do módulo Colaboradores
+Concluir as pendências do módulo Colaboradores (rotas auxiliares, auditoria de migração, wizard de OS) e validar a robustez do cadastro com um lote temporário de 50 colaboradores realistas (precificação + descrições). Após validar, remover todos os registros de teste.
 
-A causa raiz do bug em `/colaboradores/novo` é simples: `_app.colaboradores.tsx` é simultaneamente layout e tela cheia (não renderiza `<Outlet />`), então todas as rotas filhas batem no parent e mostram a lista. O padrão correto já está em `clientes`. A partir daí, encadeio correções de rotas, dados e visual.
+## Escopo das correções remanescentes
 
-## 1. Arquitetura de rotas (correção crítica)
+### 1. Rotas auxiliares (consistência das pseudo-abas e links internos)
+- `_app.colaboradores.$id.horas.tsx`, `.ordens.tsx`, `.editar.tsx`: revisar para que cada uma renderize a partir do mesmo layout (`<Outlet />` em `_app.colaboradores.tsx`) e use dados reais (`service_order_labor_entries` para horas, OS filtradas por técnico para ordens).
+- Garantir breadcrumb/back consistente e estado vazio quando o colaborador não tem dados.
+- Remover qualquer link "morto" restante nas pseudo-abas (manter apenas Visão geral + Novo).
 
-- Reescrever `src/routes/_app.colaboradores.tsx` para ser **apenas layout**:
-  ```tsx
-  export const Route = createFileRoute("/_app/colaboradores")({
-    component: () => <Outlet />,
-  });
-  ```
-- Criar `src/routes/_app.colaboradores.index.tsx` com `createFileRoute("/_app/colaboradores/")` contendo a visão geral (todo conteúdo atual: KPIs, filtros, lista, error boundary, skeleton).
-- Validar `/colaboradores`, `/colaboradores/novo`, `/colaboradores/$id`, `/colaboradores/$id/editar|horas|ordens` com refresh direto e botão voltar.
-- `routeTree.gen.ts` é regenerado automaticamente — não tocar manualmente.
+### 2. Auditoria da migração `20260629143000_colaboradores_module.sql`
+- Conferir: GRANTs por papel, RLS habilitado, policies escopadas a `auth.uid()` ou `has_role`, trigger `technician_rate_history` correto (somente quando `hourly_rate_cents` muda) e índices em `technician_id` nas tabelas referenciadoras.
+- Se faltar algo crítico (ex.: GRANT em `technician_rate_history`, policy de SELECT para admins), abrir migração corretiva nova — sem reescrever a existente.
 
-## 2. Submenus / abas (Opção B — simplificar)
+### 3. Wizard de criação de OS (`ServiceOrderWizard.tsx`)
+- Etapa de seleção de técnico: filtrar `active = true`, ordenar por nome, mostrar função e R$/h; bloquear seleção de quem está com `hourly_rate_cents = null` e exibir aviso "Defina o valor/hora antes de alocar".
+- Confirmar que o `hourly_rate_cents` é "congelado" ao criar o labor entry (já feito em `collaborators.ts`; só validar no fluxo de criação).
 
-Remover as 4 pseudo-abas que não navegam para lugar nenhum ("Perfis", "Horas trabalhadas", "Histórico de OS", "Valor/hora"). Manter apenas:
+### 4. Refinamentos visuais finais
+- `CollaboratorIslandRow`: revisar truncamento em viewport ≤375px, garantir `min-w-0` no bloco de nome/função, evitar quebra do pill R$/h.
+- `AppShell`/`BottomNav`: confirmar `padding-bottom: calc(64px + env(safe-area-inset-bottom))` na área de conteúdo da lista para que o último card não fique sob a bottom nav.
+- Topbar: confirmar `z-index` e ausência de sobreposição com o hero do módulo.
 
-- **Visão geral** (link `/colaboradores`)
-- **Novo colaborador** (link `/colaboradores/novo`)
+### 5. Form de cadastro (`CollaboratorForm`)
+- Validar máscaras CPF/telefone com paste de valores sujos.
+- Adicionar validação: nome obrigatório, função obrigatória, R$/h ≥ 0 e ≤ 99.999,99.
+- Bloquear submit duplo (`disabled` enquanto `mutation.isPending`).
 
-Dentro do perfil do colaborador (`$id`), as abas reais já existem (Perfil, Horas, Ordens, Editar) — apenas conferir que estão como `<Link>` com `activeProps`. Não criar rotas gerais novas (`/colaboradores/horas`, `/colaboradores/valores`) nesta entrega; é escopo de produto separado.
+## Validação com 50 colaboradores (seed temporário)
 
-## 3. Dados, cálculos e separação real vs. estimado
+### Geração
+- Script local em `scripts/seed-collaborators.ts` (gitignored ou removido ao final) que usa `createTechnician` via service-role (rodado por `bunx tsx`) para inserir 50 registros com:
+  - Nome (pt-BR realista, faker `@faker-js/faker` locale `pt_BR` — já instalado? se não, instalar apenas como devDependency temporária e remover).
+  - Função distribuída entre Mecânico Industrial, Eletricista Industrial, Técnico em Automação, Montador, Supervisor de Campo.
+  - `hourly_rate_cents` entre R$ 45 e R$ 220, `hourly_rate_50_cents` = +50%, `hourly_rate_100_cents` = +100%.
+  - `internal_notes` / `pricing_notes` com descrição contextual ("Especialista em manutenção de prensas hidráulicas. Disponível para turno noturno.").
+  - CPF e telefone fake válidos (mascarados), email `teste+{n}@lemarc.local`.
+  - 5 com `active = false` para testar filtro inativo; 3 com `hourly_rate_cents = null` para testar pill "A definir".
 
-- **Fonte real**: `service_order_labor_entries` (horas, `hourly_rate_cents`, subtotal).
-- **Fallback estimado**: vínculo via `service_order_technicians` ou legado `service_orders.technician_id` sem apontamento individual.
+### Checklist de validação
+1. `bun run build` (zero erros).
+2. `bunx vitest run src/lib/serviceOrders/collaborators.test.ts`.
+3. Browser via Playwright (headless):
+   - `/colaboradores` — lista renderiza 50 linhas, scroll fluido, sem overlap com bottom nav, KPIs somam corretamente.
+   - Filtro/busca por nome funciona.
+   - Inativos aparecem com pill correto, e quando filtro "ativos" está ligado, somem.
+   - Pill "A definir" aparece nos 3 sem valor/hora.
+   - Click em uma linha → expansão horizontal sem layout shift.
+   - Navegação `/colaboradores/novo` abre o form (regressão da correção principal).
+   - Detalhe `/colaboradores/$id` carrega dados certos.
+   - Wizard de OS lista 50 técnicos sem travar; bloqueia os 3 sem R$/h.
+   - Screenshot em 1280×1800 e 375×800.
+4. Conferir console e network sem erros 4xx/5xx.
 
-Regras a aplicar em `src/lib/serviceOrders/collaborators.ts` e `financials.functions.ts`:
+### Limpeza
+- `DELETE FROM public.technicians WHERE email LIKE 'teste+%@lemarc.local'` (via tool de insert) — confirmar contagem = 50.
+- Conferir cascata: `service_order_technicians`, `service_order_labor_entries`, `technician_rate_history` (não deve haver linhas porque nenhuma OS foi criada com eles).
+- Remover `scripts/seed-collaborators.ts` e a dep `@faker-js/faker` se foi adicionada.
 
-- KPI "Mão de obra mês" do dashboard e do perfil = **somente** soma de `service_order_labor_entries` do colaborador no período. Nunca somar tempo total da OS para todos os técnicos.
-- Expor separadamente `valueMonthCentsEstimated` e `hoursMonthEstimatedMinutes` quando houver OS vinculadas sem apontamento. UI mostra como segunda linha "Estimado: R$ X · Y h" ou badge "Sem apuração".
-- Listagem de colaboradores deve sempre puxar: nome, função, especialidade, status ativo/inativo, valor/hora atual, telefone, e-mail, usuário vinculado, horas trabalhadas no mês (reais), OS abertas, OS finalizadas, último atendimento. Auditar o `CollaboratorSummary` e completar campos faltantes.
-- Em `/colaboradores/$id/horas`: se entradas reais = 0 mas há OS vinculadas, mostrar mensagem explícita "Este colaborador possui OS vinculadas, mas ainda não possui apontamentos individuais finalizados." em vez de KPIs zerados sem contexto.
-- Em `/colaboradores/$id/ordens`: deduplicar união de fontes (`service_order_technicians` ∪ `labor_entries` ∪ legado `technician_id`); ao expandir, mostrar descrição inicial, descrição executada pelo colaborador, horas dele, subtotal dele, outros técnicos.
+## Entregáveis ao final
+- Resumo do que foi corrigido (rotas, migração, wizard, visual).
+- Resultado do build, do teste unitário e do roteiro Playwright.
+- Print(s) chave: lista com 50, expansão de linha, wizard com 50, mobile.
+- Confirmação da limpeza (contagem antes/depois).
 
-## 4. Migration e regras de preço histórico
-
-- Conferir se `supabase/migrations/20260629143000_colaboradores_module.sql` existe e foi aplicada (campos: `email, cpf, specialty, active, kind, default_availability, hourly_rate_50_cents, hourly_rate_100_cents, pricing_notes, internal_notes` + tabela `technician_rate_history`).
-- Validar RLS por `has_role(auth.uid(),'admin')` para CRUD do gestor; validar GRANTs.
-- Garantir trigger/insert em `technician_rate_history` ao alterar valor/hora.
-- Em `createServiceOrderLaborEntry` (criação real), o `hourly_rate_cents` é **congelado** vindo do cadastro no momento da criação — alterações futuras no cadastro NÃO recalculam apontamentos antigos. OS novas usam o valor atual. Auditar o caminho em `serviceOrders.functions.ts` para confirmar isso.
-- Se migration não estiver aplicada, falhar com erro claro ao salvar (não silenciar).
-
-## 5. Cadastro `/colaboradores/novo`
-
-Após corrigir rotas, o wizard já renderiza. Refinos no `CollaboratorForm`:
-
-- Renomear o campo "ID do usuário" para seção avançada **"Vincular usuário do sistema (opcional)"** com texto explicativo.
-- Aplicar máscara visual em telefone e CPF usando utilitários existentes (`src/lib/cnpj.ts` como referência; criar `mask/phone.ts` simples se necessário).
-- Validar valor/hora > 0; permitir 0 apenas com confirmação ("Sem valor/hora cadastrado bloqueia a finalização da OS — confirmar?").
-- Garantir `padding-bottom` com `env(safe-area-inset-bottom)` para o botão fixo não cobrir campos no mobile.
-
-## 6. Uso de colaboradores em OS
-
-Em `ServiceOrderWizard.tsx`, `FinalizeServiceOrderDialog.tsx`, `_app.ordens.$id.tsx`:
-
-- Selector de técnicos filtra `active = true` por padrão; toggle "Mostrar inativos" como opção avançada.
-- Busca por nome/função.
-- Valor/hora exibido apenas para perfil admin (já há `useUserRole`).
-- Ao selecionar, prefill da função e valor/hora atuais.
-- Na finalização: valor/hora vem do cadastro, gestor pode ajustar, valor final salvo em `service_order_labor_entries.hourly_rate_cents` (congelado).
-
-## 7-13. Refinamento visual
-
-**`CollaboratorIslandRow`**:
-- Linha horizontal com grid `[avatar 40px | nome+função | status pill | R$/h pill | horas mês tabular | OS abertas | última OS truncada | botão ⌄]` no desktop.
-- Mobile: grid `[avatar | min-w-0 nome+meta | ⌄]` com função/status/horas em duas linhas internas, todas com `truncate` e `min-w-0`.
-- Avatar sempre à esquerda, botão expandir sempre à direita (`grid-cols-[auto_minmax(0,1fr)_auto]`), nunca quebra abaixo do avatar.
-- Status como pill com cor por status; "R$/h A definir" pill âmbar discreta.
-- Tipografia: nomes em Title Case consistente (helper de normalização), funções abreviadas padronizadas ("Tec. Eletricista"). Remover `uppercase` + `tracking-[0.14em]` de textos pequenos sensíveis a leitura; manter apenas em labels técnicos.
-- Números com `tabular-nums`.
-
-**Linha expandida**: remover mini-cards quadrados. Trocar por uma régua horizontal:
-`Valor mês · OS concluídas · Hoje · Especialidade`, separadores por `·`. Botões de ação (Perfil, Horas, Ordens, Editar, Última OS) em chips horizontais com `min-h-10` para mobile.
-
-**Cabeçalho/KPIs do index**:
-- Reduzir altura do bloco hero (`p-4 sm:p-5` mantido, mas sem `text-3xl`; usar `text-xl sm:text-2xl`).
-- KPIs em linha compacta única; separar "Mão de obra mês" real de "Estimado".
-- Botão "Novo colaborador" no topo do módulo (mantido), e remover a duplicação com tabs.
-
-**AppShell / BottomNav**:
-- Auditar `BottomNav.tsx` e `AppShell.tsx`: garantir `padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom))` no `<main>` das telas com listas longas.
-- z-index da topbar acima do conteúdo; conteúdo com `padding-top` adequado.
-
-## 14. Arquivos a editar
-
-- `src/routes/_app.colaboradores.tsx` (vira layout)
-- `src/routes/_app.colaboradores.index.tsx` (novo — conteúdo da lista)
-- `src/components/colaboradores/CollaboratorIslandRow.tsx` (refino visual + tipografia + expansão)
-- `src/components/colaboradores/CollaboratorForm.tsx` (máscara, valor/hora, seção avançada)
-- `src/components/colaboradores/format.ts` (helpers Title Case, função abreviada, formatMoneyOrZero com badge "estimado")
-- `src/lib/serviceOrders/collaborators.ts` (separar real/estimado)
-- `src/lib/api/serviceOrders.functions.ts` e `financials.functions.ts` (auditar congelamento de rate; expor agregados separados)
-- `src/hooks/useServiceOrders.ts` (se novos agregados precisarem de hook)
-- `src/components/ordens/ServiceOrderWizard.tsx` + `FinalizeServiceOrderDialog.tsx` (filtro de ativos, rate do cadastro)
-- `src/components/app/BottomNav.tsx` + `AppShell.tsx` + `src/styles.css` (safe-area + densidade)
-- `src/lib/serviceOrders/collaborators.test.ts` (atualizar se mudar shape do summary)
-
-NÃO mudar rotas de clientes, ordens e relatórios além de invalidações já existentes.
-
-## 15-16. Validação
-
-- `npm run build`
-- `npx eslint` no escopo listado pelo usuário
-- `npx vitest run src/lib/serviceOrders/collaborators.test.ts`
-- Manualmente via Playwright (sandbox): visitar cada uma das 6 rotas, conferir refresh direto e bottom nav não cobrindo conteúdo em 1280/375.
-
-## 17. Entrega
-
-Resposta final com: rotas corrigidas, dados separados real/estimado, fallback identificado, abas reais, visual horizontal refinado, bottom nav OK, topbar OK, build/lint/teste verde, resumo das mudanças e quais dívidas preexistentes ficam fora do escopo (se houver).
+## Fora de escopo
+- Página `/colaboradores/$id` redesign profundo (apenas garantir que dados reais aparecem).
+- Mudança de schema além de eventual GRANT/policy faltante.
+- Importação em massa via UI (apenas seed script descartável).
