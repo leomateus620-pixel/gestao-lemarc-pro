@@ -11,9 +11,16 @@ import {
   type TechnicianInput,
   type TechnicianUpdateInput,
 } from "@/lib/api/serviceOrders.functions";
+import type { TechnicianLite } from "@/types/serviceOrder";
+import { z } from "zod";
+
+const editarSearch = z.object({
+  focus: z.enum(["rate", "operacao", "dados", "acesso"]).optional(),
+});
 
 export const Route = createFileRoute("/_app/colaboradores/$id/editar")({
   head: () => ({ meta: [{ title: "Editar colaborador — Gestão Lemarc" }] }),
+  validateSearch: editarSearch,
   component: EditarColaboradorPage,
 });
 
@@ -29,6 +36,7 @@ function EditarColaboradorPage() {
 
 function EditarContent() {
   const { id } = Route.useParams();
+  const { focus } = Route.useSearch();
   const { data: technicians } = useTechniciansQuery();
   const technician = technicians.find((item) => item.id === id);
   if (!technician) throw notFound();
@@ -39,7 +47,13 @@ function EditarContent() {
 
   const mutation = useMutation({
     mutationFn: (data: TechnicianUpdateInput) => updateFn({ data }),
-    onSuccess: () => {
+    onSuccess: (row) => {
+      if (row?.id) {
+        // Atualiza o cache imediatamente para evitar dados antigos no perfil.
+        queryClient.setQueryData<TechnicianLite[]>(["technicians"], (prev) =>
+          (prev ?? []).map((t) => (t.id === row.id ? row : t)),
+        );
+      }
       toast.success("Colaborador atualizado");
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
@@ -62,6 +76,7 @@ function EditarContent() {
       submitLabel="Salvar alterações"
       loading={mutation.isPending}
       onSubmit={handleSubmit}
+      focus={focus}
     />
   );
 }

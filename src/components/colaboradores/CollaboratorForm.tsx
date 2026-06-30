@@ -15,13 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { TechnicianInput } from "@/lib/api/serviceOrders.functions";
 import type { TechnicianLite } from "@/types/serviceOrder";
 import { cn } from "@/lib/utils";
-import {
-  centsToInput,
-  formatCpf,
-  formatCurrency,
-  formatPhone,
-  parseCurrencyInput,
-} from "./format";
+import { centsToInput, formatCpf, formatCurrency, formatPhone, parseCurrencyInput } from "./format";
 
 const steps = ["Dados", "Operação", "Valor/hora", "Acesso", "Revisão"] as const;
 
@@ -48,18 +42,24 @@ export function CollaboratorForm({
   loading,
   submitLabel,
   onSubmit,
+  focus,
 }: {
   initial?: TechnicianLite | null;
   loading?: boolean;
   submitLabel: string;
   onSubmit: (data: TechnicianInput) => void;
+  focus?: "dados" | "operacao" | "rate" | "acesso";
 }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => focusToStep(focus));
   const [draft, setDraft] = useState<Draft>(() => buildDraft(initial));
 
   useEffect(() => {
     setDraft(buildDraft(initial));
   }, [initial]);
+
+  useEffect(() => {
+    if (focus) setStep(focusToStep(focus));
+  }, [focus]);
 
   const normalRate = parseCurrencyInput(draft.hourlyRate);
   const rate50 = parseCurrencyInput(draft.hourlyRate50);
@@ -472,4 +472,18 @@ function buildDraft(initial?: TechnicianLite | null): Draft {
 function clean(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function focusToStep(focus?: "dados" | "operacao" | "rate" | "acesso"): number {
+  switch (focus) {
+    case "operacao":
+      return 1;
+    case "rate":
+      return 2;
+    case "acesso":
+      return 3;
+    case "dados":
+    default:
+      return 0;
+  }
 }

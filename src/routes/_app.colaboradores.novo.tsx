@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { CollaboratorForm } from "@/components/colaboradores/CollaboratorForm";
 import { createTechnician, type TechnicianInput } from "@/lib/api/serviceOrders.functions";
+import type { TechnicianLite } from "@/types/serviceOrder";
 
 export const Route = createFileRoute("/_app/colaboradores/novo")({
   head: () => ({ meta: [{ title: "Novo colaborador — Gestão Lemarc" }] }),
@@ -19,9 +20,20 @@ function NovoColaboradorPage() {
   const mutation = useMutation({
     mutationFn: (data: TechnicianInput) => createFn({ data }),
     onSuccess: (row) => {
-      toast.success("Colaborador cadastrado");
+      if (!row?.id) {
+        toast.error("Cadastro retornou sem ID. Tente novamente.");
+        return;
+      }
+      // Seed cache imediatamente para evitar 404 ao navegar enquanto a query
+      // ainda está fresca (staleTime de 60s em useTechniciansQuery).
+      queryClient.setQueryData<TechnicianLite[]>(["technicians"], (prev) => {
+        const list = prev ?? [];
+        if (list.some((t) => t.id === row.id)) return list;
+        return [...list, row].sort((a, b) => a.full_name.localeCompare(b.full_name));
+      });
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      toast.success("Colaborador cadastrado");
       navigate({ to: "/colaboradores/$id", params: { id: row.id } });
     },
     onError: (error: unknown) =>
