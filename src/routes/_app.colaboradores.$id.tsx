@@ -11,6 +11,8 @@ import {
   Phone,
   ShieldOff,
   Sparkles,
+  AlertTriangle,
+  ArrowRight,
   UserRound,
   WalletCards,
   type LucideIcon,
@@ -135,23 +137,28 @@ function PerfilContent() {
           to="/colaboradores/$id/editar"
           params={{ id }}
           search={{ focus: "rate" as const }}
-          className="lemarc-pressable flex items-center justify-between gap-3 rounded-3xl border border-primary/45 bg-gradient-to-r from-primary/22 via-primary/15 to-primary/10 px-5 py-4 text-white shadow-[0_18px_44px_-24px_var(--primary)] hover:border-primary/70"
+          aria-label="Definir valor/hora do colaborador"
+          className="lemarc-pressable lemarc-wizard-card group flex flex-col gap-3 rounded-3xl border border-white/[0.08] px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4"
         >
-          <span className="flex items-center gap-3 min-w-0">
-            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/40 bg-primary/20 text-primary">
-              <Sparkles size={18} />
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-amber-400/30 bg-amber-400/10 text-amber-300">
+              <AlertTriangle size={18} strokeWidth={2.4} />
             </span>
             <span className="min-w-0">
-              <p className="font-display text-sm font-black uppercase tracking-[0.14em] text-primary">
+              <p className="lemarc-technical-label text-amber-300/90">
+                Pendência de cadastro
+              </p>
+              <p className="mt-1 font-display text-base font-black uppercase tracking-[0.04em] text-white">
                 Definir valor/hora
               </p>
-              <p className="mt-0.5 truncate text-xs font-semibold text-slate-200">
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-300">
                 Necessário para apontamento de horas em novas OS.
               </p>
             </span>
           </span>
-          <span className="font-display text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-            Definir →
+          <span className="lemarc-primary-action inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] sm:w-auto">
+            Definir agora
+            <ArrowRight size={14} strokeWidth={2.6} />
           </span>
         </Link>
       )}
