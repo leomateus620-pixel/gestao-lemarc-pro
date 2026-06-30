@@ -15,13 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { TechnicianInput } from "@/lib/api/serviceOrders.functions";
 import type { TechnicianLite } from "@/types/serviceOrder";
 import { cn } from "@/lib/utils";
-import {
-  centsToInput,
-  formatCpf,
-  formatCurrency,
-  formatPhone,
-  parseCurrencyInput,
-} from "./format";
+import { centsToInput, formatCpf, formatCurrency, formatPhone, parseCurrencyInput } from "./format";
 
 const steps = ["Dados", "Operação", "Valor/hora", "Acesso", "Revisão"] as const;
 
