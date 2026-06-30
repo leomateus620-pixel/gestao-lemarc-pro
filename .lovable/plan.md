@@ -1,82 +1,50 @@
-# Assinatura do responsável na OS
+## Problema
 
-Adiciona coleta de assinatura do responsável da empresa antes da finalização da OS, com armazenamento rastreável, bloqueio para técnico, exceção para gestor e exibição no PDF.
+No mobile, o dialog de assinatura usa um layout em coluna única vertical (sidebar com campos → pad de assinatura → footer com botões). O conteúdo ultrapassa a altura da viewport (`100dvh`), mas o `DialogContent` não tem scroll interno e o footer fica empurrado para fora da tela — o usuário não consegue rolar até "Confirmar assinatura". Além disso, o botão "Limpar" só aparece no footer (também invisível) e o pad ocupa altura desnecessária quando os campos já são grandes.
 
-## 1. Banco de dados (migration)
+## Solução proposta (somente UI/UX, sem mexer em lógica)
 
-Tabela `public.service_order_signatures`:
-- `id uuid pk default gen_random_uuid()`
-- `service_order_id uuid not null references service_orders(id) on delete cascade`
-- `signed_by_name text not null`
-- `signed_by_role text` (cargo/documento opcional)
-- `signature_path text` (path no bucket, preferencial)
-- `signature_data_url text` (fallback inicial; um dos dois preenchido)
-- `signed_at timestamptz not null default now()` (servidor)
-- `collected_by uuid references auth.users(id)` (técnico autenticado)
-- `user_agent text`, `device_info jsonb`, `geo_lat numeric`, `geo_lng numeric`
-- `signature_hash text` (sha256 de `order_id|name|signed_at|payload`)
-- `revoked_at timestamptz`, `revoked_by uuid`, `revoke_reason text`
-- `metadata jsonb`, `created_at timestamptz default now()`
-- Index único parcial: uma assinatura ativa (`revoked_at is null`) por OS.
+Reestruturar `SignatureCaptureDialog.tsx` para um layout mobile-first realmente funcional:
 
-GRANT SELECT/INSERT a `authenticated`, ALL a `service_role`. RLS:
-- SELECT: qualquer autenticado (mesma política das OS).
-- INSERT: autenticado, `collected_by = auth.uid()`.
-- UPDATE (revoke): apenas `has_role(auth.uid(),'admin')`.
-- DELETE: bloqueado.
+### 1. Estrutura do Dialog
+- Manter fullscreen `h-[100dvh]` mas mudar para layout **header fixo / conteúdo scrollável / footer fixo (sticky)**:
+  - `<header>` no topo (não scrolla)
+  - `<main>` central com `overflow-y-auto` e `flex-1 min-h-0` — contém campos + pad
+  - `<footer>` sticky no rodapé com `safe-area-inset-bottom` para iPhone
+- Garante que botões "Voltar / Limpar / Confirmar" fiquem **sempre visíveis** em qualquer tela.
 
-Em `service_orders` adicionar:
-- `signature_waiver_reason text` (justificativa de exceção)
-- `signature_waived_by uuid references auth.users(id)`
-- `signature_waived_at timestamptz`
+### 2. Layout dos campos e do pad
+- **Mobile**: empilhado vertical (campos compactos no topo, pad logo abaixo com altura mínima de ~240px mas flexível).
+- **Desktop (sm+)**: grid 2 colunas (campos à esquerda, pad à direita ocupando toda a altura) — como já está.
+- Reduzir padding do bloco "Declaração" no mobile e mover "Geo capturada" para um chip menor.
+- Tornar o header mais compacto no mobile (título menor, descrição em 1 linha, esconder o subtítulo longo se necessário).
 
-Bucket privado `service-order-signatures` via tool de storage; políticas em `storage.objects` permitindo INSERT/SELECT a `authenticated` apenas em paths `{order_id}/...`.
+### 3. Ação "Limpar" mais acessível
+- Adicionar um **botão "Limpar" flutuante no canto superior direito do próprio pad** (ícone `Eraser`, pequeno, com tooltip "Limpar assinatura"), para o técnico apagar sem precisar rolar.
+- Manter o botão "Limpar" também no footer como fallback no desktop.
+- Botão fica desabilitado quando o pad está vazio.
 
-## 2. Server functions (`src/lib/api/serviceOrders.functions.ts`)
+### 4. Footer mobile otimizado
+- Em mobile: botão **"Confirmar assinatura"** em destaque (largura total), com "Voltar" e "Limpar" como ícones secundários ao lado (mais compactos).
+- Em desktop: mantém o layout horizontal atual.
+- Aplicar `pb-[env(safe-area-inset-bottom)]` para evitar sobreposição com a barra do Safari iOS.
 
-- `getServiceOrderSignature({ orderId })` — retorna assinatura ativa + signed URL do bucket.
-- `saveServiceOrderSignature({ orderId, signedByName, signedByRole?, signatureBase64, geo?, deviceInfo? })` — usa `requireSupabaseAuth`; faz upload PNG no bucket (path `{orderId}/{uuid}.png`), calcula hash, insere linha, captura `user_agent`/IP via `getRequestHeader`. Se já existir ativa, exige `replace: true` e revoga a anterior.
-- `waiveServiceOrderSignature({ orderId, reason })` — só admin; grava waiver na OS.
-- Ajustar `updateServiceOrderStatus`: ao transicionar `running → finished` (ou `finished → review`, definir no fluxo final — usar `finished`), validar que existe assinatura ativa OU waiver; senão retornar erro amigável.
-- Estender `getServiceOrder` select para incluir assinatura ativa e campos de waiver.
+### 5. Pad de assinatura
+- Reduzir `min-h` no mobile para `220px` (cabe melhor) e deixar crescer com `flex-1` quando há espaço.
+- Manter responsividade DPR e linha guia já existentes em `SignaturePad.tsx` (sem alterações de lógica).
 
-## 3. Tipos e UI
+## Arquivos alterados
 
-Atualizar `src/types/serviceOrder.ts` (`ServiceOrder` ganha `signature?`, `signature_waiver_*`). `integrations/supabase/types.ts` regenerado pela migration.
+- `src/components/ordens/signature/SignatureCaptureDialog.tsx` — reestruturação do layout do Dialog (header fixo, main scrollável, footer sticky, botão limpar dentro do pad, ajustes de tipografia mobile).
+- `src/components/ordens/signature/SignaturePad.tsx` — pequeno ajuste para aceitar um botão de limpar sobreposto via `children` opcional OU expor melhor o `clear` (já exposto via ref — sem mudança de API, apenas usar do pai).
 
-Componentes novos em `src/components/ordens/signature/`:
-- `SignaturePad.tsx` — canvas responsivo (lib `signature_pad`), suporte touch/pen, linha guia, alta DPR, exporta PNG transparente trimado.
-- `SignatureCaptureScreen.tsx` — tela cheia (Dialog fullscreen) com hint de landscape via `screen.orientation.lock('landscape')` quando suportado, área grande de assinatura, campos Nome (obrigatório) e Cargo (opcional), declaração de validação, botões Voltar / Limpar / Confirmar. Geolocalização opcional (`navigator.geolocation`).
-- `SignatureBlock.tsx` — bloco compacto na OS com 3 estados (Pendente / Registrada / Finalizada sem assinatura), preview, badge, ações.
-- `WaiveSignatureDialog.tsx` — somente admin (`useUserRole`), exige justificativa.
+## Validação
 
-Integrar em `src/routes/_app.ordens.$id.tsx` acima do `FinancialBlock`. Em `FinalizeServiceOrderDialog.tsx`, bloquear submit se sem assinatura/waiver, mostrando CTA para coletar.
+- Playwright em viewport mobile (390x844) navegando até a OS, abrindo o dialog de assinatura, verificando se o botão "Confirmar assinatura" está visível sem scroll do body, capturando screenshot.
+- Playwright em desktop (1280) para confirmar que o layout 2 colunas continua intacto.
+- `bunx tsgo --noEmit` no arquivo modificado.
 
-## 4. PDF (`ServiceOrderReportDocument.tsx`)
+## Sem mudanças
 
-Nova seção "Assinatura do responsável" com nome, cargo, data/hora, imagem (signed URL pré-renderizada), `collected_by`, hash curto. Se waiver: mostrar "Finalizada sem assinatura" + justificativa + responsável pelo waiver. Se nada: "Assinatura não registrada."
-
-## 5. Segurança/rastreabilidade
-
-- `signed_at` e hash gerados no servidor.
-- `collected_by = auth.uid()` via middleware.
-- User-agent/IP via `getRequestHeader`/`getRequestIP`.
-- Geo opcional, com consentimento.
-- Substituição registra revogação (linha antiga `revoked_at`/`revoked_by`/`revoke_reason`).
-- Declaração textual exibida antes do Confirmar.
-- Mensagem clara: "rastreabilidade operacional, não validade jurídica plena."
-
-## 6. Não-quebra
-
-Mantém rotas `/ordens`, `/ordens/nova`, `/ordens/$id`, `/ordens/$id/imprimir`, finalização, revisão e apuração. OS antigas sem assinatura continuam visíveis; bloqueio só aplica a transições futuras.
-
-## 7. Validação
-
-`bunx tsgo --noEmit`, build, ESLint focado nos arquivos tocados, e Playwright (mobile 390 vertical/horizontal + desktop 1280) para o fluxo: coletar → confirmar → finalizar → bloqueio sem assinatura → waiver admin → PDF.
-
-## Detalhes técnicos resumidos
-
-- Lib: `signature_pad` (pequena, sem deps; ~10kb) instalada com `bun add signature_pad`.
-- Upload: PNG base64 → `Uint8Array` → `supabase.storage.from('service-order-signatures').upload(path, bytes, { contentType: 'image/png' })` com admin client dentro do handler (`await import('@/integrations/supabase/client.server')`) para evitar problemas de RLS de storage na primeira iteração; policies de storage ainda escritas restringindo SELECT/INSERT por `authenticated`.
-- Signed URL: `createSignedUrl(path, 3600)` no `getServiceOrder` e no momento da geração do PDF.
-- Hash: `crypto.createHash('sha256').update(...).digest('hex').slice(0,16)` como `SIG-xxxxxxxxxxxxxxxx`.
+- Nenhuma mudança em `signatures.functions.ts`, migrations, RLS, PDF, ou no `SignatureBlock.tsx`.
+- Lógica de save, geo, hash e replace permanece idêntica.
