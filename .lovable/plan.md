@@ -1,128 +1,53 @@
-# Revisão e finalização do módulo Colaboradores
+## Objetivo
+Substituir os cards verticais pesados em `/clientes` por linhas horizontais expansíveis (Dynamic Island), mantendo toda a arquitetura de dados, rotas e vínculos atuais (clientes ↔ unidades ↔ OS ↔ relatórios).
 
-Foco: corrigir base (rotas, persistência, valor/hora, cálculo em OS) antes de qualquer refinamento visual. Sem mocks, tudo no Supabase Cloud.
+## Escopo (somente UI/apresentação)
+- Sem alterações em Supabase, RLS, server functions, schemas ou queries.
+- Sem mudanças nas rotas existentes (`/clientes`, `/clientes/novo`, `/clientes/$id`, `/clientes/$id/editar`, `/ordens/nova?clientId=`).
+- Reaproveita `useClientsFullQuery`, `useAllUnitsQuery`, `useServiceOrdersQuery` e helpers de status já existentes.
 
-## 1. Diagnóstico do 404 após cadastro
+## Novos componentes
+1. `src/components/clientes/ClientIslandRow.tsx`
+   - Linha horizontal estilo Island (mesmo molde de `CollaboratorIslandRow` / `ServiceOrderIslandRow`).
+   - **Estado retraído (desktop grid):** avatar (iniciais) · nome · status (Ativo/Inativo) · CNPJ ou pendência · unidades · OS abertas · OS concluídas · última OS · ícone expandir.
+   - **Mobile:** 2–3 linhas compactas (nome + status, CNPJ/segmento, métricas resumidas) + chevron.
+   - **Expandido:** grid de detalhes (responsável, telefone, e-mail, cidade/UF, segmento, observações, pendências), chips de unidades (até N + "ver todas"), resumo OS (abertas/concluídas/última), e barra horizontal de ações: Nova OS, Detalhes, Editar, Ver unidades, Última OS.
+   - Anima expansão com `grid-rows-[0fr→1fr]` (mesmo padrão dos outros módulos).
+   - Usa classes `lemarc-island-row` / `lemarc-island-row-expanded` já existentes no styles.css.
 
-Investigar a causa real do 404 em `/colaboradores/novo` → submit:
-- Verificar o retorno de `createTechnician` em `src/lib/api/serviceOrders.functions.ts` (se devolve `row.id` válido ou objeto incompleto).
-- Confirmar que `navigate({ to: "/colaboradores/$id", params: { id: row.id } })` em `_app.colaboradores.novo.tsx` recebe ID definido.
-- Validar `routeTree.gen.ts` lista `/_app/colaboradores/$id` corretamente (sem conflito com `/_app/colaboradores/novo`).
-- Checar se o insert no Supabase está realmente sucedendo (RLS, GRANT, payload) — pode estar retornando erro silenciosamente e ainda navegando.
+2. `src/components/clientes/ClientsKpiStrip.tsx` (opcional, inline na rota se ficar trivial)
+   - Faixa horizontal compacta de KPIs (não cards gigantes): Empresas ativas · Unidades · OS ativas · Com pendência · CNPJ completo · Sem contato.
 
-Correção definitiva: garantir que a server function retorne `.select().single()`, validar `id` antes de navegar, exibir erro real se falhar e nunca redirecionar para rota inválida.
+## Refatoração da rota
+`src/routes/_app.clientes.index.tsx`
+- Substitui o `PageHero` exagerado por cabeçalho compacto (título + subtítulo + botão "Nova empresa") no padrão de Ordens/Colaboradores.
+- Substitui o grid de 4 `MetricCard` por `ClientsKpiStrip` (linha horizontal).
+- Mantém busca atual; expande `FilterChips` para incluir: Status (Todos/Ativos/Inativos), Pendências (CNPJ/Contato/Sem unidade), Cidade/UF (derivada dos clientes carregados), Com OS ativa, Ordenação (Nome A–Z, Mais OS abertas, Atualizado recente).
+- Substitui `<div className="grid ... sm:grid-cols-2 xl:grid-cols-3">` + `<ClientCard>` por lista vertical de `<ClientIslandRow>`.
+- Mantém skeleton e empty-state atuais, adaptados para linhas horizontais.
 
-## 2. Persistência real (Supabase)
+## Derivação de dados (já disponível no client)
+- `unitsByClient`: já calculado.
+- `osByClient` (open/done/lastOrder): já calculado.
+- Pendências derivadas no render: `!cnpj`, `!responsible_name && !phone && !email`, `unitCount === 0`.
+- Cidades únicas: `useMemo` sobre `clients` (e units) para popular filtro UF.
+- Nenhuma nova query, nenhum N+1.
 
-Auditar tabela `technicians` e `technician_rate_history`:
-- Confirmar colunas esperadas (`hourly_rate_cents`, `hourly_rate_50_cents`, `hourly_rate_100_cents`, `pricing_notes`, `internal_notes`, `cpf`, `specialty`, `kind`, `default_availability`, `active`, `user_id`, etc.).
-- Confirmar GRANTs e RLS (authenticated CRUD + service_role ALL).
-- Trigger em `technicians` que insere em `technician_rate_history` apenas quando `hourly_rate_cents` (ou 50/100) mudar — preservando histórico e mantendo OS antigas com seu valor congelado.
+## Arquivo legado
+`src/components/clientes/ClientCard.tsx` permanece no projeto (sem referências após o swap) — pode ser removido em uma segunda passada se desejado. **Não removo nesta entrega** para zero risco de regressão se houver import oculto.
 
-Migração corretiva apenas se algo estiver faltando.
+## Validação pós-implementação
+- `bun run build` + lint nos arquivos alterados.
+- Smoke manual via Playwright headless em `/clientes`:
+  - Lista renderiza, expande/retrai, busca filtra, chips filtram.
+  - Botões Nova OS → `/ordens/nova?clientId=...`, Detalhes → `/clientes/$id`, Editar → `/clientes/$id/editar` navegam corretamente.
+  - Mobile 390px: sem overlap com bottom-nav, ações rolam horizontalmente.
+- Confirmar contagem de OS abertas/concluídas idêntica à anterior (mesmas funções `isDone`/`isCancelled`).
 
-## 3. Server functions de Colaboradores
+## Fora de escopo
+- Redesign das rotas `/clientes/$id` e `/clientes/novo` (mantidas como estão).
+- Mudanças em Ordens, Relatórios, Colaboradores.
+- Qualquer migração de banco.
 
-Em `src/lib/api/serviceOrders.functions.ts`:
-- `createTechnician`: validar input com Zod, mapear todos os campos do form, `INSERT ... RETURNING *`, devolver row tipada.
-- `updateTechnician`: aceitar `id` + patch parcial, NÃO zerar campos ausentes (usar update por chave existente), `RETURNING *`.
-- Garantir conversão correta R$ → centavos (parse robusto de "85,00" e "85.00", nunca multiplicar duas vezes).
-- Usar `requireSupabaseAuth` para gravar `created_by = userId`.
-
-## 4. Formulário de cadastro/edição
-
-`src/components/colaboradores/CollaboratorForm.tsx`:
-- Wizard ou seções: Dados principais → Operação → Valor/hora → Acesso.
-- Máscara CPF/telefone, parse seguro de moeda (centavos), `initial` para edição.
-- Submit único (anti double-click), erros inline, toast de sucesso/erro real.
-- Após salvar (novo): redireciona para `/colaboradores/$id` com ID retornado. Edição: redireciona para perfil.
-
-## 5. Perfil do colaborador
-
-`_app.colaboradores.$id.tsx`:
-- Mostrar dados reais; "A definir" só quando dado for null.
-- Se `hourly_rate_cents` for null, CTA destacado **"Definir valor/hora"** → `/colaboradores/$id/editar?focus=rate` (formulário rola/foca no campo).
-- Botão Editar funcional levando a `/colaboradores/$id/editar`.
-- Padding inferior para não ser coberto pelo bottom nav.
-- Cards horizontais (estilo Lemarc Dynamic Island), contraste melhorado.
-
-## 6. Telas auxiliares (horas e ordens)
-
-`_app.colaboradores.$id.horas.tsx`:
-- Query `service_order_labor_entries` filtrada por `technician_id`.
-- Soma `duration_minutes` e `subtotal_cents`, filtros por período.
-- Estado vazio claro: "Este colaborador ainda não possui apontamentos finalizados em OS."
-
-`_app.colaboradores.$id.ordens.tsx`:
-- Vínculo via `service_order_technicians` + `service_order_labor_entries` + fallback `service_orders.technician_id`. Deduplicar por `order_id`.
-- Cada card: número, cliente/unidade, status, horas do colaborador, valor gerado, demais técnicos, botão "Abrir OS".
-
-## 7. Integração com OS (cálculo correto)
-
-`ServiceOrderWizard.tsx` e `FinalizeServiceOrderDialog.tsx`:
-- Listar apenas `active = true`; mostrar pill quando `hourly_rate_cents` for null e bloquear apontamento até definir.
-- Ao adicionar apontamento, pré-preencher `hourly_rate_cents` com o valor atual do técnico (congela na entrada — `frozen rate`).
-- `subtotal_cents = round(duration_minutes / 60 * hourly_rate_cents)` por técnico, individualmente.
-- `service_order_financials.total_labor_cents` = soma dos subtotals reais (cada técnico com seu valor).
-
-## 8. Separação Real vs Estimado
-
-Em `src/lib/serviceOrders/collaborators.ts` (já existe a distinção):
-- Garantir que KPIs e cards mostrem **Real** como principal e **Estimado** com badge "estimado" separado, sem somar como se fosse real (já está parcialmente implementado — revisar visual).
-
-## 9. Refinamento visual (somente após base OK)
-
-- Bottom nav: `pb-[calc(env(safe-area-inset-bottom)+5rem)]` no AppShell do perfil.
-- Cards horizontais, labels com contraste suficiente.
-- CTA "Definir valor/hora" em destaque (gradiente Lemarc).
-- Botão Editar com ícone + label claros.
-
-## 10. Validação end-to-end
-
-Playwright headless no preview com sessão Supabase injetada:
-1. Criar colaborador "Teste Plano" com valor R$ 85,00 → verificar redirect para `/colaboradores/$id` (não 404) e row no Supabase.
-2. Editar telefone/função/valor → confirmar update e que campos não tocados ficam intactos.
-3. Criar OS, adicionar apontamento 3h30 → confirmar subtotal R$ 297,50.
-4. Múltiplos técnicos com valores diferentes na mesma OS → confirmar soma individual.
-5. Mudar valor/hora → confirmar entrada em `technician_rate_history`, OS antiga preserva valor antigo, nova OS usa novo.
-6. Verificar telas `/horas` e `/ordens` com dados reais.
-7. Deletar colaboradores de teste ao final.
-
-Comandos:
-- `npm run build`
-- `eslint` focado nos arquivos do escopo
-- `vitest run src/lib/serviceOrders/collaborators.test.ts`
-
-## Detalhes técnicos
-
-```text
-Fluxo do valor/hora:
-form input "85,00" → parseBRL() → 8500 (cents)
-→ technicians.hourly_rate_cents = 8500
-→ trigger → technician_rate_history (starts_at = now)
-
-Em OS:
-apontamento.hourly_rate_cents ← snapshot de technicians.hourly_rate_cents
-subtotal_cents = round(duration_minutes / 60 * hourly_rate_cents)
-financials.total_labor_cents = SUM(entries.subtotal_cents)
-```
-
-Arquivos previstos para edição:
-- `src/lib/api/serviceOrders.functions.ts` (create/update technician robustos)
-- `src/components/colaboradores/CollaboratorForm.tsx` (validação, máscaras, focus param)
-- `src/routes/_app.colaboradores.novo.tsx` (tratamento de erro e ID)
-- `src/routes/_app.colaboradores.$id.tsx` (CTA valor/hora, padding, layout horizontal)
-- `src/routes/_app.colaboradores.$id.editar.tsx` (suporte a `?focus=rate`)
-- `src/routes/_app.colaboradores.$id.horas.tsx` / `.ordens.tsx` (queries reais + empty states)
-- `src/components/ordens/ServiceOrderWizard.tsx` / `FinalizeServiceOrderDialog.tsx` (pré-preencher rate, bloquear sem rate)
-- Migração corretiva apenas se faltar coluna/trigger/grant.
-
-## Fora do escopo
-
-- Redesign profundo do módulo Ordens/Clientes/Relatórios.
-- Import em massa de colaboradores via UI.
-- Mudanças em Auth/Login.
-
-## Entrega final
-
-Resumo com: causa raiz do 404, rotas validadas, campos persistidos, fluxo valor/hora, cálculo em OS, arquivos alterados, validações executadas (screenshots Playwright das telas principais).
+## Entregáveis
+Resumo final com: arquivos alterados, componentes criados, validações executadas, confirmação de zero regressão em rotas/queries, screenshots desktop + mobile.
