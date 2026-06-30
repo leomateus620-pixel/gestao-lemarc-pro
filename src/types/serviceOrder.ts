@@ -87,6 +87,23 @@ export type ClientUnitLite = {
   default_displacement_type?: "km" | "fixed" | "none" | null;
 };
 
+export type ServiceOrderSignature = {
+  id: string;
+  service_order_id: string;
+  signed_by_name: string;
+  signed_by_role: string | null;
+  signature_data_url: string | null;
+  signature_path: string | null;
+  signed_at: string;
+  collected_by: string | null;
+  collected_by_name?: string | null;
+  signature_hash: string | null;
+  user_agent?: string | null;
+  geo_lat?: number | null;
+  geo_lng?: number | null;
+  revoked_at: string | null;
+};
+
 export type ServiceOrder = {
   id: string;
   number: number;
@@ -122,4 +139,8 @@ export type ServiceOrder = {
    */
   technicians: AssignedTechnician[];
   client_unit: ClientUnitLite | null;
+  signature?: ServiceOrderSignature | null;
+  signature_waiver_reason?: string | null;
+  signature_waived_by?: string | null;
+  signature_waived_at?: string | null;
 };
