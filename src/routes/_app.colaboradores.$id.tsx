@@ -10,7 +10,6 @@ import {
   PenLine,
   Phone,
   ShieldOff,
-  Sparkles,
   AlertTriangle,
   ArrowRight,
   UserRound,
