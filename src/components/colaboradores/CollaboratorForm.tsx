@@ -479,3 +479,17 @@ function clean(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
 }
+
+function focusToStep(focus?: "dados" | "operacao" | "rate" | "acesso"): number {
+  switch (focus) {
+    case "operacao":
+      return 1;
+    case "rate":
+      return 2;
+    case "acesso":
+      return 3;
+    case "dados":
+    default:
+      return 0;
+  }
+}
