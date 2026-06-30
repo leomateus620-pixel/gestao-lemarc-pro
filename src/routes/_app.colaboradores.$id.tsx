@@ -10,6 +10,7 @@ import {
   PenLine,
   Phone,
   ShieldOff,
+  Sparkles,
   UserRound,
   WalletCards,
   type LucideIcon,
@@ -67,6 +68,7 @@ function PerfilContent() {
 
   const linkedOrders = collaboratorOrdersFor(orders, id);
   const latest = collaborator.history[0];
+  const rateUndefined = collaborator.hourlyRateCents == null;
 
   const mutation = useMutation({
     mutationFn: () => updateFn({ data: { ...technician, active: !collaborator.active } }),
@@ -127,6 +129,32 @@ function PerfilContent() {
           <Metric label="OS abertas" value={String(collaborator.ordersOpen)} />
         </div>
       </section>
+
+      {rateUndefined && (
+        <Link
+          to="/colaboradores/$id/editar"
+          params={{ id }}
+          search={{ focus: "rate" as const }}
+          className="lemarc-pressable flex items-center justify-between gap-3 rounded-3xl border border-primary/45 bg-gradient-to-r from-primary/22 via-primary/15 to-primary/10 px-5 py-4 text-white shadow-[0_18px_44px_-24px_var(--primary)] hover:border-primary/70"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/40 bg-primary/20 text-primary">
+              <Sparkles size={18} />
+            </span>
+            <span className="min-w-0">
+              <p className="font-display text-sm font-black uppercase tracking-[0.14em] text-primary">
+                Definir valor/hora
+              </p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-200">
+                Necessário para apontamento de horas em novas OS.
+              </p>
+            </span>
+          </span>
+          <span className="font-display text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+            Definir →
+          </span>
+        </Link>
+      )}
 
       <section className="grid gap-3 lg:grid-cols-[1fr_0.9fr]">
         <Panel title="Dados principais" icon={UserRound}>
