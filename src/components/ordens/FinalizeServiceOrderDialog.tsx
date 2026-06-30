@@ -28,6 +28,7 @@ import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
 import type { ServiceOrder } from "@/types/serviceOrder";
+import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 
 type Props = {
   order: ServiceOrder;
@@ -87,6 +88,10 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const queryClient = useQueryClient();
   const fetcher = useServerFn(getOrderFinancials);
   const finalizeFn = useServerFn(finalizeServiceOrder);
+  const hasSignature = Boolean(order.signature);
+  const hasWaiver = Boolean(order.signature_waiver_reason);
+  const signatureOk = hasSignature || hasWaiver;
+  const [captureOpen, setCaptureOpen] = useState(false);
 
   const { data: existing } = useQuery({
     queryKey: ["order-financials", order.id],
@@ -622,14 +627,47 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
               Continuar
             </Button>
           ) : (
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !stepEntriesValid || !stepRatesValid}
-            >
-              {mutation.isPending ? "Finalizando…" : "Confirmar finalização"}
-            </Button>
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              {!signatureOk && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setCaptureOpen(true)}
+                  className="gap-2"
+                >
+                  Coletar assinatura
+                </Button>
+              )}
+              <Button
+                onClick={() => mutation.mutate()}
+                disabled={
+                  mutation.isPending || !stepEntriesValid || !stepRatesValid || !signatureOk
+                }
+                title={
+                  !signatureOk
+                    ? "Colete a assinatura do responsável antes de finalizar"
+                    : undefined
+                }
+              >
+                {mutation.isPending ? "Finalizando…" : "Confirmar finalização"}
+              </Button>
+            </div>
           )}
         </DialogFooter>
+
+        {!signatureOk && step === 2 && (
+          <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-[11px] font-bold text-amber-200">
+            Assinatura do responsável pendente. Colete antes de finalizar (ou peça ao
+            administrador para registrar a justificativa de exceção).
+          </div>
+        )}
+
+        <SignatureCaptureDialog
+          orderId={order.id}
+          orderNumber={order.number}
+          open={captureOpen}
+          onOpenChange={setCaptureOpen}
+        />
       </DialogContent>
     </Dialog>
   );
