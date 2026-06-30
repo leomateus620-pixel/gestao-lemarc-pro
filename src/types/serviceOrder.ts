@@ -49,7 +49,7 @@ export const statusLabel: Record<ServiceOrderStatus, string> = {
   cancelled: "Cancelada",
 };
 
-export type ClientLite = { id: string; name: string; unit: string | null };
+export type ClientLite = { id: string; name: string; unit: string | null; cnpj?: string | null };
 export type TechnicianLite = {
   id: string;
   full_name: string;
@@ -81,6 +81,10 @@ export type ClientUnitLite = {
   sector: string | null;
   city: string | null;
   state: string | null;
+  cnpj?: string | null;
+  distance_km_from_base?: number | null;
+  default_displacement_rate_cents?: number | null;
+  default_displacement_type?: "km" | "fixed" | "none" | null;
 };
 
 export type ServiceOrder = {

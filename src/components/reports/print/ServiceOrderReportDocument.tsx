@@ -3,6 +3,7 @@ import { displacementTypeLabel } from "@/types/financials";
 import type { LaborEntry, OrderFinancials } from "@/types/financials";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import { maskCNPJ } from "@/lib/cnpj";
 
 type Props = {
   order: ServiceOrder;
@@ -83,10 +84,17 @@ export function ServiceOrderReportDocument({
         <div className="metaGrid">
           <div>
             <span className="k">Cliente:</span> {order.client?.name ?? "—"}
+            {order.client?.cnpj ? ` · CNPJ ${maskCNPJ(order.client.cnpj)}` : ""}
           </div>
           <div>
             <span className="k">Unidade:</span>{" "}
             {order.client_unit?.name ?? order.client?.unit ?? "—"}
+            {order.client_unit?.cnpj ? ` · CNPJ ${maskCNPJ(order.client_unit.cnpj)}` : ""}
+            {order.client_unit?.city || order.client_unit?.state
+              ? ` · ${[order.client_unit?.city, order.client_unit?.state]
+                  .filter(Boolean)
+                  .join("/")}`
+              : ""}
           </div>
           <div>
             <span className="k">Local:</span> {order.location ?? "—"}

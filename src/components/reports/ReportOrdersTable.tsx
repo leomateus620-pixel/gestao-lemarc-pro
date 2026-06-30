@@ -63,7 +63,10 @@ function technicianCompact(r: ReportOrderRow): string {
   const techs = getReportRowTechnicians(r);
   if (techs.length === 0) return "Sem técnico";
   if (techs.length <= 2) return techs.map((t) => t.name).join(", ");
-  return `${techs.slice(0, 2).map((t) => t.name).join(", ")} +${techs.length - 2}`;
+  return `${techs
+    .slice(0, 2)
+    .map((t) => t.name)
+    .join(", ")} +${techs.length - 2}`;
 }
 
 function timeLabel(r: ReportOrderRow) {
@@ -181,26 +184,44 @@ export function ReportOrdersTable({ rows }: { rows: ReportOrderRow[] }) {
                       {r.title}
                     </div>
                   </Td>
-                  <Td className="max-w-[150px] font-semibold text-slate-100">
+                  <Td className="max-w-[170px] font-semibold text-slate-100">
                     <span className="line-clamp-2" title={r.client_name ?? "Sem cliente"}>
                       {r.client_name ?? <Muted>Sem cliente</Muted>}
                     </span>
+                    {r.client_cnpj && (
+                      <div className="font-mono text-[10px] font-medium text-slate-400">
+                        {r.client_cnpj}
+                      </div>
+                    )}
                   </Td>
-                  <Td>{r.client_unit_name ?? <Muted>—</Muted>}</Td>
+                  <Td>
+                    {r.client_unit_name ? (
+                      <>
+                        <div className="line-clamp-2 font-semibold text-slate-100">
+                          {r.client_unit_name}
+                        </div>
+                        {r.client_unit_cnpj && (
+                          <div className="font-mono text-[10px] font-medium text-slate-400">
+                            {r.client_unit_cnpj}
+                          </div>
+                        )}
+                        {(r.client_unit_city || r.client_unit_state) && (
+                          <div className="text-[10px] text-slate-400">
+                            {[r.client_unit_city, r.client_unit_state].filter(Boolean).join("/")}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Muted>—</Muted>
+                    )}
+                  </Td>
                   <Td className="max-w-[150px]">
                     {(() => {
                       const techs = getReportRowTechnicians(r);
                       const full = technicianNames(r);
                       return (
-                        <span
-                          className="line-clamp-2 font-semibold text-slate-100"
-                          title={full}
-                        >
-                          {techs.length === 0 ? (
-                            <Muted>Sem técnico</Muted>
-                          ) : (
-                            technicianCompact(r)
-                          )}
+                        <span className="line-clamp-2 font-semibold text-slate-100" title={full}>
+                          {techs.length === 0 ? <Muted>Sem técnico</Muted> : technicianCompact(r)}
                         </span>
                       );
                     })()}
@@ -297,7 +318,15 @@ export function ReportOrdersMobileList({ rows }: { rows: ReportOrderRow[] }) {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-              <MobileFact label="Cliente" value={r.client_name ?? "Sem cliente"} wide />
+              <MobileFact
+                label="Cliente"
+                value={
+                  r.client_cnpj
+                    ? `${r.client_name ?? "Sem cliente"} · ${r.client_cnpj}`
+                    : (r.client_name ?? "Sem cliente")
+                }
+                wide
+              />
               <MobileFact label="Técnicos" value={technicianCompact(r)} />
               <MobileFact
                 label="Prioridade"
@@ -320,7 +349,16 @@ export function ReportOrdersMobileList({ rows }: { rows: ReportOrderRow[] }) {
             </div>
             {isOpen && (
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
-                <MobileFact label="Unidade" value={r.client_unit_name ?? "—"} />
+                <MobileFact
+                  label="Unidade"
+                  value={
+                    r.client_unit_name
+                      ? r.client_unit_cnpj
+                        ? `${r.client_unit_name} · ${r.client_unit_cnpj}`
+                        : r.client_unit_name
+                      : "—"
+                  }
+                />
                 <MobileFact label="Tipo" value={typeLabel(r)} />
                 <MobileFact label="Fechamento" value={formatDate(r.closed_at)} />
                 <MobileFact

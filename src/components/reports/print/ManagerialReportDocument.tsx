@@ -6,15 +6,8 @@ import {
   formatNumber,
   formatPercent,
 } from "@/lib/reports/formatters";
-import {
-  priorityLabel,
-  serviceTypeLabel,
-  statusLabel,
-} from "@/types/serviceOrder";
-import type {
-  ManagerialReport,
-  ReportOrderRow,
-} from "@/types/reports";
+import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
+import type { ManagerialReport, ReportOrderRow } from "@/types/reports";
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import lemarcLogo from "@/assets/lemarc-logo.png.asset.json";
 
@@ -55,13 +48,17 @@ const PRINT_STYLES = `
 .lemarc-pdf .footer-note { margin-top: 18px; padding: 8px 10px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 9px; color: #475569; }
 `;
 
-export function ManagerialReportDocument({
-  report,
-  periodLabel,
-  generatedAt,
-  authorName,
-}: Props) {
-  const { summary, byStatus, topClients, topTechnicians, byServiceType, observations, incomplete, orders } = report;
+export function ManagerialReportDocument({ report, periodLabel, generatedAt, authorName }: Props) {
+  const {
+    summary,
+    byStatus,
+    topClients,
+    topTechnicians,
+    byServiceType,
+    observations,
+    incomplete,
+    orders,
+  } = report;
   return (
     <div className="lemarc-pdf">
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
@@ -69,8 +66,10 @@ export function ManagerialReportDocument({
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <img src={lemarcLogo.url} alt="Lemarc Industrial" style={{ height: 44, width: "auto" }} />
           <div>
-          <h1 className="title">Relatório Gerencial de Ordens de Serviço</h1>
-          <div className="muted" style={{ marginTop: 4 }}>{periodLabel}</div>
+            <h1 className="title">Relatório Gerencial de Ordens de Serviço</h1>
+            <div className="muted" style={{ marginTop: 4 }}>
+              {periodLabel}
+            </div>
           </div>
         </div>
         <div className="meta">
@@ -90,7 +89,10 @@ export function ManagerialReportDocument({
           <Kpi label="Em revisão" value={formatNumber(summary.review)} />
           <Kpi label="Aguardando cobrança" value={formatNumber(summary.awaitingBilling)} />
           <Kpi label="Horas trabalhadas" value={`${summary.totalHours.toFixed(1)}h`} />
-          <Kpi label="Tempo médio" value={summary.avgLeadMinutes !== null ? formatHours(summary.avgLeadMinutes) : "—"} />
+          <Kpi
+            label="Tempo médio"
+            value={summary.avgLeadMinutes !== null ? formatHours(summary.avgLeadMinutes) : "—"}
+          />
           <Kpi label="Valor estimado" value={formatCurrency(summary.estimatedValue)} />
           <Kpi label="Taxa de conclusão" value={formatPercent(summary.completionRate)} />
           <Kpi label="Clientes envolvidos" value={formatNumber(summary.clientsInvolved)} />
@@ -106,7 +108,11 @@ export function ManagerialReportDocument({
         <h2>Análise por status</h2>
         <table>
           <thead>
-            <tr><th>Status</th><th style={{ width: 80 }}>Qtd</th><th style={{ width: 80 }}>%</th></tr>
+            <tr>
+              <th>Status</th>
+              <th style={{ width: 80 }}>Qtd</th>
+              <th style={{ width: 80 }}>%</th>
+            </tr>
           </thead>
           <tbody>
             {byStatus.map((s) => (
@@ -117,7 +123,11 @@ export function ManagerialReportDocument({
               </tr>
             ))}
             {byStatus.length === 0 && (
-              <tr><td colSpan={3} className="muted">Sem dados.</td></tr>
+              <tr>
+                <td colSpan={3} className="muted">
+                  Sem dados.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -186,9 +196,9 @@ export function ManagerialReportDocument({
           </table>
         )}
         <p className="muted" style={{ fontSize: 9, marginTop: 6 }}>
-          As horas por técnico consideram a duração total da OS para cada técnico
-          vinculado como responsável. Quando há mais de um técnico na mesma OS,
-          o total distribuído pode exceder o total geral de horas.
+          As horas por técnico consideram a duração total da OS para cada técnico vinculado como
+          responsável. Quando há mais de um técnico na mesma OS, o total distribuído pode exceder o
+          total geral de horas.
         </p>
       </section>
 
@@ -199,11 +209,17 @@ export function ManagerialReportDocument({
         ) : (
           <table>
             <thead>
-              <tr><th>Tipo</th><th style={{ width: 80 }}>Qtd</th></tr>
+              <tr>
+                <th>Tipo</th>
+                <th style={{ width: 80 }}>Qtd</th>
+              </tr>
             </thead>
             <tbody>
               {byServiceType.map((s) => (
-                <tr key={s.key}><td>{s.label}</td><td>{formatNumber(s.count)}</td></tr>
+                <tr key={s.key}>
+                  <td>{s.label}</td>
+                  <td>{formatNumber(s.count)}</td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -257,14 +273,23 @@ export function ManagerialReportDocument({
                 <tr key={r.id}>
                   <td>{r.number}</td>
                   <td>{r.title}</td>
-                  <td>{r.client_name ?? "—"}{r.client_unit_name ? ` · ${r.client_unit_name}` : ""}</td>
+                  <td>
+                    {r.client_name ?? "—"}
+                    {r.client_cnpj ? ` (${r.client_cnpj})` : ""}
+                    {r.client_unit_name ? ` · ${r.client_unit_name}` : ""}
+                    {r.client_unit_cnpj ? ` (${r.client_unit_cnpj})` : ""}
+                  </td>
                   <td>{technicianNamesFor(r)}</td>
                   <td>{serviceTypeFor(r)}</td>
                   <td>{r.priority ? priorityLabel[r.priority] : "—"}</td>
                   <td>{statusLabel[r.status]}</td>
                   <td>{formatDate(r.opened_at)}</td>
                   <td>{r.closed_at ? formatDate(r.closed_at) : "—"}</td>
-                  <td>{r.worked_minutes_effective > 0 ? `${(r.worked_minutes_effective / 60).toFixed(1)}h` : "—"}</td>
+                  <td>
+                    {r.worked_minutes_effective > 0
+                      ? `${(r.worked_minutes_effective / 60).toFixed(1)}h`
+                      : "—"}
+                  </td>
                   <td>{r.estimated_value > 0 ? formatCurrency(r.estimated_value) : "—"}</td>
                 </tr>
               ))}
@@ -274,12 +299,11 @@ export function ManagerialReportDocument({
       </section>
 
       <div className="footer-note">
-        <strong>Responsabilidade dos dados:</strong>{" "}
-        {incomplete.withoutTechnician} OS sem técnico atribuído ·{" "}
-        {incomplete.withoutHourRate} OS sem valor/hora cadastrado ·{" "}
+        <strong>Responsabilidade dos dados:</strong> {incomplete.withoutTechnician} OS sem técnico
+        atribuído · {incomplete.withoutHourRate} OS sem valor/hora cadastrado ·{" "}
         {incomplete.withoutWorkedMinutes} OS sem tempo trabalhado informado ·{" "}
-        {incomplete.withoutClosedAt} OS sem data de fechamento. Valores estimados calculados
-        somente com registros completos.
+        {incomplete.withoutClosedAt} OS sem data de fechamento. Valores estimados calculados somente
+        com registros completos.
       </div>
     </div>
   );
@@ -287,7 +311,8 @@ export function ManagerialReportDocument({
 
 function serviceTypeFor(r: ReportOrderRow): string {
   if (!r.service_type) return "—";
-  if (r.service_type === "outro" && r.service_type_other?.trim()) return r.service_type_other.trim();
+  if (r.service_type === "outro" && r.service_type_other?.trim())
+    return r.service_type_other.trim();
   return serviceTypeLabel[r.service_type];
 }
 

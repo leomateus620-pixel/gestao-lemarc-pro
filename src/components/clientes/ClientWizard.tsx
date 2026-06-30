@@ -85,7 +85,10 @@ export function ClientWizard() {
           email: draft.email || null,
           responsible_name: draft.responsible_name || null,
           notes: draft.notes || null,
-          units: draft.units,
+          units: draft.units.map((u) => ({
+            ...u,
+            cnpj: u.cnpj ? onlyDigits(u.cnpj) : null,
+          })),
         },
       }),
     onSuccess: (row) => {
@@ -428,6 +431,11 @@ function UnitsStep({
         phone: "",
         notes: "",
         is_primary: draft.units.length === 0,
+        cnpj: "",
+        distance_km_from_base: null,
+        default_displacement_rate_cents: null,
+        default_displacement_type: "km",
+        billing_notes: "",
       },
     ]);
   }
@@ -562,6 +570,90 @@ function UnitsStep({
                   value={u.phone ?? ""}
                   onChange={(e) => updUnit(idx, { phone: e.target.value })}
                   className={inputCls}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CNPJ da unidade</Label>
+                <Input
+                  value={maskCNPJ(u.cnpj ?? "")}
+                  onChange={(e) => updUnit(idx, { cnpj: onlyDigits(e.target.value) })}
+                  placeholder="00.000.000/0000-00"
+                  className={cn(
+                    inputCls,
+                    u.cnpj &&
+                      !isValidCNPJ(u.cnpj) &&
+                      "border-rose-500/50 focus-visible:ring-rose-500/40",
+                  )}
+                />
+                {u.cnpj && !isValidCNPJ(u.cnpj) && (
+                  <p className="text-[11px] font-bold text-rose-200">CNPJ inválido.</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Distância até a base (km)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  min="0"
+                  value={
+                    u.distance_km_from_base === null || u.distance_km_from_base === undefined
+                      ? ""
+                      : String(u.distance_km_from_base)
+                  }
+                  onChange={(e) =>
+                    updUnit(idx, {
+                      distance_km_from_base: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Valor/km padrão (R$)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={
+                    u.default_displacement_rate_cents === null ||
+                    u.default_displacement_rate_cents === undefined
+                      ? ""
+                      : String(u.default_displacement_rate_cents / 100)
+                  }
+                  onChange={(e) =>
+                    updUnit(idx, {
+                      default_displacement_rate_cents:
+                        e.target.value === "" ? null : Math.round(Number(e.target.value) * 100),
+                    })
+                  }
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cobrança de deslocamento</Label>
+                <select
+                  value={u.default_displacement_type ?? "km"}
+                  onChange={(e) =>
+                    updUnit(idx, {
+                      default_displacement_type: e.target.value as "km" | "fixed" | "none",
+                    })
+                  }
+                  className={cn(inputCls, "appearance-none bg-[#0d1420] px-3 text-sm")}
+                >
+                  <option value="km">Por km rodado</option>
+                  <option value="fixed">Valor fixo</option>
+                  <option value="none">Não cobrar</option>
+                </select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Observações de cobrança / deslocamento</Label>
+                <Textarea
+                  value={u.billing_notes ?? ""}
+                  onChange={(e) => updUnit(idx, { billing_notes: e.target.value })}
+                  placeholder="Ex.: pedágios reembolsáveis, refeição obrigatória, restrições de horário…"
+                  className="lemarc-form-control min-h-20 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70"
                 />
               </div>
             </div>

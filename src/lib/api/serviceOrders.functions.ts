@@ -15,9 +15,9 @@ const ORDER_SELECT = `
   service_type, service_type_other, priority, status, location, requester_name, scheduled_for, client_unit_id,
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
-  client:clients!service_orders_client_id_fkey(id, name, unit),
+  client:clients!service_orders_client_id_fkey(id, name, unit, cnpj),
   technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
-  client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state),
+  client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type),
   assigned_technicians:service_order_technicians(
     is_primary, role,
     technician:technicians(id, full_name, role, hourly_rate_cents)

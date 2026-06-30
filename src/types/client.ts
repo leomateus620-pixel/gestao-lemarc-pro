@@ -11,6 +11,11 @@ export type ClientUnit = {
   phone: string | null;
   notes: string | null;
   active: boolean;
+  cnpj: string | null;
+  distance_km_from_base: number | null;
+  default_displacement_rate_cents: number | null;
+  default_displacement_type: "km" | "fixed" | "none" | null;
+  billing_notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -43,4 +48,9 @@ export type ClientUnitInput = {
   phone?: string | null;
   notes?: string | null;
   is_primary?: boolean;
+  cnpj?: string | null;
+  distance_km_from_base?: number | null;
+  default_displacement_rate_cents?: number | null;
+  default_displacement_type?: "km" | "fixed" | "none" | null;
+  billing_notes?: string | null;
 };

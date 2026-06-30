@@ -20,11 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  PERIOD_OPTIONS,
-  countActiveFilters,
-  isCustomRangeInvalid,
-} from "@/lib/reports/filters";
+import { PERIOD_OPTIONS, countActiveFilters, isCustomRangeInvalid } from "@/lib/reports/filters";
 import type { ReportFilters, BillingStatus } from "@/types/reports";
 import {
   priorityLabel,

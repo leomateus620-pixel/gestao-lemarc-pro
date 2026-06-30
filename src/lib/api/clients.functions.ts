@@ -9,7 +9,62 @@ const CLIENT_COLS =
   "id, name, cnpj, segment, address, city, state, phone, email, responsible_name, notes, active, unit, created_at, updated_at";
 
 const UNIT_COLS =
-  "id, client_id, name, is_primary, sector, city, state, address, responsible_name, phone, notes, active, created_at, updated_at";
+  "id, client_id, name, is_primary, sector, city, state, address, responsible_name, phone, notes, active, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type, billing_notes, created_at, updated_at";
+
+const ALLOWED_DISPLACEMENT_TYPES = ["km", "fixed", "none"] as const;
+
+function normalizeUnitFields(input: Partial<ClientUnitInput>) {
+  const out: Record<string, unknown> = {};
+  if (input.sector !== undefined) out.sector = input.sector ?? null;
+  if (input.city !== undefined) out.city = input.city ?? null;
+  if (input.state !== undefined) out.state = input.state ?? null;
+  if (input.address !== undefined) out.address = input.address ?? null;
+  if (input.responsible_name !== undefined) out.responsible_name = input.responsible_name ?? null;
+  if (input.phone !== undefined) out.phone = input.phone ?? null;
+  if (input.notes !== undefined) out.notes = input.notes ?? null;
+  if (input.cnpj !== undefined) {
+    const digits = input.cnpj ? onlyDigits(String(input.cnpj)) : null;
+    if (digits && !isValidCNPJ(digits)) throw new Error("CNPJ da unidade inválido.");
+    out.cnpj = digits || null;
+  }
+  if (input.distance_km_from_base !== undefined) {
+    const v = input.distance_km_from_base;
+    out.distance_km_from_base = v === null || v === undefined ? null : Number(v);
+  }
+  if (input.default_displacement_rate_cents !== undefined) {
+    const v = input.default_displacement_rate_cents;
+    out.default_displacement_rate_cents =
+      v === null || v === undefined ? null : Math.max(0, Math.round(Number(v)));
+  }
+  if (input.default_displacement_type !== undefined) {
+    const t = input.default_displacement_type;
+    if (t && !ALLOWED_DISPLACEMENT_TYPES.includes(t)) {
+      throw new Error("Tipo de deslocamento inválido.");
+    }
+    out.default_displacement_type = t ?? null;
+  }
+  if (input.billing_notes !== undefined) out.billing_notes = input.billing_notes ?? null;
+  return out;
+}
+
+async function ensureUnitCnpjUnique(
+  // The Supabase generated types are too narrow for our dynamic query chain here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: { supabase: any },
+  clientId: string,
+  cnpjDigits: string | null,
+  excludeUnitId?: string,
+) {
+  if (!cnpjDigits) return;
+  let q = context.supabase
+    .from("client_units")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("cnpj", cnpjDigits);
+  if (excludeUnitId) q = q.neq("id", excludeUnitId);
+  const { data: dup } = await q.maybeSingle();
+  if (dup) throw new Error("Já existe uma unidade desta empresa com este CNPJ.");
+}
 
 export const listClientsFull = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -62,24 +117,21 @@ export const getClientPage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
-    const [
-      { data: client, error: e1 },
-      { data: units, error: e2 },
-      { data: orders, error: e3 },
-    ] = await Promise.all([
-      context.supabase.from("clients").select(CLIENT_COLS).eq("id", data.id).maybeSingle(),
-      context.supabase
-        .from("client_units")
-        .select(UNIT_COLS)
-        .eq("client_id", data.id)
-        .order("is_primary", { ascending: false })
-        .order("name"),
-      context.supabase
-        .from("service_orders")
-        .select(PAGE_ORDER_COLS)
-        .eq("client_id", data.id)
-        .order("opened_at", { ascending: false }),
-    ]);
+    const [{ data: client, error: e1 }, { data: units, error: e2 }, { data: orders, error: e3 }] =
+      await Promise.all([
+        context.supabase.from("clients").select(CLIENT_COLS).eq("id", data.id).maybeSingle(),
+        context.supabase
+          .from("client_units")
+          .select(UNIT_COLS)
+          .eq("client_id", data.id)
+          .order("is_primary", { ascending: false })
+          .order("name"),
+        context.supabase
+          .from("service_orders")
+          .select(PAGE_ORDER_COLS)
+          .eq("client_id", data.id)
+          .order("opened_at", { ascending: false }),
+      ]);
     if (e1) throw new Error(e1.message);
     if (e2) throw new Error(e2.message);
     if (e3) throw new Error(e3.message);
@@ -183,15 +235,21 @@ export const createCompany = createServerFn({ method: "POST" })
         client_id: row.id,
         name: u.name,
         is_primary: i === effectivePrimary,
-        sector: u.sector ?? null,
-        city: u.city ?? null,
-        state: u.state ?? null,
-        address: u.address ?? null,
-        responsible_name: u.responsible_name ?? null,
-        phone: u.phone ?? null,
-        notes: u.notes ?? null,
         created_by: context.userId,
+        ...normalizeUnitFields(u),
       }));
+      // CNPJ duplicate check inside the same payload
+      const seen = new Set<string>();
+      for (const p of payload) {
+        const c = (p as { cnpj?: string | null }).cnpj;
+        if (c) {
+          if (seen.has(c))
+            throw new Error(
+              "Duas unidades desta empresa têm o mesmo CNPJ. Ajuste antes de salvar.",
+            );
+          seen.add(c);
+        }
+      }
       const { error: uErr } = await context.supabase.from("client_units").insert(payload);
       if (uErr) throw new Error(uErr.message);
     }
@@ -247,20 +305,20 @@ export const createClientUnit = createServerFn({ method: "POST" })
   .inputValidator((data: ClientUnitInput & { client_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { client_id, ...rest } = data;
+    const normalized = normalizeUnitFields(rest);
+    await ensureUnitCnpjUnique(
+      context,
+      client_id,
+      (normalized.cnpj as string | null | undefined) ?? null,
+    );
     const { data: row, error } = await context.supabase
       .from("client_units")
       .insert({
         client_id,
         name: rest.name,
         is_primary: rest.is_primary ?? false,
-        sector: rest.sector ?? null,
-        city: rest.city ?? null,
-        state: rest.state ?? null,
-        address: rest.address ?? null,
-        responsible_name: rest.responsible_name ?? null,
-        phone: rest.phone ?? null,
-        notes: rest.notes ?? null,
         created_by: context.userId,
+        ...normalized,
       })
       .select(UNIT_COLS)
       .single();
@@ -270,11 +328,33 @@ export const createClientUnit = createServerFn({ method: "POST" })
 
 export const updateClientUnit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; patch: Partial<ClientUnitInput> & { active?: boolean } }) => data)
+  .inputValidator(
+    (data: { id: string; patch: Partial<ClientUnitInput> & { active?: boolean } }) => data,
+  )
   .handler(async ({ data, context }) => {
+    const { active, name, is_primary, ...rest } = data.patch;
+    const normalized = normalizeUnitFields(rest);
+    if (name !== undefined) (normalized as Record<string, unknown>).name = name;
+    if (is_primary !== undefined) (normalized as Record<string, unknown>).is_primary = is_primary;
+    if (active !== undefined) (normalized as Record<string, unknown>).active = active;
+    if ((normalized as { cnpj?: string | null }).cnpj !== undefined) {
+      const { data: current } = await context.supabase
+        .from("client_units")
+        .select("client_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      const clientId = (current as { client_id?: string } | null)?.client_id;
+      if (clientId)
+        await ensureUnitCnpjUnique(
+          context,
+          clientId,
+          ((normalized as { cnpj?: string | null }).cnpj as string | null) ?? null,
+          data.id,
+        );
+    }
     const { data: row, error } = await context.supabase
       .from("client_units")
-      .update(data.patch)
+      .update(normalized as Database["public"]["Tables"]["client_units"]["Update"])
       .eq("id", data.id)
       .select(UNIT_COLS)
       .single();

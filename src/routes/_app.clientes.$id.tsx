@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { clientPageQueryOptions, useClientPageQuery } from "@/hooks/useClients";
@@ -30,7 +31,7 @@ import {
   getClientPage,
   updateClientUnit,
 } from "@/lib/api/clients.functions";
-import { maskCNPJ } from "@/lib/cnpj";
+import { maskCNPJ, onlyDigits, isValidCNPJ } from "@/lib/cnpj";
 import { formatServiceOrderDateTime } from "@/lib/serviceOrders/time";
 import { cn } from "@/lib/utils";
 import type { ClientUnit } from "@/types/client";
@@ -589,8 +590,7 @@ function UnitsSection({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [sector, setSector] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const create = useServerFn(createClientUnit);
   const update = useServerFn(updateClientUnit);
   const remove = useServerFn(deleteClientUnit);
@@ -603,19 +603,57 @@ function UnitsSection({
   });
 
   const addMut = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: UnitFormValues) =>
       create({
         data: {
           client_id: clientId,
-          name: name.trim(),
-          sector: sector || null,
+          name: payload.name.trim(),
+          sector: payload.sector || null,
+          city: payload.city || null,
+          state: payload.state || null,
+          address: payload.address || null,
+          responsible_name: payload.responsible_name || null,
+          phone: payload.phone || null,
+          notes: payload.notes || null,
+          cnpj: payload.cnpj ? onlyDigits(payload.cnpj) : null,
+          distance_km_from_base: payload.distance_km_from_base,
+          default_displacement_rate_cents: payload.default_displacement_rate_cents,
+          default_displacement_type: payload.default_displacement_type,
+          billing_notes: payload.billing_notes || null,
           is_primary: units.length === 0,
         },
       }),
     onSuccess: () => {
-      setName("");
-      setSector("");
       setAdding(false);
+      qc.invalidateQueries({ queryKey: ["client-page", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-units"] });
+    },
+  });
+
+  const editMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UnitFormValues }) =>
+      update({
+        data: {
+          id,
+          patch: {
+            name: payload.name.trim(),
+            sector: payload.sector || null,
+            city: payload.city || null,
+            state: payload.state || null,
+            address: payload.address || null,
+            responsible_name: payload.responsible_name || null,
+            phone: payload.phone || null,
+            notes: payload.notes || null,
+            cnpj: payload.cnpj ? onlyDigits(payload.cnpj) : null,
+            distance_km_from_base: payload.distance_km_from_base,
+            default_displacement_rate_cents: payload.default_displacement_rate_cents,
+            default_displacement_type: payload.default_displacement_type,
+            billing_notes: payload.billing_notes || null,
+          },
+        },
+      }),
+    onSuccess: () => {
+      setEditingId(null);
       qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
     },
@@ -649,6 +687,7 @@ function UnitsSection({
 
       {units.map((u) => {
         const osCount = osByUnit.get(u.id) ?? 0;
+        const isEditing = editingId === u.id;
         return (
           <Panel key={u.id} className="p-4 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -657,6 +696,11 @@ function UnitsSection({
                   <h4 className="break-words font-display text-lg font-black leading-tight text-white">
                     {u.name}
                   </h4>
+                  {u.cnpj && (
+                    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] font-bold text-slate-200">
+                      {maskCNPJ(u.cnpj)}
+                    </span>
+                  )}
                   {u.is_primary && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-300/12 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.1em] text-amber-100">
                       <Star size={11} /> Principal
@@ -681,12 +725,34 @@ function UnitsSection({
                     Responsável: <span className="text-slate-100">{u.responsible_name}</span>
                   </div>
                 )}
+                {(u.distance_km_from_base !== null ||
+                  u.default_displacement_rate_cents !== null) && (
+                  <div className="mt-1 text-[12px] font-semibold text-slate-300">
+                    {u.distance_km_from_base !== null && (
+                      <span>Distância base: {u.distance_km_from_base} km</span>
+                    )}
+                    {u.distance_km_from_base !== null &&
+                      u.default_displacement_rate_cents !== null && <span> · </span>}
+                    {u.default_displacement_rate_cents !== null && (
+                      <span>R$ {(u.default_displacement_rate_cents / 100).toFixed(2)}/km</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5 sm:justify-end">
                 <span className="rounded-full border border-primary/30 bg-primary/12 px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-[0.1em] text-primary">
                   {osCount} OS
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(isEditing ? null : u.id)}
+                  className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/7 text-slate-200 transition hover:border-primary/30 hover:bg-primary/12 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  title={isEditing ? "Cancelar edição" : "Editar unidade"}
+                  aria-label="Editar unidade"
+                >
+                  <Pencil size={15} />
+                </button>
                 <button
                   type="button"
                   onClick={() => toggleActive.mutate(u)}
@@ -710,6 +776,19 @@ function UnitsSection({
               </div>
             </div>
 
+            {isEditing && (
+              <div className="mt-4 border-t border-white/[0.06] pt-4">
+                <UnitForm
+                  initial={unitToForm(u)}
+                  onCancel={() => setEditingId(null)}
+                  onSubmit={(payload) => editMut.mutate({ id: u.id, payload })}
+                  submitting={editMut.isPending}
+                  errorMessage={editMut.isError ? (editMut.error as Error).message : null}
+                  submitLabel="Salvar unidade"
+                />
+              </div>
+            )}
+
             <div className="mt-4 flex justify-start sm:justify-end">
               <button
                 type="button"
@@ -729,37 +808,15 @@ function UnitsSection({
       })}
 
       {adding ? (
-        <Panel className="space-y-3 p-4">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nome da unidade (ex.: Matriz, Oficina)"
-            className="h-12 rounded-xl border-white/12 bg-[#0d1420] text-slate-100 placeholder:text-slate-500 focus-visible:ring-primary/50"
+        <Panel className="p-4 sm:p-5">
+          <UnitForm
+            initial={emptyUnitForm()}
+            onCancel={() => setAdding(false)}
+            onSubmit={(payload) => addMut.mutate(payload)}
+            submitting={addMut.isPending}
+            errorMessage={addMut.isError ? (addMut.error as Error).message : null}
+            submitLabel="Adicionar unidade"
           />
-          <Input
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            placeholder="Setor (opcional)"
-            className="h-12 rounded-xl border-white/12 bg-[#0d1420] text-slate-100 placeholder:text-slate-500 focus-visible:ring-primary/50"
-          />
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => setAdding(false)}
-              className="h-11 rounded-xl border border-white/10 bg-white/8 text-slate-100 hover:bg-white/12"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={!name.trim() || addMut.isPending}
-              onClick={() => addMut.mutate()}
-              className="h-11 gap-2 rounded-xl bg-primary font-display text-[0.72rem] font-black uppercase tracking-[0.1em] text-primary-foreground hover:bg-primary/95 disabled:opacity-55"
-            >
-              <Plus size={14} /> {addMut.isPending ? "Salvando..." : "Adicionar"}
-            </Button>
-          </div>
         </Panel>
       ) : (
         <Button
@@ -771,6 +828,236 @@ function UnitsSection({
           <Plus size={16} /> Adicionar unidade
         </Button>
       )}
+    </div>
+  );
+}
+
+type UnitFormValues = {
+  name: string;
+  sector: string;
+  city: string;
+  state: string;
+  address: string;
+  responsible_name: string;
+  phone: string;
+  notes: string;
+  cnpj: string;
+  distance_km_from_base: number | null;
+  default_displacement_rate_cents: number | null;
+  default_displacement_type: "km" | "fixed" | "none";
+  billing_notes: string;
+};
+
+function emptyUnitForm(): UnitFormValues {
+  return {
+    name: "",
+    sector: "",
+    city: "",
+    state: "",
+    address: "",
+    responsible_name: "",
+    phone: "",
+    notes: "",
+    cnpj: "",
+    distance_km_from_base: null,
+    default_displacement_rate_cents: null,
+    default_displacement_type: "km",
+    billing_notes: "",
+  };
+}
+
+function unitToForm(u: ClientUnit): UnitFormValues {
+  return {
+    name: u.name,
+    sector: u.sector ?? "",
+    city: u.city ?? "",
+    state: u.state ?? "",
+    address: u.address ?? "",
+    responsible_name: u.responsible_name ?? "",
+    phone: u.phone ?? "",
+    notes: u.notes ?? "",
+    cnpj: u.cnpj ?? "",
+    distance_km_from_base: u.distance_km_from_base,
+    default_displacement_rate_cents: u.default_displacement_rate_cents,
+    default_displacement_type: (u.default_displacement_type ?? "km") as "km" | "fixed" | "none",
+    billing_notes: u.billing_notes ?? "",
+  };
+}
+
+function UnitForm({
+  initial,
+  onCancel,
+  onSubmit,
+  submitting,
+  errorMessage,
+  submitLabel,
+}: {
+  initial: UnitFormValues;
+  onCancel: () => void;
+  onSubmit: (v: UnitFormValues) => void;
+  submitting: boolean;
+  errorMessage: string | null;
+  submitLabel: string;
+}) {
+  const [v, setV] = useState<UnitFormValues>(initial);
+  const cnpjDigits = v.cnpj ? onlyDigits(v.cnpj) : "";
+  const cnpjOk = !cnpjDigits || isValidCNPJ(cnpjDigits);
+  const valid = v.name.trim().length >= 2 && cnpjOk;
+  const inputC =
+    "h-11 rounded-xl border-white/12 bg-[#0d1420] text-slate-100 placeholder:text-slate-500 focus-visible:ring-primary/50";
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Nome *">
+          <Input
+            value={v.name}
+            onChange={(e) => setV({ ...v, name: e.target.value })}
+            className={inputC}
+          />
+        </Field>
+        <Field label="Setor">
+          <Input
+            value={v.sector}
+            onChange={(e) => setV({ ...v, sector: e.target.value })}
+            className={inputC}
+          />
+        </Field>
+        <Field label="CNPJ da unidade">
+          <Input
+            value={maskCNPJ(v.cnpj)}
+            onChange={(e) => setV({ ...v, cnpj: onlyDigits(e.target.value) })}
+            placeholder="00.000.000/0000-00"
+            className={cn(inputC, !cnpjOk && "border-rose-500/50")}
+          />
+          {!cnpjOk && <p className="text-[11px] font-bold text-rose-200">CNPJ inválido.</p>}
+        </Field>
+        <Field label="Cidade / UF">
+          <div className="grid grid-cols-[1fr_72px] gap-2">
+            <Input
+              value={v.city}
+              onChange={(e) => setV({ ...v, city: e.target.value })}
+              className={inputC}
+            />
+            <Input
+              value={v.state}
+              onChange={(e) => setV({ ...v, state: e.target.value.toUpperCase().slice(0, 2) })}
+              className={inputC}
+              placeholder="UF"
+            />
+          </div>
+        </Field>
+        <Field label="Endereço" wide>
+          <Input
+            value={v.address}
+            onChange={(e) => setV({ ...v, address: e.target.value })}
+            className={inputC}
+          />
+        </Field>
+        <Field label="Responsável">
+          <Input
+            value={v.responsible_name}
+            onChange={(e) => setV({ ...v, responsible_name: e.target.value })}
+            className={inputC}
+          />
+        </Field>
+        <Field label="Telefone">
+          <Input
+            value={v.phone}
+            onChange={(e) => setV({ ...v, phone: e.target.value })}
+            className={inputC}
+          />
+        </Field>
+        <Field label="Distância até a base (km)">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min="0"
+            value={v.distance_km_from_base === null ? "" : String(v.distance_km_from_base)}
+            onChange={(e) =>
+              setV({
+                ...v,
+                distance_km_from_base: e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+            className={inputC}
+          />
+        </Field>
+        <Field label="Valor/km padrão (R$)">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={
+              v.default_displacement_rate_cents === null
+                ? ""
+                : String(v.default_displacement_rate_cents / 100)
+            }
+            onChange={(e) =>
+              setV({
+                ...v,
+                default_displacement_rate_cents:
+                  e.target.value === "" ? null : Math.round(Number(e.target.value) * 100),
+              })
+            }
+            className={inputC}
+          />
+        </Field>
+        <Field label="Cobrança de deslocamento">
+          <select
+            value={v.default_displacement_type}
+            onChange={(e) =>
+              setV({
+                ...v,
+                default_displacement_type: e.target.value as "km" | "fixed" | "none",
+              })
+            }
+            className={cn(inputC, "appearance-none px-3 text-sm")}
+          >
+            <option value="km">Por km rodado</option>
+            <option value="fixed">Valor fixo</option>
+            <option value="none">Não cobrar</option>
+          </select>
+        </Field>
+        <Field label="Observações de cobrança / deslocamento" wide>
+          <Textarea
+            value={v.billing_notes}
+            onChange={(e) => setV({ ...v, billing_notes: e.target.value })}
+            className="min-h-20 rounded-xl border-white/12 bg-[#0d1420] text-slate-100"
+          />
+        </Field>
+      </div>
+      {errorMessage && <p className="text-[12px] font-bold text-rose-200">{errorMessage}</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={onCancel}
+          className="h-11 rounded-xl border border-white/10 bg-white/8 text-slate-100 hover:bg-white/12"
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          disabled={!valid || submitting}
+          onClick={() => onSubmit(v)}
+          className="h-11 gap-2 rounded-xl bg-primary font-display text-[0.72rem] font-black uppercase tracking-[0.1em] text-primary-foreground hover:bg-primary/95 disabled:opacity-55"
+        >
+          {submitting ? "Salvando..." : submitLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div className={cn("space-y-1.5", wide && "sm:col-span-2")}>
+      <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

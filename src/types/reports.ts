@@ -1,8 +1,4 @@
-import type {
-  ServiceOrderStatus,
-  ServicePriority,
-  ServiceType,
-} from "@/types/serviceOrder";
+import type { ServiceOrderStatus, ServicePriority, ServiceType } from "@/types/serviceOrder";
 
 export type BillingStatus = "pending" | "ready" | "billed" | "cancelled";
 
@@ -50,8 +46,12 @@ export type ReportOrderRow = {
   service_type_other: string | null;
   client_id: string | null;
   client_name: string | null;
+  client_cnpj: string | null;
   client_unit_id: string | null;
   client_unit_name: string | null;
+  client_unit_cnpj: string | null;
+  client_unit_city: string | null;
+  client_unit_state: string | null;
   technician_id: string | null;
   technician_name: string | null;
   /**
@@ -97,7 +97,13 @@ export type ReportOverview = {
 };
 
 export type GroupBucket = { key: string; label: string; value: number };
-export type TrendPoint = { month: string; label: string; orders: number; hours: number; value: number };
+export type TrendPoint = {
+  month: string;
+  label: string;
+  orders: number;
+  hours: number;
+  value: number;
+};
 
 export type ReportSeries = {
   byStatus: GroupBucket[];

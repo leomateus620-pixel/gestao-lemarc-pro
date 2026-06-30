@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { maskCNPJ } from "@/lib/cnpj";
 import { GlassCard } from "@/components/app/GlassCard";
 import { SectionHeader } from "@/components/app/SectionHeader";
 import { PrimaryCTA } from "@/components/app/operations";
@@ -186,9 +187,30 @@ function OrdemDetalhe() {
         </div>
         <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
           <MetaRow icon={Building2}>
-            {order.client?.name ?? "Sem cliente"}
-            {order.client?.unit ? ` · ${order.client.unit}` : ""}
+            <span className="font-bold text-foreground">{order.client?.name ?? "Sem cliente"}</span>
+            {order.client?.cnpj && (
+              <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                CNPJ {maskCNPJ(order.client.cnpj)}
+              </span>
+            )}
           </MetaRow>
+          {(order.client_unit || order.client?.unit) && (
+            <MetaRow icon={Building2}>
+              <span className="font-semibold text-foreground/90">
+                Unidade: {order.client_unit?.name ?? order.client?.unit ?? "—"}
+              </span>
+              {order.client_unit?.cnpj && (
+                <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                  CNPJ {maskCNPJ(order.client_unit.cnpj)}
+                </span>
+              )}
+              {(order.client_unit?.city || order.client_unit?.state) && (
+                <span className="ml-2 text-[11px] text-muted-foreground">
+                  · {[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}
+                </span>
+              )}
+            </MetaRow>
+          )}
           {order.location && <MetaRow icon={MapPin}>{order.location}</MetaRow>}
           <MetaRow icon={HardHat}>
             {technicians.length === 0
