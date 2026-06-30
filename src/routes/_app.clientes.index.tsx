@@ -1,24 +1,13 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Building2,
-  Factory,
-  MapPin,
-  Plus,
-  Search,
-  ClipboardList,
-  AlertTriangle,
-} from "lucide-react";
+import { Building2, Plus, Search, UsersRound } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
-import { GlassCard } from "@/components/app/GlassCard";
 import { Input } from "@/components/ui/input";
-import { FilterChips, PageHero } from "@/components/app/operations";
-import { MetricCard } from "@/components/dashboard/MetricCard";
-import { ClientCard } from "@/components/clientes/ClientCard";
+import { ClientIslandRow } from "@/components/clientes/ClientIslandRow";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
 import { isDone, isCancelled } from "@/lib/serviceOrders/status";
-import type { ClientFull } from "@/types/client";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/clientes/")({
   head: () => ({ meta: [{ title: "Clientes — Gestão Lemarc" }] }),
@@ -27,18 +16,7 @@ export const Route = createFileRoute("/_app/clientes/")({
 
 function ClientesIndex() {
   return (
-    <AppShell
-      title="Clientes"
-      action={
-        <Link
-          to="/clientes/novo"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-[var(--shadow-glow-orange)]"
-          aria-label="Cadastrar cliente"
-        >
-          <Plus size={18} />
-        </Link>
-      }
-    >
+    <AppShell title="Clientes">
       <Suspense fallback={<ClientesSkeleton />}>
         <ClientesList />
       </Suspense>
@@ -48,73 +26,38 @@ function ClientesIndex() {
 
 function ClientesSkeleton() {
   return (
-    <div className="mt-2 space-y-4">
-      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5">
-        <div className="lemarc-shimmer absolute inset-0 opacity-25" />
-        <div className="relative flex items-start gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-white/[0.08]" />
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="h-3 w-32 rounded-full bg-white/[0.08]" />
-            <div className="h-7 w-56 rounded-xl bg-white/[0.08]" />
-            <div className="h-4 w-full max-w-lg rounded-full bg-white/[0.06]" />
-          </div>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-40 rounded-[1.55rem] border border-white/[0.08] bg-white/[0.03]"
-          />
-        ))}
-      </div>
-      <div className="h-11 rounded-xl border border-white/[0.08] bg-white/[0.035]" />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="relative min-h-[280px] overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.03] p-5"
-          >
-            <div className="lemarc-shimmer absolute inset-0 opacity-25" />
-            <div className="absolute bottom-4 left-0 top-4 w-[5px] rounded-r-full bg-white/[0.08]" />
-            <div className="relative pl-2">
-              <div className="flex gap-3">
-                <div className="h-[3.25rem] w-[3.25rem] rounded-2xl bg-white/[0.08]" />
-                <div className="flex-1 space-y-3">
-                  <div className="h-5 w-44 rounded-lg bg-white/[0.08]" />
-                  <div className="h-3 w-32 rounded-full bg-white/[0.06]" />
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="h-[4.5rem] rounded-2xl bg-white/[0.045]" />
-                ))}
-              </div>
-              <div className="mt-3 h-12 rounded-2xl bg-white/[0.045]" />
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <div className="h-12 rounded-2xl bg-white/[0.04]" />
-                <div className="h-12 rounded-2xl bg-white/[0.04]" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <main className="mx-auto max-w-6xl space-y-3">
+      <div className="h-32 animate-pulse rounded-3xl bg-white/[0.06]" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-20 animate-pulse rounded-[2rem] bg-white/[0.05]" />
+      ))}
+    </main>
   );
 }
 
-type Filter = "todos" | "com-os" | "sem-os" | "ativos" | "inativos";
+type StatusFilter = "all" | "active" | "inactive";
+type PendencyFilter = "all" | "cnpj" | "contact" | "unit";
+type OsFilter = "all" | "with" | "without";
+type SortMode = "name" | "open" | "recent";
 
 function ClientesList() {
   const { data: clients } = useClientsFullQuery();
   const { data: units } = useAllUnitsQuery();
   const { data: orders } = useServiceOrdersQuery();
   const [q, setQ] = useState("");
-  const [f, setF] = useState<Filter>("todos");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [pendency, setPendency] = useState<PendencyFilter>("all");
+  const [city, setCity] = useState("all");
+  const [osFilter, setOsFilter] = useState<OsFilter>("all");
+  const [sort, setSort] = useState<SortMode>("name");
 
   const unitsByClient = useMemo(() => {
-    const m = new Map<string, number>();
-    units.forEach((u) => m.set(u.client_id, (m.get(u.client_id) ?? 0) + 1));
+    const m = new Map<string, typeof units>();
+    units.forEach((u) => {
+      const arr = m.get(u.client_id) ?? [];
+      arr.push(u);
+      m.set(u.client_id, arr);
+    });
     return m;
   }, [units]);
 
@@ -139,166 +82,250 @@ function ClientesList() {
     return m;
   }, [orders]);
 
-  const activeOsClients = useMemo(
-    () => new Set([...osByClient.entries()].filter(([, v]) => v.open > 0).map(([k]) => k)),
-    [osByClient],
-  );
+  const cities = useMemo(() => {
+    const set = new Set<string>();
+    clients.forEach((c) => {
+      const k = [c.city, c.state].filter(Boolean).join("/");
+      if (k) set.add(k);
+    });
+    units.forEach((u) => {
+      const k = [u.city, u.state].filter(Boolean).join("/");
+      if (k) set.add(k);
+    });
+    return Array.from(set).sort();
+  }, [clients, units]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return clients.filter((c) => {
-      const hay = [c.name, c.cnpj, c.city, c.state, c.segment, c.responsible_name]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const matchUnit = units.some(
-        (u) => u.client_id === c.id && u.name.toLowerCase().includes(term),
-      );
-      if (term && !hay.includes(term) && !matchUnit) return false;
-      const open = osByClient.get(c.id)?.open ?? 0;
-      if (f === "com-os" && open === 0) return false;
-      if (f === "sem-os" && open > 0) return false;
-      if (f === "ativos" && !c.active) return false;
-      if (f === "inativos" && c.active) return false;
-      return true;
-    });
-  }, [clients, units, osByClient, q, f]);
+    return clients
+      .filter((c) => {
+        const cUnits = unitsByClient.get(c.id) ?? [];
+        const hasContact = Boolean(c.responsible_name || c.phone || c.email);
+        const open = osByClient.get(c.id)?.open ?? 0;
+        if (term) {
+          const hay = [c.name, c.cnpj, c.city, c.state, c.segment, c.responsible_name, c.email, c.phone]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          const matchUnit = cUnits.some((u) => u.name.toLowerCase().includes(term));
+          if (!hay.includes(term) && !matchUnit) return false;
+        }
+        if (status === "active" && !c.active) return false;
+        if (status === "inactive" && c.active) return false;
+        if (pendency === "cnpj" && c.cnpj) return false;
+        if (pendency === "contact" && hasContact) return false;
+        if (pendency === "unit" && cUnits.length > 0) return false;
+        if (osFilter === "with" && open === 0) return false;
+        if (osFilter === "without" && open > 0) return false;
+        if (city !== "all") {
+          const cityKey = [c.city, c.state].filter(Boolean).join("/");
+          const inUnits = cUnits.some(
+            (u) => [u.city, u.state].filter(Boolean).join("/") === city,
+          );
+          if (cityKey !== city && !inUnits) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sort === "name") return a.name.localeCompare(b.name);
+        if (sort === "open") {
+          return (osByClient.get(b.id)?.open ?? 0) - (osByClient.get(a.id)?.open ?? 0);
+        }
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      });
+  }, [clients, unitsByClient, osByClient, q, status, pendency, city, osFilter, sort]);
 
   const totalUnits = units.length;
   const totalActive = clients.filter((c) => c.active).length;
   const totalOsOpen = [...osByClient.values()].reduce((s, v) => s + v.open, 0);
+  const withPendency = clients.filter((c) => {
+    const cUnits = unitsByClient.get(c.id) ?? [];
+    const hasContact = Boolean(c.responsible_name || c.phone || c.email);
+    return !c.cnpj || !hasContact || cUnits.length === 0;
+  }).length;
+  const withFullCnpj = clients.filter((c) => Boolean(c.cnpj)).length;
+  const withoutContact = clients.filter(
+    (c) => !(c.responsible_name || c.phone || c.email),
+  ).length;
 
   return (
-    <>
-      <PageHero
-        eyebrow="Base de atendimento"
-        title="Clientes industriais"
-        description="Cadastre empresas, unidades e contatos para vincular ordens de serviço com precisão."
-        icon={Factory}
-        action={
+    <main className="mx-auto max-w-6xl space-y-4 pb-6">
+      <section className="lemarc-wizard-card p-4 sm:p-5">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:items-end">
+          <div className="min-w-0">
+            <p className="lemarc-technical-label">Base de atendimento</p>
+            <h1 className="mt-0.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+              Clientes
+            </h1>
+            <p className="mt-1 max-w-2xl text-[13px] font-medium leading-snug text-slate-300">
+              Gestão de empresas, unidades e vínculos operacionais para as ordens de serviço.
+            </p>
+          </div>
           <Link
             to="/clientes/novo"
-            className="lemarc-orange-glow lemarc-pressable inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-4 font-display text-xs font-black uppercase tracking-[0.18em] text-primary-foreground"
+            className="lemarc-primary-action lemarc-pressable inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 font-display text-[11px] font-black uppercase tracking-[0.1em]"
           >
-            <Plus size={16} /> Cadastrar empresa
+            <Plus size={15} />
+            <span className="hidden sm:inline">Nova empresa</span>
+            <span className="sm:hidden">Nova</span>
           </Link>
-        }
-      />
+        </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Empresas ativas"
-          value={totalActive}
-          subtitle={`${clients.length} cadastradas no total.`}
-          icon={Building2}
-          footerLabel="Carteira"
-          accent="blue"
-        />
-        <MetricCard
-          title="Unidades"
-          value={totalUnits}
-          subtitle="Filiais, oficinas e setores cadastrados."
-          icon={MapPin}
-          footerLabel="Distribuição"
-          accent="steel"
-        />
-        <MetricCard
-          title="OS ativas"
-          value={totalOsOpen}
-          subtitle="Em fila, deslocamento ou execução."
-          icon={ClipboardList}
-          footerLabel="Operação"
-          accent="orange"
-        />
-        <MetricCard
-          title="Com pendência"
-          value={activeOsClients.size}
-          subtitle="Empresas com OS abertas no momento."
-          icon={AlertTriangle}
-          footerLabel="Atenção"
-          accent={activeOsClients.size > 0 ? "amber" : "steel"}
-        />
-      </div>
+        <div className="mt-3.5 flex gap-2 overflow-x-auto pb-1 lemarc-smart-scroll">
+          <Kpi label="Empresas ativas" value={totalActive} hint={`${clients.length} no total`} />
+          <Kpi label="Unidades" value={totalUnits} />
+          <Kpi label="OS ativas" value={totalOsOpen} />
+          <Kpi label="Com pendência" value={withPendency} accent={withPendency > 0} />
+          <Kpi label="CNPJ completo" value={withFullCnpj} />
+          <Kpi label="Sem contato" value={withoutContact} accent={withoutContact > 0} />
+        </div>
+      </section>
 
-      <div className="glass mt-5 flex items-center gap-2 rounded-xl px-3">
-        <Search size={16} className="text-muted-foreground" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por empresa, CNPJ, cidade, unidade ou responsável..."
-          className="h-11 border-0 bg-transparent px-0 focus-visible:ring-0"
-        />
-      </div>
+      <section className="lemarc-horizontal-row flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar cliente, CNPJ, cidade, unidade..."
+            className="lemarc-form-control h-11 rounded-full pl-10"
+          />
+        </div>
+        <Select value={status} onChange={(v) => setStatus(v as StatusFilter)}>
+          <option value="all">Status: Todos</option>
+          <option value="active">Ativos</option>
+          <option value="inactive">Inativos</option>
+        </Select>
+        <Select value={pendency} onChange={(v) => setPendency(v as PendencyFilter)}>
+          <option value="all">Pendências</option>
+          <option value="cnpj">Sem CNPJ</option>
+          <option value="contact">Sem contato</option>
+          <option value="unit">Sem unidade</option>
+        </Select>
+        <Select value={city} onChange={setCity}>
+          <option value="all">Cidade/UF</option>
+          {cities.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </Select>
+        <Select value={osFilter} onChange={(v) => setOsFilter(v as OsFilter)}>
+          <option value="all">OS: Todas</option>
+          <option value="with">Com OS abertas</option>
+          <option value="without">Sem OS abertas</option>
+        </Select>
+        <Select value={sort} onChange={(v) => setSort(v as SortMode)}>
+          <option value="name">Ordenar: nome</option>
+          <option value="open">Ordenar: + OS abertas</option>
+          <option value="recent">Ordenar: atualizados</option>
+        </Select>
+      </section>
 
-      <div className="mt-3 overflow-x-auto">
-        <FilterChips
-          items={[
-            { key: "todos", label: "Todos", count: clients.length },
-            { key: "com-os", label: "Com OS ativa", count: activeOsClients.size },
-            { key: "sem-os", label: "Sem OS" },
-            { key: "ativos", label: "Ativos", count: totalActive },
-            { key: "inativos", label: "Inativos" },
-          ]}
-          value={f}
-          onChange={setF}
-        />
-      </div>
-
-      {clients.length === 0 ? (
-        <EmptyClients />
-      ) : filtered.length === 0 ? (
-        <GlassCard className="mt-6 p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhum cliente corresponde ao filtro atual.
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className="text-[11px] font-bold text-slate-400">
+            {filtered.length} {filtered.length === 1 ? "cliente" : "clientes"}
           </p>
-        </GlassCard>
-      ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c: ClientFull) => (
-            <ClientCard
+        </div>
+
+        {clients.length === 0 ? (
+          <EmptyClients />
+        ) : filtered.length === 0 ? (
+          <div className="lemarc-island-row p-6 text-center">
+            <UsersRound className="mx-auto text-primary" size={26} />
+            <p className="mt-3 font-display text-lg font-black text-white">
+              Nenhum cliente encontrado
+            </p>
+            <p className="mt-1 text-sm font-medium text-slate-300">
+              Ajuste os filtros ou cadastre uma nova empresa.
+            </p>
+          </div>
+        ) : (
+          filtered.map((c) => (
+            <ClientIslandRow
               key={c.id}
               client={c}
-              unitCount={unitsByClient.get(c.id) ?? 0}
+              units={unitsByClient.get(c.id) ?? []}
               osOpen={osByClient.get(c.id)?.open ?? 0}
               osDone={osByClient.get(c.id)?.done ?? 0}
               lastOrder={osByClient.get(c.id)?.lastOrder ?? null}
             />
-          ))}
-        </div>
-      )}
-    </>
+          ))
+        )}
+      </section>
+    </main>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="lemarc-compact-metric min-w-[9.5rem]">
+      <p className="lemarc-technical-label">{label}</p>
+      <p
+        className={cn(
+          "mt-1 font-display text-lg font-black tabular-nums",
+          accent ? "text-primary" : "text-white",
+        )}
+      >
+        {value}
+      </p>
+      {hint && <p className="mt-0.5 text-[10px] font-bold text-slate-400 tabular-nums">{hint}</p>}
+    </div>
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="lemarc-form-control h-11 min-w-[9.5rem] rounded-full px-3 text-xs font-bold text-white"
+    >
+      {children}
+    </select>
   );
 }
 
 function EmptyClients() {
   return (
-    <GlassCard className="relative mt-6 overflow-hidden p-10 text-center">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-50"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
-          backgroundSize: "16px 16px",
-        }}
-      />
-      <div className="relative">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/30">
-          <Building2 size={26} />
-        </div>
-        <h3 className="mt-4 font-display text-lg font-black text-foreground">
-          Nenhum cliente cadastrado ainda
-        </h3>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          Cadastre a primeira empresa para vincular unidades e abrir ordens de serviço com dados
-          estruturados.
-        </p>
-        <Link
-          to="/clientes/novo"
-          className="lemarc-orange-glow lemarc-pressable mt-5 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-display text-xs font-black uppercase tracking-[0.18em] text-primary-foreground"
-        >
-          <Plus size={16} /> Cadastrar empresa
-        </Link>
+    <div className="lemarc-island-row p-8 text-center">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/30">
+        <Building2 size={26} />
       </div>
-    </GlassCard>
+      <h3 className="mt-4 font-display text-lg font-black text-white">
+        Nenhum cliente cadastrado ainda
+      </h3>
+      <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">
+        Cadastre a primeira empresa para vincular unidades e abrir ordens de serviço.
+      </p>
+      <Link
+        to="/clientes/novo"
+        className="lemarc-primary-action lemarc-pressable mt-5 inline-flex h-11 items-center gap-2 rounded-full px-5 font-display text-xs font-black uppercase tracking-[0.12em]"
+      >
+        <Plus size={15} /> Cadastrar empresa
+      </Link>
+    </div>
   );
 }
