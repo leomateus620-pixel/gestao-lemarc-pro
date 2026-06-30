@@ -41,6 +41,7 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
+import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
@@ -257,6 +258,8 @@ function OrdemDetalhe() {
         open={finalizeOpen}
         onOpenChange={setFinalizeOpen}
       />
+
+      <SignatureBlock order={order} />
 
       <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />
 

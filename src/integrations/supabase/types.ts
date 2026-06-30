@@ -396,6 +396,80 @@ export type Database = {
           },
         ]
       }
+      service_order_signatures: {
+        Row: {
+          collected_by: string | null
+          created_at: string
+          device_info: Json | null
+          geo_lat: number | null
+          geo_lng: number | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          service_order_id: string
+          signature_data_url: string | null
+          signature_hash: string | null
+          signature_path: string | null
+          signed_at: string
+          signed_by_name: string
+          signed_by_role: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          collected_by?: string | null
+          created_at?: string
+          device_info?: Json | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          service_order_id: string
+          signature_data_url?: string | null
+          signature_hash?: string | null
+          signature_path?: string | null
+          signed_at?: string
+          signed_by_name: string
+          signed_by_role?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          collected_by?: string | null
+          created_at?: string
+          device_info?: Json | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          service_order_id?: string
+          signature_data_url?: string | null
+          signature_hash?: string | null
+          signature_path?: string | null
+          signed_at?: string
+          signed_by_name?: string
+          signed_by_role?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_signatures_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_order_technicians: {
         Row: {
           assigned_at: string
@@ -468,6 +542,9 @@ export type Database = {
           scheduled_for: string | null
           service_type: Database["public"]["Enums"]["service_type"] | null
           service_type_other: string | null
+          signature_waived_at: string | null
+          signature_waived_by: string | null
+          signature_waiver_reason: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
@@ -498,6 +575,9 @@ export type Database = {
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           service_type_other?: string | null
+          signature_waived_at?: string | null
+          signature_waived_by?: string | null
+          signature_waiver_reason?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
@@ -528,6 +608,9 @@ export type Database = {
           scheduled_for?: string | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           service_type_other?: string | null
+          signature_waived_at?: string | null
+          signature_waived_by?: string | null
+          signature_waiver_reason?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null

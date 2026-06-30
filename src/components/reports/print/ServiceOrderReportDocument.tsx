@@ -37,6 +37,12 @@ const STYLES = `
 .os-pdf .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #0b2545; color: #fff; font-size: 9.5px; letter-spacing: 0.6px; }
 .os-pdf .footer { margin-top: 22px; font-size: 9.5px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between; }
 .os-pdf .warn { margin-top: 10px; padding: 8px 10px; border: 1px dashed #f59e0b; color: #92400e; background: #fef3c7; border-radius: 6px; font-size: 11px; }
+.os-pdf .sigBox { display: flex; gap: 16px; align-items: flex-start; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; background: #f8fafc; }
+.os-pdf .sigImg { width: 220px; height: 90px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.os-pdf .sigImg img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.os-pdf .sigMeta { font-size: 10.5px; color: #334155; }
+.os-pdf .sigMeta .name { font-size: 13px; font-weight: 800; color: #0b2545; letter-spacing: 0.5px; }
+.os-pdf .sigMissing { padding: 10px 12px; border: 1px dashed #94a3b8; color: #475569; background: #f1f5f9; border-radius: 6px; font-size: 11px; }
 `;
 
 function fmtDate(iso: string | null | undefined) {
@@ -223,6 +229,42 @@ export function ServiceOrderReportDocument({
           <p>{financials.notes}</p>
         </section>
       )}
+
+      <section className="section">
+        <h2>Assinatura do responsável</h2>
+        {order.signature ? (
+          <div className="sigBox">
+            <div className="sigImg">
+              {order.signature.signature_data_url ? (
+                <img
+                  src={order.signature.signature_data_url}
+                  alt={`Assinatura de ${order.signature.signed_by_name}`}
+                />
+              ) : (
+                <span style={{ fontSize: 10, color: "#94a3b8" }}>imagem indisponível</span>
+              )}
+            </div>
+            <div className="sigMeta">
+              <div className="name">{order.signature.signed_by_name}</div>
+              {order.signature.signed_by_role && <div>{order.signature.signed_by_role}</div>}
+              <div style={{ marginTop: 4 }}>Assinado em {fmtDate(order.signature.signed_at)}</div>
+              {order.signature.signature_hash && (
+                <div>Registro: SIG-{order.signature.signature_hash}</div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 9.5, color: "#64748b" }}>
+                Rastreabilidade operacional — não substitui assinatura jurídica formal.
+              </div>
+            </div>
+          </div>
+        ) : order.signature_waiver_reason ? (
+          <div className="warn">
+            <strong>Finalizada sem assinatura.</strong> {order.signature_waiver_reason}
+            {order.signature_waived_at ? ` (em ${fmtDate(order.signature_waived_at)})` : ""}
+          </div>
+        ) : (
+          <div className="sigMissing">Assinatura não registrada.</div>
+        )}
+      </section>
 
       <footer className="footer">
         <span>Gestão Lemarc — Relatório de OS #{order.number}</span>
