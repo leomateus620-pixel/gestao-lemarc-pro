@@ -48,18 +48,24 @@ export function CollaboratorForm({
   loading,
   submitLabel,
   onSubmit,
+  focus,
 }: {
   initial?: TechnicianLite | null;
   loading?: boolean;
   submitLabel: string;
   onSubmit: (data: TechnicianInput) => void;
+  focus?: "dados" | "operacao" | "rate" | "acesso";
 }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => focusToStep(focus));
   const [draft, setDraft] = useState<Draft>(() => buildDraft(initial));
 
   useEffect(() => {
     setDraft(buildDraft(initial));
   }, [initial]);
+
+  useEffect(() => {
+    if (focus) setStep(focusToStep(focus));
+  }, [focus]);
 
   const normalRate = parseCurrencyInput(draft.hourlyRate);
   const rate50 = parseCurrencyInput(draft.hourlyRate50);
