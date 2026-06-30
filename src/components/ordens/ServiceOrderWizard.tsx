@@ -28,6 +28,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
+import { maskCNPJ } from "@/lib/cnpj";
 import {
   createClient as createClientFn,
   createServiceOrder,
@@ -456,7 +457,17 @@ function ClientStep({
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   clients: { id: string; name: string; unit: string | null }[];
-  units: { id: string; client_id: string; name: string; sector: string | null }[];
+  units: {
+    id: string;
+    client_id: string;
+    name: string;
+    sector: string | null;
+    cnpj?: string | null;
+    city?: string | null;
+    state?: string | null;
+    distance_km_from_base?: number | null;
+    default_displacement_rate_cents?: number | null;
+  }[];
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -592,15 +603,67 @@ function ClientStep({
                       )}
                     >
                       <div className="truncate">{u.name}</div>
-                      {u.sector && (
+                      {u.cnpj && (
+                        <div className="truncate font-mono text-[10px] font-semibold text-slate-400">
+                          {maskCNPJ(u.cnpj)}
+                        </div>
+                      )}
+                      {(u.city || u.state || u.sector) && (
                         <div className="truncate text-[10px] font-semibold text-slate-400">
-                          {u.sector}
+                          {[u.sector, [u.city, u.state].filter(Boolean).join("/")]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </div>
                       )}
                     </button>
                   );
                 })}
               </div>
+              {draft.unitId &&
+                (() => {
+                  const selected = selectedUnits.find((u) => u.id === draft.unitId);
+                  if (!selected) return null;
+                  const hasExtra =
+                    selected.cnpj ||
+                    selected.city ||
+                    selected.state ||
+                    selected.distance_km_from_base != null ||
+                    selected.default_displacement_rate_cents != null;
+                  if (!hasExtra) return null;
+                  return (
+                    <div className="mt-2 rounded-2xl border border-primary/25 bg-primary/10 p-3 text-[11px] font-semibold text-slate-100">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">
+                        Dados da unidade selecionada
+                      </p>
+                      <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
+                        {selected.cnpj && (
+                          <span>
+                            <span className="text-slate-400">CNPJ:</span>{" "}
+                            <span className="font-mono">{maskCNPJ(selected.cnpj)}</span>
+                          </span>
+                        )}
+                        {(selected.city || selected.state) && (
+                          <span>
+                            <span className="text-slate-400">Cidade/UF:</span>{" "}
+                            {[selected.city, selected.state].filter(Boolean).join("/")}
+                          </span>
+                        )}
+                        {selected.distance_km_from_base != null && (
+                          <span>
+                            <span className="text-slate-400">Distância base:</span>{" "}
+                            {selected.distance_km_from_base} km
+                          </span>
+                        )}
+                        {selected.default_displacement_rate_cents != null && (
+                          <span>
+                            <span className="text-slate-400">Valor/km padrão:</span> R${" "}
+                            {(selected.default_displacement_rate_cents / 100).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
           )}
         </div>
@@ -991,7 +1054,15 @@ function ReviewStep({
 }: {
   draft: Draft;
   clients: { id: string; name: string; unit: string | null }[];
-  units: { id: string; client_id: string; name: string; sector: string | null }[];
+  units: {
+    id: string;
+    client_id: string;
+    name: string;
+    sector: string | null;
+    cnpj?: string | null;
+    city?: string | null;
+    state?: string | null;
+  }[];
   technicians: TechnicianLite[];
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
@@ -1003,7 +1074,14 @@ function ReviewStep({
     ? new Date(draft.scheduled).toLocaleString("pt-BR")
     : "Sem previsão definida";
   const unitLabel = unit
-    ? [unit.name, unit.sector].filter(Boolean).join(" · ")
+    ? [
+        unit.name,
+        unit.cnpj ? `CNPJ ${maskCNPJ(unit.cnpj)}` : null,
+        unit.sector,
+        [unit.city, unit.state].filter(Boolean).join("/") || null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : client?.unit || "Não informado";
   const typeLabel =
     draft.type === "outro" ? draft.typeOther.trim() || "Outro" : serviceTypeLabel[draft.type];

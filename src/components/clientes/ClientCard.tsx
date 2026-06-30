@@ -173,9 +173,7 @@ export function ClientCard({ client, unitCount, osOpen, osDone, lastOrder }: Cli
           <InfoLine icon={Clock3} highlighted>
             {lastOrder ? (
               <>
-                <span className="text-foreground">
-                  Última: OS #{lastOrder.number}
-                </span>
+                <span className="text-foreground">Última: OS #{lastOrder.number}</span>
                 {latestOrderDate ? (
                   <span className="text-muted-foreground"> · aberta {latestOrderDate}</span>
                 ) : null}
@@ -236,15 +234,7 @@ export function ClientCard({ client, unitCount, osOpen, osDone, lastOrder }: Cli
   );
 }
 
-function Metric({
-  value,
-  label,
-  accent,
-}: {
-  value: number;
-  label: string;
-  accent?: boolean;
-}) {
+function Metric({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
     <span className="inline-flex items-baseline gap-1.5 min-w-0">
       <span
@@ -298,13 +288,7 @@ function InfoLine({
   );
 }
 
-function InfoCell({
-  icon: Icon,
-  children,
-}: {
-  icon: LucideIcon;
-  children: ReactNode;
-}) {
+function InfoCell({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
@@ -312,4 +296,3 @@ function InfoCell({
     </div>
   );
 }
-

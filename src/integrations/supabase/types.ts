@@ -18,10 +18,15 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          billing_notes: string | null
           city: string | null
           client_id: string
+          cnpj: string | null
           created_at: string
           created_by: string
+          default_displacement_rate_cents: number | null
+          default_displacement_type: string | null
+          distance_km_from_base: number | null
           id: string
           is_primary: boolean
           name: string
@@ -35,10 +40,15 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          billing_notes?: string | null
           city?: string | null
           client_id: string
+          cnpj?: string | null
           created_at?: string
           created_by: string
+          default_displacement_rate_cents?: number | null
+          default_displacement_type?: string | null
+          distance_km_from_base?: number | null
           id?: string
           is_primary?: boolean
           name: string
@@ -52,10 +62,15 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          billing_notes?: string | null
           city?: string | null
           client_id?: string
+          cnpj?: string | null
           created_at?: string
           created_by?: string
+          default_displacement_rate_cents?: number | null
+          default_displacement_type?: string | null
+          distance_km_from_base?: number | null
           id?: string
           is_primary?: boolean
           name?: string

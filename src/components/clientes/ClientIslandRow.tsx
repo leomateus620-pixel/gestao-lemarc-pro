@@ -88,7 +88,11 @@ export function ClientIslandRow({
             {client.name || "Empresa sem nome"}
           </span>
           <span className="mt-0.5 hidden truncate text-[12px] font-semibold text-slate-300 md:block">
-            {cnpjMasked ? <span className="font-mono">{cnpjMasked}</span> : <span className="text-amber-200">CNPJ pendente</span>}
+            {cnpjMasked ? (
+              <span className="font-mono">{cnpjMasked}</span>
+            ) : (
+              <span className="text-amber-200">CNPJ pendente</span>
+            )}
             {client.segment && <span className="text-slate-500"> · {client.segment}</span>}
             {location && <span className="text-slate-500"> · {location}</span>}
           </span>
@@ -129,7 +133,12 @@ export function ClientIslandRow({
         <div className="min-h-0 overflow-hidden">
           <div className="mt-4 border-t border-white/[0.08] pt-4">
             <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <Detail label="CNPJ" value={cnpjMasked ?? "Pendente"} strong={!cnpjMasked} tone={!cnpjMasked ? "warn" : undefined} />
+              <Detail
+                label="CNPJ"
+                value={cnpjMasked ?? "Pendente"}
+                strong={!cnpjMasked}
+                tone={!cnpjMasked ? "warn" : undefined}
+              />
               <Detail label="Segmento" value={client.segment ?? "Não informado"} />
               <Detail label="Cidade/UF" value={location || "Não informado"} />
               <Detail label="Responsável" value={client.responsible_name ?? "Não informado"} />
@@ -154,15 +163,29 @@ export function ClientIslandRow({
                     <span
                       key={u.id}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
+                        "inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
                         u.is_primary
                           ? "border-primary/40 bg-primary/12 text-primary"
                           : "border-white/10 bg-white/[0.05] text-slate-200",
                       )}
-                      title={[u.city, u.state].filter(Boolean).join("/") || undefined}
+                      title={
+                        [
+                          u.cnpj ? maskCNPJ(u.cnpj) : null,
+                          [u.city, u.state].filter(Boolean).join("/"),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined
+                      }
                     >
-                      {u.is_primary && <span className="text-[8px] uppercase tracking-wider">★</span>}
+                      {u.is_primary && (
+                        <span className="text-[8px] uppercase tracking-wider">★</span>
+                      )}
                       {u.name}
+                      {u.cnpj && (
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {maskCNPJ(u.cnpj)}
+                        </span>
+                      )}
                       {(u.city || u.state) && (
                         <span className="text-slate-400 font-semibold">
                           · {[u.city, u.state].filter(Boolean).join("/")}

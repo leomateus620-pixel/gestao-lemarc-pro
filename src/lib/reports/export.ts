@@ -1,12 +1,6 @@
 import type { ReportOrderRow } from "@/types/reports";
-import {
-  billingStatusLabel,
-} from "@/types/reports";
-import {
-  priorityLabel,
-  serviceTypeLabel,
-  statusLabel,
-} from "@/types/serviceOrder";
+import { billingStatusLabel } from "@/types/reports";
+import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
 import { formatCurrency, formatDateTime, formatHours } from "./formatters";
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 
@@ -20,7 +14,9 @@ const CSV_HEADERS = [
   "Numero",
   "Titulo",
   "Cliente",
+  "CNPJ Cliente",
   "Unidade",
+  "CNPJ Unidade",
   "Tecnicos",
   "Status",
   "Prioridade",
@@ -53,7 +49,9 @@ export function ordersToCsv(rows: ReportOrderRow[]): string {
         r.number,
         r.title,
         r.client_name ?? "Sem cliente",
+        r.client_cnpj ?? "",
         r.client_unit_name ?? "Sem unidade",
+        r.client_unit_cnpj ?? "",
         technicianCsv(r),
         statusLabel[r.status],
         r.priority ? priorityLabel[r.priority] : "—",
@@ -128,8 +126,8 @@ export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
       return `<tr>
         <td>#${r.number}</td>
         <td>${escapeHtml(r.title)}</td>
-        <td>${escapeHtml(r.client_name ?? "—")}</td>
-        <td>${escapeHtml(r.client_unit_name ?? "—")}</td>
+        <td>${escapeHtml(r.client_name ?? "—")}${r.client_cnpj ? `<br/><small>${escapeHtml(r.client_cnpj)}</small>` : ""}</td>
+        <td>${escapeHtml(r.client_unit_name ?? "—")}${r.client_unit_cnpj ? `<br/><small>${escapeHtml(r.client_unit_cnpj)}</small>` : ""}</td>
         <td>${escapeHtml(technicianCsv(r))}</td>
         <td>${statusLabel[r.status]}</td>
         <td>${escapeHtml(type)}</td>
@@ -141,7 +139,8 @@ export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
       </tr>`;
     })
     .join("");
-  win.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${css}</style></head><body>
+  win.document
+    .write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${css}</style></head><body>
     <div class="brand">Gestão Lemarc · Relatório</div>
     <h1>${escapeHtml(title)}</h1>
     ${subtitle ? `<div class="sub">${escapeHtml(subtitle)}</div>` : ""}
