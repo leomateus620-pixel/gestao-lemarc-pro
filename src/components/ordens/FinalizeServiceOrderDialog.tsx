@@ -644,9 +644,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   mutation.isPending || !stepEntriesValid || !stepRatesValid || !signatureOk
                 }
                 title={
-                  !signatureOk
-                    ? "Colete a assinatura do responsável antes de finalizar"
-                    : undefined
+                  !signatureOk ? "Colete a assinatura do responsável antes de finalizar" : undefined
                 }
               >
                 {mutation.isPending ? "Finalizando…" : "Confirmar finalização"}
@@ -657,8 +655,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
 
         {!signatureOk && step === 2 && (
           <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-[11px] font-bold text-amber-200">
-            Assinatura do responsável pendente. Colete antes de finalizar (ou peça ao
-            administrador para registrar a justificativa de exceção).
+            Assinatura do responsável pendente. Colete antes de finalizar (ou peça ao administrador
+            para registrar a justificativa de exceção).
           </div>
         )}
 

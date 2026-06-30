@@ -247,9 +247,7 @@ export function ServiceOrderReportDocument({
             <div className="sigMeta">
               <div className="name">{order.signature.signed_by_name}</div>
               {order.signature.signed_by_role && <div>{order.signature.signed_by_role}</div>}
-              <div style={{ marginTop: 4 }}>
-                Assinado em {fmtDate(order.signature.signed_at)}
-              </div>
+              <div style={{ marginTop: 4 }}>Assinado em {fmtDate(order.signature.signed_at)}</div>
               {order.signature.signature_hash && (
                 <div>Registro: SIG-{order.signature.signature_hash}</div>
               )}
@@ -260,8 +258,7 @@ export function ServiceOrderReportDocument({
           </div>
         ) : order.signature_waiver_reason ? (
           <div className="warn">
-            <strong>Finalizada sem assinatura.</strong>{" "}
-            {order.signature_waiver_reason}
+            <strong>Finalizada sem assinatura.</strong> {order.signature_waiver_reason}
             {order.signature_waived_at ? ` (em ${fmtDate(order.signature_waived_at)})` : ""}
           </div>
         ) : (

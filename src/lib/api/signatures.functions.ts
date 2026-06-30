@@ -33,8 +33,7 @@ export const saveServiceOrderSignature = createServerFn({ method: "POST" })
     if (!data?.orderId) throw new Error("orderId obrigatório");
     if (!data?.signedByName?.trim()) throw new Error("Nome do responsável obrigatório");
     if (data.signedByName.length > 160) throw new Error("Nome muito longo");
-    if (!data?.signatureDataUrl?.startsWith("data:image/"))
-      throw new Error("Assinatura inválida");
+    if (!data?.signatureDataUrl?.startsWith("data:image/")) throw new Error("Assinatura inválida");
     if (data.signatureDataUrl.length > 1_500_000) throw new Error("Assinatura muito grande");
     return data;
   })
