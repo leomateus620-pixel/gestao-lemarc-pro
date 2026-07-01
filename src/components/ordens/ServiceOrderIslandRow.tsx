@@ -1,9 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   ChevronDown,
   ExternalLink,
   FileText,
+  FileDown,
+  Loader2,
   Printer,
   Receipt,
   type LucideIcon,
@@ -17,6 +21,9 @@ import {
   getServiceOrderWorkedMinutes,
 } from "@/lib/serviceOrders/technicians";
 import { displacementTypeLabel, type OrderFinancials } from "@/types/financials";
+import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
+import { useAuth } from "@/components/app/AuthContext";
 import {
   priorityLabel,
   serviceTypeLabel,
