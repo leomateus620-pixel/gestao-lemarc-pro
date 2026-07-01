@@ -124,7 +124,10 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     if (!open) return;
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
     const fallbackStart = timeFromIso(order.started_at ?? order.opened_at);
-    const fallbackEnd = timeFromIso(order.finished_at ?? new Date().toISOString());
+    const rawEnd = timeFromIso(order.finished_at ?? new Date().toISOString());
+    // Nunca inventar horário de saída: se saída <= entrada, deixa igual à entrada
+    // (duração 0) e obriga o técnico a ajustar antes de finalizar.
+    const fallbackEnd = rawEnd > fallbackStart ? rawEnd : fallbackStart;
     const existingEntries = existing?.entries ?? [];
 
     if (existingEntries.length > 0) {
@@ -149,7 +152,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           role: t.assignment_role ?? null,
           work_date: fallbackDate,
           start_time: fallbackStart,
-          end_time: fallbackEnd > fallbackStart ? fallbackEnd : "17:00",
+          end_time: fallbackEnd,
           hourly_rate_cents: t.hourly_rate_cents ?? 0,
           rate_input:
             t.hourly_rate_cents != null
