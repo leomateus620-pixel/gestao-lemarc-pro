@@ -1,66 +1,60 @@
-## Objetivo
+## Diagnóstico
 
-Adicionar um botão "PDF OS" nos cards de OS **finalizadas** (`finished`) e **aprovadas** (`approved`) da lista `/ordens`, ocupando o espaço onde hoje aparece o badge de prioridade "Média". O clique busca dados financeiros sob demanda e gera um PDF individual da OS, no mesmo padrão visual do relatório gerencial (jspdf + identidade Lemarc).
+**1. Horas fictícias (08:06 · R$ 445,50)**
+Em `FinalizeServiceOrderDialog.tsx` (hidratação, linha ~152):
+```ts
+end_time: fallbackEnd > fallbackStart ? fallbackEnd : "17:00",
+```
+Quando a OS é aberta e finalizada no mesmo minuto, `started_at ≈ finished_at`, então `fallbackEnd == fallbackStart` e o código inventa `"17:00"` como saída. Resultado: entrada 08:54 · saída 17:00 → 8h06 fictícias e R$ 445,50 falsos, sem qualquer aviso ao usuário.
 
-## Escopo
+**2. Texto sobreposto no CTA "Finalizar" (mobile)**
+No card "Próxima ação" (`_app.ordens.$id.tsx`, ~232-253), quando `action.next === "finished"`:
+- o `<h2>` mostra `action.label` ("Finalizar serviço")
+- o botão mostra "Finalizar OS (apuração)"
 
-### 1. Novo helper `src/lib/reports/serviceOrderDownload.ts`
-Baseado em `managerialDownload.ts`, exporta:
-- `buildServiceOrderReportFilename(order, generatedAt)` → `os-<numero>-<slug-cliente>-YYYY-MM-DD.pdf`
-- `downloadServiceOrderReportPdf({ order, entries, financials, generatedAt, authorName })`
+Preciso investigar o `PrimaryCTA` para confirmar se a sobreposição visual do print vem de `line-height`/`text-truncate` ou de duplicação de nó — nas outras transições o mesmo componente renderiza normalmente. Ajuste vai ser textual + garantir que o CTA suporte rótulo mais longo em telas estreitas.
 
-Layout A4 retrato com:
-- Cabeçalho: logo Lemarc + dados da empresa (`LEMARC_COMPANY`) + bloco "RELATÓRIO DE OS #<numero>" com data/emitente
-- Identificação: cliente + CNPJ, unidade + CNPJ + cidade/UF, local, solicitante, status, prioridade, tipo, abertura, fechamento
-- Técnicos envolvidos (via `getOrderTechnicians`)
-- Descrição da OS
-- Tabela de apontamentos: técnico, função, data, entrada/saída, horas (`formatHHmm`), R$/h, subtotal, descrição
-- Bloco de deslocamento quando aplicável
-- Resumo financeiro (mão de obra, deslocamento, materiais, total geral) usando `formatBRL`
-- Se `financials` for `null`: card de aviso "Apuração financeira pendente"
-- Observações se houver
-- Bloco de assinatura do responsável ou aviso de dispensa (mesmos dados hoje mostrados no `ServiceOrderReportDocument`)
-- Rodapé com paginação e nome do gerador
+**3. Botão de PDF individual não aparece na lista de Ordens**
+O botão "PDF OS" foi adicionado em `ServiceOrderCard.tsx`, mas o menu `/ordens` renderiza `ServiceOrderIslandRow.tsx` (islands agrupadas por período). Por isso o botão nunca aparece na tela que o usuário abre. Nada foi adicionado ao componente correto.
 
-Reutiliza `LEMARC_COLORS`, `LEMARC_COMPANY`, `LEMARC_LOGO_URL`, `LEMARC_LOGO_ASPECT`, `formatBRL`, `formatHHmm`, `getOrderTechnicians`, `sanitizePdfText`, `displacementTypeLabel`, e o mesmo cache do logo/paginação/rodapé usados em `managerialDownload.ts` (extrair helper compartilhado se for pequeno; caso contrário duplicar de forma isolada dentro do arquivo para não mexer no gerencial).
+---
 
-### 2. `src/components/app/ServiceOrderCard.tsx`
-- Trocar o wrapper `<Link>` externo por um `<div>` com `role="link"`, `tabIndex={0}`, handlers `onClick`/`onKeyDown` (Enter/Space) que chamam `navigate({ to: "/ordens/$id", params: { id } })`. Mantém foco visível e `aria-label`.
-- No slot onde hoje ficam `ServiceOrderStatusBadge` + `ServiceOrderPriorityBadge`:
-  - OS `finished` ou `approved`: renderizar `<OrderPdfButton order={order} />` no lugar do badge de prioridade (status continua acima).
-  - OS `cancelled` ou outras: renderizar prioridade como hoje.
-- Novo componente local `OrderPdfButton`:
-  - Botão compacto com ícone `FileDown` + texto "PDF OS" (mobile: só ícone opcional; usar mesma altura/estilo do badge para não quebrar layout).
-  - `onClick` faz `event.stopPropagation()` + `event.preventDefault()`, seta estado `loading`, chama `useServerFn(getOrderFinancials)({ data: { orderId: order.id } })`, gera o PDF via `downloadServiceOrderReportPdf`, mostra `toast.success("PDF da OS #<n> baixado")` ou `toast.error(...)`.
-  - `aria-label="Baixar PDF da OS #<n>"`, estado `Gerando…`, `active:scale-[0.98]`, `disabled` durante o loading.
-- Nome do autor: usar `useAuth().displayName` (já usado na rota de impressão).
+## Plano de correções (somente UI/fluxo, sem mexer em schema)
 
-### 3. `src/routes/_app.ordens.$id.imprimir.tsx`
-- Adicionar botão "Baixar PDF" ao lado de "Imprimir / Salvar PDF" no header no-print, usando o novo helper com os dados já carregados pelos `useSuspenseQuery` existentes. Mantém a impressão do documento HTML atual.
+### 1. Corrigir cálculo de horas fictícias
+Arquivo: `src/components/ordens/FinalizeServiceOrderDialog.tsx`
 
-### 4. Fora do escopo
-- Não criar migrations, tabelas, rotas novas nem mocks.
-- Não alterar `ServiceOrderReportDocument.tsx` nem `financials.functions.ts`.
-- `routeTree.gen.ts` não deve mudar (nenhuma rota criada).
-- Cards de OS não finalizadas continuam exibindo prioridade como hoje.
+- Remover o fallback `"17:00"`. Quando não houver `finished_at` real ou quando `fallbackEnd <= fallbackStart`, manter `end_time` **igual** ao `start_time` (duração 0) em vez de inventar horário.
+- Aplicar a mesma regra em `addEntry` (hoje força "08:00"/"17:00" fixos): usar o horário atual do dispositivo como sugestão inicial e deixar duração 0 até o técnico editar.
+- Reforçar validação existente `stepEntriesValid` (já exige `duration_minutes > 0`) e mostrar aviso amigável quando duração for 0: *"Ajuste entrada e saída — a OS foi aberta e finalizada no mesmo instante."*
+- Nenhum impacto em dados salvos: apenas remove sugestão inventada; nada é gravado sem o usuário revisar.
 
-## Detalhes técnicos
+### 2. Corrigir o CTA "Finalizar" sobreposto
+Arquivos: `src/routes/_app.ordens.$id.tsx` e o `PrimaryCTA` que ele usa.
 
-- **Nested link**: refatorar `ServiceOrderCard` de `<Link>` para `<div role="link">` é mais seguro que `<button>` dentro de `<Link>` (evita hidratação inválida). Usar `useNavigate` de `@tanstack/react-router`.
-- **Server fn**: `getOrderFinancials` já usa `requireSupabaseAuth`; chamada apenas no clique não impacta SSR do listing.
-- **Slug do arquivo**: normalizar cliente (NFD, remover acentos, `[^a-z0-9]+` → `-`), truncar 36 chars, fallback `sem-cliente`.
-- **jspdf**: import dinâmico (`await import("jspdf")`) como no `managerialDownload.ts` para manter o chunk assíncrono.
-- **Cache logo**: reaproveitar mesma função `loadLemarcLogoDataUrl` — extraí-la para um helper compartilhado `src/lib/reports/pdfShared.ts` (movendo do `managerialDownload.ts`) para não duplicar. Alteração mínima e não muda o comportamento do gerencial.
+- Ler o componente `PrimaryCTA` (dentro de `_app.ordens.$id.tsx`) para confirmar a causa da sobreposição no mobile.
+- Unificar rótulo: passar a chamar o botão de `"Finalizar OS"` (sem "(apuração)") e manter o subtítulo `<h2>Finalizar serviço</h2>` da seção. Assim o rótulo cabe em uma linha e reduz o risco visual.
+- Se a inspeção mostrar que `PrimaryCTA` fixa altura ou usa `truncate`, ajustar para `whitespace-nowrap` + padding coerente e `min-h` em vez de `h`.
+- Sem mudar a ação — continua abrindo `FinalizeServiceOrderDialog`.
+
+### 3. Botão "PDF OS" na lista de Ordens (padrão relatório gerencial)
+Arquivo: `src/components/ordens/ServiceOrderIslandRow.tsx`
+
+- Criar um pequeno `OrderPdfButton` local (mesma lógica do que já existe em `ServiceOrderCard.tsx`: `useServerFn(getOrderFinancials)` → `downloadServiceOrderReportPdf`), com `stopPropagation` para não expandir a row ao clicar.
+- Mostrar apenas para `status === "finished" || "approved"`.
+- Posicionar:
+  - **Mobile**: substituir o `PriorityPill` na linha compacta quando a OS estiver encerrada (era o pedido original — usar o slot da "Média"). OS não encerradas continuam mostrando prioridade normalmente.
+  - **Desktop**: substituir o `PriorityPill` na grade compacta pelo mesmo botão nas mesmas condições.
+  - **Expandido**: adicionar um `ActionLink`-equivalente "Baixar PDF" ao lado de "Imprimir PDF" / "Gerar relatório" (também só para encerradas). Não precisa de rota nova.
+- Reaproveitar `downloadServiceOrderReportPdf` e `buildServiceOrderReportFilename` existentes (mesmo layout Lemarc do relatório gerencial, mas por OS). Nada muda em `serviceOrderDownload.ts`, `financials.functions.ts`, `routeTree.gen.ts` ou schema.
+
+### Fora de escopo
+- Migrações Supabase, edge functions, mocks.
+- Reescrever `ServiceOrderReportDocument.tsx` ou `managerialDownload.ts`.
+- Alterar rotas (`routeTree.gen.ts` continua sem mudança).
 
 ## Validação
-
-- `bunx tsgo --noEmit` nos arquivos alterados.
-- Playwright headless em `/ordens`: verificar que o botão aparece apenas em OS `finished`/`approved`, clicar não navega, um `download` é disparado (mock via `page.on("download")`).
-- Screenshot desktop (1280) + mobile (390) para conferir que o slot não trunca.
-- Testar OS com múltiplos técnicos/apontamentos e OS finalizada sem `financials` (aviso "Apuração financeira pendente").
-- Verificar visualmente 1 PDF renderizado (via `pdftoppm`) para checar paginação, rodapé e ausência de sobreposição.
-
-## Arquivos
-
-- **Criado**: `src/lib/reports/serviceOrderDownload.ts`, `src/lib/reports/pdfShared.ts`
-- **Editado**: `src/components/app/ServiceOrderCard.tsx`, `src/routes/_app.ordens.$id.imprimir.tsx`, `src/lib/reports/managerialDownload.ts` (só para importar `loadLemarcLogoDataUrl` do módulo compartilhado)
+- Reabrir OS #1016 aberta/fechada no mesmo minuto → confirmar que entrada = saída, duração 00:00, subtotal R$ 0,00 e aviso pedindo ajuste.
+- Fluxo running → finished no mobile → verificar CTA sem sobreposição.
+- Na lista `/ordens`: OS finalizadas mostram botão "PDF OS" no slot da prioridade, clique baixa PDF sem expandir a row. OS abertas seguem com o pill de prioridade.
+- Rodar `bunx tsgo --noEmit` nos arquivos alterados.

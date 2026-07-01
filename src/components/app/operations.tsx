@@ -55,11 +55,11 @@ export function PrimaryCTA({
   disabled?: boolean;
 }) {
   const cls =
-    "lemarc-orange-glow lemarc-pressable flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 font-display text-sm font-black uppercase tracking-wider text-primary-foreground disabled:opacity-50";
+    "lemarc-orange-glow lemarc-pressable flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 font-display text-sm font-black uppercase leading-tight tracking-wider text-primary-foreground disabled:opacity-50";
   const content = (
     <>
-      <Icon size={20} strokeWidth={2.5} />
-      {children}
+      <Icon size={20} strokeWidth={2.5} className="shrink-0" />
+      <span className="text-center">{children}</span>
     </>
   );
   if (to)

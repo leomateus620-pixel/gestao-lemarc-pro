@@ -124,7 +124,10 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     if (!open) return;
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
     const fallbackStart = timeFromIso(order.started_at ?? order.opened_at);
-    const fallbackEnd = timeFromIso(order.finished_at ?? new Date().toISOString());
+    const rawEnd = timeFromIso(order.finished_at ?? new Date().toISOString());
+    // Nunca inventar horário de saída: se saída <= entrada, deixa igual à entrada
+    // (duração 0) e obriga o técnico a ajustar antes de finalizar.
+    const fallbackEnd = rawEnd > fallbackStart ? rawEnd : fallbackStart;
     const existingEntries = existing?.entries ?? [];
 
     if (existingEntries.length > 0) {
@@ -149,7 +152,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           role: t.assignment_role ?? null,
           work_date: fallbackDate,
           start_time: fallbackStart,
-          end_time: fallbackEnd > fallbackStart ? fallbackEnd : "17:00",
+          end_time: fallbackEnd,
           hourly_rate_cents: t.hourly_rate_cents ?? 0,
           rate_input:
             t.hourly_rate_cents != null
@@ -217,6 +220,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const addEntry = (technicianId?: string) => {
     const tech = techs.find((t) => t.id === technicianId) ?? techs[0];
     if (!tech) return;
+    const nowTime = timeFromIso(new Date().toISOString());
     setEntries((prev) => [
       ...prev,
       {
@@ -224,8 +228,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         technician_id: tech.id,
         role: tech.assignment_role ?? null,
         work_date: todayISO(),
-        start_time: "08:00",
-        end_time: "17:00",
+        start_time: nowTime,
+        end_time: nowTime,
         hourly_rate_cents: tech.hourly_rate_cents ?? 0,
         rate_input:
           tech.hourly_rate_cents != null
@@ -452,6 +456,13 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
               {!stepRatesValid && (
                 <p className="text-[11px] text-amber-300">
                   Informe o valor da hora de todos os técnicos antes de finalizar.
+                </p>
+              )}
+              {computed.some((e) => !e.error && e.duration_minutes === 0) && (
+                <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+                  Ajuste entrada e saída de cada apontamento — não é possível
+                  finalizar com duração zero. Registre apenas as horas realmente
+                  trabalhadas.
                 </p>
               )}
             </div>

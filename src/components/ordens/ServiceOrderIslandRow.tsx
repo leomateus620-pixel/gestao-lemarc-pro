@@ -1,9 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   ChevronDown,
   ExternalLink,
   FileText,
+  FileDown,
+  Loader2,
   Printer,
   Receipt,
   type LucideIcon,
@@ -17,6 +21,9 @@ import {
   getServiceOrderWorkedMinutes,
 } from "@/lib/serviceOrders/technicians";
 import { displacementTypeLabel, type OrderFinancials } from "@/types/financials";
+import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
+import { useAuth } from "@/components/app/AuthContext";
 import {
   priorityLabel,
   serviceTypeLabel,
@@ -89,6 +96,7 @@ export function ServiceOrderIslandRow({
   const serviceType = getServiceType(order);
   const billingStatus = getBillingStatus(order, financials);
   const actionLabel = nextAction[order.status];
+  const isClosedOrder = order.status === "finished" || order.status === "approved";
 
   return (
     <article
@@ -114,7 +122,11 @@ export function ServiceOrderIslandRow({
             <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
               <span className="truncate text-[12px] font-bold text-slate-200">{unitName}</span>
               <StatusPill status={order.status} compact />
-              <PriorityPill priority={order.priority} compact />
+              {isClosedOrder ? (
+                <OrderPdfButton order={order} compact />
+              ) : (
+                <PriorityPill priority={order.priority} compact />
+              )}
             </span>
             <span className="mt-1 block truncate text-[12px] font-bold tabular-nums text-slate-300">
               {technicianLabel} · {timeSummary.short}
@@ -146,7 +158,11 @@ export function ServiceOrderIslandRow({
             </span>
           </span>
           <StatusPill status={order.status} />
-          <PriorityPill priority={order.priority} />
+          {isClosedOrder ? (
+            <OrderPdfButton order={order} />
+          ) : (
+            <PriorityPill priority={order.priority} />
+          )}
           <DesktopMetric label="Técnicos" value={technicianLabel} title={technicianTitle} />
           <DesktopMetric label="Tempo" value={timeSummary.short} />
           <DesktopMetric label={valueSummary.kind} value={valueSummary.short} />
@@ -199,6 +215,7 @@ export function ServiceOrderIslandRow({
                   {actionLabel}
                 </ActionLink>
               )}
+              {isClosedOrder && <OrderPdfActionButton order={order} />}
               <ActionLink to="/ordens/$id/imprimir" params={{ id: order.id }} icon={Printer}>
                 Imprimir PDF
               </ActionLink>
@@ -465,4 +482,90 @@ function getBillingStatus(order: ServiceOrder, financials: OrderFinancials | nul
   if (order.status === "finished") return "Aguardando revisão";
   if (financials?.finalized_at) return "Apuração finalizada";
   return "Aguardando finalização";
+}
+
+function useOrderPdfDownload(order: ServiceOrder) {
+  const [loading, setLoading] = useState(false);
+  const fetchFinancials = useServerFn(getOrderFinancials);
+  const { displayName } = useAuth();
+
+  const download = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { entries, financials } = await fetchFinancials({ data: { orderId: order.id } });
+      await downloadServiceOrderReportPdf({
+        order,
+        entries,
+        financials,
+        generatedAt: new Date(),
+        authorName: displayName ?? null,
+      });
+      toast.success(`PDF da OS #${order.number} baixado`);
+    } catch (error) {
+      console.error("Failed to download OS PDF", error);
+      toast.error("Não foi possível baixar o PDF da OS. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { loading, download };
+}
+
+function OrderPdfButton({ order, compact = false }: { order: ServiceOrder; compact?: boolean }) {
+  const { loading, download } = useOrderPdfDownload(order);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        void download();
+      }}
+      disabled={loading}
+      aria-label={`Baixar PDF da OS #${order.number}`}
+      className={cn(
+        "inline-flex w-fit items-center gap-1.5 rounded-full border border-status-done/50 bg-status-done/12 font-black uppercase tracking-[0.08em] text-emerald-100 transition-colors",
+        compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
+        "hover:bg-status-done/20 disabled:cursor-wait disabled:opacity-70",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/60",
+      )}
+    >
+      {loading ? (
+        <>
+          <Loader2 size={compact ? 10 : 12} className="animate-spin" />
+          <span>Gerando…</span>
+        </>
+      ) : (
+        <>
+          <FileDown size={compact ? 10 : 12} />
+          <span>PDF OS</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function OrderPdfActionButton({ order }: { order: ServiceOrder }) {
+  const { loading, download } = useOrderPdfDownload(order);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        void download();
+      }}
+      disabled={loading}
+      className={cn(
+        "lemarc-pressable inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.12em]",
+        "border-status-done/45 bg-status-done/12 text-emerald-100 hover:bg-status-done/20",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/60",
+        "disabled:cursor-wait disabled:opacity-70",
+      )}
+    >
+      {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+      {loading ? "Gerando…" : "Baixar PDF"}
+    </button>
+  );
 }
