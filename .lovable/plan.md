@@ -1,50 +1,66 @@
-## Problema
+## Objetivo
 
-No mobile, o dialog de assinatura usa um layout em coluna única vertical (sidebar com campos → pad de assinatura → footer com botões). O conteúdo ultrapassa a altura da viewport (`100dvh`), mas o `DialogContent` não tem scroll interno e o footer fica empurrado para fora da tela — o usuário não consegue rolar até "Confirmar assinatura". Além disso, o botão "Limpar" só aparece no footer (também invisível) e o pad ocupa altura desnecessária quando os campos já são grandes.
+Adicionar um botão "PDF OS" nos cards de OS **finalizadas** (`finished`) e **aprovadas** (`approved`) da lista `/ordens`, ocupando o espaço onde hoje aparece o badge de prioridade "Média". O clique busca dados financeiros sob demanda e gera um PDF individual da OS, no mesmo padrão visual do relatório gerencial (jspdf + identidade Lemarc).
 
-## Solução proposta (somente UI/UX, sem mexer em lógica)
+## Escopo
 
-Reestruturar `SignatureCaptureDialog.tsx` para um layout mobile-first realmente funcional:
+### 1. Novo helper `src/lib/reports/serviceOrderDownload.ts`
+Baseado em `managerialDownload.ts`, exporta:
+- `buildServiceOrderReportFilename(order, generatedAt)` → `os-<numero>-<slug-cliente>-YYYY-MM-DD.pdf`
+- `downloadServiceOrderReportPdf({ order, entries, financials, generatedAt, authorName })`
 
-### 1. Estrutura do Dialog
-- Manter fullscreen `h-[100dvh]` mas mudar para layout **header fixo / conteúdo scrollável / footer fixo (sticky)**:
-  - `<header>` no topo (não scrolla)
-  - `<main>` central com `overflow-y-auto` e `flex-1 min-h-0` — contém campos + pad
-  - `<footer>` sticky no rodapé com `safe-area-inset-bottom` para iPhone
-- Garante que botões "Voltar / Limpar / Confirmar" fiquem **sempre visíveis** em qualquer tela.
+Layout A4 retrato com:
+- Cabeçalho: logo Lemarc + dados da empresa (`LEMARC_COMPANY`) + bloco "RELATÓRIO DE OS #<numero>" com data/emitente
+- Identificação: cliente + CNPJ, unidade + CNPJ + cidade/UF, local, solicitante, status, prioridade, tipo, abertura, fechamento
+- Técnicos envolvidos (via `getOrderTechnicians`)
+- Descrição da OS
+- Tabela de apontamentos: técnico, função, data, entrada/saída, horas (`formatHHmm`), R$/h, subtotal, descrição
+- Bloco de deslocamento quando aplicável
+- Resumo financeiro (mão de obra, deslocamento, materiais, total geral) usando `formatBRL`
+- Se `financials` for `null`: card de aviso "Apuração financeira pendente"
+- Observações se houver
+- Bloco de assinatura do responsável ou aviso de dispensa (mesmos dados hoje mostrados no `ServiceOrderReportDocument`)
+- Rodapé com paginação e nome do gerador
 
-### 2. Layout dos campos e do pad
-- **Mobile**: empilhado vertical (campos compactos no topo, pad logo abaixo com altura mínima de ~240px mas flexível).
-- **Desktop (sm+)**: grid 2 colunas (campos à esquerda, pad à direita ocupando toda a altura) — como já está.
-- Reduzir padding do bloco "Declaração" no mobile e mover "Geo capturada" para um chip menor.
-- Tornar o header mais compacto no mobile (título menor, descrição em 1 linha, esconder o subtítulo longo se necessário).
+Reutiliza `LEMARC_COLORS`, `LEMARC_COMPANY`, `LEMARC_LOGO_URL`, `LEMARC_LOGO_ASPECT`, `formatBRL`, `formatHHmm`, `getOrderTechnicians`, `sanitizePdfText`, `displacementTypeLabel`, e o mesmo cache do logo/paginação/rodapé usados em `managerialDownload.ts` (extrair helper compartilhado se for pequeno; caso contrário duplicar de forma isolada dentro do arquivo para não mexer no gerencial).
 
-### 3. Ação "Limpar" mais acessível
-- Adicionar um **botão "Limpar" flutuante no canto superior direito do próprio pad** (ícone `Eraser`, pequeno, com tooltip "Limpar assinatura"), para o técnico apagar sem precisar rolar.
-- Manter o botão "Limpar" também no footer como fallback no desktop.
-- Botão fica desabilitado quando o pad está vazio.
+### 2. `src/components/app/ServiceOrderCard.tsx`
+- Trocar o wrapper `<Link>` externo por um `<div>` com `role="link"`, `tabIndex={0}`, handlers `onClick`/`onKeyDown` (Enter/Space) que chamam `navigate({ to: "/ordens/$id", params: { id } })`. Mantém foco visível e `aria-label`.
+- No slot onde hoje ficam `ServiceOrderStatusBadge` + `ServiceOrderPriorityBadge`:
+  - OS `finished` ou `approved`: renderizar `<OrderPdfButton order={order} />` no lugar do badge de prioridade (status continua acima).
+  - OS `cancelled` ou outras: renderizar prioridade como hoje.
+- Novo componente local `OrderPdfButton`:
+  - Botão compacto com ícone `FileDown` + texto "PDF OS" (mobile: só ícone opcional; usar mesma altura/estilo do badge para não quebrar layout).
+  - `onClick` faz `event.stopPropagation()` + `event.preventDefault()`, seta estado `loading`, chama `useServerFn(getOrderFinancials)({ data: { orderId: order.id } })`, gera o PDF via `downloadServiceOrderReportPdf`, mostra `toast.success("PDF da OS #<n> baixado")` ou `toast.error(...)`.
+  - `aria-label="Baixar PDF da OS #<n>"`, estado `Gerando…`, `active:scale-[0.98]`, `disabled` durante o loading.
+- Nome do autor: usar `useAuth().displayName` (já usado na rota de impressão).
 
-### 4. Footer mobile otimizado
-- Em mobile: botão **"Confirmar assinatura"** em destaque (largura total), com "Voltar" e "Limpar" como ícones secundários ao lado (mais compactos).
-- Em desktop: mantém o layout horizontal atual.
-- Aplicar `pb-[env(safe-area-inset-bottom)]` para evitar sobreposição com a barra do Safari iOS.
+### 3. `src/routes/_app.ordens.$id.imprimir.tsx`
+- Adicionar botão "Baixar PDF" ao lado de "Imprimir / Salvar PDF" no header no-print, usando o novo helper com os dados já carregados pelos `useSuspenseQuery` existentes. Mantém a impressão do documento HTML atual.
 
-### 5. Pad de assinatura
-- Reduzir `min-h` no mobile para `220px` (cabe melhor) e deixar crescer com `flex-1` quando há espaço.
-- Manter responsividade DPR e linha guia já existentes em `SignaturePad.tsx` (sem alterações de lógica).
+### 4. Fora do escopo
+- Não criar migrations, tabelas, rotas novas nem mocks.
+- Não alterar `ServiceOrderReportDocument.tsx` nem `financials.functions.ts`.
+- `routeTree.gen.ts` não deve mudar (nenhuma rota criada).
+- Cards de OS não finalizadas continuam exibindo prioridade como hoje.
 
-## Arquivos alterados
+## Detalhes técnicos
 
-- `src/components/ordens/signature/SignatureCaptureDialog.tsx` — reestruturação do layout do Dialog (header fixo, main scrollável, footer sticky, botão limpar dentro do pad, ajustes de tipografia mobile).
-- `src/components/ordens/signature/SignaturePad.tsx` — pequeno ajuste para aceitar um botão de limpar sobreposto via `children` opcional OU expor melhor o `clear` (já exposto via ref — sem mudança de API, apenas usar do pai).
+- **Nested link**: refatorar `ServiceOrderCard` de `<Link>` para `<div role="link">` é mais seguro que `<button>` dentro de `<Link>` (evita hidratação inválida). Usar `useNavigate` de `@tanstack/react-router`.
+- **Server fn**: `getOrderFinancials` já usa `requireSupabaseAuth`; chamada apenas no clique não impacta SSR do listing.
+- **Slug do arquivo**: normalizar cliente (NFD, remover acentos, `[^a-z0-9]+` → `-`), truncar 36 chars, fallback `sem-cliente`.
+- **jspdf**: import dinâmico (`await import("jspdf")`) como no `managerialDownload.ts` para manter o chunk assíncrono.
+- **Cache logo**: reaproveitar mesma função `loadLemarcLogoDataUrl` — extraí-la para um helper compartilhado `src/lib/reports/pdfShared.ts` (movendo do `managerialDownload.ts`) para não duplicar. Alteração mínima e não muda o comportamento do gerencial.
 
 ## Validação
 
-- Playwright em viewport mobile (390x844) navegando até a OS, abrindo o dialog de assinatura, verificando se o botão "Confirmar assinatura" está visível sem scroll do body, capturando screenshot.
-- Playwright em desktop (1280) para confirmar que o layout 2 colunas continua intacto.
-- `bunx tsgo --noEmit` no arquivo modificado.
+- `bunx tsgo --noEmit` nos arquivos alterados.
+- Playwright headless em `/ordens`: verificar que o botão aparece apenas em OS `finished`/`approved`, clicar não navega, um `download` é disparado (mock via `page.on("download")`).
+- Screenshot desktop (1280) + mobile (390) para conferir que o slot não trunca.
+- Testar OS com múltiplos técnicos/apontamentos e OS finalizada sem `financials` (aviso "Apuração financeira pendente").
+- Verificar visualmente 1 PDF renderizado (via `pdftoppm`) para checar paginação, rodapé e ausência de sobreposição.
 
-## Sem mudanças
+## Arquivos
 
-- Nenhuma mudança em `signatures.functions.ts`, migrations, RLS, PDF, ou no `SignatureBlock.tsx`.
-- Lógica de save, geo, hash e replace permanece idêntica.
+- **Criado**: `src/lib/reports/serviceOrderDownload.ts`, `src/lib/reports/pdfShared.ts`
+- **Editado**: `src/components/app/ServiceOrderCard.tsx`, `src/routes/_app.ordens.$id.imprimir.tsx`, `src/lib/reports/managerialDownload.ts` (só para importar `loadLemarcLogoDataUrl` do módulo compartilhado)
