@@ -1,12 +1,14 @@
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Printer } from "lucide-react";
+import { FileDown, Loader2, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getServiceOrder } from "@/lib/api/serviceOrders.functions";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
+import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
 
 export const Route = createFileRoute("/_app/ordens/$id/imprimir")({
@@ -22,15 +24,65 @@ function PrintOSPage() {
         <div className="text-xs font-semibold text-slate-600">
           Pré-visualização do relatório da OS. Confira os dados antes de imprimir / salvar como PDF.
         </div>
-        <Button onClick={() => window.print()} className="gap-2">
-          <Printer size={15} /> Imprimir / Salvar PDF
-        </Button>
+        <Suspense fallback={null}>
+          <PrintActions />
+        </Suspense>
       </div>
       <div className="mx-auto max-w-[900px] rounded border border-slate-200 bg-white p-4 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <Suspense fallback={<p className="text-sm text-slate-500">Carregando dados…</p>}>
           <Body />
         </Suspense>
       </div>
+    </div>
+  );
+}
+
+function PrintActions() {
+  const { id } = Route.useParams();
+  const { displayName } = useAuth();
+  const orderFn = useServerFn(getServiceOrder);
+  const finFn = useServerFn(getOrderFinancials);
+  const { data: order } = useSuspenseQuery(
+    queryOptions({
+      queryKey: ["service-order", id],
+      queryFn: () => orderFn({ data: { id } }),
+    }),
+  );
+  const { data: fin } = useSuspenseQuery(
+    queryOptions({
+      queryKey: ["order-financials", id],
+      queryFn: () => finFn({ data: { orderId: id } }),
+    }),
+  );
+  const [downloading, setDownloading] = useState(false);
+  if (!order) return null;
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadServiceOrderReportPdf({
+        order,
+        entries: fin.entries,
+        financials: fin.financials,
+        generatedAt: new Date(),
+        authorName: displayName ?? null,
+      });
+      toast.success(`PDF da OS #${order.number} baixado`);
+    } catch (error) {
+      console.error("Failed to download OS PDF", error);
+      toast.error("Não foi possível baixar o PDF da OS.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="secondary" onClick={handleDownload} disabled={downloading} className="gap-2">
+        {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+        {downloading ? "Gerando…" : "Baixar PDF"}
+      </Button>
+      <Button onClick={() => window.print()} className="gap-2">
+        <Printer size={15} /> Imprimir / Salvar PDF
+      </Button>
     </div>
   );
 }
