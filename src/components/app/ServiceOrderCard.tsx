@@ -1,5 +1,7 @@
-import type { CSSProperties, ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Building2,
@@ -7,7 +9,9 @@ import {
   CheckCircle2,
   Clock3,
   Factory,
+  FileDown,
   HardHat,
+  Loader2,
   MapPin,
   Timer,
   XCircle,
@@ -16,6 +20,9 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { isAlert, isIncomplete, missingFields, statusBucket } from "@/lib/serviceOrders/status";
+import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
+import { useAuth } from "@/components/app/AuthContext";
 import {
   closureKind,
   formatRelativeServiceOrderTime,
@@ -81,6 +88,7 @@ function cardAccent(order: ServiceOrder): CardAccent {
 
 export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
   const accent = accentConfig[cardAccent(order)];
+  const navigate = useNavigate();
   const physics = usePhysicsCard<HTMLDivElement>({
     maxRotate: 3.4,
     mobileMaxRotate: 1,
@@ -114,11 +122,26 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
     "--lemarc-card-glow": accent.glow,
   } as CSSProperties;
 
+  const openOrder = () => {
+    void navigate({ to: "/ordens/$id", params: { id: order.id } });
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openOrder();
+    }
+  };
+
+  const isClosedOrder = order.status === "finished" || order.status === "approved";
+
   return (
-    <Link
-      to="/ordens/$id"
-      params={{ id: order.id }}
-      className="group/order block rounded-[1.5rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={openOrder}
+      onKeyDown={onKeyDown}
+      className="group/order block cursor-pointer rounded-[1.5rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`Abrir OS ${order.number}`}
     >
       <div
@@ -148,7 +171,11 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <ServiceOrderStatusBadge status={order.status} />
-              <ServiceOrderPriorityBadge priority={order.priority} />
+              {isClosedOrder ? (
+                <OrderPdfButton order={order} />
+              ) : (
+                <ServiceOrderPriorityBadge priority={order.priority} />
+              )}
             </div>
           </div>
 
@@ -237,7 +264,64 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
           </div>
         </div>
       </div>
-    </Link>
+    </div>
+  );
+}
+
+function OrderPdfButton({ order }: { order: ServiceOrder }) {
+  const [loading, setLoading] = useState(false);
+  const fetchFinancials = useServerFn(getOrderFinancials);
+  const { displayName } = useAuth();
+
+  const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { entries, financials } = await fetchFinancials({ data: { orderId: order.id } });
+      await downloadServiceOrderReportPdf({
+        order,
+        entries,
+        financials,
+        generatedAt: new Date(),
+        authorName: displayName ?? null,
+      });
+      toast.success(`PDF da OS #${order.number} baixado`);
+    } catch (error) {
+      console.error("Failed to download OS PDF", error);
+      toast.error("Não foi possível baixar o PDF da OS. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      onKeyDown={(e) => e.stopPropagation()}
+      disabled={loading}
+      aria-label={`Baixar PDF da OS #${order.number}`}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklab,var(--lemarc-card-accent)_45%,transparent)] bg-[color-mix(in_oklab,var(--lemarc-card-accent)_16%,transparent)] px-2.5 py-1 text-[0.6rem] font-black uppercase tracking-[0.12em] text-[var(--lemarc-card-accent)] transition-all duration-150",
+        "hover:bg-[color-mix(in_oklab,var(--lemarc-card-accent)_26%,transparent)] active:scale-[0.98]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lemarc-card-accent)]/60",
+        "disabled:cursor-wait disabled:opacity-70",
+      )}
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+          <span>Gerando…</span>
+        </>
+      ) : (
+        <>
+          <FileDown className="h-3 w-3 shrink-0" />
+          <span>PDF OS</span>
+        </>
+      )}
+    </button>
   );
 }
 
