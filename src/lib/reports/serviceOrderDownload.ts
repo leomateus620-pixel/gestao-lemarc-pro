@@ -20,6 +20,32 @@ type Input = {
   authorName: string | null;
 };
 
+type TextOptions = {
+  maxWidth?: number;
+  size?: number;
+  style?: "normal" | "bold";
+  color?: readonly [number, number, number];
+  align?: "left" | "right" | "center";
+};
+
+type FieldCell = {
+  label: string;
+  value: string;
+};
+
+type WorkItem = {
+  label: string;
+  value: string;
+};
+
+type TableCol = {
+  label: string;
+  width: number;
+  align?: "left" | "right" | "center";
+};
+
+const EMPTY = "—";
+
 function slug(input: string, max = 36): string {
   const s = input
     .normalize("NFD")
@@ -38,9 +64,9 @@ export function buildServiceOrderReportFilename(order: ServiceOrder, generatedAt
 }
 
 function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return EMPTY;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return EMPTY;
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
@@ -53,174 +79,95 @@ function fmtDateOnly(iso: string): string {
   return d && m && y ? `${d}/${m}/${y}` : iso;
 }
 
-function serviceTypeFor(order: ServiceOrder): string {
-  if (order.service_type === "outro" && order.service_type_other) return order.service_type_other;
-  return order.service_type ? serviceTypeLabel[order.service_type] : "—";
+function fmtEntryDateTime(entry: LaborEntry, time: string): string {
+  return `${fmtDateOnly(entry.work_date)} ${time.slice(0, 5)}`;
 }
 
-export async function downloadServiceOrderReportPdf(input: Input) {
+function serviceTypeFor(order: ServiceOrder): string {
+  if (order.service_type === "outro" && order.service_type_other) return order.service_type_other;
+  return order.service_type ? serviceTypeLabel[order.service_type] : EMPTY;
+}
+
+function joinParts(parts: Array<string | null | undefined>, separator = " · "): string {
+  const clean = parts.map((part) => part?.trim()).filter(Boolean);
+  return clean.length ? clean.join(separator) : EMPTY;
+}
+
+function shortHash(hash: string | null | undefined): string | null {
+  return hash ? hash.slice(0, 14) : null;
+}
+
+function displacementDetail(financials: OrderFinancials | null): string {
+  if (!financials || financials.displacement_type === "none") return "Sem deslocamento";
+  const parts = [displacementTypeLabel[financials.displacement_type]];
+  if (financials.displacement_type === "per_km") {
+    parts.push(`${financials.displacement_count} desloc.`);
+    parts.push(`${financials.displacement_km_total} km`);
+    parts.push(`${formatBRL(financials.displacement_rate_cents)}/km`);
+  }
+  return parts.join(" · ");
+}
+
+export async function buildServiceOrderReportPdfDocument(input: Input) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const logoDataUrl = await loadLemarcLogoDataUrl();
   const { order, entries, financials, generatedAt, authorName } = input;
 
-  const margin = 14;
+  const marginX = 10;
+  const marginTop = 9;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = pageWidth - margin * 2;
-  const footerReserve = 14;
-  const headerHeightFull = 38;
-  const headerHeightCompact = 18;
-
+  const contentWidth = pageWidth - marginX * 2;
+  const footerReserve = 11;
   const generatedAtLabel = fmtDateTime(generatedAt.toISOString());
+  const filename = buildServiceOrderReportFilename(order, generatedAt);
 
-  let y = margin;
-  let isFirstPage = true;
+  let y = marginTop;
 
-  const txt = (
-    value: string,
-    x: number,
-    yy: number,
-    options?: {
-      maxWidth?: number;
-      size?: number;
-      style?: "normal" | "bold";
-      color?: readonly [number, number, number];
-      align?: "left" | "right" | "center";
-    },
-  ) => {
+  const txt = (value: string, x: number, yy: number, options?: TextOptions) => {
     doc.setFont("helvetica", options?.style ?? "normal");
-    doc.setFontSize(options?.size ?? 9);
-    const [r, g, b] = options?.color ?? LEMARC_COLORS.ink;
-    doc.setTextColor(r, g, b);
+    doc.setFontSize(options?.size ?? 8);
+    doc.setTextColor(...(options?.color ?? LEMARC_COLORS.ink));
     doc.text(sanitizePdfText(value), x, yy, {
       maxWidth: options?.maxWidth,
       align: options?.align,
     });
   };
 
-  const drawLogoMark = (x: number, yy: number, w: number, h: number) => {
+  const split = (value: string, width: number): string[] =>
+    doc.splitTextToSize(sanitizePdfText(value), width) as string[];
+
+  const drawLogoFallback = (x: number, yy: number, targetHeight: number) => {
     doc.setFillColor(...LEMARC_COLORS.orange);
-    doc.roundedRect(x, yy, h, h, 1.2, 1.2, "F");
+    doc.roundedRect(x, yy, targetHeight, targetHeight, 1.1, 1.1, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(h * 2.2);
+    doc.setFontSize(targetHeight * 2.1);
     doc.setTextColor(255, 255, 255);
-    doc.text("L", x + h / 2, yy + h * 0.72, { align: "center" });
-    txt("GESTÃO", x + h + 2, yy + h * 0.42, { size: 7.5, style: "bold", color: LEMARC_COLORS.slate });
-    txt("LEMARC", x + h + 2, yy + h * 0.85, { size: 11, style: "bold", color: LEMARC_COLORS.navy });
-    return x + h + 2 + Math.max(w - h - 2, 22);
+    doc.text("L", x + targetHeight / 2, yy + targetHeight * 0.72, { align: "center" });
+    txt("LEMARC", x + targetHeight + 2, yy + targetHeight * 0.72, {
+      size: 10.5,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+    });
   };
 
   const drawLogo = (x: number, yy: number, targetHeight: number) => {
-    const w = targetHeight * LEMARC_LOGO_ASPECT;
+    const width = targetHeight * LEMARC_LOGO_ASPECT;
     if (logoDataUrl) {
       try {
-        doc.addImage(logoDataUrl, "PNG", x, yy, w, targetHeight, undefined, "FAST");
-        return w;
+        doc.addImage(logoDataUrl, "PNG", x, yy, width, targetHeight, undefined, "FAST");
+        return width;
       } catch {
-        // fall through
+        drawLogoFallback(x, yy, targetHeight);
+        return width;
       }
     }
-    drawLogoMark(x, yy, w, targetHeight);
-    return w;
-  };
-
-  const drawHeader = () => {
-    const top = margin;
-    if (isFirstPage) {
-      const logoH = 10;
-      const logoW = drawLogo(margin, top + 2, logoH);
-      const infoX = margin + logoW + 6;
-      txt(LEMARC_COMPANY.legalName, infoX, top + 4, {
-        size: 8.5,
-        style: "bold",
-        color: LEMARC_COLORS.navy,
-      });
-      txt(`${LEMARC_COMPANY.address} · ${LEMARC_COMPANY.city}`, infoX, top + 8, {
-        size: 7.5,
-        color: LEMARC_COLORS.slate,
-      });
-      txt(`Fone: ${LEMARC_COMPANY.phone} · ${LEMARC_COMPANY.email}`, infoX, top + 11.5, {
-        size: 7.5,
-        color: LEMARC_COLORS.slate,
-      });
-      txt(`CNPJ: ${LEMARC_COMPANY.cnpj}`, infoX, top + 15, {
-        size: 7.5,
-        color: LEMARC_COLORS.slate,
-      });
-      txt("Gerado em", pageWidth - margin, top + 4, {
-        size: 6.5,
-        color: LEMARC_COLORS.slateSoft,
-        align: "right",
-      });
-      txt(generatedAtLabel, pageWidth - margin, top + 8, {
-        size: 8,
-        style: "bold",
-        color: LEMARC_COLORS.navy,
-        align: "right",
-      });
-      if (authorName) {
-        txt(`Por ${authorName}`, pageWidth - margin, top + 12, {
-          size: 7,
-          color: LEMARC_COLORS.slate,
-          align: "right",
-        });
-      }
-      doc.setDrawColor(...LEMARC_COLORS.orange);
-      doc.setLineWidth(0.8);
-      doc.line(margin, top + 19, pageWidth - margin, top + 19);
-      txt(`RELATÓRIO DE OS #${order.number}`, margin, top + 26, {
-        size: 13,
-        style: "bold",
-        color: LEMARC_COLORS.navy,
-      });
-      txt(order.title || "OS sem título", margin, top + 31, {
-        size: 8.5,
-        color: LEMARC_COLORS.slate,
-        maxWidth: contentWidth - 40,
-      });
-      // status badge top-right
-      drawStatusBadge(margin, top, order.status, pageWidth - margin, top + 27);
-      doc.setDrawColor(...LEMARC_COLORS.border);
-      doc.setLineWidth(0.2);
-      doc.line(margin, top + 34, pageWidth - margin, top + 34);
-      y = top + headerHeightFull;
-      isFirstPage = false;
-    } else {
-      const logoH = 6;
-      const logoW = drawLogo(margin, top + 1, logoH);
-      const infoX = margin + logoW + 4;
-      txt(LEMARC_COMPANY.legalName, infoX, top + 3.5, {
-        size: 7.5,
-        style: "bold",
-        color: LEMARC_COLORS.navy,
-      });
-      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, infoX, top + 7, {
-        size: 6.5,
-        color: LEMARC_COLORS.slate,
-      });
-      txt(`Relatório da OS #${order.number}`, pageWidth - margin, top + 3.5, {
-        size: 7.5,
-        style: "bold",
-        color: LEMARC_COLORS.navy,
-        align: "right",
-      });
-      txt(order.title || "—", pageWidth - margin, top + 7, {
-        size: 6.5,
-        color: LEMARC_COLORS.slate,
-        align: "right",
-        maxWidth: contentWidth * 0.6,
-      });
-      doc.setDrawColor(...LEMARC_COLORS.orange);
-      doc.setLineWidth(0.5);
-      doc.line(margin, top + 11, pageWidth - margin, top + 11);
-      y = top + headerHeightCompact;
-    }
+    drawLogoFallback(x, yy, targetHeight);
+    return width;
   };
 
   const drawStatusBadge = (
-    _mx: number,
-    _my: number,
     status: ServiceOrder["status"],
     xRight: number,
     yy: number,
@@ -228,434 +175,564 @@ export async function downloadServiceOrderReportPdf(input: Input) {
   ) => {
     const label = sanitizePdfText(statusLabel[status]);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    const w = doc.getTextWidth(label) + 5;
-    const [r, g, b] = statusBadgeColor(status);
-    doc.setFillColor(r, g, b);
-    doc.roundedRect(xRight - w, yy - height + 1, w, height, 1, 1, "F");
+    doc.setFontSize(6.5);
+    const width = doc.getTextWidth(label) + 5;
+    doc.setFillColor(...statusBadgeColor(status));
+    doc.roundedRect(xRight - width, yy - height + 1, width, height, 1, 1, "F");
     doc.setTextColor(255, 255, 255);
-    doc.text(label, xRight - w / 2, yy - 0.4, { align: "center" });
+    doc.text(label, xRight - width / 2, yy - 0.45, { align: "center" });
   };
 
-  const addPageIfNeeded = (height: number) => {
-    if (y + height <= pageHeight - margin - footerReserve) return;
+  const drawHeader = (compact = false) => {
+    const top = marginTop;
+    if (compact) {
+      const logoH = 6;
+      const logoW = drawLogo(marginX, top + 1, logoH);
+      const infoX = marginX + logoW + 4;
+      txt(LEMARC_COMPANY.legalName, infoX, top + 3.4, {
+        size: 7.2,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      txt(`CNPJ ${LEMARC_COMPANY.cnpj}`, infoX, top + 6.8, {
+        size: 6.2,
+        color: LEMARC_COLORS.slate,
+      });
+      txt(`Relatório da OS #${order.number}`, pageWidth - marginX, top + 3.4, {
+        size: 7.2,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+        align: "right",
+      });
+      txt(statusLabel[order.status], pageWidth - marginX, top + 6.8, {
+        size: 6.2,
+        color: LEMARC_COLORS.slate,
+        align: "right",
+      });
+      doc.setDrawColor(...LEMARC_COLORS.orange);
+      doc.setLineWidth(0.45);
+      doc.line(marginX, top + 10.5, pageWidth - marginX, top + 10.5);
+      y = top + 15;
+      return;
+    }
+
+    const logoH = 12;
+    const logoW = drawLogo(marginX, top + 1.5, logoH);
+    const infoX = marginX + logoW + 6;
+    txt(LEMARC_COMPANY.legalName, infoX, top + 4, {
+      size: 8,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+    });
+    txt(`${LEMARC_COMPANY.address} · ${LEMARC_COMPANY.city}`, infoX, top + 7.8, {
+      size: 6.8,
+      color: LEMARC_COLORS.slate,
+    });
+    txt(`Fone: ${LEMARC_COMPANY.phone} · ${LEMARC_COMPANY.email}`, infoX, top + 11, {
+      size: 6.8,
+      color: LEMARC_COLORS.slate,
+    });
+    txt(`CNPJ: ${LEMARC_COMPANY.cnpj}`, infoX, top + 14.2, {
+      size: 6.8,
+      color: LEMARC_COLORS.slate,
+    });
+    txt(`OS #${order.number}`, pageWidth - marginX, top + 4, {
+      size: 7,
+      color: LEMARC_COLORS.slate,
+      align: "right",
+    });
+    txt(generatedAtLabel, pageWidth - marginX, top + 8, {
+      size: 7.5,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+      align: "right",
+    });
+    if (authorName) {
+      txt(`Por ${authorName}`, pageWidth - marginX, top + 11.6, {
+        size: 6.5,
+        color: LEMARC_COLORS.slate,
+        align: "right",
+      });
+    }
+    doc.setDrawColor(...LEMARC_COLORS.orange);
+    doc.setLineWidth(0.75);
+    doc.line(marginX, top + 18.5, pageWidth - marginX, top + 18.5);
+    txt(`RELATÓRIO DE OS #${order.number}`, marginX, top + 25, {
+      size: 12.5,
+      style: "bold",
+      color: LEMARC_COLORS.navy,
+    });
+    txt(order.title || "OS sem título", marginX, top + 30, {
+      size: 8,
+      color: LEMARC_COLORS.slate,
+      maxWidth: contentWidth - 46,
+    });
+    drawStatusBadge(order.status, pageWidth - marginX, top + 27.6);
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setLineWidth(0.2);
+    doc.line(marginX, top + 33.5, pageWidth - marginX, top + 33.5);
+    y = top + 37.5;
+  };
+
+  const ensurePage = (height: number) => {
+    if (y + height <= pageHeight - footerReserve) return;
     doc.addPage();
-    drawHeader();
+    drawHeader(true);
   };
 
   const section = (title: string) => {
-    addPageIfNeeded(14);
-    y += 4;
-    txt(title.toUpperCase(), margin, y, {
-      size: 9,
+    ensurePage(9);
+    y += 2.5;
+    txt(title.toUpperCase(), marginX, y, {
+      size: 8.3,
       style: "bold",
       color: LEMARC_COLORS.navy,
     });
     y += 2;
     doc.setDrawColor(...LEMARC_COLORS.border);
     doc.setLineWidth(0.2);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 4.2;
   };
 
-  const kvGrid = (rows: [string, string][], cols = 2) => {
-    const gap = 3;
+  const fieldGrid = (cells: FieldCell[], cols = 3) => {
+    const gap = 4;
     const colW = (contentWidth - gap * (cols - 1)) / cols;
-    const lineH = 4.2;
-    const boxH = lineH * 2 + 3;
-    for (let i = 0; i < rows.length; i++) {
-      const col = i % cols;
-      const rowIdx = Math.floor(i / cols);
-      if (col === 0) {
-        addPageIfNeeded(boxH + 1);
+    for (let start = 0; start < cells.length; start += cols) {
+      const row = cells.slice(start, start + cols);
+      const prepared = row.map((cell) => ({
+        ...cell,
+        lines: split(cell.value || EMPTY, colW),
+      }));
+      const rowH = Math.max(9, Math.max(...prepared.map((cell) => cell.lines.length)) * 3.2 + 5);
+      ensurePage(rowH + 1);
+      prepared.forEach((cell, index) => {
+        const x = marginX + index * (colW + gap);
+        txt(cell.label.toUpperCase(), x, y + 2.4, {
+          size: 5.8,
+          style: "bold",
+          color: LEMARC_COLORS.slateSoft,
+        });
+        txt(cell.lines.join("\n"), x, y + 6, {
+          size: 7.6,
+          style: "bold",
+          color: LEMARC_COLORS.ink,
+          maxWidth: colW,
+        });
+      });
+      y += rowH + 1;
+    }
+  };
+
+  const workBox = (items: WorkItem[]) => {
+    const prepared = items.map((item) => ({
+      ...item,
+      lines: split(item.value, contentWidth - 8),
+    }));
+    const height =
+      prepared.reduce((total, item) => total + 6 + Math.max(1, item.lines.length) * 3.35, 5) +
+      Math.max(0, prepared.length - 1) * 1.2;
+    ensurePage(height + 1);
+    doc.setDrawColor(...LEMARC_COLORS.borderSoft);
+    doc.setFillColor(...LEMARC_COLORS.zebra);
+    doc.roundedRect(marginX, y, contentWidth, height, 1.5, 1.5, "FD");
+    let yy = y + 4;
+    prepared.forEach((item, index) => {
+      if (index > 0) {
+        doc.setDrawColor(...LEMARC_COLORS.borderSoft);
+        doc.line(marginX + 3, yy - 1.3, pageWidth - marginX - 3, yy - 1.3);
       }
-      const x = margin + col * (colW + gap);
-      const yy = y + rowIdx * (boxH + 1);
-      txt(rows[i][0].toUpperCase(), x, yy + 3, {
-        size: 6.2,
+      txt(item.label.toUpperCase(), marginX + 4, yy, {
+        size: 6.1,
         style: "bold",
         color: LEMARC_COLORS.slateSoft,
       });
-      txt(rows[i][1], x, yy + 7.5, {
-        size: 8.5,
-        style: "bold",
+      yy += 3.4;
+      txt(item.lines.join("\n"), marginX + 4, yy, {
+        size: 7.8,
         color: LEMARC_COLORS.ink,
-        maxWidth: colW,
+        maxWidth: contentWidth - 8,
       });
-    }
-    const rowsCount = Math.ceil(rows.length / cols);
-    y += rowsCount * (boxH + 1) + 2;
+      yy += Math.max(1, item.lines.length) * 3.35 + 2.4;
+    });
+    y += height + 1.5;
   };
 
-  type Col = { label: string; width: number; align?: "left" | "right" | "center" };
-
-  const table = (cols: Col[], rows: string[][], emptyText: string) => {
+  const table = (cols: TableCol[], rows: string[][], emptyText: string) => {
     if (rows.length === 0) {
-      addPageIfNeeded(8);
-      txt(emptyText, margin, y + 3, { size: 8, color: LEMARC_COLORS.slateSoft });
-      y += 7;
+      ensurePage(8);
+      doc.setDrawColor(...LEMARC_COLORS.border);
+      doc.setFillColor(...LEMARC_COLORS.bgSoft);
+      doc.roundedRect(marginX, y, contentWidth, 8, 1.3, 1.3, "FD");
+      txt(emptyText, marginX + 3, y + 5, { size: 7.5, color: LEMARC_COLORS.slate });
+      y += 10;
       return;
     }
+
     const drawTableHeader = () => {
-      addPageIfNeeded(8);
-      let x = margin;
+      ensurePage(6.2);
       doc.setFillColor(...LEMARC_COLORS.bgSoft);
-      doc.rect(margin, y, contentWidth, 7, "F");
+      doc.rect(marginX, y, contentWidth, 6.2, "F");
       doc.setDrawColor(...LEMARC_COLORS.border);
-      doc.line(margin, y + 7, margin + contentWidth, y + 7);
-      for (const c of cols) {
-        txt(c.label, x + (c.align === "right" ? c.width - 1.5 : 1.5), y + 4.7, {
-          size: 7,
+      doc.line(marginX, y + 6.2, marginX + contentWidth, y + 6.2);
+      let x = marginX;
+      cols.forEach((col) => {
+        const tx =
+          col.align === "right"
+            ? x + col.width - 1.3
+            : col.align === "center"
+              ? x + col.width / 2
+              : x + 1.3;
+        txt(col.label, tx, y + 4.1, {
+          size: 6.2,
           style: "bold",
           color: LEMARC_COLORS.navy,
-          align: c.align === "right" ? "right" : "left",
+          align: col.align ?? "left",
+          maxWidth: col.width - 2,
         });
-        x += c.width;
-      }
-      y += 7;
+        x += col.width;
+      });
+      y += 6.2;
     };
+
     drawTableHeader();
     let zebra = false;
-    for (const row of rows) {
-      const wrapped = row.map((cell, i) =>
-        doc.splitTextToSize(sanitizePdfText(cell), Math.max(8, cols[i].width - 3)) as string[],
-      );
-      const rowHeight = Math.max(6.5, Math.max(...wrapped.map((l) => l.length)) * 3.6 + 3);
-      if (y + rowHeight > pageHeight - margin - footerReserve) {
+    rows.forEach((row) => {
+      const wrapped = row.map((cell, index) => split(cell, Math.max(8, cols[index].width - 2.5)));
+      const rowH = Math.max(5.7, Math.max(...wrapped.map((lines) => lines.length)) * 3 + 2.3);
+      if (y + rowH > pageHeight - footerReserve) {
         doc.addPage();
-        drawHeader();
+        drawHeader(true);
         drawTableHeader();
         zebra = false;
       }
       if (zebra) {
         doc.setFillColor(...LEMARC_COLORS.zebra);
-        doc.rect(margin, y, contentWidth, rowHeight, "F");
+        doc.rect(marginX, y, contentWidth, rowH, "F");
       }
       doc.setDrawColor(...LEMARC_COLORS.borderSoft);
-      doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
-      let x = margin;
-      for (let i = 0; i < row.length; i++) {
-        const c = cols[i];
-        const value = wrapped[i].join("\n");
+      doc.line(marginX, y + rowH, marginX + contentWidth, y + rowH);
+      let x = marginX;
+      row.forEach((_cell, index) => {
+        const col = cols[index];
+        const lines = wrapped[index].join("\n");
         const tx =
-          c.align === "right"
-            ? x + c.width - 1.5
-            : c.align === "center"
-              ? x + c.width / 2
-              : x + 1.5;
-        txt(value, tx, y + 3.8, {
-          size: 7,
-          maxWidth: c.width - 3,
-          align: c.align ?? "left",
+          col.align === "right"
+            ? x + col.width - 1.3
+            : col.align === "center"
+              ? x + col.width / 2
+              : x + 1.3;
+        txt(lines, tx, y + 3.5, {
+          size: 6.8,
           color: LEMARC_COLORS.ink,
+          align: col.align ?? "left",
+          maxWidth: col.width - 2.5,
         });
-        x += c.width;
-      }
-      y += rowHeight;
+        x += col.width;
+      });
+      y += rowH;
       zebra = !zebra;
-    }
-    y += 2;
+    });
+    y += 1.5;
   };
 
-  const noticeBox = (text: string, tone: "warn" | "info" = "warn") => {
-    const lines = doc.splitTextToSize(sanitizePdfText(text), contentWidth - 6) as string[];
-    const h = Math.max(10, lines.length * 3.6 + 5);
-    addPageIfNeeded(h + 2);
-    const bg: [number, number, number] = tone === "warn" ? [255, 247, 237] : [241, 245, 249];
-    const border = tone === "warn" ? LEMARC_COLORS.orangeSoft : LEMARC_COLORS.border;
-    doc.setDrawColor(...border);
-    doc.setFillColor(...bg);
-    doc.roundedRect(margin, y, contentWidth, h, 1.4, 1.4, "FD");
-    txt(lines.join("\n"), margin + 3, y + 5, {
-      size: 8,
+  const noticeBox = (text: string, tone: "warn" | "info" = "warn", width = contentWidth) => {
+    const lines = split(text, width - 6);
+    const height = Math.max(8, lines.length * 3.3 + 4.5);
+    doc.setDrawColor(...(tone === "warn" ? LEMARC_COLORS.orangeSoft : LEMARC_COLORS.border));
+    doc.setFillColor(...(tone === "warn" ? ([255, 247, 237] as const) : LEMARC_COLORS.bgSoft));
+    doc.roundedRect(marginX, y, width, height, 1.4, 1.4, "FD");
+    txt(lines.join("\n"), marginX + 3, y + 4.6, {
+      size: 7.3,
       color: tone === "warn" ? LEMARC_COLORS.amber : LEMARC_COLORS.slate,
-      maxWidth: contentWidth - 6,
+      maxWidth: width - 6,
     });
-    y += h + 2;
+    y += height;
   };
 
-  // ============================================================
-  // Render
-  // ============================================================
-  drawHeader();
-
-  // ----- Identificação -----
-  section("Identificação");
-  const techs = getOrderTechnicians(order);
-  const primary = techs.find((t) => t.is_primary) ?? techs[0];
-  const unitLabel = [order.client_unit?.name ?? order.client?.unit ?? "—"];
-  if (order.client_unit?.cnpj) unitLabel.push(`CNPJ ${maskCNPJ(order.client_unit.cnpj)}`);
-  if (order.client_unit?.city || order.client_unit?.state) {
-    unitLabel.push([order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/"));
-  }
-  kvGrid([
-    [
-      "Cliente",
-      `${order.client?.name ?? "—"}${order.client?.cnpj ? ` · CNPJ ${maskCNPJ(order.client.cnpj)}` : ""}`,
-    ],
-    ["Unidade", unitLabel.join(" · ")],
-    ["Local", order.location ?? "—"],
-    ["Solicitante", order.requester_name ?? "—"],
-    ["Tipo de serviço", serviceTypeFor(order)],
-    ["Prioridade", order.priority ? priorityLabel[order.priority] : "—"],
-    ["Abertura", fmtDateTime(order.opened_at)],
-    ["Fechamento", fmtDateTime(order.finished_at ?? order.closed_at)],
-    ["Responsável", primary?.full_name ?? "—"],
-    [
-      "Técnicos envolvidos",
-      techs.length ? techs.map((t) => t.full_name).join(", ") : "—",
-    ],
-  ]);
-
-  // ----- Trabalhos executados -----
-  section("Trabalhos executados");
-  const desc = order.description?.trim() || "Sem descrição cadastrada.";
-  const descLines = doc.splitTextToSize(sanitizePdfText(desc), contentWidth) as string[];
-  const descH = Math.max(6, descLines.length * 3.8 + 2);
-  addPageIfNeeded(descH);
-  txt(descLines.join("\n"), margin, y + 3.5, {
-    size: 8.5,
-    color: LEMARC_COLORS.ink,
-    maxWidth: contentWidth,
-  });
-  y += descH;
-
-  // ----- Apuração de horas -----
-  section("Apuração de horas");
-  table(
-    [
-      { label: "#", width: 8, align: "right" },
-      { label: "Técnico", width: 40 },
-      { label: "Função", width: 24 },
-      { label: "Data", width: 18, align: "right" },
-      { label: "Entrada", width: 14, align: "right" },
-      { label: "Saída", width: 14, align: "right" },
-      { label: "Horas", width: 14, align: "right" },
-      { label: "R$/h", width: 20, align: "right" },
-      {
-        label: "Subtotal",
-        width: contentWidth - 8 - 40 - 24 - 18 - 14 - 14 - 14 - 20,
-        align: "right",
-      },
-    ],
-    entries.map((e, i) => [
-      String(i + 1),
-      e.technician?.full_name ?? "—",
-      e.role ?? "—",
-      fmtDateOnly(e.work_date),
-      e.start_time.slice(0, 5),
-      e.end_time.slice(0, 5),
-      formatHHmm(e.duration_minutes),
-      formatBRL(e.hourly_rate_cents),
-      formatBRL(e.subtotal_cents),
-    ]),
-    "Sem apontamentos registrados.",
-  );
-
-  // Descriptions (if any)
-  const entriesWithDesc = entries.filter((e) => (e.description ?? "").trim().length > 0);
-  if (entriesWithDesc.length > 0) {
-    y += 1;
-    for (const e of entriesWithDesc) {
-      const line = `#${entries.indexOf(e) + 1} — ${e.description}`;
-      const lines = doc.splitTextToSize(sanitizePdfText(line), contentWidth) as string[];
-      const h = lines.length * 3.6 + 1;
-      addPageIfNeeded(h);
-      txt(lines.join("\n"), margin, y + 2, {
-        size: 7,
-        color: LEMARC_COLORS.slate,
-        maxWidth: contentWidth,
-      });
-      y += h;
+  const drawTotalsAndSignature = () => {
+    const totalRows: [string, string][] = financials
+      ? [
+          ["Horas totais", formatHHmm(financials.total_labor_minutes)],
+          ["Mão de obra", formatBRL(financials.total_labor_cents)],
+          ["Deslocamento", formatBRL(financials.displacement_total_cents)],
+        ]
+      : [];
+    if (financials?.materials_total_cents && financials.materials_total_cents > 0) {
+      totalRows.push(["Materiais", formatBRL(financials.materials_total_cents)]);
     }
-  }
 
-  // ----- Deslocamento -----
-  if (financials && financials.displacement_type !== "none") {
-    section("Deslocamento");
-    const parts: string[] = [displacementTypeLabel[financials.displacement_type]];
-    if (financials.displacement_type === "per_km") {
-      parts.push(`${financials.displacement_count} desloc.`);
-      parts.push(`${financials.displacement_km_total} km`);
-      parts.push(`${formatBRL(financials.displacement_rate_cents)}/km`);
-    }
-    parts.push(`Total ${formatBRL(financials.displacement_total_cents)}`);
-    addPageIfNeeded(8);
-    txt(parts.join(" · "), margin, y + 3.5, {
-      size: 8.5,
-      style: "bold",
-      color: LEMARC_COLORS.ink,
-    });
-    y += 6;
-    if (financials.displacement_notes) {
-      const lines = doc.splitTextToSize(
-        sanitizePdfText(financials.displacement_notes),
-        contentWidth,
-      ) as string[];
-      const h = lines.length * 3.6 + 1;
-      addPageIfNeeded(h);
-      txt(lines.join("\n"), margin, y + 2, {
-        size: 7.5,
-        color: LEMARC_COLORS.slate,
-        maxWidth: contentWidth,
-      });
-      y += h;
-    }
-  }
+    const displacementLines = financials
+      ? split(displacementDetail(financials), contentWidth - 8)
+      : [];
+    const displacementNoteLines = financials?.displacement_notes
+      ? split(financials.displacement_notes, contentWidth - 8)
+      : [];
+    const totalsH = financials
+      ? 10 +
+        totalRows.length * 4.25 +
+        8 +
+        Math.max(1, displacementLines.length) * 3 +
+        displacementNoteLines.length * 3
+      : 10;
 
-  // ----- Resumo financeiro -----
-  section("Resumo financeiro");
-  if (financials) {
-    const rows: [string, string][] = [
-      ["Total de horas trabalhadas", formatHHmm(financials.total_labor_minutes)],
-      ["Total mão de obra", formatBRL(financials.total_labor_cents)],
-      ["Deslocamento", formatBRL(financials.displacement_total_cents)],
-    ];
-    if (financials.materials_total_cents > 0) {
-      rows.push(["Materiais", formatBRL(financials.materials_total_cents)]);
-    }
-    const boxH = rows.length * 5.5 + 16;
-    addPageIfNeeded(boxH);
-    doc.setDrawColor(...LEMARC_COLORS.navy);
-    doc.setLineWidth(0.4);
-    doc.setFillColor(...LEMARC_COLORS.bgSoft);
-    doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, "FD");
-    let ry = y + 5.5;
-    for (const [k, v] of rows) {
-      txt(k, margin + 4, ry, { size: 8.5, color: LEMARC_COLORS.slate });
-      txt(v, pageWidth - margin - 4, ry, {
-        size: 8.5,
+    const signatureH = order.signature
+      ? 32
+      : order.signature_waiver_reason
+        ? Math.max(14, split(order.signature_waiver_reason, contentWidth - 8).length * 3.2 + 8)
+        : 10;
+    const groupH = totalsH + 2.5 + signatureH;
+    ensurePage(groupH);
+
+    if (financials) {
+      doc.setDrawColor(...LEMARC_COLORS.navy);
+      doc.setLineWidth(0.35);
+      doc.setFillColor(...LEMARC_COLORS.bgSoft);
+      doc.roundedRect(marginX, y, contentWidth, totalsH, 1.5, 1.5, "FD");
+      txt("TOTAIS DA OS", marginX + 4, y + 4.8, {
+        size: 7.4,
         style: "bold",
-        color: LEMARC_COLORS.ink,
+        color: LEMARC_COLORS.navy,
+      });
+      let ry = y + 9;
+      totalRows.forEach(([label, value]) => {
+        txt(label, marginX + 4, ry, { size: 7.5, color: LEMARC_COLORS.slate });
+        txt(value, pageWidth - marginX - 4, ry, {
+          size: 7.5,
+          style: "bold",
+          color: LEMARC_COLORS.ink,
+          align: "right",
+        });
+        ry += 4.25;
+      });
+      doc.setDrawColor(...LEMARC_COLORS.navy);
+      doc.setLineWidth(0.35);
+      doc.line(marginX + 3, ry - 1.6, pageWidth - marginX - 3, ry - 1.6);
+      txt("Total geral", marginX + 4, ry + 3, {
+        size: 8.6,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      txt(formatBRL(financials.grand_total_cents), pageWidth - marginX - 4, ry + 3, {
+        size: 10.5,
+        style: "bold",
+        color: LEMARC_COLORS.orange,
         align: "right",
       });
-      ry += 5.5;
+      ry += 7.2;
+      txt(displacementLines.join("\n"), marginX + 4, ry, {
+        size: 6.7,
+        color: LEMARC_COLORS.slate,
+        maxWidth: contentWidth - 8,
+      });
+      ry += Math.max(1, displacementLines.length) * 3;
+      if (displacementNoteLines.length > 0) {
+        txt(displacementNoteLines.join("\n"), marginX + 4, ry, {
+          size: 6.6,
+          color: LEMARC_COLORS.slateSoft,
+          maxWidth: contentWidth - 8,
+        });
+      }
+      y += totalsH + 2.5;
+    } else {
+      noticeBox("Apuração financeira pendente — finalize a OS para gerar os totais.");
+      y += 2.5;
     }
-    doc.setDrawColor(...LEMARC_COLORS.navy);
-    doc.setLineWidth(0.4);
-    doc.line(margin + 3, ry - 2, pageWidth - margin - 3, ry - 2);
-    txt("TOTAL GERAL DA OS", margin + 4, ry + 3, {
-      size: 9.5,
+
+    doc.setDrawColor(...LEMARC_COLORS.border);
+    doc.setFillColor(...LEMARC_COLORS.bgSoft);
+    doc.roundedRect(marginX, y, contentWidth, signatureH, 1.5, 1.5, "FD");
+    txt("ASSINATURA DO RESPONSÁVEL", marginX + 4, y + 4.8, {
+      size: 7.4,
       style: "bold",
       color: LEMARC_COLORS.navy,
     });
-    txt(formatBRL(financials.grand_total_cents), pageWidth - margin - 4, ry + 3, {
-      size: 12,
-      style: "bold",
-      color: LEMARC_COLORS.orange,
-      align: "right",
-    });
-    y += boxH + 2;
-  } else {
-    noticeBox("Apuração financeira pendente — finalize a OS para gerar os totais.");
-  }
 
-  if (financials?.notes) {
-    section("Observações");
-    const lines = doc.splitTextToSize(sanitizePdfText(financials.notes), contentWidth) as string[];
-    const h = lines.length * 3.8 + 2;
-    addPageIfNeeded(h);
-    txt(lines.join("\n"), margin, y + 3, {
-      size: 8.5,
-      color: LEMARC_COLORS.ink,
-      maxWidth: contentWidth,
-    });
-    y += h;
-  }
-
-  // ----- Assinatura do responsável -----
-  section("Assinatura do responsável");
-  if (order.signature) {
-    const sig = order.signature;
-    const boxH = 40;
-    addPageIfNeeded(boxH);
-    doc.setDrawColor(...LEMARC_COLORS.border);
-    doc.setFillColor(...LEMARC_COLORS.bgSoft);
-    doc.roundedRect(margin, y, contentWidth, boxH, 1.4, 1.4, "FD");
-    // signature image
-    const sigW = 70;
-    const sigH = 30;
-    const sigX = margin + 3;
-    const sigY = y + 5;
-    doc.setDrawColor(...LEMARC_COLORS.borderSoft);
-    doc.setFillColor(255, 255, 255);
-    doc.rect(sigX, sigY, sigW, sigH, "FD");
-    if (sig.signature_data_url) {
-      try {
-        doc.addImage(sig.signature_data_url, "PNG", sigX + 1, sigY + 1, sigW - 2, sigH - 2, undefined, "FAST");
-      } catch {
+    if (order.signature) {
+      const sig = order.signature;
+      const sigW = 62;
+      const sigH = 21;
+      const sigX = marginX + 4;
+      const sigY = y + 7.5;
+      doc.setDrawColor(...LEMARC_COLORS.borderSoft);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(sigX, sigY, sigW, sigH, "FD");
+      if (sig.signature_data_url) {
+        try {
+          doc.addImage(
+            sig.signature_data_url,
+            "PNG",
+            sigX + 1,
+            sigY + 1,
+            sigW - 2,
+            sigH - 2,
+            undefined,
+            "FAST",
+          );
+        } catch {
+          txt("imagem indisponível", sigX + sigW / 2, sigY + sigH / 2, {
+            size: 6.5,
+            color: LEMARC_COLORS.slateSoft,
+            align: "center",
+          });
+        }
+      } else {
         txt("imagem indisponível", sigX + sigW / 2, sigY + sigH / 2, {
-          size: 7,
+          size: 6.5,
           color: LEMARC_COLORS.slateSoft,
           align: "center",
         });
       }
-    } else {
-      txt("imagem indisponível", sigX + sigW / 2, sigY + sigH / 2, {
-        size: 7,
-        color: LEMARC_COLORS.slateSoft,
-        align: "center",
+
+      const metaX = sigX + sigW + 5;
+      txt(sig.signed_by_name, metaX, y + 10.2, {
+        size: 9,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
       });
-    }
-    const metaX = sigX + sigW + 5;
-    txt(sig.signed_by_name, metaX, y + 8, {
-      size: 10.5,
-      style: "bold",
-      color: LEMARC_COLORS.navy,
-    });
-    if (sig.signed_by_role) {
-      txt(sig.signed_by_role, metaX, y + 13, { size: 8, color: LEMARC_COLORS.slate });
-    }
-    txt(`Assinado em ${fmtDateTime(sig.signed_at)}`, metaX, y + 19, {
-      size: 8,
-      color: LEMARC_COLORS.ink,
-    });
-    if (sig.signature_hash) {
-      txt(`Registro: SIG-${sig.signature_hash}`, metaX, y + 24, {
-        size: 7.5,
+      if (sig.signed_by_role) {
+        txt(sig.signed_by_role, metaX, y + 14, { size: 7, color: LEMARC_COLORS.slate });
+      }
+      txt(`Assinado em ${fmtDateTime(sig.signed_at)}`, metaX, y + 18.5, {
+        size: 7.2,
+        color: LEMARC_COLORS.ink,
+      });
+      if (sig.signature_hash) {
+        txt(`Registro: SIG-${shortHash(sig.signature_hash)}`, metaX, y + 22.5, {
+          size: 6.7,
+          color: LEMARC_COLORS.slate,
+        });
+      }
+      txt(
+        "Rastreabilidade operacional — não substitui assinatura jurídica formal.",
+        metaX,
+        y + 27,
+        {
+          size: 6.2,
+          color: LEMARC_COLORS.slateSoft,
+          maxWidth: contentWidth - (metaX - marginX) - 4,
+        },
+      );
+    } else if (order.signature_waiver_reason) {
+      const parts = [`Finalizada sem assinatura: ${order.signature_waiver_reason}`];
+      if (order.signature_waived_at) parts.push(`(${fmtDateTime(order.signature_waived_at)})`);
+      txt(parts.join(" "), marginX + 4, y + 9.5, {
+        size: 7.2,
+        color: LEMARC_COLORS.amber,
+        maxWidth: contentWidth - 8,
+      });
+    } else {
+      txt("Assinatura não registrada.", marginX + 4, y + 9.5, {
+        size: 7.2,
         color: LEMARC_COLORS.slate,
       });
     }
-    txt(
-      "Rastreabilidade operacional — não substitui assinatura jurídica formal.",
-      metaX,
-      y + 32,
-      { size: 6.8, color: LEMARC_COLORS.slateSoft, maxWidth: contentWidth - (metaX - margin) - 4 },
-    );
-    y += boxH + 2;
-  } else if (order.signature_waiver_reason) {
-    const parts = [`Finalizada sem assinatura: ${order.signature_waiver_reason}`];
-    if (order.signature_waived_at) parts.push(`(em ${fmtDateTime(order.signature_waived_at)})`);
-    noticeBox(parts.join(" "));
-  } else {
-    noticeBox("Assinatura não registrada.", "info");
+    y += signatureH + 1.5;
+  };
+
+  drawHeader(false);
+
+  const techs = getOrderTechnicians(order);
+  const primary = techs.find((technician) => technician.is_primary) ?? techs[0];
+  const unitName = order.client_unit?.name ?? order.client?.unit ?? EMPTY;
+  const localSetor = joinParts([order.location, order.client_unit?.sector], " / ");
+
+  section("Identificação");
+  fieldGrid([
+    { label: "Empresa", value: order.client?.name ?? EMPTY },
+    { label: "CNPJ da empresa", value: order.client?.cnpj ? maskCNPJ(order.client.cnpj) : EMPTY },
+    { label: "Unidade", value: unitName },
+    {
+      label: "CNPJ da unidade",
+      value: order.client_unit?.cnpj ? maskCNPJ(order.client_unit.cnpj) : EMPTY,
+    },
+    { label: "Local / setor", value: localSetor },
+    { label: "Solicitante", value: order.requester_name ?? EMPTY },
+    { label: "Prioridade", value: order.priority ? priorityLabel[order.priority] : EMPTY },
+    { label: "Tipo de serviço", value: serviceTypeFor(order) },
+    { label: "Técnico responsável", value: primary?.full_name ?? EMPTY },
+  ]);
+
+  const executedDescriptions = entries
+    .map((entry, index) => {
+      const description = entry.description?.trim();
+      if (!description) return null;
+      const technician = entry.technician?.full_name ? `${entry.technician.full_name}: ` : "";
+      return `${index + 1}. ${technician}${description}`;
+    })
+    .filter((description): description is string => Boolean(description));
+
+  const workItems: WorkItem[] = [
+    {
+      label: "Descrição inicial / chamado",
+      value: order.description?.trim() || "Sem descrição cadastrada.",
+    },
+  ];
+  if (executedDescriptions.length > 0) {
+    workItems.push({ label: "Serviço executado", value: executedDescriptions.join("\n") });
+  }
+  if (financials?.notes?.trim()) {
+    workItems.push({ label: "Observações da apuração", value: financials.notes.trim() });
   }
 
-  // ----- Footer on every page -----
+  section("Trabalho executado");
+  workBox(workItems);
+
+  section("Execução e valores");
+  table(
+    [
+      { label: "Técnico", width: 43 },
+      { label: "Função", width: 24 },
+      { label: "Início", width: 28 },
+      { label: "Fim", width: 28 },
+      { label: "Horas", width: 15, align: "right" },
+      { label: "R$/h", width: 24, align: "right" },
+      { label: "Total", width: contentWidth - 43 - 24 - 28 - 28 - 15 - 24, align: "right" },
+    ],
+    entries.map((entry) => [
+      entry.technician?.full_name ?? EMPTY,
+      entry.role ?? EMPTY,
+      fmtEntryDateTime(entry, entry.start_time),
+      fmtEntryDateTime(entry, entry.end_time),
+      formatHHmm(entry.duration_minutes),
+      formatBRL(entry.hourly_rate_cents),
+      formatBRL(entry.subtotal_cents),
+    ]),
+    "Sem apontamentos registrados.",
+  );
+
+  drawTotalsAndSignature();
+
   const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
     const fy = pageHeight - 8;
     doc.setDrawColor(...LEMARC_COLORS.border);
     doc.setLineWidth(0.2);
-    doc.line(margin, fy - 4, pageWidth - margin, fy - 4);
+    doc.line(marginX, fy - 4, pageWidth - marginX, fy - 4);
     txt(
       `${LEMARC_COMPANY.legalName} · CNPJ ${LEMARC_COMPANY.cnpj} · ${LEMARC_COMPANY.phoneShort}`,
-      margin,
+      marginX,
       fy,
-      { size: 6.8, color: LEMARC_COLORS.slate },
+      { size: 6.4, color: LEMARC_COLORS.slate },
     );
-    txt(`Gerado em ${generatedAtLabel}`, margin, fy + 3.5, {
-      size: 6.5,
+    txt(`Gerado em ${generatedAtLabel}`, marginX, fy + 3.2, {
+      size: 6.2,
       color: LEMARC_COLORS.slateSoft,
     });
-    txt(`Página ${p} de ${totalPages}`, pageWidth - margin, fy + 3.5, {
-      size: 6.8,
+    txt(`Página ${page} de ${totalPages}`, pageWidth - marginX, fy + 3.2, {
+      size: 6.4,
       style: "bold",
       color: LEMARC_COLORS.navy,
       align: "right",
     });
   }
 
-  doc.save(buildServiceOrderReportFilename(order, generatedAt));
+  return { doc, filename, pages: totalPages };
+}
+
+export async function downloadServiceOrderReportPdf(input: Input) {
+  const { doc, filename, pages } = await buildServiceOrderReportPdfDocument(input);
+  doc.save(filename);
+  return { filename, pages };
 }
