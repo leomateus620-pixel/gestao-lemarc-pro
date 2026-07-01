@@ -1,60 +1,36 @@
-## Diagnóstico
+## Objetivo
+Na visão expandida de cada OS finalizada (menu Ordens), manter apenas o botão **BAIXAR PDF** — remover **IMPRIMIR PDF** e **GERAR RELATÓRIO** — e destacar visualmente o botão mantido.
 
-**1. Horas fictícias (08:06 · R$ 445,50)**
-Em `FinalizeServiceOrderDialog.tsx` (hidratação, linha ~152):
-```ts
-end_time: fallbackEnd > fallbackStart ? fallbackEnd : "17:00",
-```
-Quando a OS é aberta e finalizada no mesmo minuto, `started_at ≈ finished_at`, então `fallbackEnd == fallbackStart` e o código inventa `"17:00"` como saída. Resultado: entrada 08:54 · saída 17:00 → 8h06 fictícias e R$ 445,50 falsos, sem qualquer aviso ao usuário.
+## Escopo
+Arquivo único: `src/components/ordens/ServiceOrderIslandRow.tsx`.
 
-**2. Texto sobreposto no CTA "Finalizar" (mobile)**
-No card "Próxima ação" (`_app.ordens.$id.tsx`, ~232-253), quando `action.next === "finished"`:
-- o `<h2>` mostra `action.label` ("Finalizar serviço")
-- o botão mostra "Finalizar OS (apuração)"
+Sem mudanças em rotas, dados, PDFs, wizard, dialogs, ou fluxo de finalização. O botão "PDF OS" compacto no cabeçalho da OS (topo do card) fica intacto. A rota `/ordens/$id/imprimir` continua existindo e acessível via "Abrir OS" (que já possui o botão "Baixar PDF" e "Imprimir/Salvar PDF" internos) — só removemos os atalhos duplicados da linha de ações da ilha.
 
-Preciso investigar o `PrimaryCTA` para confirmar se a sobreposição visual do print vem de `line-height`/`text-truncate` ou de duplicação de nó — nas outras transições o mesmo componente renderiza normalmente. Ajuste vai ser textual + garantir que o CTA suporte rótulo mais longo em telas estreitas.
+## Mudanças
 
-**3. Botão de PDF individual não aparece na lista de Ordens**
-O botão "PDF OS" foi adicionado em `ServiceOrderCard.tsx`, mas o menu `/ordens` renderiza `ServiceOrderIslandRow.tsx` (islands agrupadas por período). Por isso o botão nunca aparece na tela que o usuário abre. Nada foi adicionado ao componente correto.
+### 1. Remover os dois botões duplicados (linhas ~219-224)
+Excluir os `<ActionLink to="/ordens/$id/imprimir" …>` de "Imprimir PDF" e "Gerar relatório". Se `Printer` e `FileText` ficarem sem uso após a remoção, retirar dos imports do `lucide-react` para evitar warning de import não usado.
 
----
+### 2. Destacar visualmente o `OrderPdfActionButton`
+Reescrever o estilo para que seja o CTA principal dessa faixa de ações — proeminente, verde vibrante, com sombra e destaque:
 
-## Plano de correções (somente UI/fluxo, sem mexer em schema)
+- Fundo sólido em gradiente `bg-status-done` (verde) em vez do atual `bg-status-done/12` translúcido
+- Texto branco/preto forte (`text-white`) — usar token semântico do próprio `--status-done-foreground` se existir; senão manter branco via classe já usada no design system (verificar tokens existentes em `styles.css` antes de aplicar)
+- Ícone maior (`size={16}`) e label mais legível: manter texto **"Baixar PDF"** com `text-xs` (ao invés de `text-[10px]`), tracking mais suave e padding maior (`px-4 min-h-11`)
+- Shadow/glow: `shadow-[0_8px_24px_-12px_theme(colors.emerald.500)]` ou equivalente já disponível no design system
+- Hover mais notável (`hover:brightness-110` ou aumento de opacidade)
+- Manter `stopPropagation`, estado `loading` e `Loader2`
 
-### 1. Corrigir cálculo de horas fictícias
-Arquivo: `src/components/ordens/FinalizeServiceOrderDialog.tsx`
-
-- Remover o fallback `"17:00"`. Quando não houver `finished_at` real ou quando `fallbackEnd <= fallbackStart`, manter `end_time` **igual** ao `start_time` (duração 0) em vez de inventar horário.
-- Aplicar a mesma regra em `addEntry` (hoje força "08:00"/"17:00" fixos): usar o horário atual do dispositivo como sugestão inicial e deixar duração 0 até o técnico editar.
-- Reforçar validação existente `stepEntriesValid` (já exige `duration_minutes > 0`) e mostrar aviso amigável quando duração for 0: *"Ajuste entrada e saída — a OS foi aberta e finalizada no mesmo instante."*
-- Nenhum impacto em dados salvos: apenas remove sugestão inventada; nada é gravado sem o usuário revisar.
-
-### 2. Corrigir o CTA "Finalizar" sobreposto
-Arquivos: `src/routes/_app.ordens.$id.tsx` e o `PrimaryCTA` que ele usa.
-
-- Ler o componente `PrimaryCTA` (dentro de `_app.ordens.$id.tsx`) para confirmar a causa da sobreposição no mobile.
-- Unificar rótulo: passar a chamar o botão de `"Finalizar OS"` (sem "(apuração)") e manter o subtítulo `<h2>Finalizar serviço</h2>` da seção. Assim o rótulo cabe em uma linha e reduz o risco visual.
-- Se a inspeção mostrar que `PrimaryCTA` fixa altura ou usa `truncate`, ajustar para `whitespace-nowrap` + padding coerente e `min-h` em vez de `h`.
-- Sem mudar a ação — continua abrindo `FinalizeServiceOrderDialog`.
-
-### 3. Botão "PDF OS" na lista de Ordens (padrão relatório gerencial)
-Arquivo: `src/components/ordens/ServiceOrderIslandRow.tsx`
-
-- Criar um pequeno `OrderPdfButton` local (mesma lógica do que já existe em `ServiceOrderCard.tsx`: `useServerFn(getOrderFinancials)` → `downloadServiceOrderReportPdf`), com `stopPropagation` para não expandir a row ao clicar.
-- Mostrar apenas para `status === "finished" || "approved"`.
-- Posicionar:
-  - **Mobile**: substituir o `PriorityPill` na linha compacta quando a OS estiver encerrada (era o pedido original — usar o slot da "Média"). OS não encerradas continuam mostrando prioridade normalmente.
-  - **Desktop**: substituir o `PriorityPill` na grade compacta pelo mesmo botão nas mesmas condições.
-  - **Expandido**: adicionar um `ActionLink`-equivalente "Baixar PDF" ao lado de "Imprimir PDF" / "Gerar relatório" (também só para encerradas). Não precisa de rota nova.
-- Reaproveitar `downloadServiceOrderReportPdf` e `buildServiceOrderReportFilename` existentes (mesmo layout Lemarc do relatório gerencial, mas por OS). Nada muda em `serviceOrderDownload.ts`, `financials.functions.ts`, `routeTree.gen.ts` ou schema.
-
-### Fora de escopo
-- Migrações Supabase, edge functions, mocks.
-- Reescrever `ServiceOrderReportDocument.tsx` ou `managerialDownload.ts`.
-- Alterar rotas (`routeTree.gen.ts` continua sem mudança).
+### 3. Layout da faixa
+A faixa `<div className="mt-4 flex gap-2 overflow-x-auto …">` continua com "Abrir OS" (primário laranja), opcionalmente `actionLabel` (Aprovar / Encerrar), e o `OrderPdfActionButton` destacado. Sem outros botões.
 
 ## Validação
-- Reabrir OS #1016 aberta/fechada no mesmo minuto → confirmar que entrada = saída, duração 00:00, subtotal R$ 0,00 e aviso pedindo ajuste.
-- Fluxo running → finished no mobile → verificar CTA sem sobreposição.
-- Na lista `/ordens`: OS finalizadas mostram botão "PDF OS" no slot da prioridade, clique baixa PDF sem expandir a row. OS abertas seguem com o pill de prioridade.
-- Rodar `bunx tsgo --noEmit` nos arquivos alterados.
+- Abrir OS #1017 (aprovada) → confirmar visualmente: apenas 3 ações (Abrir OS · [ação de status opcional] · Baixar PDF verde destacado)
+- Clicar "Baixar PDF" → confirma download do PDF (sem navegar/expandir)
+- Verificar OS em status `running`/`open` → botão PDF não aparece (comportamento atual preservado via `isClosedOrder`)
+- `bunx tsgo --noEmit src/components/ordens/ServiceOrderIslandRow.tsx`
+
+## Fora do escopo
+- Página `/ordens/$id/imprimir` (mantida intacta — acessível por "Abrir OS" → header)
+- Botão compacto "PDF OS" no cabeçalho da linha (não alterado)
+- Qualquer lógica de geração de PDF
