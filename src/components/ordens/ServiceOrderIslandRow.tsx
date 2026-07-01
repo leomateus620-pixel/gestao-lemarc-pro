@@ -215,6 +215,7 @@ export function ServiceOrderIslandRow({
                   {actionLabel}
                 </ActionLink>
               )}
+              {isClosedOrder && <OrderPdfActionButton order={order} />}
               <ActionLink to="/ordens/$id/imprimir" params={{ id: order.id }} icon={Printer}>
                 Imprimir PDF
               </ActionLink>
