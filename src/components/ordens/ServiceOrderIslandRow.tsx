@@ -550,13 +550,14 @@ function OrderPdfActionButton({ order }: { order: ServiceOrder }) {
       }}
       disabled={loading}
       className={cn(
-        "lemarc-pressable inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.12em]",
-        "border-status-done/45 bg-status-done/12 text-emerald-100 hover:bg-status-done/20",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/60",
+        "lemarc-pressable inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-black uppercase tracking-[0.1em]",
+        "border-status-done/70 bg-status-done text-white shadow-[0_10px_28px_-14px_rgba(16,185,129,0.9)]",
+        "hover:brightness-110 hover:shadow-[0_14px_32px_-14px_rgba(16,185,129,1)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-wait disabled:opacity-70",
       )}
     >
-      {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+      {loading ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
       {loading ? "Gerando…" : "Baixar PDF"}
     </button>
   );
