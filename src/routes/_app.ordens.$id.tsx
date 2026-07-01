@@ -238,7 +238,7 @@ function OrdemDetalhe() {
           <div className="mt-3">
             {action.next === "finished" ? (
               <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
-                Finalizar OS (apuração)
+                Finalizar OS
               </PrimaryCTA>
             ) : (
               <PrimaryCTA
