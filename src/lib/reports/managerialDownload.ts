@@ -10,6 +10,7 @@ import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ManagerialReport, ReportOrderRow } from "@/types/reports";
 import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
 import { LEMARC_COLORS, LEMARC_COMPANY, LEMARC_LOGO_ASPECT, LEMARC_LOGO_URL } from "@/lib/reports/lemarcBrand";
+import { loadLemarcLogoDataUrl } from "@/lib/reports/pdfShared";
 import {
   PENDING_LABELS,
   formatFechamento,
@@ -52,26 +53,6 @@ export function downloadHtmlFile(filename: string, html: string) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-let cachedLogoDataUrl: string | null = null;
-async function loadLemarcLogoDataUrl(): Promise<string | null> {
-  if (cachedLogoDataUrl) return cachedLogoDataUrl;
-  try {
-    const res = await fetch(LEMARC_LOGO_URL);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-    cachedLogoDataUrl = dataUrl;
-    return dataUrl;
-  } catch {
-    return null;
-  }
 }
 
 export async function downloadManagerialReportPdf(input: ManagerialReportHtmlInput) {
