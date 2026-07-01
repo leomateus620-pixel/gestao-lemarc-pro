@@ -5,10 +5,8 @@ import { toast } from "sonner";
 import {
   ChevronDown,
   ExternalLink,
-  FileText,
   FileDown,
   Loader2,
-  Printer,
   Receipt,
   type LucideIcon,
 } from "lucide-react";
@@ -216,12 +214,6 @@ export function ServiceOrderIslandRow({
                 </ActionLink>
               )}
               {isClosedOrder && <OrderPdfActionButton order={order} />}
-              <ActionLink to="/ordens/$id/imprimir" params={{ id: order.id }} icon={Printer}>
-                Imprimir PDF
-              </ActionLink>
-              <ActionLink to="/ordens/$id/imprimir" params={{ id: order.id }} icon={FileText}>
-                Gerar relatório
-              </ActionLink>
             </div>
           </div>
         </div>
