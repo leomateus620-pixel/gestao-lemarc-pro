@@ -96,6 +96,7 @@ export function ServiceOrderIslandRow({
   const serviceType = getServiceType(order);
   const billingStatus = getBillingStatus(order, financials);
   const actionLabel = nextAction[order.status];
+  const isClosedOrder = order.status === "finished" || order.status === "approved";
 
   return (
     <article
@@ -121,7 +122,11 @@ export function ServiceOrderIslandRow({
             <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
               <span className="truncate text-[12px] font-bold text-slate-200">{unitName}</span>
               <StatusPill status={order.status} compact />
-              <PriorityPill priority={order.priority} compact />
+              {isClosedOrder ? (
+                <OrderPdfButton order={order} compact />
+              ) : (
+                <PriorityPill priority={order.priority} compact />
+              )}
             </span>
             <span className="mt-1 block truncate text-[12px] font-bold tabular-nums text-slate-300">
               {technicianLabel} · {timeSummary.short}
@@ -153,7 +158,11 @@ export function ServiceOrderIslandRow({
             </span>
           </span>
           <StatusPill status={order.status} />
-          <PriorityPill priority={order.priority} />
+          {isClosedOrder ? (
+            <OrderPdfButton order={order} />
+          ) : (
+            <PriorityPill priority={order.priority} />
+          )}
           <DesktopMetric label="Técnicos" value={technicianLabel} title={technicianTitle} />
           <DesktopMetric label="Tempo" value={timeSummary.short} />
           <DesktopMetric label={valueSummary.kind} value={valueSummary.short} />
