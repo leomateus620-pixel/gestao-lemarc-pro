@@ -440,7 +440,11 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
     const lines = split(text, width - 6);
     const height = Math.max(8, lines.length * 3.3 + 4.5);
     doc.setDrawColor(...(tone === "warn" ? LEMARC_COLORS.orangeSoft : LEMARC_COLORS.border));
-    doc.setFillColor(...(tone === "warn" ? ([255, 247, 237] as const) : LEMARC_COLORS.bgSoft));
+    doc.setFillColor(
+      ...(tone === "warn"
+        ? ([255, 247, 237] as [number, number, number])
+        : LEMARC_COLORS.bgSoft),
+    );
     doc.roundedRect(marginX, y, width, height, 1.4, 1.4, "FD");
     txt(lines.join("\n"), marginX + 3, y + 4.6, {
       size: 7.3,
