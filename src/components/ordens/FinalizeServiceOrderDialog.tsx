@@ -458,6 +458,13 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   Informe o valor da hora de todos os técnicos antes de finalizar.
                 </p>
               )}
+              {computed.some((e) => !e.error && e.duration_minutes === 0) && (
+                <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+                  Ajuste entrada e saída de cada apontamento — não é possível
+                  finalizar com duração zero. Registre apenas as horas realmente
+                  trabalhadas.
+                </p>
+              )}
             </div>
           )}
 
