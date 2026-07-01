@@ -220,6 +220,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const addEntry = (technicianId?: string) => {
     const tech = techs.find((t) => t.id === technicianId) ?? techs[0];
     if (!tech) return;
+    const nowTime = timeFromIso(new Date().toISOString());
     setEntries((prev) => [
       ...prev,
       {
@@ -227,8 +228,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         technician_id: tech.id,
         role: tech.assignment_role ?? null,
         work_date: todayISO(),
-        start_time: "08:00",
-        end_time: "17:00",
+        start_time: nowTime,
+        end_time: nowTime,
         hourly_rate_cents: tech.hourly_rate_cents ?? 0,
         rate_input:
           tech.hourly_rate_cents != null
