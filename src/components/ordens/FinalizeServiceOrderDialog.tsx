@@ -26,6 +26,8 @@ import {
 } from "@/lib/serviceOrders/finance";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
+import { listTimeSessions } from "@/lib/api/timeSessions.functions";
+import { computeClosedWorkedMinutesByTech } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
@@ -83,11 +85,23 @@ function dateFromIso(iso: string | null | undefined): string {
   }).format(d);
 }
 
+function addMinutesToHm(hm: string, minutes: number): string {
+  const [h, m] = hm.split(":").map(Number);
+  const total = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0) + Math.max(0, minutes);
+  const capped = Math.min(23 * 60 + 59, total);
+  const hh = Math.floor(capped / 60)
+    .toString()
+    .padStart(2, "0");
+  const mm = (capped % 60).toString().padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props) {
   const techs = useMemo(() => getOrderTechnicians(order), [order]);
   const queryClient = useQueryClient();
   const fetcher = useServerFn(getOrderFinancials);
   const finalizeFn = useServerFn(finalizeServiceOrder);
+  const sessionsFn = useServerFn(listTimeSessions);
   const hasSignature = Boolean(order.signature);
   const hasWaiver = Boolean(order.signature_waiver_reason);
   const signatureOk = hasSignature || hasWaiver;
@@ -96,6 +110,13 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const { data: existing } = useQuery({
     queryKey: ["order-financials", order.id],
     queryFn: () => fetcher({ data: { orderId: order.id } }),
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const { data: sessions = [] } = useQuery({
+    queryKey: ["order-time-sessions", order.id],
+    queryFn: () => sessionsFn({ data: { orderId: order.id } }),
     enabled: open,
     staleTime: 0,
   });
@@ -145,21 +166,30 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         })),
       );
     } else {
+      // Prefer prefill from real time sessions (líquido, sem contar pausa).
+      const workedByTech = computeClosedWorkedMinutesByTech(sessions);
       setEntries(
-        techs.map((t) => ({
-          uid: uid(),
-          technician_id: t.id,
-          role: t.assignment_role ?? null,
-          work_date: fallbackDate,
-          start_time: fallbackStart,
-          end_time: fallbackEnd,
-          hourly_rate_cents: t.hourly_rate_cents ?? 0,
-          rate_input:
-            t.hourly_rate_cents != null
-              ? (t.hourly_rate_cents / 100).toFixed(2).replace(".", ",")
-              : "",
-          description: null,
-        })),
+        techs.map((t) => {
+          const minutes = workedByTech[t.id] ?? 0;
+          const start = fallbackStart;
+          const end =
+            minutes > 0 ? addMinutesToHm(start, minutes) : fallbackEnd;
+          return {
+            uid: uid(),
+            technician_id: t.id,
+            role: t.assignment_role ?? null,
+            work_date: fallbackDate,
+            start_time: start,
+            end_time: end,
+            hourly_rate_cents: t.hourly_rate_cents ?? 0,
+            rate_input:
+              t.hourly_rate_cents != null
+                ? (t.hourly_rate_cents / 100).toFixed(2).replace(".", ",")
+                : "",
+            description:
+              minutes > 0 ? "Calculado automaticamente pelo controle de tempo" : null,
+          };
+        }),
       );
     }
 
@@ -181,7 +211,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       setGeneralNotes(f.notes ?? "");
     }
     setStep(0);
-  }, [open, existing, order, techs]);
+  }, [open, existing, order, techs, sessions]);
 
   // Compute per-entry duration/subtotal preview.
   const computed = entries.map((e) => {
