@@ -1,5 +1,13 @@
 import type { AssignedTechnician } from "@/types/serviceOrder";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue | undefined }
+  | JsonValue[];
+
 export type TimeSessionKind = "work" | "displacement";
 export type TimeSessionEndReason = "pause" | "finish" | "manual" | "resume_correction";
 export type TimeSessionSource = "mobile" | "desktop" | "admin_adjustment";
@@ -17,7 +25,7 @@ export type TimeSession = {
   end_reason: TimeSessionEndReason | null;
   source: TimeSessionSource;
   notes: string | null;
-  metadata: unknown;
+  metadata: JsonValue | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Supabase generated types don't include the new time_sessions table yet. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
+import type { TimeSession, JsonValue } from "@/lib/serviceOrders/timeSessions";
 
 const SELECT = `
   id, service_order_id, technician_id, kind, started_at, ended_at,
@@ -23,7 +23,7 @@ function normalize(row: any): TimeSession {
     end_reason: row.end_reason ?? null,
     source: row.source ?? "mobile",
     notes: row.notes ?? null,
-    metadata: row.metadata ?? null,
+    metadata: (row.metadata ?? null) as JsonValue | null,
     created_by: row.created_by ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
