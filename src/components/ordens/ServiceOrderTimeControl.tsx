@@ -53,7 +53,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   // Live tick to keep chronometer moving.
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    const anyOpen = sessions.some((s) => s.kind === "work" && !s.ended_at);
+    const anyOpen = sessions.some((s: TimeSession) => s.kind === "work" && !s.ended_at);
     if (!anyOpen) return;
     const t = window.setInterval(() => setTick((n) => n + 1), 30_000);
     return () => window.clearInterval(t);

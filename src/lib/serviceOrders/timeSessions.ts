@@ -17,7 +17,7 @@ export type TimeSession = {
   end_reason: TimeSessionEndReason | null;
   source: TimeSessionSource;
   notes: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: unknown;
   created_by: string | null;
   created_at: string;
   updated_at: string;
