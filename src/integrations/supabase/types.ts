@@ -518,6 +518,78 @@ export type Database = {
           },
         ]
       }
+      service_order_time_sessions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          duration_minutes: number | null
+          end_reason: string | null
+          ended_at: string | null
+          id: string
+          kind: string
+          metadata: Json | null
+          notes: string | null
+          pause_notes: string | null
+          pause_reason: string | null
+          service_order_id: string
+          source: string
+          started_at: string
+          technician_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          end_reason?: string | null
+          ended_at?: string | null
+          id?: string
+          kind: string
+          metadata?: Json | null
+          notes?: string | null
+          pause_notes?: string | null
+          pause_reason?: string | null
+          service_order_id: string
+          source?: string
+          started_at?: string
+          technician_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          end_reason?: string | null
+          ended_at?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json | null
+          notes?: string | null
+          pause_notes?: string | null
+          pause_reason?: string | null
+          service_order_id?: string
+          source?: string
+          started_at?: string
+          technician_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_time_sessions_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_time_sessions_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_orders: {
         Row: {
           approved_at: string | null
