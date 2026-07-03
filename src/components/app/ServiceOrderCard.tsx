@@ -1,4 +1,10 @@
-import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -40,10 +46,7 @@ import {
   type ServiceOrderStatus,
   type ServicePriority,
 } from "@/types/serviceOrder";
-import {
-  formatTechnicianList,
-  getOrderTechnicians,
-} from "@/lib/serviceOrders/technicians";
+import { formatTechnicianList, getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 
 type CardAccent = "orange" | "blue" | "amber" | "green" | "red" | "steel";
 
@@ -86,7 +89,13 @@ function cardAccent(order: ServiceOrder): CardAccent {
   return "steel";
 }
 
-export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
+export function ServiceOrderCard({
+  order,
+  children,
+}: {
+  order: ServiceOrder;
+  children?: ReactNode;
+}) {
   const accent = accentConfig[cardAccent(order)];
   const navigate = useNavigate();
   const physics = usePhysicsCard<HTMLDivElement>({
@@ -262,6 +271,8 @@ export function ServiceOrderCard({ order }: { order: ServiceOrder }) {
               </SummaryChip>
             )}
           </div>
+
+          {children}
         </div>
       </div>
     </div>
@@ -386,7 +397,7 @@ function MetaCell({
         )}
       />
       <span
-      className={cn(
+        className={cn(
           "truncate text-[0.8rem] font-semibold text-foreground/90",
           pending && "font-medium text-muted-foreground/70 italic",
         )}
