@@ -2,6 +2,7 @@ import { Suspense, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
@@ -14,6 +15,7 @@ import { updateCompany } from "@/lib/api/clients.functions";
 import { maskCNPJ, onlyDigits, isValidCNPJ } from "@/lib/cnpj";
 import { cn } from "@/lib/utils";
 import type { ClientFull } from "@/types/client";
+import { ClientUnitsEditor } from "@/components/clientes/ClientUnitsEditor";
 
 export const Route = createFileRoute("/_app/clientes/$id/editar")({
   head: () => ({ meta: [{ title: "Editar cliente — Gestão Lemarc" }] }),
@@ -40,6 +42,7 @@ function Edit() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const c = data?.client as ClientFull;
+  const units = data?.units ?? [];
 
   const [draft, setDraft] = useState({
     name: c.name,
@@ -83,9 +86,13 @@ function Edit() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client", id] });
+      qc.invalidateQueries({ queryKey: ["client-page", id] });
       qc.invalidateQueries({ queryKey: ["clients"] });
+      toast.success("Cliente atualizado");
       navigate({ to: "/clientes/$id", params: { id } });
     },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar cliente"),
   });
 
   return (
@@ -182,6 +189,8 @@ function Edit() {
           />
         </label>
       </GlassCard>
+
+      <ClientUnitsEditor clientId={id} units={units} />
 
       {mut.isError && (
         <p className="text-sm text-rose-300">{(mut.error as Error).message}</p>
