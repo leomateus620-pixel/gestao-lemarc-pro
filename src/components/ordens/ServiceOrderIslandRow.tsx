@@ -3,11 +3,18 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
+  Building2,
   ChevronDown,
+  Clock3,
   ExternalLink,
   FileDown,
+  HardHat,
   Loader2,
+  MapPin,
   Receipt,
+  UserRound,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,7 +25,7 @@ import {
   getOrderTechnicians,
   getServiceOrderWorkedMinutes,
 } from "@/lib/serviceOrders/technicians";
-import { displacementTypeLabel, type OrderFinancials } from "@/types/financials";
+import type { OrderFinancials } from "@/types/financials";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
@@ -84,7 +91,6 @@ export function ServiceOrderIslandRow({
   const timeSummary = getTimeSummary(order, financials);
   const valueSummary = getValueSummary(order, financials);
   const openedAt = formatServiceOrderDateTime(getOpenedAt(order)) ?? "Não informado";
-  const scheduledFor = formatServiceOrderDateTime(order.scheduled_for) ?? "Não informado";
   const startedAt =
     formatServiceOrderDateTime(order.started_at) ??
     (order.status === "running" ? "Em andamento" : "Não informado");
@@ -176,45 +182,57 @@ export function ServiceOrderIslandRow({
       >
         <div className="min-h-0 overflow-hidden">
           <div className="lemarc-order-expanded-ruler mt-4 border-t border-white/[0.08] pt-4">
-            <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <Detail label="Cliente completo" value={clientName} strong />
-              <Detail label="Unidade" value={unitName} strong />
-              <Detail label="Local" value={localName} />
-              <Detail label="Solicitante" value={clean(order.requester_name) ?? "Não informado"} />
-              <Detail
-                label="Descrição inicial"
-                value={clean(order.description) ?? "Não informado"}
-                wide
-              />
-              <Detail label="Tipo de serviço" value={serviceType} />
-              <Detail
-                label="Prioridade"
-                value={order.priority ? priorityLabel[order.priority] : "Não informado"}
-              />
-              <Detail label="Status" value={statusLabel[order.status]} />
-              <Detail label="Técnicos envolvidos" value={technicianTitle} wide />
-              <Detail label="Abertura" value={openedAt} />
-              <Detail label="Previsão de início" value={scheduledFor} />
-              <Detail label="Início do serviço" value={startedAt} />
-              <Detail label="Finalização" value={closedAt} />
-              <Detail label="Tempo total" value={timeSummary.full} />
-              <Detail label="Valor de mão de obra" value={valueSummary.labor} />
-              <Detail label="Deslocamento" value={getDisplacementSummary(financials)} />
-              <Detail label="Total geral" value={valueSummary.full} strong />
-              <Detail label="Status de cobrança" value={billingStatus} strong />
-            </dl>
+            <OrderExpandedSummary
+              number={order.number}
+              title={title}
+              serviceType={serviceType}
+              clientName={clientName}
+              unitName={unitName}
+              status={order.status}
+              priority={order.priority}
+            />
 
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lemarc-smart-scroll">
-              <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ExternalLink} primary>
-                Abrir OS
-              </ActionLink>
-              {actionLabel && (
-                <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={Receipt}>
-                  {actionLabel}
-                </ActionLink>
-              )}
-              {isClosedOrder && <OrderPdfActionButton order={order} />}
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1.05fr_1fr_0.95fr]">
+              <OrderExpandedSection icon={Building2} title="Identificação">
+                <OrderExpandedRow label="Cliente" value={clientName} strong />
+                <OrderExpandedRow label="Unidade" value={unitName} />
+                <OrderExpandedRow label="Local" value={localName} icon={MapPin} />
+                <OrderExpandedRow
+                  label="Solicitante"
+                  value={clean(order.requester_name) ?? "Não informado"}
+                  icon={UserRound}
+                />
+              </OrderExpandedSection>
+
+              <OrderExpandedSection icon={Wrench} title="Operação">
+                <OrderExpandedRow label="Chamado inicial" value={title} strong />
+                <OrderExpandedRow
+                  label="Status"
+                  value={statusLabel[order.status]}
+                  icon={BadgeCheck}
+                />
+                <OrderExpandedRow
+                  label="Prioridade"
+                  value={order.priority ? priorityLabel[order.priority] : "Não informada"}
+                />
+                <OrderExpandedRow label="Tipo de serviço" value={serviceType} />
+                <OrderExpandedRow
+                  label="Técnicos"
+                  value={<span title={technicianTitle}>{technicianTitle}</span>}
+                  icon={HardHat}
+                />
+              </OrderExpandedSection>
+
+              <OrderExpandedSection icon={Clock3} title="Tempo e cobrança">
+                <OrderExpandedRow label="Abertura" value={openedAt} tabular />
+                <OrderExpandedRow label="Início" value={startedAt} tabular />
+                <OrderExpandedRow label="Tempo" value={timeSummary.full} strong tabular />
+                <OrderExpandedRow label="Finalização" value={closedAt} tabular />
+                <OrderExpandedRow label="Cobrança" value={billingStatus} strong />
+              </OrderExpandedSection>
             </div>
+
+            <OrderActionBar order={order} actionLabel={actionLabel} isClosedOrder={isClosedOrder} />
           </div>
         </div>
       </div>
@@ -309,33 +327,125 @@ function DesktopMetric({ label, value, title }: { label: string; value: string; 
   );
 }
 
-function Detail({
+function OrderExpandedSummary({
+  number,
+  title,
+  serviceType,
+  clientName,
+  unitName,
+  status,
+  priority,
+}: {
+  number: number;
+  title: string;
+  serviceType: string;
+  clientName: string;
+  unitName: string;
+  status: ServiceOrderStatus;
+  priority: ServicePriority | null;
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-white/[0.09] bg-[linear-gradient(135deg,oklch(1_0_0/0.075),oklch(1_0_0/0.025))] px-3 py-3 shadow-[inset_0_1px_0_oklch(1_0_0/0.11),0_16px_36px_-30px_oklch(0_0_0/0.88)] sm:px-4">
+      <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="truncate font-mono text-[11px] font-black text-primary tabular-nums">
+            OS #{number} · {serviceType}
+          </p>
+          <h4 className="mt-1 truncate font-display text-[15px] font-black leading-tight text-white sm:text-[17px]">
+            {title}
+          </h4>
+          <p className="mt-1 truncate text-[12px] font-semibold text-slate-300">
+            Cliente: {clientName} · Unidade: {unitName}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+          <StatusPill status={status} compact />
+          <PriorityPill priority={priority} compact />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderExpandedSection({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 rounded-[1.15rem] border border-white/[0.075] bg-white/[0.032] p-3 shadow-[inset_0_1px_0_oklch(1_0_0/0.075)]">
+      <div className="flex items-center gap-2">
+        <span className="grid size-8 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/12 text-primary shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]">
+          <Icon size={15} />
+        </span>
+        <h4 className="font-display text-[12px] font-black uppercase tracking-[0.08em] text-white">
+          {title}
+        </h4>
+      </div>
+      <dl className="mt-2 divide-y divide-white/[0.055]">{children}</dl>
+    </section>
+  );
+}
+
+function OrderExpandedRow({
   label,
   value,
+  icon: Icon,
   strong = false,
-  wide = false,
+  tabular = false,
 }: {
   label: string;
   value: ReactNode;
+  icon?: LucideIcon;
   strong?: boolean;
-  wide?: boolean;
+  tabular?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "min-w-0 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5",
-        wide && "sm:col-span-2",
-      )}
-    >
-      <dt className="lemarc-technical-label">{label}</dt>
+    <div className="grid min-w-0 gap-1 py-2 first:pt-0 last:pb-0 sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:items-start sm:gap-3">
+      <dt className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold leading-snug text-slate-400">
+        {Icon && <Icon size={12} className="shrink-0 text-primary/80" />}
+        <span className="truncate">{label}</span>
+      </dt>
       <dd
         className={cn(
-          "mt-1 min-w-0 break-words text-[13px] font-semibold leading-snug text-slate-200",
+          "min-w-0 break-words text-[13px] font-semibold leading-snug text-slate-200",
           strong && "font-display font-black text-white",
+          tabular && "tabular-nums",
         )}
       >
         {value}
       </dd>
+    </div>
+  );
+}
+
+function OrderActionBar({
+  order,
+  actionLabel,
+  isClosedOrder,
+}: {
+  order: ServiceOrder;
+  actionLabel?: string;
+  isClosedOrder: boolean;
+}) {
+  return (
+    <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="lemarc-technical-label text-slate-300">Ações da OS</p>
+      <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+        <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ExternalLink} primary>
+          Abrir OS
+        </ActionLink>
+        {actionLabel && (
+          <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={Receipt}>
+            {actionLabel}
+          </ActionLink>
+        )}
+        {isClosedOrder && <OrderPdfActionButton order={order} />}
+      </div>
     </div>
   );
 }
@@ -358,7 +468,7 @@ function ActionLink({
       to={to as never}
       params={params as never}
       className={cn(
-        "lemarc-pressable inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.12em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+        "lemarc-pressable inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.1em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto",
         primary
           ? "lemarc-primary-action text-[color:var(--primary-foreground)]"
           : "border-white/[0.12] bg-white/[0.055] text-slate-200 hover:border-primary/40 hover:bg-primary/12",
@@ -460,13 +570,6 @@ function getValueSummary(order: ServiceOrder, financials: OrderFinancials | null
   };
 }
 
-function getDisplacementSummary(financials: OrderFinancials | null) {
-  if (!financials) return "Sem apuração";
-  if (financials.displacement_total_cents <= 0) return "Sem deslocamento";
-  const type = displacementTypeLabel[financials.displacement_type];
-  return `${formatBRL(financials.displacement_total_cents)} · ${type}`;
-}
-
 function getBillingStatus(order: ServiceOrder, financials: OrderFinancials | null) {
   if (order.status === "approved") return "Aprovada para cobrança";
   if (order.status === "cancelled") return "Cancelada";
@@ -550,9 +653,9 @@ function OrderPdfActionButton({ order }: { order: ServiceOrder }) {
       }}
       disabled={loading}
       className={cn(
-        "lemarc-pressable inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-black uppercase tracking-[0.1em]",
-        "border-status-done/70 bg-status-done text-white shadow-[0_10px_28px_-14px_rgba(16,185,129,0.9)]",
-        "hover:brightness-110 hover:shadow-[0_14px_32px_-14px_rgba(16,185,129,1)]",
+        "lemarc-pressable inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.1em] sm:w-auto",
+        "border-status-done/55 bg-status-done/14 text-emerald-100 shadow-[inset_0_1px_0_oklch(1_0_0/0.12),0_10px_24px_-20px_rgba(16,185,129,0.72)]",
+        "hover:border-status-done/75 hover:bg-status-done/22",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-wait disabled:opacity-70",
       )}
