@@ -1,54 +1,24 @@
-## Problema identificado
+## Diagnóstico
 
-A rota `/_app/clientes/$id/editar` já existe e edita os campos da empresa (nome, CNPJ, segmento, endereço, cidade/UF, telefone, e-mail, responsável, observações, ativo). Mas ela **não permite gerenciar as unidades/filiais** (adicionar, editar, remover, marcar principal, editar CNPJ da filial, distância, taxa de deslocamento etc.). Como o usuário vê o cliente com "0 UNIDADES" e sem CNPJ preenchido, ao clicar em "Editar" ele espera um menu completo para preencher tudo isso — inclusive as filiais — e hoje não encontra essa área.
+Ao clicar em "Editar" na tela do cliente, a URL muda para `/clientes/{id}/editar` e o título da aba vira "Editar cliente" — ou seja, a rota carrega. Mas o conteúdo que aparece continua sendo o **detalhe** do cliente, sem nenhum campo editável.
 
-Além disso, mensagens de erro da mutação hoje aparecem só como texto pequeno; sem toast, dá sensação de que "nada acontece".
+Causa raiz: no roteador (TanStack Router), quando existe o arquivo `_app.clientes.$id.editar.tsx`, o arquivo pai `_app.clientes.$id.tsx` deixa de ser apenas uma página e passa a atuar como **layout pai** de `/editar`. Para o filho aparecer, o pai precisaria renderizar um `<Outlet />` — mas ele renderiza direto o componente `<Detail />` (a tela de detalhe). Resultado: a rota `/editar` casa, executa `head()` (por isso o título muda), mas o componente da tela de edição nunca é montado.
 
-## O que será feito
+## Correção
 
-Transformar a tela de edição de cliente em um menu completo com duas seções, sem quebrar nenhum fluxo existente:
+Transformar `/clientes/$id` em uma rota folha "irmã" de `/clientes/$id/editar`, eliminando a hierarquia pai/filho indevida:
 
-### 1. Dados da empresa (já existe — melhorar)
-- Manter todos os campos atuais.
-- Adicionar toasts de sucesso/erro no salvar (via `sonner`, já usado no projeto).
-- Manter validação de CNPJ e nome mínimo.
+1. Renomear `src/routes/_app.clientes.$id.tsx` → `src/routes/_app.clientes.$id.index.tsx`.
+2. Ajustar dentro do arquivo o `createFileRoute("/_app/clientes/$id")` para `createFileRoute("/_app/clientes/$id/")` (formato de rota index exigido pelo TanStack).
+3. Nenhuma outra mudança: os `<Link to="/clientes/$id">` e `<Link to="/clientes/$id/editar">` existentes continuam funcionando sem edição, pois o path público não muda.
 
-### 2. Unidades / Filiais (novo bloco na mesma página)
-Nova seção "Unidades" logo abaixo da empresa, com UI no mesmo padrão glass/dark do restante:
+## Validação
 
-- Lista das unidades existentes, cada uma como card expansível com os campos:
-  - Nome, marcar como principal (estrela)
-  - CNPJ da filial (com máscara + validação)
-  - Setor, cidade, UF, endereço
-  - Responsável, telefone
-  - Distância (km) da base
-  - Tipo de deslocamento (km / fixo / nenhum) + valor (centavos → input em reais)
-  - Observações de faturamento e observações gerais
-  - Toggle ativo/inativo
-  - Botão "Salvar unidade" (usa `updateClientUnit`)
-  - Botão "Excluir unidade" com confirmação (usa `deleteClientUnit`)
-- Botão "+ Adicionar unidade" que abre um formulário inline com os mesmos campos e salva via `createClientUnit`.
-- Ao marcar uma unidade como principal, desmarcar as outras (chamada extra `updateClientUnit` nas afetadas).
-- Toasts de sucesso/erro em cada ação; invalidar `["client", id]`, `["client-page", id]`, `["clients", ...]` e `["client-units", "all"]` após cada mutação para refletir na tela de detalhes/listagens.
+- Abrir um cliente → tela de detalhe continua idêntica.
+- Clicar em "Editar" → agora carrega a tela de edição com todos os campos (nome, CNPJ, segmento, cidade/UF, endereço, telefone, e-mail, responsável, observações, ativo) e a seção "Unidades" com CRUD.
+- Salvar alterações → toast de sucesso, cache invalidado, volta para o detalhe atualizado.
+- Verificar no preview que a URL `/clientes/{id}/editar` renderiza o formulário e não mais o detalhe.
 
-### 3. Navegação e integrações (sem quebrar nada)
-- O botão "Editar" no card de cliente (`ClientIslandRow`) e o botão "Editar" na página de detalhes (`_app.clientes.$id.tsx`) continuam apontando para a mesma rota `/clientes/$id/editar`.
-- `AppShell` continua com `back` e `fullscreenForm` — nada muda no shell/menu.
-- Wizard de novo cliente permanece inalterado.
-- Server functions `createClientUnit`, `updateClientUnit`, `deleteClientUnit` já existem e já validam CNPJ único por cliente — reutilizar como está.
+## Escopo
 
-## Arquivos afetados
-
-- **Editar** `src/routes/_app.clientes.$id.editar.tsx`
-  - Passar `units` do `useClientDetailQuery` para o novo bloco.
-  - Adicionar toasts no salvar da empresa.
-- **Criar** `src/components/clientes/ClientUnitsEditor.tsx`
-  - Componente que recebe `clientId` + `units` e renderiza a lista + form de nova unidade, encapsulando as mutações `createClientUnit`, `updateClientUnit`, `deleteClientUnit`.
-- Nenhum outro arquivo é modificado. Nenhuma migração de banco é necessária (tabela `client_units` e políticas já existem).
-
-## Resultado esperado
-
-Ao clicar em "Editar" em qualquer cliente (lista ou detalhes), o usuário abre uma única tela onde consegue:
-1. Alterar todos os dados da empresa (incluindo CNPJ).
-2. Ver, editar, adicionar, remover e marcar como principal qualquer unidade/filial, com todos os campos operacionais (distância, taxa, tipo de deslocamento).
-3. Receber feedback visual (toast) de cada operação e ver as mudanças refletidas na tela de detalhes ao voltar.
+Alteração cirúrgica só em `clientes`. Não mexer nas rotas de `colaboradores` / `ordens` neste turno, mesmo que tenham estrutura parecida — o usuário pediu apenas a correção do fluxo de editar cliente.

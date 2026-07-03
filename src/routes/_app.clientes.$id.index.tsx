@@ -94,7 +94,7 @@ const orderToneStyles: Record<
   },
 };
 
-export const Route = createFileRoute("/_app/clientes/$id")({
+export const Route = createFileRoute("/_app/clientes/$id/")({
   head: ({ params }) => ({
     meta: [{ title: `Cliente — Gestão Lemarc` }],
     title: params.id,
