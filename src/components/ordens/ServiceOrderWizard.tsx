@@ -456,7 +456,7 @@ function ClientStep({
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-  clients: { id: string; name: string; unit: string | null }[];
+  clients: { id: string; name: string; unit: string | null; cnpj: string | null }[];
   units: {
     id: string;
     client_id: string;
@@ -480,9 +480,16 @@ function ClientStep({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || (c.unit ?? "").toLowerCase().includes(q),
-    );
+    const qDigits = onlyDigits(q);
+    return clients.filter((c) => {
+      if (c.name.toLowerCase().includes(q)) return true;
+      if ((c.unit ?? "").toLowerCase().includes(q)) return true;
+      if (c.cnpj) {
+        if (qDigits && c.cnpj.includes(qDigits)) return true;
+        if (maskCNPJ(c.cnpj).toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
   }, [clients, query]);
 
   const selectedUnits = useMemo(
