@@ -274,7 +274,6 @@ function UnitRow({
   const saveMut = useMutation({
     mutationFn: async (d: UnitDraft) => {
       const patch = draftToInput(d);
-      patch.active = d.active as unknown as boolean;
       const updated = await updateFn({
         data: {
           id: unit.id,
