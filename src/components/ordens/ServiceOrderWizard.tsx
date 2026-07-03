@@ -28,7 +28,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
-import { maskCNPJ } from "@/lib/cnpj";
+import { maskCNPJ, onlyDigits } from "@/lib/cnpj";
 import {
   createClient as createClientFn,
   createServiceOrder,
