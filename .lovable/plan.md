@@ -1,24 +1,19 @@
-## Diagnóstico
+## Ajuste
 
-Ao clicar em "Editar" na tela do cliente, a URL muda para `/clientes/{id}/editar` e o título da aba vira "Editar cliente" — ou seja, a rota carrega. Mas o conteúdo que aparece continua sendo o **detalhe** do cliente, sem nenhum campo editável.
+Na Etapa 2 do wizard de nova OS (`ClientStep` em `src/components/ordens/ServiceOrderWizard.tsx`), cada cartão de cliente hoje mostra apenas nome + unidade. Vou incluir o CNPJ.
 
-Causa raiz: no roteador (TanStack Router), quando existe o arquivo `_app.clientes.$id.editar.tsx`, o arquivo pai `_app.clientes.$id.tsx` deixa de ser apenas uma página e passa a atuar como **layout pai** de `/editar`. Para o filho aparecer, o pai precisaria renderizar um `<Outlet />` — mas ele renderiza direto o componente `<Detail />` (a tela de detalhe). Resultado: a rota `/editar` casa, executa `head()` (por isso o título muda), mas o componente da tela de edição nunca é montado.
+## Mudanças
 
-## Correção
+Arquivo: `src/components/ordens/ServiceOrderWizard.tsx`
 
-Transformar `/clientes/$id` em uma rota folha "irmã" de `/clientes/$id/editar`, eliminando a hierarquia pai/filho indevida:
+1. Ampliar o tipo da prop `clients` em `ClientStep` e `ReviewStep` para incluir `cnpj: string | null` (o hook `useClientsFullQuery` já retorna esse campo, então não precisa tocar em API).
+2. No cartão de cliente (dentro do `filtered.map`), abaixo do nome/unidade, renderizar uma linha `CNPJ 00.000.000/0000-00` usando `maskCNPJ(c.cnpj)` — só quando existir. Estilo discreto (mono, `text-slate-400`, `text-[10px]`), consistente com a linha de CNPJ já usada nos cards de unidade logo abaixo.
+3. Incluir o CNPJ (mascarado e apenas dígitos) no filtro de busca, para permitir buscar cliente também por CNPJ.
 
-1. Renomear `src/routes/_app.clientes.$id.tsx` → `src/routes/_app.clientes.$id.index.tsx`.
-2. Ajustar dentro do arquivo o `createFileRoute("/_app/clientes/$id")` para `createFileRoute("/_app/clientes/$id/")` (formato de rota index exigido pelo TanStack).
-3. Nenhuma outra mudança: os `<Link to="/clientes/$id">` e `<Link to="/clientes/$id/editar">` existentes continuam funcionando sem edição, pois o path público não muda.
+Nenhuma outra tela, tipo global ou rota é alterada. Sem mudanças de backend.
 
 ## Validação
 
-- Abrir um cliente → tela de detalhe continua idêntica.
-- Clicar em "Editar" → agora carrega a tela de edição com todos os campos (nome, CNPJ, segmento, cidade/UF, endereço, telefone, e-mail, responsável, observações, ativo) e a seção "Unidades" com CRUD.
-- Salvar alterações → toast de sucesso, cache invalidado, volta para o detalhe atualizado.
-- Verificar no preview que a URL `/clientes/{id}/editar` renderiza o formulário e não mais o detalhe.
-
-## Escopo
-
-Alteração cirúrgica só em `clientes`. Não mexer nas rotas de `colaboradores` / `ordens` neste turno, mesmo que tenham estrutura parecida — o usuário pediu apenas a correção do fluxo de editar cliente.
+- Abrir `/ordens/nova` → Etapa 2 → cada cliente com CNPJ cadastrado exibe o CNPJ formatado abaixo da unidade.
+- Digitar dígitos do CNPJ na busca → cliente aparece filtrado.
+- Clientes sem CNPJ continuam funcionando (linha some).
