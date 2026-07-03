@@ -9,6 +9,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
+  ArrowRight,
   AlertTriangle,
   Building2,
   CalendarClock,
@@ -125,6 +126,7 @@ export function ServiceOrderCard({
   const elapsed = !isClosedStatus(order.status) ? formatRelativeServiceOrderTime(openedIso) : null;
   const duration = formatServiceOrderDuration(openedIso, closedIso);
   const closure = closureKind(order);
+  const hasPendingAlerts = !hasTechnician || !hasUnit || incomplete;
   const style = {
     ...physics.style,
     "--lemarc-card-accent": accent.color,
@@ -155,15 +157,15 @@ export function ServiceOrderCard({
     >
       <div
         ref={physics.ref}
-        className="lemarc-kinetic-card relative overflow-hidden rounded-[1.5rem] border border-white/[0.1] bg-[linear-gradient(155deg,oklch(0.265_0.042_252/0.94),oklch(0.135_0.036_252/0.92))] p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.12),0_18px_40px_-26px_oklch(0_0_0/0.85),0_6px_16px_-18px_var(--lemarc-card-glow)] backdrop-blur-xl transition-all duration-300 hover:border-[color-mix(in_oklab,var(--lemarc-card-accent)_38%,white_8%)] hover:shadow-[inset_0_1px_0_oklch(1_0_0/0.14),0_22px_46px_-24px_oklch(0_0_0/0.9),0_10px_22px_-16px_var(--lemarc-card-glow)] sm:p-5"
+        className="lemarc-kinetic-card relative overflow-hidden rounded-[1.5rem] border border-white/[0.12] bg-[linear-gradient(180deg,oklch(1_0_0/0.055),transparent_32%),linear-gradient(155deg,oklch(0.245_0.04_252/0.96),oklch(0.125_0.034_252/0.94))] p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.14),inset_0_-1px_0_oklch(0_0_0/0.28),0_20px_44px_-30px_oklch(0_0_0/0.9),0_6px_18px_-20px_var(--lemarc-card-glow)] backdrop-blur-xl transition-all duration-300 hover:border-[color-mix(in_oklab,var(--lemarc-card-accent)_28%,white_10%)] sm:p-5"
         data-kinetic-active={physics.active}
         style={style}
         {...physics.handlers}
       >
-        <div aria-hidden="true" className="lemarc-card-glare" />
+        <div aria-hidden="true" className="lemarc-card-glare lemarc-card-glare-subtle" />
         <div
           aria-hidden="true"
-          className="absolute bottom-5 left-0 top-5 w-[3px] rounded-r-full bg-gradient-to-b from-[var(--lemarc-card-accent)] via-[color-mix(in_oklab,var(--lemarc-card-accent)_70%,transparent)] to-transparent shadow-[0_0_18px_var(--lemarc-card-glow)]"
+          className="absolute bottom-5 left-0 top-5 w-[2px] rounded-r-full bg-gradient-to-b from-[color-mix(in_oklab,var(--lemarc-card-accent)_78%,white_10%)] via-[color-mix(in_oklab,var(--lemarc-card-accent)_44%,transparent)] to-transparent"
         />
 
         <div className="relative pl-3 sm:pl-4">
@@ -180,11 +182,7 @@ export function ServiceOrderCard({
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <ServiceOrderStatusBadge status={order.status} />
-              {isClosedOrder ? (
-                <OrderPdfButton order={order} />
-              ) : (
-                <ServiceOrderPriorityBadge priority={order.priority} />
-              )}
+              {!isClosedOrder && <ServiceOrderPriorityBadge priority={order.priority} />}
             </div>
           </div>
 
@@ -254,32 +252,59 @@ export function ServiceOrderCard({
           </div>
 
           {/* Pendências (somente quando relevantes) */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {!hasTechnician && (
-              <SummaryChip icon={AlertTriangle} tone="warn">
-                Técnico pendente
-              </SummaryChip>
-            )}
-            {!hasUnit && (
-              <SummaryChip icon={AlertTriangle} tone="warn">
-                Unidade pendente
-              </SummaryChip>
-            )}
-            {incomplete && (
-              <SummaryChip icon={AlertTriangle} tone="warn">
-                Dados pendentes{missing.length ? ` (${missing.length})` : ""}
-              </SummaryChip>
-            )}
-          </div>
+          {hasPendingAlerts && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {!hasTechnician && (
+                <SummaryChip icon={AlertTriangle} tone="warn">
+                  Técnico pendente
+                </SummaryChip>
+              )}
+              {!hasUnit && (
+                <SummaryChip icon={AlertTriangle} tone="warn">
+                  Unidade pendente
+                </SummaryChip>
+              )}
+              {incomplete && (
+                <SummaryChip icon={AlertTriangle} tone="warn">
+                  Dados pendentes{missing.length ? ` (${missing.length})` : ""}
+                </SummaryChip>
+              )}
+            </div>
+          )}
 
           {children}
+
+          <div className="mt-3.5 flex flex-col gap-2 rounded-[1rem] border border-white/[0.09] bg-white/[0.035] p-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.09)] sm:flex-row sm:items-center sm:justify-end">
+            {isClosedOrder && <OrderPdfButton order={order} className="w-full sm:w-auto" />}
+            <OpenOrderButton onOpen={openOrder} />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function OrderPdfButton({ order }: { order: ServiceOrder }) {
+function OpenOrderButton({ onOpen }: { onOpen: () => void }) {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    onOpen();
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      onKeyDown={(event) => event.stopPropagation()}
+      className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl border border-white/25 bg-[linear-gradient(180deg,oklch(1_0_0/0.24),transparent_42%),linear-gradient(135deg,oklch(0.84_0.18_62),oklch(0.69_0.2_47))] px-3.5 text-[0.72rem] font-black uppercase tracking-[0.075em] text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.34),0_14px_28px_-20px_oklch(0.72_0.19_50/0.9)] transition duration-150 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:w-auto"
+    >
+      <span>Abrir OS</span>
+      <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+    </button>
+  );
+}
+
+function OrderPdfButton({ order, className }: { order: ServiceOrder; className?: string }) {
   const [loading, setLoading] = useState(false);
   const fetchFinancials = useServerFn(getOrderFinancials);
   const { displayName } = useAuth();
@@ -315,10 +340,11 @@ function OrderPdfButton({ order }: { order: ServiceOrder }) {
       disabled={loading}
       aria-label={`Baixar PDF da OS #${order.number}`}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklab,var(--lemarc-card-accent)_45%,transparent)] bg-[color-mix(in_oklab,var(--lemarc-card-accent)_16%,transparent)] px-2.5 py-1 text-[0.6rem] font-black uppercase tracking-[0.12em] text-[var(--lemarc-card-accent)] transition-all duration-150",
-        "hover:bg-[color-mix(in_oklab,var(--lemarc-card-accent)_26%,transparent)] active:scale-[0.98]",
+        "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-white/[0.12] bg-white/[0.055] px-3 text-[0.66rem] font-black uppercase tracking-[0.08em] text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.1)] transition-all duration-150",
+        "hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--lemarc-card-accent)_26%,white_10%)] hover:bg-white/[0.075] active:translate-y-px",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lemarc-card-accent)]/60",
         "disabled:cursor-wait disabled:opacity-70",
+        className,
       )}
     >
       {loading ? (
