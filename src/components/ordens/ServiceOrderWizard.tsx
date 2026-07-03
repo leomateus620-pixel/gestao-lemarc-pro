@@ -1065,7 +1065,7 @@ function ReviewStep({
   technicians,
 }: {
   draft: Draft;
-  clients: { id: string; name: string; unit: string | null }[];
+  clients: { id: string; name: string; unit: string | null; cnpj: string | null }[];
   units: {
     id: string;
     client_id: string;
