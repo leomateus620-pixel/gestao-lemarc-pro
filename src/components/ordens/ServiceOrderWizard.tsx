@@ -28,7 +28,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
-import { maskCNPJ } from "@/lib/cnpj";
+import { maskCNPJ, onlyDigits } from "@/lib/cnpj";
 import {
   createClient as createClientFn,
   createServiceOrder,
@@ -456,7 +456,7 @@ function ClientStep({
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-  clients: { id: string; name: string; unit: string | null }[];
+  clients: { id: string; name: string; unit: string | null; cnpj: string | null }[];
   units: {
     id: string;
     client_id: string;
@@ -480,9 +480,16 @@ function ClientStep({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || (c.unit ?? "").toLowerCase().includes(q),
-    );
+    const qDigits = onlyDigits(q);
+    return clients.filter((c) => {
+      if (c.name.toLowerCase().includes(q)) return true;
+      if ((c.unit ?? "").toLowerCase().includes(q)) return true;
+      if (c.cnpj) {
+        if (qDigits && c.cnpj.includes(qDigits)) return true;
+        if (maskCNPJ(c.cnpj).toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
   }, [clients, query]);
 
   const selectedUnits = useMemo(
@@ -557,6 +564,11 @@ function ClientStep({
                     {c.unit && (
                       <div className="truncate text-[11px] font-semibold text-slate-300">
                         {c.unit}
+                      </div>
+                    )}
+                    {c.cnpj && (
+                      <div className="truncate font-mono text-[10px] font-semibold text-slate-400">
+                        CNPJ {maskCNPJ(c.cnpj)}
                       </div>
                     )}
                   </div>
@@ -1053,7 +1065,7 @@ function ReviewStep({
   technicians,
 }: {
   draft: Draft;
-  clients: { id: string; name: string; unit: string | null }[];
+  clients: { id: string; name: string; unit: string | null; cnpj: string | null }[];
   units: {
     id: string;
     client_id: string;
