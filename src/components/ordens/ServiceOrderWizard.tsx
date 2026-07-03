@@ -566,6 +566,11 @@ function ClientStep({
                         {c.unit}
                       </div>
                     )}
+                    {c.cnpj && (
+                      <div className="truncate font-mono text-[10px] font-semibold text-slate-400">
+                        CNPJ {maskCNPJ(c.cnpj)}
+                      </div>
+                    )}
                   </div>
                   {active && (
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
