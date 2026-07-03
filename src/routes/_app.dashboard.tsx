@@ -18,7 +18,10 @@ import { EmptyOperations } from "@/components/dashboard/EmptyOperations";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { OperationTodayCard } from "@/components/dashboard/OperationTodayCard";
+import { OrderTechnicianTimeCard } from "@/components/dashboard/OrderTechnicianTimeCard";
+import { useDashboardTechnicianTimeQuery } from "@/hooks/useServiceOrders";
 import { useOperationalDashboard } from "@/hooks/useOperationalDashboard";
+import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import type { ServiceOrder } from "@/types/serviceOrder";
@@ -161,7 +164,13 @@ function Dashboard() {
   const periodText = periodContextLabel(period, periodRange);
   const periodSearch = periodSearchParams(period, periodRange);
   const summaries = useMemo(() => buildCardSummaries(metrics), [metrics]);
-  const recent = orders.slice(0, 4);
+  const recent = useMemo(() => orders.slice(0, 4), [orders]);
+  const recentOrderIds = useMemo(() => recent.map((order) => order.id), [recent]);
+  const { data: technicianTimeData } = useDashboardTechnicianTimeQuery(recentOrderIds);
+  const technicianTimeByOrder = useMemo(
+    () => groupDashboardTechnicianTimeByOrder(technicianTimeData),
+    [technicianTimeData],
+  );
 
   return (
     <>
@@ -176,7 +185,9 @@ function Dashboard() {
         <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--on-app-bg)]/10 bg-white/55 p-3 shadow-[0_8px_24px_-18px_oklch(0.2_0.05_252/0.35)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-3">
           <div className="min-w-0 px-1 sm:px-0">
             <h2 className="section-title">Cards operacionais</h2>
-            <p className="mt-1 text-[11px] font-medium text-[color:var(--on-app-bg-muted)]">Resumo {periodText}.</p>
+            <p className="mt-1 text-[11px] font-medium text-[color:var(--on-app-bg-muted)]">
+              Resumo {periodText}.
+            </p>
           </div>
           <MetricPeriodFilter
             value={period}
@@ -300,7 +311,9 @@ function Dashboard() {
           </div>
           <div className="grid gap-3 xl:grid-cols-2">
             {recent.map((order) => (
-              <ServiceOrderCard key={order.id} order={order} />
+              <ServiceOrderCard key={order.id} order={order}>
+                <OrderTechnicianTimeCard order={order} data={technicianTimeByOrder[order.id]} />
+              </ServiceOrderCard>
             ))}
           </div>
         </section>

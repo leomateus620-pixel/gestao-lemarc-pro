@@ -2,11 +2,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TimeSession, JsonValue } from "@/lib/serviceOrders/timeSessions";
+import type {
+  DashboardLaborEntry,
+  DashboardTechnicianTimeDataset,
+} from "@/lib/serviceOrders/dashboardTechnicianTime";
 
 const SELECT = `
   id, service_order_id, technician_id, kind, started_at, ended_at,
   duration_minutes, pause_reason, pause_notes, end_reason, source,
   notes, metadata, created_by, created_at, updated_at
+`;
+
+const DASHBOARD_LABOR_SELECT = `
+  id, service_order_id, technician_id, duration_minutes,
+  technician:technicians(id, full_name, role)
 `;
 
 function normalize(row: any): TimeSession {
@@ -30,6 +39,32 @@ function normalize(row: any): TimeSession {
   };
 }
 
+function normalizeDashboardLabor(row: any): DashboardLaborEntry {
+  const technician = Array.isArray(row.technician) ? row.technician[0] : row.technician;
+
+  return {
+    id: row.id,
+    service_order_id: row.service_order_id,
+    technician_id: row.technician_id ?? null,
+    duration_minutes: row.duration_minutes ?? 0,
+    technician: technician
+      ? {
+          id: technician.id,
+          full_name: technician.full_name,
+          role: technician.role ?? null,
+        }
+      : null,
+  };
+}
+
+function missingTimeSessionStructure(error: any): boolean {
+  const message = String(error?.message ?? error ?? "");
+  return (
+    message.includes("service_order_time_sessions") &&
+    /does not exist|relation|schema cache|Could not find/i.test(message)
+  );
+}
+
 export const listTimeSessions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string }) => data)
@@ -42,6 +77,47 @@ export const listTimeSessions = createServerFn({ method: "GET" })
       .order("started_at", { ascending: true });
     if (error) throw new Error(error.message);
     return (rows ?? []).map(normalize);
+  });
+
+export const listDashboardTechnicianTime = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderIds?: string[] }) => {
+    const ids = Array.isArray(data?.orderIds) ? data.orderIds : [];
+    return {
+      orderIds: Array.from(
+        new Set(ids.filter((id): id is string => typeof id === "string" && id.trim().length > 0)),
+      ).slice(0, 12),
+    };
+  })
+  .handler(async ({ data, context }): Promise<DashboardTechnicianTimeDataset> => {
+    if (data.orderIds.length === 0) {
+      return { sessions: [], laborEntries: [] };
+    }
+
+    const sb = context.supabase as any;
+    const [sessions, laborEntries] = await Promise.all([
+      sb
+        .from("service_order_time_sessions")
+        .select(SELECT)
+        .in("service_order_id", data.orderIds)
+        .order("started_at", { ascending: true }),
+      sb
+        .from("service_order_labor_entries")
+        .select(DASHBOARD_LABOR_SELECT)
+        .in("service_order_id", data.orderIds)
+        .order("work_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+    ]);
+
+    if (sessions.error && !missingTimeSessionStructure(sessions.error)) {
+      throw new Error(sessions.error.message);
+    }
+    if (laborEntries.error) throw new Error(laborEntries.error.message);
+
+    return {
+      sessions: sessions.error ? [] : (sessions.data ?? []).map(normalize),
+      laborEntries: (laborEntries.data ?? []).map(normalizeDashboardLabor),
+    };
   });
 
 async function findOpenWork(sb: any, orderId: string, technicianId: string) {

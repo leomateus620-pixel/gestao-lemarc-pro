@@ -5,6 +5,7 @@ import {
   listServiceOrderFinancialSummaries,
   listTechnicianLaborHistory,
 } from "@/lib/api/financials.functions";
+import { listDashboardTechnicianTime } from "@/lib/api/timeSessions.functions";
 import type { TechnicianLite } from "@/types/serviceOrder";
 
 export function useServiceOrdersQuery() {
@@ -58,6 +59,22 @@ export function useServiceOrderFinancialSummariesQuery() {
       queryKey: ["service-order-financial-summaries"],
       queryFn: () => fetcher(),
       staleTime: 30_000,
+    }),
+  );
+}
+
+export function useDashboardTechnicianTimeQuery(orderIds: string[]) {
+  const fetcher = useServerFn(listDashboardTechnicianTime);
+  const normalizedOrderIds = Array.from(new Set(orderIds.filter(Boolean))).sort();
+
+  return useSuspenseQuery(
+    queryOptions({
+      queryKey: ["dashboard-technician-time", normalizedOrderIds],
+      queryFn: () =>
+        normalizedOrderIds.length === 0
+          ? Promise.resolve({ sessions: [], laborEntries: [] })
+          : fetcher({ data: { orderIds: normalizedOrderIds } }),
+      staleTime: 15_000,
     }),
   );
 }
