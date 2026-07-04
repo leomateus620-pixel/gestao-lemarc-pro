@@ -29,7 +29,13 @@ import {
 type StatusFilter = "todas" | "pendente" | "andamento" | "revisao" | "concluida" | "cancelada";
 type PriorityFilter = "todas" | ServicePriority;
 type SortMode =
-  "recentes" | "status" | "prioridade" | "cliente" | "previsao" | "maior-tempo" | "maior-valor";
+  | "recentes"
+  | "status"
+  | "prioridade"
+  | "cliente"
+  | "previsao"
+  | "maior-tempo"
+  | "maior-valor";
 
 const searchSchema = z.object({
   status: fallback(
@@ -167,21 +173,21 @@ function OrdensList() {
     q.trim() !== "";
 
   return (
-    <main className="mx-auto max-w-6xl space-y-4 pb-8">
-      <section className="lemarc-wizard-card p-4 sm:p-5">
+    <main className="mx-auto max-w-6xl space-y-3 pb-8">
+      <section className="lemarc-wizard-card p-3 sm:p-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:items-end">
           <div className="min-w-0">
             <p className="lemarc-technical-label">Operação Lemarc</p>
-            <h1 className="mt-0.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+            <h1 className="mt-0.5 font-display text-lg font-black leading-tight text-white sm:text-2xl">
               Ordens de Serviço
             </h1>
-            <p className="mt-1 max-w-2xl text-[13px] font-medium leading-snug text-slate-300">
+            <p className="mt-0.5 max-w-2xl text-[12px] font-medium leading-snug text-slate-300 sm:text-[13px]">
               Acompanhamento das OS abertas, em campo, finalizadas e em revisão.
             </p>
           </div>
           <Link
             to="/ordens/nova"
-            className="lemarc-primary-action lemarc-pressable inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 font-display text-[11px] font-black uppercase tracking-[0.1em]"
+            className="lemarc-primary-action lemarc-pressable inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 font-display text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:px-3.5 sm:text-[11px]"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Nova OS</span>
@@ -189,7 +195,7 @@ function OrdensList() {
           </Link>
         </div>
 
-        <div className="mt-3.5 flex gap-2 overflow-x-auto pb-1 lemarc-smart-scroll">
+        <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll">
           <Kpi label="Total" value={kpis.total} />
           <Kpi label="Abertas" value={kpis.open} />
           <Kpi label="Em campo" value={kpis.inField} />
@@ -216,20 +222,20 @@ function OrdensList() {
         </div>
       </section>
 
-      <section className="lemarc-horizontal-row flex-col gap-3 p-3 lg:flex-row lg:items-center">
+      <section className="lemarc-horizontal-row flex-col gap-2 p-2.5 lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
           <Search
             size={15}
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
           />
           <Input
             value={q}
             onChange={(event) => setSearch({ q: event.target.value })}
             placeholder="Buscar OS..."
-            className="lemarc-form-control h-11 rounded-full pl-10"
+            className="lemarc-form-control h-10 rounded-full pl-9"
           />
         </div>
-        <div className="flex w-full gap-2 overflow-x-auto pb-1 lemarc-smart-scroll lg:w-auto lg:pb-0">
+        <div className="flex w-full gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll lg:w-auto lg:pb-0">
           <MetricPeriodFilter
             value={period as Period}
             range={periodRange}
@@ -319,7 +325,7 @@ function OrdensList() {
         </section>
       )}
 
-      <section className="space-y-2.5">
+      <section className="space-y-2">
         {filtered.length === 0 ? (
           <EmptyState
             icon={Search}
@@ -533,12 +539,12 @@ function buildFilterOptions(orders: ServiceOrder[]) {
 
 function Kpi({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className="lemarc-compact-metric min-w-[8.75rem]">
+    <div className="lemarc-compact-metric min-w-[6.75rem] !px-2.5 !py-1.5 sm:min-w-[7.5rem]">
       <p className="lemarc-technical-label">{label}</p>
-      <p className="mt-1 font-display text-lg font-black text-white tabular-nums">{value}</p>
-      {hint && (
-        <p className="mt-0.5 text-[10px] font-bold text-amber-200/85 tabular-nums">{hint}</p>
-      )}
+      <p className="mt-0.5 font-display text-sm font-black text-white tabular-nums sm:text-base">
+        {value}
+      </p>
+      {hint && <p className="mt-0.5 text-[9px] font-bold text-amber-200/85 tabular-nums">{hint}</p>}
     </div>
   );
 }
@@ -556,7 +562,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="lemarc-form-control h-11 min-w-[9.5rem] rounded-full px-3 text-xs font-bold text-white"
+      className="lemarc-form-control h-10 min-w-[8.75rem] rounded-full px-3 text-[11px] font-bold text-white"
     >
       {children}
     </select>
@@ -566,14 +572,14 @@ function Select({
 function OrdensSkeleton() {
   return (
     <main className="mx-auto max-w-6xl space-y-3 pb-8">
-      <div className="relative h-40 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.045]">
+      <div className="relative h-28 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.045]">
         <div className="lemarc-shimmer absolute inset-0 opacity-25" />
       </div>
-      <div className="h-16 rounded-[1.35rem] border border-white/[0.08] bg-white/[0.045]" />
+      <div className="h-14 rounded-[1.15rem] border border-white/[0.08] bg-white/[0.045]" />
       {Array.from({ length: 5 }).map((_, index) => (
         <div
           key={index}
-          className="relative h-[4.75rem] overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.04]"
+          className="relative h-[4.15rem] overflow-hidden rounded-[1.2rem] border border-white/[0.08] bg-white/[0.04]"
         >
           <div className="lemarc-shimmer absolute inset-0 opacity-25" />
         </div>

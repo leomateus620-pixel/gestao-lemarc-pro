@@ -8,16 +8,13 @@ import {
   Building2,
   ChevronDown,
   Clock3,
-  CircleDollarSign,
   ExternalLink,
   FileDown,
   HardHat,
   Loader2,
   MapPin,
   Receipt,
-  Timer,
   UserRound,
-  UsersRound,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -119,17 +116,15 @@ export function ServiceOrderIslandRow({
   const isClosedOrder = order.status === "finished" || order.status === "approved";
   const hasValue = valueSummary.realCents > 0 || valueSummary.estimatedCents > 0;
   const hasTrackedTime = timeSummary.short !== "Sem horas";
-  const unitDetail =
-    localName !== "Não informado" && localName !== unitName
-      ? localName
-      : hasUnit
-        ? "Local não informado"
-        : "Aguardando unidade";
   const technicianDetail = technicians.length
     ? technicians.length === 1
       ? "1 técnico alocado"
       : `${technicians.length} técnicos alocados`
     : "Aguardando definição";
+  const locationSummary =
+    localName !== "Não informado" && localName !== unitName
+      ? `${unitName} · ${localName}`
+      : unitName;
   const collapsedHints = buildOperationalHints({
     hasUnit,
     hasTechnicians: technicians.length > 0,
@@ -147,64 +142,62 @@ export function ServiceOrderIslandRow({
         compact && "p-2.5",
       )}
     >
-      <div className="lemarc-order-collapsed-shell">
+      <div className="lemarc-order-collapsed-shell grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="block w-full min-w-0 rounded-[1.2rem] border border-white/[0.07] bg-black/[0.08] p-3 text-left outline-none transition-colors hover:border-white/[0.12] focus-visible:ring-2 focus-visible:ring-primary/70 sm:p-3.5"
+          className="block w-full min-w-0 rounded-[1rem] border border-white/[0.07] bg-black/[0.075] px-2.5 py-2 text-left outline-none transition-colors hover:border-white/[0.12] focus-visible:ring-2 focus-visible:ring-primary/70 sm:px-3 lg:py-2.5"
           aria-expanded={expanded}
           aria-label={`${expanded ? "Recolher" : "Expandir"} OS ${order.number}`}
         >
-          <span className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-            <span className="flex min-w-0 gap-3">
-              <OrderIdentity number={order.number} serviceType={serviceType} />
-              <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="truncate font-display text-[15px] font-black leading-tight text-white sm:text-[16px]">
-                    {clientName}
-                  </span>
-                  <span className="hidden h-1 w-1 shrink-0 rounded-full bg-white/25 sm:block" />
-                  <span className="truncate text-[11px] font-bold text-slate-300 sm:text-[12px]">
-                    {serviceType}
-                  </span>
-                </span>
-                <span className="mt-1 block min-w-0 text-[13px] font-semibold leading-snug text-slate-100 sm:text-[14px]">
-                  {title}
+          <span className="grid min-w-0 gap-1.5 lg:hidden">
+            <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <OrderIdentity number={order.number} />
+                <span className="truncate font-display text-[14px] font-black leading-tight text-white">
+                  {clientName}
                 </span>
               </span>
+              <OrderStatusCluster status={order.status} priority={order.priority} compact />
             </span>
 
-            <OrderStatusCluster status={order.status} priority={order.priority} />
+            <span className="block min-w-0 truncate text-[12px] font-bold leading-snug text-slate-100">
+              {title} · <span className="text-slate-300">{serviceType}</span>
+            </span>
+
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold leading-snug text-slate-300">
+              <InlineMeta label="Unidade" value={unitName} />
+              <InlineMeta label="Técnico" value={technicianLabel} title={technicianTitle} />
+            </span>
+
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold leading-snug text-slate-300">
+              <InlineMeta label="Tempo" value={timeSummary.short} tabular />
+              <InlineMeta label={valueSummary.kind} value={valueSummary.short} tabular />
+            </span>
           </span>
 
-          <span className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <OrderMetaGroup
-              icon={Building2}
-              label="Unidade / local"
-              value={unitName}
-              detail={unitDetail}
-            />
-            <OrderMetaGroup
-              icon={UsersRound}
-              label="Técnicos"
-              value={technicianLabel}
-              detail={technicianDetail}
-              title={technicianTitle}
-            />
-            <OrderMetaGroup
-              icon={Timer}
-              label="Tempo"
-              value={timeSummary.short}
-              detail={timeSummary.full}
-              tabular
-            />
-            <OrderMetaGroup
-              icon={CircleDollarSign}
-              label={valueSummary.kind}
-              value={valueSummary.short}
-              detail={valueSummary.full}
-              tabular
-            />
+          <span className="hidden min-w-0 items-center gap-3 lg:grid lg:grid-cols-[auto_minmax(8rem,1.05fr)_minmax(9rem,1.25fr)_auto_minmax(7rem,0.75fr)_minmax(6.5rem,0.62fr)_minmax(7rem,0.65fr)]">
+            <OrderIdentity number={order.number} />
+            <span className="min-w-0">
+              <span className="block truncate font-display text-[14px] font-black leading-tight text-white">
+                {clientName}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
+                {locationSummary}
+              </span>
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-bold leading-tight text-slate-100">
+                {title}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
+                {serviceType}
+              </span>
+            </span>
+            <OrderStatusCluster status={order.status} priority={order.priority} compact />
+            <InlineMetric label="Técnico" value={technicianLabel} title={technicianTitle} />
+            <InlineMetric label="Tempo" value={timeSummary.short} tabular />
+            <InlineMetric label={valueSummary.kind} value={valueSummary.short} tabular />
           </span>
         </button>
 
@@ -226,18 +219,8 @@ export function ServiceOrderIslandRow({
         )}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="lemarc-order-expanded-ruler mt-4 border-t border-white/[0.08] pt-4">
-            <OrderExpandedSummary
-              number={order.number}
-              title={title}
-              serviceType={serviceType}
-              clientName={clientName}
-              unitName={unitName}
-              status={order.status}
-              priority={order.priority}
-            />
-
-            <div className="mt-3 grid gap-3 lg:grid-cols-[1.05fr_1fr_0.95fr]">
+          <div className="lemarc-order-expanded-ruler mt-2.5 border-t border-white/[0.08] pt-2.5">
+            <div className="grid gap-2.5 lg:grid-cols-[1.02fr_1fr_1.05fr]">
               <OrderExpandedSection icon={Building2} title="Identificação">
                 <OrderExpandedRow label="Cliente" value={clientName} strong />
                 <OrderExpandedRow label="Unidade" value={unitName} />
@@ -250,7 +233,8 @@ export function ServiceOrderIslandRow({
               </OrderExpandedSection>
 
               <OrderExpandedSection icon={Wrench} title="Operação">
-                <OrderExpandedRow label="Chamado inicial" value={title} strong />
+                <OrderExpandedRow label="Chamado" value={title} strong />
+                <OrderExpandedRow label="Tipo" value={serviceType} />
                 <OrderExpandedRow
                   label="Status"
                   value={statusLabel[order.status]}
@@ -260,10 +244,13 @@ export function ServiceOrderIslandRow({
                   label="Prioridade"
                   value={order.priority ? priorityLabel[order.priority] : "Não informada"}
                 />
-                <OrderExpandedRow label="Tipo de serviço" value={serviceType} />
                 <OrderExpandedRow
                   label="Técnicos"
-                  value={<span title={technicianTitle}>{technicianTitle}</span>}
+                  value={
+                    <span title={technicianTitle}>
+                      {technicianTitle} · {technicianDetail}
+                    </span>
+                  }
                   icon={HardHat}
                 />
               </OrderExpandedSection>
@@ -271,8 +258,10 @@ export function ServiceOrderIslandRow({
               <OrderExpandedSection icon={Clock3} title="Tempo e cobrança">
                 <OrderExpandedRow label="Abertura" value={openedAt} tabular />
                 <OrderExpandedRow label="Início" value={startedAt} tabular />
-                <OrderExpandedRow label="Tempo" value={timeSummary.full} strong tabular />
                 <OrderExpandedRow label="Finalização" value={closedAt} tabular />
+                <OrderExpandedRow label="Tempo total" value={timeSummary.full} strong tabular />
+                <OrderExpandedRow label="Mão de obra" value={valueSummary.labor} tabular />
+                <OrderExpandedRow label="Valor total" value={valueSummary.full} strong tabular />
                 <OrderExpandedRow label="Cobrança" value={billingStatus} strong />
               </OrderExpandedSection>
             </div>
@@ -285,18 +274,10 @@ export function ServiceOrderIslandRow({
   );
 }
 
-function OrderIdentity({ number, serviceType }: { number: number; serviceType: string }) {
+function OrderIdentity({ number }: { number: number }) {
   return (
-    <span className="grid h-[3.35rem] w-[4.8rem] shrink-0 content-center rounded-2xl border border-[color:var(--order-accent-line)] bg-[color:var(--order-accent-muted)] px-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_10px_24px_-22px_var(--order-accent-shadow)]">
-      <span className="font-mono text-[10px] font-black uppercase leading-none text-slate-300">
-        OS
-      </span>
-      <span className="mt-0.5 font-mono text-[14px] font-black leading-none text-white tabular-nums">
-        #{number}
-      </span>
-      <span className="mt-1 truncate text-[9px] font-black uppercase leading-none text-[color:var(--order-accent-text)]">
-        {serviceType}
-      </span>
+    <span className="inline-flex h-7 shrink-0 items-center rounded-xl border border-[color:var(--order-accent-line)] bg-[color:var(--order-accent-muted)] px-2 font-mono text-[11px] font-black leading-none text-white tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_18px_-18px_var(--order-accent-shadow)]">
+      OS #{number}
     </span>
   );
 }
@@ -304,14 +285,16 @@ function OrderIdentity({ number, serviceType }: { number: number; serviceType: s
 function OrderStatusCluster({
   status,
   priority,
+  compact = false,
 }: {
   status: ServiceOrderStatus;
   priority: ServicePriority | null;
+  compact?: boolean;
 }) {
   return (
-    <span className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-end">
-      <StatusPill status={status} />
-      <PriorityPill priority={priority} />
+    <span className="flex min-w-0 flex-wrap items-center gap-1 lg:justify-end">
+      <StatusPill status={status} compact={compact} />
+      <PriorityPill priority={priority} compact={compact} />
     </span>
   );
 }
@@ -370,45 +353,47 @@ function PriorityPill({
   );
 }
 
-function OrderMetaGroup({
-  icon: Icon,
+function InlineMeta({
   label,
   value,
-  detail,
   title,
   tabular = false,
 }: {
-  icon: LucideIcon;
   label: string;
   value: string;
-  detail: string;
   title?: string;
   tabular?: boolean;
 }) {
   return (
-    <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-2xl border border-white/[0.075] bg-white/[0.035] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
-      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-xl border border-[color:var(--order-accent-line)] bg-[color:var(--order-accent-muted)] text-[color:var(--order-accent-text)]">
-        <Icon size={13} />
-      </span>
-      <span className="min-w-0">
-        <span className="lemarc-technical-label block">{label}</span>
-        <span
-          className={cn(
-            "mt-0.5 block truncate font-display text-[12px] font-black leading-tight text-white",
-            tabular && "tabular-nums",
-          )}
-          title={title ?? value}
-        >
-          {value}
-        </span>
-        <span
-          className={cn(
-            "mt-0.5 block truncate text-[11px] font-semibold leading-tight text-slate-300",
-            tabular && "tabular-nums",
-          )}
-        >
-          {detail}
-        </span>
+    <span className={cn("min-w-0 truncate", tabular && "tabular-nums")} title={title ?? value}>
+      <span className="text-slate-500">{label}:</span>{" "}
+      <span className="font-bold text-slate-200">{value}</span>
+    </span>
+  );
+}
+
+function InlineMetric({
+  label,
+  value,
+  title,
+  tabular = false,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  tabular?: boolean;
+}) {
+  return (
+    <span className="min-w-0">
+      <span className="lemarc-technical-label block tracking-[0.06em]">{label}</span>
+      <span
+        className={cn(
+          "mt-0.5 block truncate text-[12px] font-black leading-tight text-white",
+          tabular && "tabular-nums",
+        )}
+        title={title ?? value}
+      >
+        {value}
       </span>
     </span>
   );
@@ -428,8 +413,8 @@ function OrderCollapsedActionBar({
   onExpand: () => void;
 }) {
   return (
-    <div className="mt-2.5 flex flex-col gap-2.5 border-t border-white/[0.08] pt-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5 border-t border-white/[0.08] pt-2 sm:flex-row sm:items-center sm:justify-between lg:border-t-0 lg:pt-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
         {hints.length > 0 ? (
           hints.map((hint) => <HintPill key={hint}>{hint}</HintPill>)
         ) : (
@@ -437,17 +422,17 @@ function OrderCollapsedActionBar({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
         <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ArrowUpRight} primary>
-          Abrir OS
+          Abrir
         </ActionLink>
         {isClosedOrder && <OrderCollapsedPdfButton order={order} />}
         <button
           type="button"
           onClick={onExpand}
-          className="lemarc-pressable col-span-2 inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-[color:var(--order-accent-line)] hover:bg-[color:var(--order-accent-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:col-span-1 sm:w-auto"
+          className="lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.055] px-2.5 text-[10px] font-black uppercase tracking-[0.06em] text-slate-200 hover:border-[color:var(--order-accent-line)] hover:bg-[color:var(--order-accent-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto"
         >
-          <ChevronDown size={15} />
+          <ChevronDown size={13} />
           Expandir
         </button>
       </div>
@@ -457,7 +442,7 @@ function OrderCollapsedActionBar({
 
 function HintPill({ children }: { children: string }) {
   return (
-    <span className="rounded-full border border-amber-300/35 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.05em] text-amber-100">
+    <span className="rounded-full border border-amber-300/35 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.04em] text-amber-100">
       {children}
     </span>
   );
@@ -471,54 +456,14 @@ function OrderCollapsedPdfButton({ order }: { order: ServiceOrder }) {
       onClick={() => void download()}
       disabled={loading}
       className={cn(
-        "lemarc-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.08em] sm:w-auto",
+        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] sm:w-auto",
         "border-status-done/45 bg-status-done/12 text-emerald-100 hover:border-status-done/65 hover:bg-status-done/18",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 disabled:cursor-wait disabled:opacity-70",
       )}
     >
-      {loading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
-      {loading ? "Gerando" : "PDF OS"}
+      {loading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+      {loading ? "Gerando" : "PDF"}
     </button>
-  );
-}
-
-function OrderExpandedSummary({
-  number,
-  title,
-  serviceType,
-  clientName,
-  unitName,
-  status,
-  priority,
-}: {
-  number: number;
-  title: string;
-  serviceType: string;
-  clientName: string;
-  unitName: string;
-  status: ServiceOrderStatus;
-  priority: ServicePriority | null;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-white/[0.09] bg-[linear-gradient(135deg,oklch(1_0_0/0.075),oklch(1_0_0/0.025))] px-3 py-3 shadow-[inset_0_1px_0_oklch(1_0_0/0.11),0_16px_36px_-30px_oklch(0_0_0/0.88)] sm:px-4">
-      <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="truncate font-mono text-[11px] font-black text-primary tabular-nums">
-            OS #{number} · {serviceType}
-          </p>
-          <h4 className="mt-1 truncate font-display text-[15px] font-black leading-tight text-white sm:text-[17px]">
-            {title}
-          </h4>
-          <p className="mt-1 truncate text-[12px] font-semibold text-slate-300">
-            Cliente: {clientName} · Unidade: {unitName}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
-          <StatusPill status={status} compact />
-          <PriorityPill priority={priority} compact />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -532,16 +477,16 @@ function OrderExpandedSection({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-[1.15rem] border border-white/[0.075] bg-white/[0.032] p-3 shadow-[inset_0_1px_0_oklch(1_0_0/0.075)]">
-      <div className="flex items-center gap-2">
-        <span className="grid size-8 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/12 text-primary shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]">
-          <Icon size={15} />
+    <section className="min-w-0 rounded-[0.95rem] border border-white/[0.075] bg-white/[0.028] p-2.5 shadow-[inset_0_1px_0_oklch(1_0_0/0.07)]">
+      <div className="flex items-center gap-1.5">
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-primary/22 bg-primary/10 text-primary shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]">
+          <Icon size={13} />
         </span>
-        <h4 className="font-display text-[12px] font-black uppercase tracking-[0.08em] text-white">
+        <h4 className="font-display text-[11px] font-black uppercase tracking-[0.06em] text-white">
           {title}
         </h4>
       </div>
-      <dl className="mt-2 divide-y divide-white/[0.055]">{children}</dl>
+      <dl className="mt-1.5 divide-y divide-white/[0.05]">{children}</dl>
     </section>
   );
 }
@@ -560,14 +505,14 @@ function OrderExpandedRow({
   tabular?: boolean;
 }) {
   return (
-    <div className="grid min-w-0 gap-1 py-2 first:pt-0 last:pb-0 sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:items-start sm:gap-3">
-      <dt className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold leading-snug text-slate-400">
+    <div className="grid min-w-0 gap-0.5 py-1.5 first:pt-0 last:pb-0 sm:grid-cols-[5.9rem_minmax(0,1fr)] sm:items-start sm:gap-2">
+      <dt className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold leading-snug text-slate-400">
         {Icon && <Icon size={12} className="shrink-0 text-primary/80" />}
         <span className="truncate">{label}</span>
       </dt>
       <dd
         className={cn(
-          "min-w-0 break-words text-[13px] font-semibold leading-snug text-slate-200",
+          "min-w-0 break-words text-[12px] font-semibold leading-snug text-slate-200",
           strong && "font-display font-black text-white",
           tabular && "tabular-nums",
         )}
@@ -588,9 +533,9 @@ function OrderActionBar({
   isClosedOrder: boolean;
 }) {
   return (
-    <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-2.5 flex flex-col gap-2 border-t border-white/[0.08] pt-2.5 sm:flex-row sm:items-center sm:justify-between">
       <p className="lemarc-technical-label text-slate-300">Ações da OS</p>
-      <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+      <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
         <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ExternalLink} primary>
           Abrir OS
         </ActionLink>
@@ -623,13 +568,13 @@ function ActionLink({
       to={to as never}
       params={params as never}
       className={cn(
-        "lemarc-pressable inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.1em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto",
+        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto",
         primary
           ? "lemarc-primary-action text-[color:var(--primary-foreground)]"
           : "border-white/[0.12] bg-white/[0.055] text-slate-200 hover:border-primary/40 hover:bg-primary/12",
       )}
     >
-      <Icon size={14} />
+      <Icon size={13} />
       {children}
     </Link>
   );
@@ -804,14 +749,14 @@ function OrderPdfActionButton({ order }: { order: ServiceOrder }) {
       }}
       disabled={loading}
       className={cn(
-        "lemarc-pressable inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.1em] sm:w-auto",
+        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] sm:w-auto",
         "border-status-done/55 bg-status-done/14 text-emerald-100 shadow-[inset_0_1px_0_oklch(1_0_0/0.12),0_10px_24px_-20px_rgba(16,185,129,0.72)]",
         "hover:border-status-done/75 hover:bg-status-done/22",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-wait disabled:opacity-70",
       )}
     >
-      {loading ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+      {loading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
       {loading ? "Gerando…" : "Baixar PDF"}
     </button>
   );
