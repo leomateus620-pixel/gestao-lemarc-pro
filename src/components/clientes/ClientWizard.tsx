@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   ArrowRight,
+  AlertTriangle,
   Building2,
   Check,
+  CheckCircle2,
   ClipboardCheck,
+  FileText,
+  Loader2,
   MapPin,
+  Phone,
   Plus,
   Trash2,
   Star,
@@ -42,6 +47,7 @@ const STEPS = ["Empresa", "Localização", "Unidades", "Revisão"] as const;
 export function ClientWizard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const flowRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>({
     name: "",
@@ -105,13 +111,26 @@ export function ClientWizard() {
     if (typeof window === "undefined") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    const focusTimer = window.setTimeout(
+      () => {
+        const panel = flowRef.current?.querySelector<HTMLElement>(
+          `[data-client-step-panel="${step}"]`,
+        );
+        const target = panel?.querySelector<HTMLElement>(
+          "[data-autofocus], input:not([disabled]), textarea:not([disabled]), select:not([disabled])",
+        );
+        target?.focus({ preventScroll: true });
+      },
+      reduce ? 0 : 180,
+    );
+    return () => window.clearTimeout(focusTimer);
   }, [step]);
 
   return (
-    <div className="mt-2 space-y-5">
+    <div className="mt-2 space-y-4 pb-28 sm:space-y-5 sm:pb-32">
       <Stepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div className="overflow-x-clip">
+      <div ref={flowRef} className="overflow-x-clip">
         <div
           className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
@@ -119,23 +138,25 @@ export function ClientWizard() {
             transform: `translateX(-${(step * 100) / STEPS.length}%)`,
           }}
         >
-          <Slot>
+          <Slot index={0} active={step === 0}>
             <CompanyStep draft={draft} set={set} cnpjOk={cnpjOk} />
           </Slot>
-          <Slot>
+          <Slot index={1} active={step === 1}>
             <LocationStep draft={draft} set={set} />
           </Slot>
-          <Slot>
+          <Slot index={2} active={step === 2}>
             <UnitsStep draft={draft} set={set} />
           </Slot>
-          <Slot>
+          <Slot index={3} active={step === 3}>
             <ReviewStep draft={draft} />
           </Slot>
         </div>
       </div>
 
       {mutation.isError && (
-        <p className="text-sm text-rose-300">{(mutation.error as Error).message}</p>
+        <div className="rounded-2xl border border-rose-300/30 bg-rose-500/12 px-4 py-3 text-sm font-semibold text-rose-100">
+          {(mutation.error as Error).message}
+        </div>
       )}
 
       <FormFlowActions>
@@ -160,7 +181,13 @@ export function ClientWizard() {
             canNext && !mutation.isPending && "lemarc-orange-glow hover:-translate-y-0.5",
           )}
         >
-          {isLast ? <ClipboardCheck size={18} /> : <ArrowRight size={18} />}
+          {mutation.isPending ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : isLast ? (
+            <ClipboardCheck size={18} />
+          ) : (
+            <ArrowRight size={18} />
+          )}
           {mutation.isPending ? "Salvando..." : isLast ? "Cadastrar empresa" : "Continuar"}
         </button>
       </FormFlowActions>
@@ -168,10 +195,20 @@ export function ClientWizard() {
   );
 }
 
-function Slot({ children }: { children: React.ReactNode }) {
+function Slot({
+  children,
+  index,
+  active,
+}: {
+  children: ReactNode;
+  index: number;
+  active: boolean;
+}) {
   return (
     <div
-      className="px-1 pb-2"
+      data-client-step-panel={index}
+      aria-hidden={!active}
+      className="px-0 pb-2 sm:px-1"
       style={{ flex: `0 0 ${100 / STEPS.length}%`, width: `${100 / STEPS.length}%` }}
     >
       {children}
@@ -251,8 +288,8 @@ function StepHeader({
   description?: string;
 }) {
   return (
-    <div>
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
+    <div className="max-w-3xl">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">{eyebrow}</p>
       <h2 className="mt-1 font-display text-xl font-black leading-tight text-white sm:text-2xl">
         {title}
       </h2>
@@ -261,12 +298,87 @@ function StepHeader({
   );
 }
 
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function Label({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.16em]">
+    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.08em]">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
+  );
+}
+
+function FormField({
+  label,
+  required,
+  help,
+  children,
+  className,
+}: {
+  label: string;
+  required?: boolean;
+  help?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label required={required}>{label}</Label>
+      {children}
+      {help && <p className="text-[11px] font-semibold leading-snug text-slate-400">{help}</p>}
+    </div>
+  );
+}
+
+function FormSection({
+  icon: Icon,
+  title,
+  description,
+  children,
+  className,
+}: {
+  icon: typeof Building2;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("lemarc-client-form-section rounded-2xl p-4 sm:p-5", className)}>
+      <div className="mb-3 flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/14 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+          <Icon size={16} />
+        </span>
+        <div className="min-w-0">
+          <h3 className="font-display text-sm font-black leading-tight text-white sm:text-base">
+            {title}
+          </h3>
+          {description && (
+            <p className="mt-0.5 text-[12px] font-medium leading-snug text-slate-400">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PendingBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.04em] text-amber-100">
+      <AlertTriangle size={11} />
+      {children}
+    </span>
+  );
+}
+
+function ReadyBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/35 bg-emerald-500/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.04em] text-emerald-100">
+      <CheckCircle2 size={11} />
+      {children}
+    </span>
   );
 }
 
@@ -285,46 +397,57 @@ function CompanyStep({
   cnpjOk: boolean;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 1 · Empresa"
-        title="Dados da empresa"
-        description="Identificação principal e segmento de atuação."
+        title="Identificação do cliente"
+        description="Comece pelos dados que a equipe usa para reconhecer a empresa nas OS, relatórios e histórico operacional."
       />
-      <div className="space-y-2">
-        <Label required>Nome da empresa</Label>
-        <Input
-          value={draft.name}
-          onChange={(e) => set("name", e.target.value)}
-          placeholder="Razão social"
-          className={inputCls}
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>CNPJ</Label>
-          <Input
-            value={maskCNPJ(draft.cnpj)}
-            onChange={(e) => set("cnpj", onlyDigits(e.target.value))}
-            placeholder="00.000.000/0000-00"
-            className={cn(inputCls, !cnpjOk && "border-rose-500/50 focus-visible:ring-rose-500/40")}
-          />
-          {!cnpjOk && (
-            <p className="mt-1 rounded-lg border border-rose-300/35 bg-rose-500/12 px-3 py-2 text-[11px] font-bold text-rose-100">
-              CNPJ inválido. Verifique os dígitos.
-            </p>
-          )}
+
+      <FormSection
+        icon={Building2}
+        title="Dados principais"
+        description="O nome é obrigatório. CNPJ e segmento ajudam na busca, conferência e organização comercial."
+      >
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(13rem,0.8fr)_minmax(12rem,0.85fr)]">
+          <FormField label="Nome da empresa" required>
+            <Input
+              data-autofocus
+              value={draft.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="Ex.: Lemarc Manutenção Industrial"
+              className={inputCls}
+            />
+          </FormField>
+          <FormField
+            label="CNPJ"
+            help="Opcional, mas recomendado para evitar cadastros duplicados."
+          >
+            <Input
+              value={maskCNPJ(draft.cnpj)}
+              onChange={(e) => set("cnpj", onlyDigits(e.target.value))}
+              placeholder="00.000.000/0000-00"
+              className={cn(
+                inputCls,
+                !cnpjOk && "border-rose-500/50 focus-visible:ring-rose-500/40",
+              )}
+            />
+            {!cnpjOk && (
+              <p className="rounded-lg border border-rose-300/35 bg-rose-500/12 px-3 py-2 text-[11px] font-bold text-rose-100">
+                CNPJ inválido. Verifique os dígitos antes de continuar.
+              </p>
+            )}
+          </FormField>
+          <FormField label="Segmento">
+            <Input
+              value={draft.segment}
+              onChange={(e) => set("segment", e.target.value)}
+              placeholder="Ex.: Usinagem"
+              className={inputCls}
+            />
+          </FormField>
         </div>
-        <div className="space-y-2">
-          <Label>Segmento</Label>
-          <Input
-            value={draft.segment}
-            onChange={(e) => set("segment", e.target.value)}
-            placeholder="Ex.: Usinagem, Alimentos, Petroquímica"
-            className={inputCls}
-          />
-        </div>
-      </div>
+      </FormSection>
     </GlassCard>
   );
 }
@@ -337,76 +460,97 @@ function LocationStep({
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 2 · Localização & contato"
-        title="Onde fica e quem responde"
-        description="Endereço principal e contato de referência."
+        title="Localização e contato"
+        description="Separe o endereço principal dos contatos. Isso reduz erro na OS e deixa a equipe saber quem procurar."
       />
-      <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-        <div className="space-y-2">
-          <Label required>Cidade</Label>
-          <Input
-            value={draft.city}
-            onChange={(e) => set("city", e.target.value)}
-            className={inputCls}
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
+        <FormSection
+          icon={MapPin}
+          title="Localização"
+          description="Informe a base principal do cliente. Unidades específicas entram na próxima etapa."
+        >
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+            <FormField label="Cidade" required>
+              <Input
+                data-autofocus
+                value={draft.city}
+                onChange={(e) => set("city", e.target.value)}
+                placeholder="Ex.: Piracicaba"
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="UF" required>
+              <Input
+                value={draft.state}
+                onChange={(e) => set("state", e.target.value.toUpperCase().slice(0, 2))}
+                placeholder="SP"
+                className={inputCls}
+              />
+            </FormField>
+          </div>
+          <FormField label="Endereço completo" className="mt-3">
+            <Input
+              value={draft.address}
+              onChange={(e) => set("address", e.target.value)}
+              placeholder="Rua, número, bairro"
+              className={inputCls}
+            />
+          </FormField>
+        </FormSection>
+
+        <FormSection
+          icon={Phone}
+          title="Contato"
+          description="Adicione um canal de referência para dúvidas de atendimento e faturamento."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <FormField label="Telefone">
+              <Input
+                value={draft.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                placeholder="(00) 00000-0000"
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="E-mail">
+              <Input
+                type="email"
+                value={draft.email}
+                onChange={(e) => set("email", e.target.value)}
+                placeholder="contato@empresa.com.br"
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="Responsável principal" className="sm:col-span-2 xl:col-span-1">
+              <Input
+                value={draft.responsible_name}
+                onChange={(e) => set("responsible_name", e.target.value)}
+                placeholder="Nome do contato"
+                className={inputCls}
+              />
+            </FormField>
+          </div>
+        </FormSection>
+      </div>
+
+      <FormSection
+        icon={FileText}
+        title="Observações internas"
+        description="Use apenas informações operacionais úteis para a equipe Lemarc."
+      >
+        <FormField label="Notas">
+          <Textarea
+            value={draft.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            placeholder="Ex.: regras de acesso, horários preferenciais, observações de atendimento..."
+            className={textareaCls}
           />
-        </div>
-        <div className="space-y-2">
-          <Label required>UF</Label>
-          <Input
-            value={draft.state}
-            onChange={(e) => set("state", e.target.value.toUpperCase().slice(0, 2))}
-            placeholder="SP"
-            className={inputCls}
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Endereço completo</Label>
-        <Input
-          value={draft.address}
-          onChange={(e) => set("address", e.target.value)}
-          placeholder="Rua, número, bairro"
-          className={inputCls}
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Telefone</Label>
-          <Input
-            value={draft.phone}
-            onChange={(e) => set("phone", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>E-mail</Label>
-          <Input
-            type="email"
-            value={draft.email}
-            onChange={(e) => set("email", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Responsável principal</Label>
-        <Input
-          value={draft.responsible_name}
-          onChange={(e) => set("responsible_name", e.target.value)}
-          placeholder="Nome do contato"
-          className={inputCls}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Observações internas</Label>
-        <Textarea
-          value={draft.notes}
-          onChange={(e) => set("notes", e.target.value)}
-          className={textareaCls}
-        />
-      </div>
+        </FormField>
+      </FormSection>
     </GlassCard>
   );
 }
@@ -458,280 +602,389 @@ function UnitsStep({
   }
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
-      <StepHeader
-        eyebrow="Etapa 3 · Unidades"
-        title="Unidades operacionais"
-        description="Adicione filiais, oficinas e setores. Você pode deixar para depois."
-      />
-
-      {draft.units.length === 0 && (
-        <div className="lemarc-form-panel rounded-2xl border-dashed p-6 text-center">
-          <Building2 size={26} className="mx-auto text-primary" />
-          <p className="lemarc-form-help mt-2 text-sm font-semibold">
-            Nenhuma unidade adicionada ainda.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {draft.units.map((u, idx) => (
-          <div key={idx} className="lemarc-review-card rounded-2xl p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-[11px] font-black text-primary">
-                  {idx + 1}
-                </span>
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
-                  Unidade {idx + 1}
-                </span>
-                {u.is_primary && (
-                  <span className="flex items-center gap-1 rounded-md border border-amber-300/35 bg-amber-400/18 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100">
-                    <Star size={10} /> Principal
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {!u.is_primary && (
-                  <button
-                    type="button"
-                    onClick={() => setPrimary(idx)}
-                    className="rounded-lg p-2 text-slate-300 transition hover:bg-white/[0.07] hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                    title="Marcar como principal"
-                  >
-                    <Star size={14} />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeUnit(idx)}
-                  className="rounded-lg p-2 text-slate-300 transition hover:bg-rose-500/12 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/60"
-                  title="Remover"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label required>Nome</Label>
-                <Input
-                  value={u.name}
-                  onChange={(e) => updUnit(idx, { name: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Setor</Label>
-                <Input
-                  value={u.sector ?? ""}
-                  onChange={(e) => updUnit(idx, { sector: e.target.value })}
-                  placeholder="Ex.: Produção"
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Cidade</Label>
-                <Input
-                  value={u.city ?? ""}
-                  onChange={(e) => updUnit(idx, { city: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>UF</Label>
-                <Input
-                  value={u.state ?? ""}
-                  onChange={(e) =>
-                    updUnit(idx, { state: e.target.value.toUpperCase().slice(0, 2) })
-                  }
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Endereço</Label>
-                <Input
-                  value={u.address ?? ""}
-                  onChange={(e) => updUnit(idx, { address: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Responsável</Label>
-                <Input
-                  value={u.responsible_name ?? ""}
-                  onChange={(e) => updUnit(idx, { responsible_name: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input
-                  value={u.phone ?? ""}
-                  onChange={(e) => updUnit(idx, { phone: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CNPJ da unidade</Label>
-                <Input
-                  value={maskCNPJ(u.cnpj ?? "")}
-                  onChange={(e) => updUnit(idx, { cnpj: onlyDigits(e.target.value) })}
-                  placeholder="00.000.000/0000-00"
-                  className={cn(
-                    inputCls,
-                    u.cnpj &&
-                      !isValidCNPJ(u.cnpj) &&
-                      "border-rose-500/50 focus-visible:ring-rose-500/40",
-                  )}
-                />
-                {u.cnpj && !isValidCNPJ(u.cnpj) && (
-                  <p className="text-[11px] font-bold text-rose-200">CNPJ inválido.</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Distância até a base (km)</Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  min="0"
-                  value={
-                    u.distance_km_from_base === null || u.distance_km_from_base === undefined
-                      ? ""
-                      : String(u.distance_km_from_base)
-                  }
-                  onChange={(e) =>
-                    updUnit(idx, {
-                      distance_km_from_base: e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor/km padrão (R$)</Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={
-                    u.default_displacement_rate_cents === null ||
-                    u.default_displacement_rate_cents === undefined
-                      ? ""
-                      : String(u.default_displacement_rate_cents / 100)
-                  }
-                  onChange={(e) =>
-                    updUnit(idx, {
-                      default_displacement_rate_cents:
-                        e.target.value === "" ? null : Math.round(Number(e.target.value) * 100),
-                    })
-                  }
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Cobrança de deslocamento</Label>
-                <select
-                  value={u.default_displacement_type ?? "km"}
-                  onChange={(e) =>
-                    updUnit(idx, {
-                      default_displacement_type: e.target.value as "km" | "fixed" | "none",
-                    })
-                  }
-                  className={cn(inputCls, "appearance-none bg-[#0d1420] px-3 text-sm")}
-                >
-                  <option value="km">Por km rodado</option>
-                  <option value="fixed">Valor fixo</option>
-                  <option value="none">Não cobrar</option>
-                </select>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Observações de cobrança / deslocamento</Label>
-                <Textarea
-                  value={u.billing_notes ?? ""}
-                  onChange={(e) => updUnit(idx, { billing_notes: e.target.value })}
-                  placeholder="Ex.: pedágios reembolsáveis, refeição obrigatória, restrições de horário…"
-                  className="lemarc-form-control min-h-20 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
+    <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <StepHeader
+          eyebrow="Etapa 3 · Unidades"
+          title="Unidades operacionais"
+          description="Unidades são filiais, oficinas, setores ou locais onde a equipe pode vincular Ordens de Serviço."
+        />
+        {draft.units.length > 0 && (
+          <button
+            type="button"
+            onClick={addUnit}
+            className="lemarc-primary-action lemarc-pressable inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 font-display text-[11px] font-black uppercase tracking-[0.08em]"
+          >
+            <Plus size={15} /> Adicionar unidade
+          </button>
+        )}
       </div>
 
-      <Button
-        type="button"
-        onClick={addUnit}
-        variant="secondary"
-        className="lemarc-secondary-action h-12 w-full gap-2 rounded-xl border-dashed font-black uppercase tracking-wider hover:bg-white/[0.08]"
-      >
-        <Plus size={16} /> Adicionar unidade
-      </Button>
+      {draft.units.length === 0 ? (
+        <div className="lemarc-client-empty-state rounded-2xl p-5 text-center sm:p-7">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-primary/35 bg-primary/14 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
+            <Building2 size={22} />
+          </span>
+          <h3 className="mt-3 font-display text-lg font-black text-white">
+            Nenhuma unidade adicionada ainda
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-xl text-sm font-medium leading-relaxed text-slate-300">
+            Você ainda não adicionou nenhuma unidade. Adicione filiais, setores ou locais de
+            atendimento para vincular as Ordens de Serviço corretamente.
+          </p>
+          <button
+            type="button"
+            onClick={addUnit}
+            className="lemarc-primary-action lemarc-pressable mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 font-display text-[11px] font-black uppercase tracking-[0.08em]"
+          >
+            <Plus size={15} /> Adicionar unidade
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {draft.units.map((u, idx) => (
+            <UnitDraftCard
+              key={idx}
+              unit={u}
+              index={idx}
+              onUpdate={(patch) => updUnit(idx, patch)}
+              onRemove={() => removeUnit(idx)}
+              onSetPrimary={() => setPrimary(idx)}
+            />
+          ))}
+        </div>
+      )}
     </GlassCard>
+  );
+}
+
+function UnitDraftCard({
+  unit,
+  index,
+  onUpdate,
+  onRemove,
+  onSetPrimary,
+}: {
+  unit: ClientUnitInput;
+  index: number;
+  onUpdate: (patch: Partial<ClientUnitInput>) => void;
+  onRemove: () => void;
+  onSetPrimary: () => void;
+}) {
+  const location = [unit.city, unit.state].filter(Boolean).join("/");
+  const pending = getUnitPendingItems(unit);
+  const cnpjInvalid = Boolean(unit.cnpj && !isValidCNPJ(unit.cnpj));
+
+  return (
+    <section className="lemarc-client-unit-card rounded-2xl p-3.5 sm:p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="grid size-8 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/14 text-[11px] font-black text-primary">
+              {index + 1}
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate font-display text-base font-black leading-tight text-white">
+                {unit.name || `Unidade ${index + 1}`}
+              </h3>
+              <p className="mt-0.5 truncate text-[12px] font-semibold text-slate-400">
+                {[
+                  unit.sector,
+                  location || "Local não informado",
+                  unit.cnpj ? maskCNPJ(unit.cnpj) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+            {unit.is_primary && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-400/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.04em] text-amber-100">
+                <Star size={11} /> Principal
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {pending.length === 0 ? (
+              <ReadyBadge>Pronta para OS</ReadyBadge>
+            ) : (
+              pending.map((item) => <PendingBadge key={item}>{item}</PendingBadge>)
+            )}
+            {cnpjInvalid && <PendingBadge>CNPJ inválido</PendingBadge>}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 self-start">
+          {!unit.is_primary && (
+            <button
+              type="button"
+              onClick={onSetPrimary}
+              className="lemarc-pressable rounded-xl border border-white/[0.1] bg-white/[0.045] p-2 text-slate-300 transition hover:border-amber-300/40 hover:bg-amber-400/10 hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              title="Marcar como principal"
+            >
+              <Star size={15} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            className="lemarc-pressable rounded-xl border border-white/[0.1] bg-white/[0.045] p-2 text-slate-300 transition hover:border-rose-300/40 hover:bg-rose-500/12 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/60"
+            title="Remover unidade"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <FormField label="Nome" required className="xl:col-span-2">
+          <Input
+            data-autofocus={index === 0 ? true : undefined}
+            value={unit.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            placeholder="Ex.: Matriz, Filial Norte"
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Setor">
+          <Input
+            value={unit.sector ?? ""}
+            onChange={(e) => onUpdate({ sector: e.target.value })}
+            placeholder="Ex.: Produção"
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="CNPJ da unidade">
+          <Input
+            value={maskCNPJ(unit.cnpj ?? "")}
+            onChange={(e) => onUpdate({ cnpj: onlyDigits(e.target.value) })}
+            placeholder="00.000.000/0000-00"
+            className={cn(
+              inputCls,
+              cnpjInvalid && "border-rose-500/50 focus-visible:ring-rose-500/40",
+            )}
+          />
+          {cnpjInvalid && <p className="text-[11px] font-bold text-rose-200">CNPJ inválido.</p>}
+        </FormField>
+        <FormField label="Cidade">
+          <Input
+            value={unit.city ?? ""}
+            onChange={(e) => onUpdate({ city: e.target.value })}
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="UF">
+          <Input
+            value={unit.state ?? ""}
+            onChange={(e) => onUpdate({ state: e.target.value.toUpperCase().slice(0, 2) })}
+            placeholder="SP"
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Responsável">
+          <Input
+            value={unit.responsible_name ?? ""}
+            onChange={(e) => onUpdate({ responsible_name: e.target.value })}
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Telefone">
+          <Input
+            value={unit.phone ?? ""}
+            onChange={(e) => onUpdate({ phone: e.target.value })}
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Endereço" className="md:col-span-2">
+          <Input
+            value={unit.address ?? ""}
+            onChange={(e) => onUpdate({ address: e.target.value })}
+            className={inputCls}
+          />
+        </FormField>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <FormField label="Distância até a base (km)">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min="0"
+            value={
+              unit.distance_km_from_base === null || unit.distance_km_from_base === undefined
+                ? ""
+                : String(unit.distance_km_from_base)
+            }
+            onChange={(e) =>
+              onUpdate({
+                distance_km_from_base: e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Valor/km padrão (R$)">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={
+              unit.default_displacement_rate_cents === null ||
+              unit.default_displacement_rate_cents === undefined
+                ? ""
+                : String(unit.default_displacement_rate_cents / 100)
+            }
+            onChange={(e) =>
+              onUpdate({
+                default_displacement_rate_cents:
+                  e.target.value === "" ? null : Math.round(Number(e.target.value) * 100),
+              })
+            }
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label="Cobrança de deslocamento">
+          <select
+            value={unit.default_displacement_type ?? "km"}
+            onChange={(e) =>
+              onUpdate({
+                default_displacement_type: e.target.value as "km" | "fixed" | "none",
+              })
+            }
+            className={cn(inputCls, "appearance-none px-3 text-sm")}
+          >
+            <option value="km">Por km rodado</option>
+            <option value="fixed">Valor fixo</option>
+            <option value="none">Não cobrar</option>
+          </select>
+        </FormField>
+      </div>
+
+      <FormField label="Observações de cobrança / deslocamento" className="mt-3">
+        <Textarea
+          value={unit.billing_notes ?? ""}
+          onChange={(e) => onUpdate({ billing_notes: e.target.value })}
+          placeholder="Ex.: pedágios reembolsáveis, refeição obrigatória, restrições de horário..."
+          className="lemarc-form-control min-h-20 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/70"
+        />
+      </FormField>
+    </section>
   );
 }
 
 function ReviewStep({ draft }: { draft: Draft }) {
   const empty = "Não informado";
   const cityState = [draft.city, draft.state].filter(Boolean).join(" / ");
+  const pending = getReviewPendingItems(draft);
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-5 p-5 sm:p-6">
+    <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
       <StepHeader
         eyebrow="Etapa 4 · Revisão"
-        title="Confira antes de cadastrar"
-        description="Você ainda pode voltar e ajustar qualquer informação."
+        title="Confirmação final"
+        description="Revise o que será salvo. Pendências não bloqueantes aparecem como avisos para correção antes ou depois do cadastro."
       />
+
       <div className="lemarc-summary-panel rounded-2xl p-4 sm:p-5">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Empresa</p>
-        <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
-          {draft.name || empty}
-        </h3>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100">
-            {draft.cnpj ? maskCNPJ(draft.cnpj) : "CNPJ não informado"}
-          </span>
-          <span className="rounded-full border border-primary/50 bg-primary/18 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
-            {draft.segment || "Segmento não informado"}
-          </span>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+              Empresa principal
+            </p>
+            <h3 className="mt-1.5 truncate font-display text-2xl font-black leading-tight text-white sm:text-3xl">
+              {draft.name || empty}
+            </h3>
+            <p className="mt-1 text-sm font-semibold text-slate-300">
+              {[draft.segment || "Segmento não informado", cityState || "Local não informado"]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {draft.cnpj ? (
+              <ReadyBadge>{maskCNPJ(draft.cnpj)}</ReadyBadge>
+            ) : (
+              <PendingBadge>CNPJ não informado</PendingBadge>
+            )}
+            {draft.units.length > 0 ? (
+              <ReadyBadge>
+                {draft.units.length} unidade{draft.units.length > 1 ? "s" : ""}
+              </ReadyBadge>
+            ) : (
+              <PendingBadge>Nenhuma unidade adicionada</PendingBadge>
+            )}
+          </div>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Block title="Empresa" icon={Building2}>
+
+      {pending.length > 0 && (
+        <div className="lemarc-client-warning-strip rounded-2xl p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.08em] text-amber-100">
+              Pendências antes da criação
+            </span>
+            {pending.map((item) => (
+              <PendingBadge key={item}>{item}</PendingBadge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <Block title="Identificação" icon={Building2}>
           <Row k="Nome" v={draft.name || empty} />
           <Row k="CNPJ" v={draft.cnpj ? maskCNPJ(draft.cnpj) : empty} />
           <Row k="Segmento" v={draft.segment || empty} />
         </Block>
-        <Block title="Localização & contato" icon={MapPin}>
+        <Block title="Localização e contato" icon={MapPin}>
           <Row k="Cidade/UF" v={cityState || empty} />
           <Row k="Endereço" v={draft.address || empty} />
           <Row k="Telefone" v={draft.phone || empty} />
           <Row k="E-mail" v={draft.email || empty} />
           <Row k="Responsável" v={draft.responsible_name || empty} />
         </Block>
-        <Block title={`Unidades (${draft.units.length})`} icon={Building2}>
+        <Block title={`Unidades cadastradas (${draft.units.length})`} icon={Building2}>
           {draft.units.length === 0 ? (
-            <p className="text-sm font-semibold text-slate-300">Nenhuma unidade adicionada.</p>
+            <p className="text-sm font-semibold text-slate-300">
+              Nenhuma unidade adicionada. As OS ainda poderão ser vinculadas ao cliente, mas sem
+              separação por filial, setor ou local de atendimento.
+            </p>
           ) : (
             draft.units.map((u, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between border-b border-white/5 py-1.5 last:border-0"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-white">
-                    {u.name}
-                    {u.is_primary && <span className="ml-2 text-[10px] text-amber-100">★</span>}
+              <div key={i} className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-white">
+                      {u.name || `Unidade ${i + 1}`}
+                      {u.is_primary && (
+                        <span className="ml-2 text-[10px] text-amber-100">Principal</span>
+                      )}
+                    </div>
+                    <div className="truncate text-[11px] font-semibold text-slate-300">
+                      {[
+                        u.sector,
+                        [u.city, u.state].filter(Boolean).join("/"),
+                        u.cnpj ? maskCNPJ(u.cnpj) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Dados complementares pendentes"}
+                    </div>
                   </div>
-                  <div className="truncate text-[11px] font-semibold text-slate-300">
-                    {[u.sector, u.city, u.state].filter(Boolean).join(" · ")}
+                  <div className="hidden shrink-0 flex-wrap justify-end gap-1 sm:flex">
+                    {getUnitPendingItems(u).map((item) => (
+                      <PendingBadge key={item}>{item}</PendingBadge>
+                    ))}
                   </div>
                 </div>
               </div>
             ))
           )}
+        </Block>
+        <Block title="Observações internas" icon={FileText}>
+          <p className="text-sm font-semibold leading-relaxed text-slate-200">
+            {draft.notes || "Nenhuma observação interna informada."}
+          </p>
         </Block>
       </div>
     </GlassCard>
@@ -745,7 +998,7 @@ function Block({
 }: {
   title: string;
   icon: typeof Building2;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="lemarc-review-card rounded-2xl p-4">
@@ -762,9 +1015,29 @@ function Block({
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">{k}</span>
-      <span className="max-w-[65%] text-right font-bold text-white">{v}</span>
+    <div className="grid gap-1 border-b border-white/[0.055] py-2 text-sm last:border-0 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-start sm:gap-3">
+      <span className="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">{k}</span>
+      <span className="min-w-0 break-words font-bold text-white sm:text-right">{v}</span>
     </div>
   );
+}
+
+function getUnitPendingItems(unit: ClientUnitInput) {
+  const items: string[] = [];
+  if (!unit.name?.trim()) items.push("Nome pendente");
+  if (!unit.sector?.trim()) items.push("Setor pendente");
+  if (!unit.city?.trim() || !unit.state?.trim()) items.push("Local pendente");
+  if (!unit.cnpj?.trim()) items.push("CNPJ opcional");
+  return items.slice(0, 3);
+}
+
+function getReviewPendingItems(draft: Draft) {
+  const items: string[] = [];
+  if (!draft.cnpj.trim()) items.push("CNPJ não informado");
+  if (!draft.segment.trim()) items.push("Segmento não informado");
+  if (draft.units.length === 0) items.push("Nenhuma unidade adicionada");
+  if (!draft.phone.trim() && !draft.email.trim() && !draft.responsible_name.trim()) {
+    items.push("Contato incompleto");
+  }
+  return items;
 }

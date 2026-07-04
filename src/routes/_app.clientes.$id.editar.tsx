@@ -1,9 +1,9 @@
-import { Suspense, useState } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Building2, FileText, Loader2, MapPin, Phone, Save } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
@@ -33,8 +33,7 @@ function EditPage() {
   );
 }
 
-const inputCls =
-  "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
+const inputCls = "h-12 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40";
 
 function Edit() {
   const { id } = Route.useParams();
@@ -91,109 +90,164 @@ function Edit() {
       toast.success("Cliente atualizado");
       navigate({ to: "/clientes/$id", params: { id } });
     },
-    onError: (e) =>
-      toast.error(e instanceof Error ? e.message : "Falha ao salvar cliente"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar cliente"),
   });
 
   return (
-    <div className="space-y-5">
-      <GlassCard className="space-y-5 p-5">
-        <div className="space-y-1">
-          <Label required>Nome da empresa</Label>
-          <Input
-            value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>CNPJ</Label>
-            <Input
-              value={maskCNPJ(draft.cnpj)}
-              onChange={(e) => set("cnpj", onlyDigits(e.target.value))}
-              className={cn(inputCls, !cnpjOk && "border-rose-500/50")}
+    <div className="space-y-5 pb-28 sm:pb-32">
+      <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+              Cadastro do cliente
+            </p>
+            <h1 className="mt-1 font-display text-2xl font-black leading-tight text-white sm:text-3xl">
+              Editar cliente
+            </h1>
+            <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-300">
+              Atualize apenas o que mudou. As unidades continuam em uma seção própria para manter OS
+              e histórico vinculados corretamente.
+            </p>
+          </div>
+          <label className="lemarc-client-active-toggle flex cursor-pointer items-center justify-between gap-4 rounded-2xl p-3 lg:min-w-[18rem]">
+            <span>
+              <span className="block text-sm font-black text-white">Cliente ativo</span>
+              <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">
+                Controla exibição nas listagens operacionais.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={draft.active}
+              onChange={(e) => set("active", e.target.checked)}
+              className="h-5 w-5 accent-primary"
             />
-            {!cnpjOk && <p className="text-[11px] text-rose-300">CNPJ inválido.</p>}
-          </div>
-          <div className="space-y-1">
-            <Label>Segmento</Label>
-            <Input
-              value={draft.segment}
-              onChange={(e) => set("segment", e.target.value)}
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-          <div className="space-y-1">
-            <Label>Cidade</Label>
-            <Input value={draft.city} onChange={(e) => set("city", e.target.value)} className={inputCls} />
-          </div>
-          <div className="space-y-1">
-            <Label>UF</Label>
-            <Input
-              value={draft.state}
-              onChange={(e) => set("state", e.target.value.toUpperCase().slice(0, 2))}
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label>Endereço</Label>
-          <Input
-            value={draft.address}
-            onChange={(e) => set("address", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Telefone</Label>
-            <Input value={draft.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} />
-          </div>
-          <div className="space-y-1">
-            <Label>E-mail</Label>
-            <Input value={draft.email} onChange={(e) => set("email", e.target.value)} className={inputCls} />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label>Responsável</Label>
-          <Input
-            value={draft.responsible_name}
-            onChange={(e) => set("responsible_name", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label>Observações</Label>
-          <Textarea
-            value={draft.notes}
-            onChange={(e) => set("notes", e.target.value)}
-            className="min-h-24 rounded-xl border-white/10 bg-white/[0.07] focus-visible:ring-primary/40"
-          />
+          </label>
         </div>
 
-        <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div>
-            <div className="text-sm font-bold text-foreground">Cliente ativo</div>
-            <div className="text-[11px] text-muted-foreground">
-              Desative para esconder das listagens operacionais.
-            </div>
+        <FormSection
+          icon={Building2}
+          title="Identificação da empresa"
+          description="Dados usados para busca, conferência e vínculo com ordens de serviço."
+        >
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(13rem,0.78fr)_minmax(12rem,0.82fr)]">
+            <FormField label="Nome da empresa" required>
+              <Input
+                value={draft.name}
+                onChange={(e) => set("name", e.target.value)}
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="CNPJ" help="Opcional, mas recomendado para evitar duplicidade.">
+              <Input
+                value={maskCNPJ(draft.cnpj)}
+                onChange={(e) => set("cnpj", onlyDigits(e.target.value))}
+                placeholder="00.000.000/0000-00"
+                className={cn(inputCls, !cnpjOk && "border-rose-500/50")}
+              />
+              {!cnpjOk && (
+                <p className="rounded-lg border border-rose-300/35 bg-rose-500/12 px-3 py-2 text-[11px] font-bold text-rose-100">
+                  CNPJ inválido. Verifique os dígitos antes de salvar.
+                </p>
+              )}
+            </FormField>
+            <FormField label="Segmento">
+              <Input
+                value={draft.segment}
+                onChange={(e) => set("segment", e.target.value)}
+                placeholder="Ex.: Manutenção industrial"
+                className={inputCls}
+              />
+            </FormField>
           </div>
-          <input
-            type="checkbox"
-            checked={draft.active}
-            onChange={(e) => set("active", e.target.checked)}
-            className="h-5 w-5 accent-primary"
-          />
-        </label>
+        </FormSection>
+
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
+          <FormSection
+            icon={MapPin}
+            title="Localização"
+            description="Base principal do cliente. Unidades específicas ficam abaixo."
+          >
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+              <FormField label="Cidade">
+                <Input
+                  value={draft.city}
+                  onChange={(e) => set("city", e.target.value)}
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="UF">
+                <Input
+                  value={draft.state}
+                  onChange={(e) => set("state", e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="SP"
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+            <FormField label="Endereço" className="mt-3">
+              <Input
+                value={draft.address}
+                onChange={(e) => set("address", e.target.value)}
+                className={inputCls}
+              />
+            </FormField>
+          </FormSection>
+
+          <FormSection
+            icon={Phone}
+            title="Contato"
+            description="Referência para alinhamento operacional, agenda e cobrança."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <FormField label="Telefone">
+                <Input
+                  value={draft.phone}
+                  onChange={(e) => set("phone", e.target.value)}
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="E-mail">
+                <Input
+                  type="email"
+                  value={draft.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="Responsável" className="sm:col-span-2 xl:col-span-1">
+                <Input
+                  value={draft.responsible_name}
+                  onChange={(e) => set("responsible_name", e.target.value)}
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+          </FormSection>
+        </div>
+
+        <FormSection
+          icon={FileText}
+          title="Observações internas"
+          description="Informações que ajudam atendimento, acesso, cobrança ou relacionamento."
+        >
+          <FormField label="Notas">
+            <Textarea
+              value={draft.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Ex.: regras de acesso, horário preferencial, observações de cobrança..."
+              className="lemarc-form-control min-h-24 rounded-xl focus-visible:ring-primary/40"
+            />
+          </FormField>
+        </FormSection>
       </GlassCard>
 
       <ClientUnitsEditor clientId={id} units={units} />
 
       {mut.isError && (
-        <p className="text-sm text-rose-300">{(mut.error as Error).message}</p>
+        <div className="rounded-2xl border border-rose-300/30 bg-rose-500/12 px-4 py-3 text-sm font-semibold text-rose-100">
+          {(mut.error as Error).message}
+        </div>
       )}
 
       <FormFlowActions>
@@ -214,18 +268,76 @@ function Edit() {
             valid && !mut.isPending && "lemarc-orange-glow",
           )}
         >
-          <Save size={18} /> {mut.isPending ? "Salvando..." : "Salvar alterações"}
+          {mut.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+          {mut.isPending ? "Salvando..." : "Salvar alterações"}
         </button>
       </FormFlowActions>
     </div>
   );
 }
 
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function Label({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.08em]">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
+  );
+}
+
+function FormField({
+  label,
+  required,
+  help,
+  children,
+  className,
+}: {
+  label: string;
+  required?: boolean;
+  help?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label required={required}>{label}</Label>
+      {children}
+      {help && <p className="text-[11px] font-semibold leading-snug text-slate-400">{help}</p>}
+    </div>
+  );
+}
+
+function FormSection({
+  icon: Icon,
+  title,
+  description,
+  children,
+  className,
+}: {
+  icon: typeof Building2;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("lemarc-client-form-section rounded-2xl p-4 sm:p-5", className)}>
+      <div className="mb-3 flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/14 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+          <Icon size={16} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-sm font-black leading-tight text-white sm:text-base">
+            {title}
+          </h2>
+          {description && (
+            <p className="mt-0.5 text-[12px] font-medium leading-snug text-slate-400">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
