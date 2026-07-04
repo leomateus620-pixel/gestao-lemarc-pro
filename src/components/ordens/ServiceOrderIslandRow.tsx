@@ -142,7 +142,7 @@ export function ServiceOrderIslandRow({
         compact && "p-2.5",
       )}
     >
-      <div className="lemarc-order-collapsed-shell grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <div className="lemarc-order-collapsed-shell grid min-w-0 gap-2">
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
@@ -176,11 +176,13 @@ export function ServiceOrderIslandRow({
             </span>
           </span>
 
-          <span className="hidden min-w-0 items-center gap-3 lg:grid lg:grid-cols-[auto_minmax(8rem,1.05fr)_minmax(9rem,1.25fr)_auto_minmax(7rem,0.75fr)_minmax(6.5rem,0.62fr)_minmax(7rem,0.65fr)]">
-            <OrderIdentity number={order.number} />
+          <span className="lemarc-order-desktop-summary min-w-0">
             <span className="min-w-0">
-              <span className="block truncate font-display text-[14px] font-black leading-tight text-white">
-                {clientName}
+              <span className="flex min-w-0 items-center gap-2">
+                <OrderIdentity number={order.number} />
+                <span className="truncate font-display text-[14px] font-black leading-tight text-white">
+                  {clientName}
+                </span>
               </span>
               <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
                 {locationSummary}
@@ -194,7 +196,12 @@ export function ServiceOrderIslandRow({
                 {serviceType}
               </span>
             </span>
-            <OrderStatusCluster status={order.status} priority={order.priority} compact />
+            <OrderStatusCluster
+              status={order.status}
+              priority={order.priority}
+              compact
+              className="lg:flex-col lg:items-start lg:justify-center"
+            />
             <InlineMetric label="Técnico" value={technicianLabel} title={technicianTitle} />
             <InlineMetric label="Tempo" value={timeSummary.short} tabular />
             <InlineMetric label={valueSummary.kind} value={valueSummary.short} tabular />
@@ -210,6 +217,8 @@ export function ServiceOrderIslandRow({
             onExpand={() => setExpanded(true)}
           />
         )}
+
+        {!expanded && collapsedHints.length > 0 && <DesktopHintRail hints={collapsedHints} />}
       </div>
 
       <div
@@ -286,13 +295,15 @@ function OrderStatusCluster({
   status,
   priority,
   compact = false,
+  className,
 }: {
   status: ServiceOrderStatus;
   priority: ServicePriority | null;
   compact?: boolean;
+  className?: string;
 }) {
   return (
-    <span className="flex min-w-0 flex-wrap items-center gap-1 lg:justify-end">
+    <span className={cn("flex min-w-0 flex-wrap items-center gap-1 lg:justify-end", className)}>
       <StatusPill status={status} compact={compact} />
       <PriorityPill priority={priority} compact={compact} />
     </span>
@@ -384,7 +395,7 @@ function InlineMetric({
   tabular?: boolean;
 }) {
   return (
-    <span className="min-w-0">
+    <span className="min-w-0 lg:border-l lg:border-white/[0.065] lg:pl-2">
       <span className="lemarc-technical-label block tracking-[0.06em]">{label}</span>
       <span
         className={cn(
@@ -396,6 +407,16 @@ function InlineMetric({
         {value}
       </span>
     </span>
+  );
+}
+
+function DesktopHintRail({ hints }: { hints: string[] }) {
+  return (
+    <div className="lemarc-order-desktop-hints min-w-0">
+      {hints.map((hint) => (
+        <HintPill key={hint}>{hint}</HintPill>
+      ))}
+    </div>
   );
 }
 
@@ -413,8 +434,8 @@ function OrderCollapsedActionBar({
   onExpand: () => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 border-t border-white/[0.08] pt-2 sm:flex-row sm:items-center sm:justify-between lg:border-t-0 lg:pt-0">
-      <div className="flex min-w-0 flex-wrap items-center gap-1">
+    <div className="flex min-w-0 flex-col gap-1.5 border-t border-white/[0.08] pt-2 sm:flex-row sm:items-center sm:justify-between lg:min-w-[13.25rem] lg:justify-end lg:border-t-0 lg:pt-0 xl:min-w-[14rem]">
+      <div className="flex min-w-0 flex-wrap items-center gap-1 lg:hidden">
         {hints.length > 0 ? (
           hints.map((hint) => <HintPill key={hint}>{hint}</HintPill>)
         ) : (
@@ -422,7 +443,7 @@ function OrderCollapsedActionBar({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end lg:flex-nowrap">
         <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ArrowUpRight} primary>
           Abrir
         </ActionLink>
@@ -430,7 +451,7 @@ function OrderCollapsedActionBar({
         <button
           type="button"
           onClick={onExpand}
-          className="lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.055] px-2.5 text-[10px] font-black uppercase tracking-[0.06em] text-slate-200 hover:border-[color:var(--order-accent-line)] hover:bg-[color:var(--order-accent-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto"
+          className="lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.055] px-2.5 text-[10px] font-black uppercase tracking-[0.06em] text-slate-200 hover:border-[color:var(--order-accent-line)] hover:bg-[color:var(--order-accent-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto lg:min-h-8 lg:min-w-[5.25rem]"
         >
           <ChevronDown size={13} />
           Expandir
@@ -456,7 +477,7 @@ function OrderCollapsedPdfButton({ order }: { order: ServiceOrder }) {
       onClick={() => void download()}
       disabled={loading}
       className={cn(
-        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] sm:w-auto",
+        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] sm:w-auto lg:min-h-8 lg:min-w-[4.35rem]",
         "border-status-done/45 bg-status-done/12 text-emerald-100 hover:border-status-done/65 hover:bg-status-done/18",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 disabled:cursor-wait disabled:opacity-70",
       )}
@@ -568,7 +589,7 @@ function ActionLink({
       to={to as never}
       params={params as never}
       className={cn(
-        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto",
+        "lemarc-pressable inline-flex min-h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.06em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto lg:min-h-8 lg:min-w-[4.35rem]",
         primary
           ? "lemarc-primary-action text-[color:var(--primary-foreground)]"
           : "border-white/[0.12] bg-white/[0.055] text-slate-200 hover:border-primary/40 hover:bg-primary/12",
