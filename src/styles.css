@@ -490,6 +490,51 @@
 .lemarc-order-collapsed-shell {
   position: relative;
 }
+.lemarc-order-desktop-summary,
+.lemarc-order-desktop-hints {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .lemarc-order-collapsed-shell {
+    grid-template-columns: minmax(0, 1fr) minmax(13.25rem, auto);
+    align-items: center;
+    column-gap: 0.65rem;
+  }
+
+  .lemarc-order-desktop-summary {
+    display: grid;
+    grid-template-columns: minmax(9.5rem, 1fr) minmax(12rem, 1.35fr) minmax(7.2rem, 0.75fr);
+    align-items: center;
+    gap: 0.4rem 0.65rem;
+  }
+
+  .lemarc-order-desktop-summary > * {
+    min-width: 0;
+  }
+
+  .lemarc-order-desktop-hints {
+    grid-column: 1 / -1;
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0 0.25rem;
+  }
+}
+@media (min-width: 1280px) {
+  .lemarc-order-collapsed-shell {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, auto);
+    column-gap: 0.75rem;
+  }
+
+  .lemarc-order-desktop-summary {
+    grid-template-columns:
+      minmax(9.5rem, 1.08fr) minmax(12.75rem, 1.55fr) minmax(7.25rem, 0.7fr)
+      minmax(6.75rem, 0.72fr) minmax(5.75rem, 0.58fr) minmax(6.5rem, 0.65fr);
+    column-gap: 0.75rem;
+  }
+}
 @media (hover: hover) {
   .lemarc-order-island-row:hover {
     transform: translateY(-1px);

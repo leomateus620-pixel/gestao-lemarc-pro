@@ -173,7 +173,7 @@ function OrdensList() {
     q.trim() !== "";
 
   return (
-    <main className="mx-auto max-w-6xl space-y-3 pb-8">
+    <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
       <section className="lemarc-wizard-card p-3 sm:p-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:items-end">
           <div className="min-w-0">
@@ -222,8 +222,8 @@ function OrdensList() {
         </div>
       </section>
 
-      <section className="lemarc-horizontal-row flex-col gap-2 p-2.5 lg:flex-row lg:items-center">
-        <div className="relative min-w-0 flex-1">
+      <section className="lemarc-horizontal-row flex-col gap-2 p-2.5 lg:grid lg:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.6fr)] lg:items-center lg:gap-3 xl:grid-cols-[minmax(20rem,0.75fr)_minmax(0,1.8fr)]">
+        <div className="relative min-w-0 flex-1 lg:flex-none">
           <Search
             size={15}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -235,7 +235,7 @@ function OrdensList() {
             className="lemarc-form-control h-10 rounded-full pl-9"
           />
         </div>
-        <div className="flex w-full gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll lg:w-auto lg:pb-0">
+        <div className="flex w-full gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll lg:flex-wrap lg:justify-end lg:overflow-visible lg:pb-0">
           <MetricPeriodFilter
             value={period as Period}
             range={periodRange}
@@ -562,7 +562,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="lemarc-form-control h-10 min-w-[8.75rem] rounded-full px-3 text-[11px] font-bold text-white"
+      className="lemarc-form-control h-10 min-w-[8.75rem] rounded-full px-3 text-[11px] font-bold text-white lg:min-w-[9.25rem] xl:min-w-[9.75rem]"
     >
       {children}
     </select>
@@ -571,7 +571,7 @@ function Select({
 
 function OrdensSkeleton() {
   return (
-    <main className="mx-auto max-w-6xl space-y-3 pb-8">
+    <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
       <div className="relative h-28 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.045]">
         <div className="lemarc-shimmer absolute inset-0 opacity-25" />
       </div>
