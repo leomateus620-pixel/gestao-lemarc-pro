@@ -3,17 +3,21 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   BadgeCheck,
   Building2,
   ChevronDown,
   Clock3,
+  CircleDollarSign,
   ExternalLink,
   FileDown,
   HardHat,
   Loader2,
   MapPin,
   Receipt,
+  Timer,
   UserRound,
+  UsersRound,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -45,14 +49,14 @@ type ServiceOrderIslandRowProps = {
 };
 
 const statusTone: Record<ServiceOrderStatus, string> = {
-  pending: "border-primary/55 bg-primary/18 text-amber-100",
-  dispatched: "border-primary/55 bg-primary/18 text-amber-100",
-  transit: "border-status-transit/55 bg-status-transit/16 text-sky-100",
-  running: "border-status-transit/60 bg-status-transit/18 text-sky-100",
-  finished: "border-status-review/55 bg-status-review/17 text-amber-100",
-  review: "border-status-review/60 bg-status-review/18 text-amber-100",
-  approved: "border-status-done/55 bg-status-done/16 text-emerald-100",
-  cancelled: "border-destructive/55 bg-destructive/16 text-rose-100",
+  pending: "border-primary/45 bg-primary/14 text-amber-100",
+  dispatched: "border-primary/45 bg-primary/14 text-amber-100",
+  transit: "border-status-transit/45 bg-status-transit/13 text-sky-100",
+  running: "border-status-transit/50 bg-status-transit/14 text-sky-100",
+  finished: "border-status-done/45 bg-status-done/13 text-emerald-100",
+  review: "border-status-review/50 bg-status-review/14 text-amber-100",
+  approved: "border-status-done/50 bg-status-done/14 text-emerald-100",
+  cancelled: "border-destructive/48 bg-destructive/13 text-rose-100",
 };
 
 const priorityTone: Record<ServicePriority, string> = {
@@ -60,6 +64,17 @@ const priorityTone: Record<ServicePriority, string> = {
   media: "border-status-review/40 bg-status-review/13 text-amber-100",
   alta: "border-primary/48 bg-primary/15 text-orange-100",
   urgente: "border-destructive/58 bg-destructive/17 text-rose-100",
+};
+
+const statusSurfaceTone: Record<ServiceOrderStatus, string> = {
+  pending: "lemarc-order-tone-pending",
+  dispatched: "lemarc-order-tone-pending",
+  transit: "lemarc-order-tone-running",
+  running: "lemarc-order-tone-running",
+  finished: "lemarc-order-tone-approved",
+  review: "lemarc-order-tone-review",
+  approved: "lemarc-order-tone-approved",
+  cancelled: "lemarc-order-tone-cancelled",
 };
 
 const nextAction: Partial<Record<ServiceOrderStatus, string>> = {
@@ -79,6 +94,7 @@ export function ServiceOrderIslandRow({
   const [expanded, setExpanded] = useState(false);
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
   const clientName = clean(order.client?.name) ?? "Não informado";
+  const hasUnit = Boolean(clean(order.client_unit?.name) ?? clean(order.client?.unit));
   const unitName = getUnitName(order);
   const localName = getLocalName(order);
   const title = clean(order.title) ?? "Chamado não informado";
@@ -101,78 +117,107 @@ export function ServiceOrderIslandRow({
   const billingStatus = getBillingStatus(order, financials);
   const actionLabel = nextAction[order.status];
   const isClosedOrder = order.status === "finished" || order.status === "approved";
+  const hasValue = valueSummary.realCents > 0 || valueSummary.estimatedCents > 0;
+  const hasTrackedTime = timeSummary.short !== "Sem horas";
+  const unitDetail =
+    localName !== "Não informado" && localName !== unitName
+      ? localName
+      : hasUnit
+        ? "Local não informado"
+        : "Aguardando unidade";
+  const technicianDetail = technicians.length
+    ? technicians.length === 1
+      ? "1 técnico alocado"
+      : `${technicians.length} técnicos alocados`
+    : "Aguardando definição";
+  const collapsedHints = buildOperationalHints({
+    hasUnit,
+    hasTechnicians: technicians.length > 0,
+    hasValue,
+    hasTrackedTime,
+  });
 
   return (
     <article
+      data-status={order.status}
       className={cn(
         "lemarc-order-island-row lemarc-island-row group/order",
+        statusSurfaceTone[order.status],
         expanded && "lemarc-island-row-expanded",
         compact && "p-2.5",
       )}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="w-full min-w-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-        aria-expanded={expanded}
-        aria-label={`${expanded ? "Recolher" : "Expandir"} OS ${order.number}`}
-      >
-        <span className="flex min-w-0 items-start gap-2 lg:hidden">
-          <OrderNumber number={order.number} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-display text-[15px] font-black leading-tight text-white">
-              #{order.number} · {clientName}
+      <div className="lemarc-order-collapsed-shell">
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="block w-full min-w-0 rounded-[1.2rem] border border-white/[0.07] bg-black/[0.08] p-3 text-left outline-none transition-colors hover:border-white/[0.12] focus-visible:ring-2 focus-visible:ring-primary/70 sm:p-3.5"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Recolher" : "Expandir"} OS ${order.number}`}
+        >
+          <span className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <span className="flex min-w-0 gap-3">
+              <OrderIdentity number={order.number} serviceType={serviceType} />
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="truncate font-display text-[15px] font-black leading-tight text-white sm:text-[16px]">
+                    {clientName}
+                  </span>
+                  <span className="hidden h-1 w-1 shrink-0 rounded-full bg-white/25 sm:block" />
+                  <span className="truncate text-[11px] font-bold text-slate-300 sm:text-[12px]">
+                    {serviceType}
+                  </span>
+                </span>
+                <span className="mt-1 block min-w-0 text-[13px] font-semibold leading-snug text-slate-100 sm:text-[14px]">
+                  {title}
+                </span>
+              </span>
             </span>
-            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="truncate text-[12px] font-bold text-slate-200">{unitName}</span>
-              <StatusPill status={order.status} compact />
-              {isClosedOrder ? (
-                <OrderPdfButton order={order} compact />
-              ) : (
-                <PriorityPill priority={order.priority} compact />
-              )}
-            </span>
-            <span className="mt-1 block truncate text-[12px] font-bold tabular-nums text-slate-300">
-              {technicianLabel} · {timeSummary.short}
-            </span>
-          </span>
-          <ExpandIcon expanded={expanded} />
-        </span>
 
-        <span className="hidden min-w-0 grid-cols-[auto_minmax(7rem,1.05fr)_minmax(7rem,0.8fr)_minmax(10rem,1.2fr)_auto_auto_minmax(6.5rem,0.7fr)_minmax(6.5rem,0.7fr)_auto] items-center gap-3 lg:grid">
-          <OrderNumber number={order.number} />
-          <span className="min-w-0">
-            <span className="block truncate font-display text-[14px] font-black text-white">
-              {clientName}
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
-              Cliente
-            </span>
+            <OrderStatusCluster status={order.status} priority={order.priority} />
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-slate-100">{unitName}</span>
-            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
-              Unidade
-            </span>
+
+          <span className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <OrderMetaGroup
+              icon={Building2}
+              label="Unidade / local"
+              value={unitName}
+              detail={unitDetail}
+            />
+            <OrderMetaGroup
+              icon={UsersRound}
+              label="Técnicos"
+              value={technicianLabel}
+              detail={technicianDetail}
+              title={technicianTitle}
+            />
+            <OrderMetaGroup
+              icon={Timer}
+              label="Tempo"
+              value={timeSummary.short}
+              detail={timeSummary.full}
+              tabular
+            />
+            <OrderMetaGroup
+              icon={CircleDollarSign}
+              label={valueSummary.kind}
+              value={valueSummary.short}
+              detail={valueSummary.full}
+              tabular
+            />
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-slate-100">{title}</span>
-            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
-              Chamado inicial
-            </span>
-          </span>
-          <StatusPill status={order.status} />
-          {isClosedOrder ? (
-            <OrderPdfButton order={order} />
-          ) : (
-            <PriorityPill priority={order.priority} />
-          )}
-          <DesktopMetric label="Técnicos" value={technicianLabel} title={technicianTitle} />
-          <DesktopMetric label="Tempo" value={timeSummary.short} />
-          <DesktopMetric label={valueSummary.kind} value={valueSummary.short} />
-          <ExpandIcon expanded={expanded} />
-        </span>
-      </button>
+        </button>
+
+        {!expanded && (
+          <OrderCollapsedActionBar
+            order={order}
+            hints={collapsedHints}
+            actionHint={getActionHint(order.status, actionLabel, isClosedOrder)}
+            isClosedOrder={isClosedOrder}
+            onExpand={() => setExpanded(true)}
+          />
+        )}
+      </div>
 
       <div
         className={cn(
@@ -240,21 +285,33 @@ export function ServiceOrderIslandRow({
   );
 }
 
-function OrderNumber({ number }: { number: number }) {
+function OrderIdentity({ number, serviceType }: { number: number; serviceType: string }) {
   return (
-    <span className="grid h-10 min-w-12 shrink-0 place-items-center rounded-2xl border border-primary/42 bg-primary/16 px-2 font-mono text-[12px] font-black text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
-      #{number}
+    <span className="grid h-[3.35rem] w-[4.8rem] shrink-0 content-center rounded-2xl border border-[color:var(--order-accent-line)] bg-[color:var(--order-accent-muted)] px-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_10px_24px_-22px_var(--order-accent-shadow)]">
+      <span className="font-mono text-[10px] font-black uppercase leading-none text-slate-300">
+        OS
+      </span>
+      <span className="mt-0.5 font-mono text-[14px] font-black leading-none text-white tabular-nums">
+        #{number}
+      </span>
+      <span className="mt-1 truncate text-[9px] font-black uppercase leading-none text-[color:var(--order-accent-text)]">
+        {serviceType}
+      </span>
     </span>
   );
 }
 
-function ExpandIcon({ expanded }: { expanded: boolean }) {
+function OrderStatusCluster({
+  status,
+  priority,
+}: {
+  status: ServiceOrderStatus;
+  priority: ServicePriority | null;
+}) {
   return (
-    <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.055] text-primary transition group-hover/order:border-primary/40">
-      <ChevronDown
-        size={16}
-        className={cn("transition-transform duration-200", expanded && "rotate-180")}
-      />
+    <span className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-end">
+      <StatusPill status={status} />
+      <PriorityPill priority={priority} />
     </span>
   );
 }
@@ -269,12 +326,12 @@ function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex w-fit items-center gap-1.5 rounded-full border font-black uppercase tracking-[0.08em]",
+        "inline-flex w-fit items-center gap-1.5 rounded-full border font-black uppercase tracking-[0.04em]",
         compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
         statusTone[status],
       )}
     >
-      <span className="size-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+      <span className="size-1.5 rounded-full bg-current" />
       {statusLabel[status]}
     </span>
   );
@@ -291,7 +348,7 @@ function PriorityPill({
     return (
       <span
         className={cn(
-          "inline-flex w-fit rounded-full border border-slate-300/25 bg-slate-300/10 font-black uppercase tracking-[0.08em] text-slate-300",
+          "inline-flex w-fit rounded-full border border-slate-300/25 bg-slate-300/10 font-black uppercase tracking-[0.04em] text-slate-300",
           compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
         )}
       >
@@ -303,7 +360,7 @@ function PriorityPill({
   return (
     <span
       className={cn(
-        "inline-flex w-fit rounded-full border font-black uppercase tracking-[0.08em]",
+        "inline-flex w-fit rounded-full border font-black uppercase tracking-[0.04em]",
         compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
         priorityTone[priority],
       )}
@@ -313,17 +370,115 @@ function PriorityPill({
   );
 }
 
-function DesktopMetric({ label, value, title }: { label: string; value: string; title?: string }) {
+function OrderMetaGroup({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  title,
+  tabular = false,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  detail: string;
+  title?: string;
+  tabular?: boolean;
+}) {
   return (
-    <span className="min-w-0">
-      <span className="lemarc-technical-label block">{label}</span>
-      <span
-        className="mt-0.5 block truncate font-display text-[13px] font-black tabular-nums text-white"
-        title={title ?? value}
-      >
-        {value}
+    <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-2xl border border-white/[0.075] bg-white/[0.035] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-xl border border-[color:var(--order-accent-line)] bg-[color:var(--order-accent-muted)] text-[color:var(--order-accent-text)]">
+        <Icon size={13} />
+      </span>
+      <span className="min-w-0">
+        <span className="lemarc-technical-label block">{label}</span>
+        <span
+          className={cn(
+            "mt-0.5 block truncate font-display text-[12px] font-black leading-tight text-white",
+            tabular && "tabular-nums",
+          )}
+          title={title ?? value}
+        >
+          {value}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block truncate text-[11px] font-semibold leading-tight text-slate-300",
+            tabular && "tabular-nums",
+          )}
+        >
+          {detail}
+        </span>
       </span>
     </span>
+  );
+}
+
+function OrderCollapsedActionBar({
+  order,
+  hints,
+  actionHint,
+  isClosedOrder,
+  onExpand,
+}: {
+  order: ServiceOrder;
+  hints: string[];
+  actionHint: string;
+  isClosedOrder: boolean;
+  onExpand: () => void;
+}) {
+  return (
+    <div className="mt-2.5 flex flex-col gap-2.5 border-t border-white/[0.08] pt-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {hints.length > 0 ? (
+          hints.map((hint) => <HintPill key={hint}>{hint}</HintPill>)
+        ) : (
+          <span className="truncate text-[11px] font-bold text-slate-300">{actionHint}</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+        <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ArrowUpRight} primary>
+          Abrir OS
+        </ActionLink>
+        {isClosedOrder && <OrderCollapsedPdfButton order={order} />}
+        <button
+          type="button"
+          onClick={onExpand}
+          className="lemarc-pressable col-span-2 inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-[color:var(--order-accent-line)] hover:bg-[color:var(--order-accent-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:col-span-1 sm:w-auto"
+        >
+          <ChevronDown size={15} />
+          Expandir
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HintPill({ children }: { children: string }) {
+  return (
+    <span className="rounded-full border border-amber-300/35 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.05em] text-amber-100">
+      {children}
+    </span>
+  );
+}
+
+function OrderCollapsedPdfButton({ order }: { order: ServiceOrder }) {
+  const { loading, download } = useOrderPdfDownload(order);
+  return (
+    <button
+      type="button"
+      onClick={() => void download()}
+      disabled={loading}
+      className={cn(
+        "lemarc-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.08em] sm:w-auto",
+        "border-status-done/45 bg-status-done/12 text-emerald-100 hover:border-status-done/65 hover:bg-status-done/18",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/70 disabled:cursor-wait disabled:opacity-70",
+      )}
+    >
+      {loading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+      {loading ? "Gerando" : "PDF OS"}
+    </button>
   );
 }
 
@@ -528,6 +683,36 @@ function getTimeSummary(order: ServiceOrder, financials: OrderFinancials | null)
   return { short: "Sem horas", full: "Aguardando apuração" };
 }
 
+function buildOperationalHints({
+  hasUnit,
+  hasTechnicians,
+  hasValue,
+  hasTrackedTime,
+}: {
+  hasUnit: boolean;
+  hasTechnicians: boolean;
+  hasValue: boolean;
+  hasTrackedTime: boolean;
+}) {
+  const hints: string[] = [];
+  if (!hasUnit) hints.push("Unidade não informada");
+  if (!hasTechnicians) hints.push("Sem técnico");
+  if (!hasTrackedTime) hints.push("Sem horas");
+  if (!hasValue) hints.push("Sem valor");
+  return hints.slice(0, 3);
+}
+
+function getActionHint(
+  status: ServiceOrderStatus,
+  actionLabel: string | undefined,
+  isClosedOrder: boolean,
+) {
+  if (actionLabel) return `Próxima ação: ${actionLabel}`;
+  if (isClosedOrder) return "OS finalizada para consulta, PDF e cobrança.";
+  if (status === "cancelled") return "OS cancelada, mantida para histórico operacional.";
+  return "Acompanhamento operacional ativo.";
+}
+
 function getEstimatedLaborCents(order: ServiceOrder) {
   const worked = getServiceOrderWorkedMinutes(order);
   if (worked.minutes <= 0 || !order.hour_rate || order.hour_rate <= 0) return 0;
@@ -606,40 +791,6 @@ function useOrderPdfDownload(order: ServiceOrder) {
   };
 
   return { loading, download };
-}
-
-function OrderPdfButton({ order, compact = false }: { order: ServiceOrder; compact?: boolean }) {
-  const { loading, download } = useOrderPdfDownload(order);
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        void download();
-      }}
-      disabled={loading}
-      aria-label={`Baixar PDF da OS #${order.number}`}
-      className={cn(
-        "inline-flex w-fit items-center gap-1.5 rounded-full border border-status-done/50 bg-status-done/12 font-black uppercase tracking-[0.08em] text-emerald-100 transition-colors",
-        compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
-        "hover:bg-status-done/20 disabled:cursor-wait disabled:opacity-70",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-done/60",
-      )}
-    >
-      {loading ? (
-        <>
-          <Loader2 size={compact ? 10 : 12} className="animate-spin" />
-          <span>Gerando…</span>
-        </>
-      ) : (
-        <>
-          <FileDown size={compact ? 10 : 12} />
-          <span>PDF OS</span>
-        </>
-      )}
-    </button>
-  );
 }
 
 function OrderPdfActionButton({ order }: { order: ServiceOrder }) {
