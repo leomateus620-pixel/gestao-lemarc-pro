@@ -172,9 +172,18 @@ function OrdemDetalhe() {
   }
 
   // Técnico não avança além de "finished". Também não abre a apuração financeira.
-  const showActionCard =
-    action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review"));
   const tecnicoFinalize = isTecnico && order.status === "running";
+  const adminReview =
+    isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review");
+  const showActionCard =
+    adminReview ||
+    (action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review")));
+  const adminReviewLabel =
+    order.status === "running" ? "Finalizar OS" : "Revisar e finalizar OS";
+  const adminReviewHint =
+    order.status === "running"
+      ? "Apure horas, deslocamento e feche a OS."
+      : "Confira valores, adicione deslocamento e feche a OS.";
 
   return (
     <>
@@ -269,12 +278,17 @@ function OrdemDetalhe() {
         </div>
       </GlassCard>
 
-      {showActionCard && action.next && (
+      {showActionCard && (
         <GlassCard className="mt-4 p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
             Próxima ação
           </p>
-          <h2 className="font-display text-lg font-black text-foreground">{action.label}</h2>
+          <h2 className="font-display text-lg font-black text-foreground">
+            {adminReview ? adminReviewLabel : action.label}
+          </h2>
+          {adminReview && (
+            <p className="mt-1 text-xs text-muted-foreground">{adminReviewHint}</p>
+          )}
           <div className="mt-3">
             {tecnicoFinalize ? (
               <PrimaryCTA
@@ -284,11 +298,11 @@ function OrdemDetalhe() {
               >
                 {mutation.isPending ? "Finalizando..." : "Finalizar OS"}
               </PrimaryCTA>
-            ) : action.next === "finished" ? (
+            ) : adminReview ? (
               <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
-                Finalizar OS
+                {adminReviewLabel}
               </PrimaryCTA>
-            ) : (
+            ) : action.next ? (
               <PrimaryCTA
                 onClick={() => action.next && mutation.mutate(action.next)}
                 icon={action.icon}
@@ -296,7 +310,7 @@ function OrdemDetalhe() {
               >
                 {mutation.isPending ? "Atualizando..." : action.label}
               </PrimaryCTA>
-            )}
+            ) : null}
           </div>
         </GlassCard>
       )}
