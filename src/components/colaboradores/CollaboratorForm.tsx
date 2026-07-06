@@ -33,7 +33,7 @@ type Draft = {
   hourlyRate50: string;
   hourlyRate100: string;
   pricingNotes: string;
-  userId: string;
+  accessEmail: string;
   internalNotes: string;
 };
 
@@ -104,7 +104,7 @@ export function CollaboratorForm({
       hourly_rate_100_cents: rate100,
       pricing_notes: clean(draft.pricingNotes),
       internal_notes: clean(draft.internalNotes),
-      user_id: clean(draft.userId),
+      access_email: draft.accessEmail.trim().toLowerCase() || null,
     });
   }
 
