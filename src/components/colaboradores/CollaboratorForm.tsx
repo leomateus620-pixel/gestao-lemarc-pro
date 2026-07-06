@@ -312,32 +312,24 @@ export function CollaboratorForm({
             />
             <div className="lemarc-form-panel rounded-2xl p-4">
               <p className="text-sm font-black text-white">
-                Etapa opcional — pode salvar sem vincular usuário.
+                Informe o e-mail de login do colaborador para que as OS designadas apareçam no painel dele.
               </p>
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
-                Use este campo apenas quando o colaborador já tiver login no sistema. O ID do
-                usuário é gerado automaticamente no cadastro de acesso e fica preparado para o
-                futuro portal do técnico.
+                O colaborador precisa ter entrado ao menos uma vez em <strong>/login</strong> com este e-mail.
+                Deixe em branco para remover o vínculo.
               </p>
             </div>
-            <details className="rounded-2xl border border-white/[0.1] bg-white/[0.035] p-4">
-              <summary className="cursor-pointer text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
-                Avançado · Vincular usuário existente
-              </summary>
-              <div className="mt-3 space-y-2">
-                <Field label="ID do usuário (UUID)">
-                  <Input
-                    value={draft.userId}
-                    onChange={(event) => set("userId", event.target.value)}
-                    className="lemarc-form-control h-12 rounded-xl font-mono text-[12px]"
-                    placeholder="00000000-0000-0000-0000-000000000000"
-                  />
-                </Field>
-                <p className="text-[11px] font-semibold text-slate-400">
-                  Deixe em branco se não houver login criado para este colaborador.
-                </p>
-              </div>
-            </details>
+            <Field label="E-mail de acesso">
+              <Input
+                value={draft.accessEmail}
+                onChange={(event) => set("accessEmail", event.target.value)}
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                className="lemarc-form-control h-12 rounded-xl"
+                placeholder="colaborador@empresa.com"
+              />
+            </Field>
           </div>
         )}
 
@@ -355,7 +347,9 @@ export function CollaboratorForm({
                 <ReviewMetric label="Hora extra 100%" value={formatCurrency(rate100)} />
               </div>
               <p className="mt-4 text-xs font-semibold text-slate-300">
-                {draft.userId.trim() ? "Usuário vinculado informado" : "Sem usuário vinculado"}
+                {draft.accessEmail.trim()
+                  ? `Usuário vinculado: ${draft.accessEmail.trim().toLowerCase()}`
+                  : "Sem usuário vinculado"}
               </p>
             </div>
           </div>
