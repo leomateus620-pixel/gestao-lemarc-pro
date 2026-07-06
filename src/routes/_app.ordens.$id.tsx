@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { useUserRole } from "@/hooks/useUserRole";
+import { toast as toastFn } from "sonner";
 import { maskCNPJ } from "@/lib/cnpj";
 import { GlassCard } from "@/components/app/GlassCard";
 import { SectionHeader } from "@/components/app/SectionHeader";
@@ -114,6 +116,8 @@ function OrdemPage() {
 
 function OrdemDetalhe() {
   const { id } = Route.useParams();
+  const { isAdmin, isTecnico, loading: roleLoading } = useUserRole();
+  const navigate = (typeof window !== "undefined") ? undefined : undefined; // placeholder
   const fetcher = useServerFn(getServiceOrder);
   const { data: order } = useSuspenseQuery(
     queryOptions({
@@ -127,9 +131,12 @@ function OrdemDetalhe() {
   const updateStatus = useServerFn(updateServiceOrderStatus);
   const mutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => updateStatus({ data: { id: order.id, status } }),
-    onSuccess: () => {
+    onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", id] });
+      if (isTecnico && status === "finished") {
+        toastFn.success("OS finalizada e enviada para revisão.");
+      }
     },
   });
 
@@ -137,6 +144,11 @@ function OrdemDetalhe() {
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+
+  // Técnico não avança além de "finished". Também não abre a apuração financeira.
+  const showActionCard =
+    action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review"));
+  const tecnicoFinalize = isTecnico && order.status === "running";
 
   return (
     <>
