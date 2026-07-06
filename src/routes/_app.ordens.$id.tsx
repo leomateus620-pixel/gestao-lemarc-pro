@@ -287,11 +287,13 @@ function OrdemDetalhe() {
         </GlassCard>
       )}
 
-      <FinalizeServiceOrderDialog
-        order={order}
-        open={finalizeOpen}
-        onOpenChange={setFinalizeOpen}
-      />
+      {isAdmin && (
+        <FinalizeServiceOrderDialog
+          order={order}
+          open={finalizeOpen}
+          onOpenChange={setFinalizeOpen}
+        />
+      )}
 
       <ServiceOrderTimeControl order={order} />
 
@@ -299,7 +301,7 @@ function OrdemDetalhe() {
 
       <ServiceOrderAttachmentsSection orderId={order.id} />
 
-      <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />
+      {isAdmin && <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />}
 
       {missing.length > 0 && (
         <Section title="Pendências de cadastro" icon={FileText}>
