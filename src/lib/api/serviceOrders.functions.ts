@@ -51,6 +51,8 @@ export type TechnicianInput = {
   pricing_notes?: string | null;
   internal_notes?: string | null;
   user_id?: string | null;
+  /** Se presente, sobrescreve user_id resolvendo o e-mail contra public.profiles. */
+  access_email?: string | null;
 };
 
 export type TechnicianUpdateInput = TechnicianInput & { id: string };
@@ -73,6 +75,7 @@ function normalizeTechnician(row: any): TechnicianLite {
     pricing_notes: row.pricing_notes ?? null,
     internal_notes: row.internal_notes ?? null,
     user_id: row.user_id ?? null,
+    access_email: row.access_email ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
   };
@@ -102,6 +105,38 @@ function fullTechnicianPayload(data: TechnicianInput) {
     pricing_notes: data.pricing_notes ?? null,
     internal_notes: data.internal_notes ?? null,
   };
+}
+
+async function enrichWithAccessEmail(sb: any, techs: TechnicianLite[]): Promise<TechnicianLite[]> {
+  const ids = Array.from(new Set(techs.map((t) => t.user_id).filter(Boolean))) as string[];
+  if (ids.length === 0) return techs;
+  const { data, error } = await sb.from("profiles").select("user_id, email").in("user_id", ids);
+  if (error) return techs;
+  const map = new Map<string, string | null>();
+  for (const row of (data ?? []) as { user_id: string; email: string | null }[]) {
+    map.set(row.user_id, row.email ?? null);
+  }
+  return techs.map((t) => ({ ...t, access_email: t.user_id ? (map.get(t.user_id) ?? null) : null }));
+}
+
+async function resolveAccessEmail(
+  sb: any,
+  email: string | null | undefined,
+): Promise<string | null> {
+  const trimmed = (email ?? "").trim();
+  if (!trimmed) return null;
+  const { data, error } = await sb
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", trimmed)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.user_id) {
+    throw new Error(
+      "Nenhum usuário encontrado com este e-mail. Peça para o colaborador entrar uma vez em /login com este e-mail e tente novamente.",
+    );
+  }
+  return data.user_id as string;
 }
 
 function normalize(row: any): ServiceOrder {
@@ -371,11 +406,11 @@ export const listTechnicians = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sb = context.supabase as any;
     const full = await sb.from("technicians").select(TECHNICIAN_FULL_SELECT).order("full_name");
-    if (!full.error) return (full.data ?? []).map(normalizeTechnician);
+    if (!full.error) return enrichWithAccessEmail(sb, (full.data ?? []).map(normalizeTechnician));
 
     const legacy = await sb.from("technicians").select(TECHNICIAN_LEGACY_SELECT).order("full_name");
     if (legacy.error) throw new Error(legacy.error.message);
-    return (legacy.data ?? []).map(normalizeTechnician);
+    return enrichWithAccessEmail(sb, (legacy.data ?? []).map(normalizeTechnician));
   });
 
 export const createTechnician = createServerFn({ method: "POST" })
@@ -383,6 +418,9 @@ export const createTechnician = createServerFn({ method: "POST" })
   .inputValidator((data: TechnicianInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    if (data.access_email !== undefined) {
+      data = { ...data, user_id: await resolveAccessEmail(sb, data.access_email) };
+    }
     const payload = {
       ...fullTechnicianPayload(data),
       created_by: context.userId,
@@ -408,6 +446,9 @@ export const updateTechnician = createServerFn({ method: "POST" })
   .inputValidator((data: TechnicianUpdateInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    if (data.access_email !== undefined) {
+      data = { ...data, user_id: await resolveAccessEmail(sb, data.access_email) };
+    }
     const before = await sb
       .from("technicians")
       .select(TECHNICIAN_FULL_SELECT)

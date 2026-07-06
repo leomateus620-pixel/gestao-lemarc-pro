@@ -67,6 +67,8 @@ export type TechnicianLite = {
   default_availability?: string | null;
   kind?: string | null;
   user_id?: string | null;
+  /** E-mail do usuário do sistema vinculado ao colaborador (derivado de profiles.email). */
+  access_email?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
