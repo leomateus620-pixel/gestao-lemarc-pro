@@ -962,6 +962,11 @@ export type Database = {
           read_ct: number
         }[]
       }
+      user_is_order_technician: {
+        Args: { _order_id: string }
+        Returns: boolean
+      }
+      user_owns_order: { Args: { _order_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "operador" | "tecnico"
