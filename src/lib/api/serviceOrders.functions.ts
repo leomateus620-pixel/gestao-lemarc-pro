@@ -51,6 +51,8 @@ export type TechnicianInput = {
   pricing_notes?: string | null;
   internal_notes?: string | null;
   user_id?: string | null;
+  /** Se presente, sobrescreve user_id resolvendo o e-mail contra public.profiles. */
+  access_email?: string | null;
 };
 
 export type TechnicianUpdateInput = TechnicianInput & { id: string };
@@ -73,6 +75,7 @@ function normalizeTechnician(row: any): TechnicianLite {
     pricing_notes: row.pricing_notes ?? null,
     internal_notes: row.internal_notes ?? null,
     user_id: row.user_id ?? null,
+    access_email: row.access_email ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
   };
@@ -371,11 +374,11 @@ export const listTechnicians = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sb = context.supabase as any;
     const full = await sb.from("technicians").select(TECHNICIAN_FULL_SELECT).order("full_name");
-    if (!full.error) return (full.data ?? []).map(normalizeTechnician);
+    if (!full.error) return enrichWithAccessEmail(sb, (full.data ?? []).map(normalizeTechnician));
 
     const legacy = await sb.from("technicians").select(TECHNICIAN_LEGACY_SELECT).order("full_name");
     if (legacy.error) throw new Error(legacy.error.message);
-    return (legacy.data ?? []).map(normalizeTechnician);
+    return enrichWithAccessEmail(sb, (legacy.data ?? []).map(normalizeTechnician));
   });
 
 export const createTechnician = createServerFn({ method: "POST" })
