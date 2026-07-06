@@ -1,47 +1,40 @@
 ## Diagnóstico
 
-1. **"Iniciar serviço" pede um clique por técnico.**
-   `ServiceOrderTimeControl` cria uma sessão só para o técnico selecionado. Quando são 2 pessoas, o técnico tem que trocar o `select`, clicar de novo e às vezes esquece — daí a sensação de bug.
+Quando o técnico finaliza a OS, `updateServiceOrderStatus({status:"finished"})` muda o status direto para `finished`. Ao abrir essa OS, o administrador vê a rota `flow.finished`, cujo botão é **"Enviar para revisão"** e apenas dispara `mutation.mutate("review")` — pulando o `FinalizeServiceOrderDialog` (a tela de apuração, deslocamento, materiais, revisão e fechamento).
 
-2. **Ao clicar "Finalizar serviço" acontece um erro silencioso.**
-   No topo da OS, "Finalizar serviço" chama `updateServiceOrderStatus({status:'finished'})`. O servidor **exige assinatura** (`Antes de finalizar a OS, colete a assinatura do responsável…`). A `useMutation` não tem `onError`, então nada é exibido; o usuário toca em outras coisas e acaba em `/ordens` (barra inferior nova) achando que foi redirecionado por causa do "Finalizar". Também não checamos se ainda existe alguém com o cronômetro rodando.
+Na sequência, `flow.review` mostra **"Aprovar para cobrança"** e vai direto a `approved`, também sem passar pelo diálogo.
+
+Ou seja: hoje o diálogo de revisão só abre quando `action.next === "finished"` (isto é, quando o próprio admin sai de `running`). Se o técnico já deixou a OS em `finished`, o admin nunca mais chega a ele — daí "a revisão não abre os campos" e a OS aparece já finalizada (anexo 3), sem chance de editar deslocamento/valores.
+
+O backend está OK: `finalizeServiceOrder` continua sendo a chamada correta para consolidar tudo (labor entries, deslocamento, materiais, `worked_minutes`, `hour_rate`, `finished_at`, `closed_at`). Só precisamos reconduzir o admin ao diálogo.
 
 ## Correção
 
-### 1. Iniciar serviço em lote (1–2 técnicos)
-
-Em `src/components/ordens/ServiceOrderTimeControl.tsx`:
-
-- Se `technicians.length <= 2` **e nenhum** técnico está com sessão `running`, mostrar um **único botão principal** "Iniciar serviço para toda a equipe" que executa `startWork` para cada técnico em paralelo (`Promise.all`, ignorando os que já estejam ativos). Toast único: "Serviço iniciado para X técnicos.".
-- Se algum já iniciou, cair para os botões individuais atuais (permitir o companheiro iniciar depois).
-- Se `technicians.length >= 3`, manter o fluxo atual (um botão por técnico, com o `select`).
-- Mesma lógica aplicada a **retomar** quando todos estão pausados (opcional, só se ficar trivial — se não, deixar de fora deste plano).
-- Nada muda no servidor (`startWork` continua por técnico).
-
-### 2. Finalizar serviço para técnico — sem erro cego, sem redirect
-
 Em `src/routes/_app.ordens.$id.tsx`:
 
-- Na `useMutation` de `updateServiceOrderStatus`, adicionar `onError` com `toast.error(e.message)` em pt-BR — assim o técnico vê o motivo real ("colete a assinatura…") em vez de nada.
-- Antes de disparar `mutation.mutate("finished")` no botão do técnico:
-  - Se **não houver assinatura ativa nem waiver**, abrir automaticamente o diálogo de coleta de assinatura (`SignatureCaptureDialog`) em vez de chamar o backend. Após a assinatura ser salva, disparar `finished` na sequência.
-  - Se ainda houver sessão de tempo em execução para algum técnico, encerrar automaticamente essas sessões (`finishWork` por técnico ativo) antes de mudar o status. Toast informativo: "Encerrando cronômetro antes de finalizar…".
-- Em `onSuccess` do `status === "finished"` para técnico: **não navegar**. Continuar mostrando a mesma OS com o card "OS finalizada e enviada para revisão." (já existe). Invalidar caches: `service-order`, `service-orders`, `order-time-sessions`.
-- Nada muda para o admin (ele continua usando o `FinalizeServiceOrderDialog`).
+1. **Reabrir o diálogo de revisão para admin em `finished` e `review`**
+   - Definir `adminReview = isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review")`.
+   - No card "Próxima ação", quando `adminReview` for verdadeiro, o botão principal chama `setFinalizeOpen(true)` (ícone `Calculator`) — em vez de disparar transição de status.
+   - Ajustar o rótulo do card:
+     - `running` → "Finalizar OS" (mantém).
+     - `finished` → "Revisar e finalizar OS" (subtítulo: "Confira valores, adicione deslocamento e feche a OS").
+     - `review` → "Revisar e finalizar OS".
+   - `showActionCard` passa a considerar também admin em `finished`/`review` (hoje já é verdade, mas sem passar pelo diálogo). Nenhuma outra transição da máquina de estados é alterada.
 
-### 3. Guarda-corpo contra redirect indesejado
+2. **Rota `flow` intocada** — o admin não vai mais usar `finished → review → approved` pela CTA principal. `finalizeServiceOrder` continua deixando o status em `finished` após a revisão, o que é o comportamento existente para o fluxo do admin.
 
-- Nenhum código atual navega para `/ordens` após finalizar; a percepção do usuário vem do menu inferior (que agora inclui `/ordens`). Manter `/ordens` no menu — o técnico agora precisa dele — mas garantir que o botão "Finalizar" nunca perca o contexto da OS (fica na mesma rota `/ordens/$id`).
+3. **Técnico continua igual**: `tecnicoFinalize` (status `running`) abre a assinatura + `mutate("finished")`. Card verde "OS finalizada e enviada para revisão." segue como está.
+
+4. **Nada muda no backend, RLS, servidor, ou no `FinalizeServiceOrderDialog`**.
 
 ## Fora de escopo
 
-- Alterações no servidor `updateServiceOrderStatus` ou nas políticas RLS.
-- Mudar o fluxo do admin (revisão/aprovação continua igual).
+- Estados `approved`/`cancelled`.
+- Alterações no servidor ou nas políticas RLS.
+- Fluxo do técnico após finalizar.
 
 ## Validação
 
-- OS com 1 técnico + Marcio (2): botão único "Iniciar serviço para toda a equipe" cria sessões para ambos.
-- OS com 3+ técnicos: botões individuais como hoje.
-- Marcio clica "Finalizar serviço" sem assinatura → abre o diálogo de assinatura; após assinar, OS vai a `finished`, aparece "OS finalizada e enviada para revisão." e ele permanece em `/ordens/$id`. Nada de erro silencioso.
-- Marcio clica "Finalizar serviço" com cronômetro rodando → sistema encerra a sessão, finaliza a OS e mostra o card final.
-- Admin não vê mudança de comportamento.
+- Técnico finaliza OS #X → status vai a `finished`, ele vê card "OS finalizada e enviada para revisão." (como no anexo 2).
+- Admin abre a mesma OS #X: card "Próxima ação" mostra **"Revisar e finalizar OS"** → clique abre o `FinalizeServiceOrderDialog` (Apontamentos / Deslocamento / Revisão), permitindo editar valores, adicionar deslocamento e concluir. Ao confirmar, `finalizeServiceOrder` roda e a OS fica `finished` com totais preenchidos.
+- OS criada e finalizada pelo próprio admin (fluxo antigo, anexo 1) continua idêntica.
