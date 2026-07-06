@@ -243,14 +243,22 @@ function OrdemDetalhe() {
         </div>
       </GlassCard>
 
-      {action.next && (
+      {showActionCard && action.next && (
         <GlassCard className="mt-4 p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
             Próxima ação
           </p>
           <h2 className="font-display text-lg font-black text-foreground">{action.label}</h2>
           <div className="mt-3">
-            {action.next === "finished" ? (
+            {tecnicoFinalize ? (
+              <PrimaryCTA
+                onClick={() => mutation.mutate("finished")}
+                icon={Calculator}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? "Finalizando..." : "Finalizar OS"}
+              </PrimaryCTA>
+            ) : action.next === "finished" ? (
               <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
                 Finalizar OS
               </PrimaryCTA>
@@ -264,6 +272,18 @@ function OrdemDetalhe() {
               </PrimaryCTA>
             )}
           </div>
+        </GlassCard>
+      )}
+
+      {isTecnico && (order.status === "finished" || order.status === "review" || order.status === "approved") && (
+        <GlassCard className="mt-4 p-4 text-center">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Concluído</p>
+          <h2 className="font-display text-lg font-black text-foreground">
+            OS finalizada e enviada para revisão.
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A equipe administrativa fará a apuração e o fechamento.
+          </p>
         </GlassCard>
       )}
 
