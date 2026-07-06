@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { reportSearchSchema, searchToFilters } from "@/lib/reports/filters";
@@ -38,7 +39,11 @@ import { ReportExportActions } from "@/components/reports/ReportExportActions";
 export const Route = createFileRoute("/_app/relatorios_/cliente/$clientId")({
   head: () => ({ meta: [{ title: "Relatório por cliente — Gestão Lemarc" }] }),
   validateSearch: zodValidator(reportSearchSchema),
-  component: ClientReportPage,
+  component: () => (
+    <RequireAdmin>
+      <ClientReportPage />
+    </RequireAdmin>
+  ),
   errorComponent: ({ error }) => <ErrorView error={error} />,
   notFoundComponent: () => (
     <AppShell title="Relatório por cliente" back>

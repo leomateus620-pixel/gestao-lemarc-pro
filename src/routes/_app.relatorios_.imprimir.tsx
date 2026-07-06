@@ -6,6 +6,7 @@ import { useReportOrdersQuery } from "@/hooks/useReports";
 import { buildManagerialReport, describePeriod } from "@/lib/reports/managerial";
 import { ManagerialReportDocument } from "@/components/reports/print/ManagerialReportDocument";
 import { useAuth } from "@/components/app/AuthContext";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, FileDown, Printer, RefreshCcw } from "lucide-react";
 import { downloadManagerialReportPdf } from "@/lib/reports/managerialDownload";
@@ -14,7 +15,11 @@ export const Route = createFileRoute("/_app/relatorios_/imprimir")({
   head: () => ({ meta: [{ title: "Relatório gerencial — Gestão Lemarc" }] }),
   validateSearch: zodValidator(reportSearchSchema),
   staticData: { hideBottomNav: true },
-  component: PrintPage,
+  component: () => (
+    <RequireAdmin>
+      <PrintPage />
+    </RequireAdmin>
+  ),
   errorComponent: PrintError,
   notFoundComponent: PrintNotFound,
 });

@@ -15,6 +15,7 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { reportSearchSchema, searchToFilters } from "@/lib/reports/filters";
@@ -46,7 +47,11 @@ export const Route = createFileRoute("/_app/relatorios")({
     meta: [{ title: "Relatórios — Gestão Lemarc" }],
   }),
   validateSearch: zodValidator(reportSearchSchema),
-  component: RelatoriosPage,
+  component: () => (
+    <RequireAdmin>
+      <RelatoriosPage />
+    </RequireAdmin>
+  ),
   errorComponent: RelatoriosError,
 });
 

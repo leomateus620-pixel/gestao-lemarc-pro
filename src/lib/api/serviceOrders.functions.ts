@@ -270,6 +270,12 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)
   .handler(async ({ data, context }) => {
     const now = new Date().toISOString();
+    // Técnico não pode aprovar cobrança nem cancelar.
+    if (data.status === "approved" || data.status === "cancelled") {
+      const sb = context.supabase as any;
+      const { data: isAdmin } = await sb.rpc("is_admin");
+      if (!isAdmin) throw new Error("Ação restrita ao administrador.");
+    }
     // Bloqueio: ao finalizar/enviar para revisão/aprovar, exigir assinatura ou waiver.
     if (data.status === "finished" || data.status === "review" || data.status === "approved") {
       const sb = context.supabase as any;

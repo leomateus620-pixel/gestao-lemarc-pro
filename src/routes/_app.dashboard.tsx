@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { useAuth } from "@/components/app/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
+import { Plus, ClipboardCheck } from "lucide-react";
 import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { EmptyOperations } from "@/components/dashboard/EmptyOperations";
@@ -35,9 +38,77 @@ function DashboardPage() {
   return (
     <AppShell>
       <Suspense fallback={<DashboardSkeleton />}>
-        <Dashboard />
+        <DashboardRouter />
       </Suspense>
     </AppShell>
+  );
+}
+
+function DashboardRouter() {
+  const { isTecnico, loading } = useUserRole();
+  if (loading) return <DashboardSkeleton />;
+  if (isTecnico) return <TechnicianHome />;
+  return <Dashboard />;
+}
+
+function TechnicianHome() {
+  const { displayName } = useAuth();
+  const { data: orders } = useServiceOrdersQuery();
+  const firstName = (displayName || "Técnico").split(" ")[0];
+  const myActive = orders.filter((o) =>
+    ["pending", "dispatched", "transit", "running"].includes(o.status),
+  );
+  const myRecent = orders.slice(0, 6);
+  return (
+    <main className="mx-auto max-w-3xl space-y-5 pb-6">
+      <section className="lemarc-hero-gradient rounded-2xl border border-primary/25 bg-primary/[0.06] p-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+          Bem-vindo, {firstName}
+        </p>
+        <h1 className="mt-1 font-display text-2xl font-black text-foreground">
+          Central do técnico
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Acompanhe suas ordens de serviço e registre a execução em campo.
+        </p>
+        <Link
+          to="/ordens/nova"
+          className="lemarc-pressable mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-black uppercase tracking-wide text-primary-foreground shadow-lg"
+        >
+          <Plus size={18} /> Nova OS
+        </Link>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="section-title flex items-center gap-2">
+          <ClipboardCheck size={16} className="text-primary" /> OS em execução
+        </h2>
+        {myActive.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-muted-foreground">
+            Nenhuma OS atribuída a você.
+            <br />
+            Crie uma nova OS para iniciar um atendimento.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {myActive.map((o) => (
+              <ServiceOrderCard key={o.id} order={o} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {myRecent.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="section-title">Últimas OS</h2>
+          <div className="grid gap-3">
+            {myRecent.map((o) => (
+              <ServiceOrderCard key={o.id} order={o} />
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
   );
 }
 

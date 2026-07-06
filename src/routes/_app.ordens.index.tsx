@@ -4,6 +4,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { Activity, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { EmptyState } from "@/components/app/EmptyState";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { ServiceOrderIslandRow } from "@/components/ordens/ServiceOrderIslandRow";
@@ -72,7 +73,11 @@ export const Route = createFileRoute("/_app/ordens/")({
   head: () => ({ meta: [{ title: "Ordens de serviço — Gestão Lemarc" }] }),
   validateSearch: zodValidator(searchSchema),
   errorComponent: OrdensError,
-  component: OrdensPage,
+  component: () => (
+    <RequireAdmin>
+      <OrdensPage />
+    </RequireAdmin>
+  ),
 });
 
 const statusRank: Record<ServiceOrderStatus, number> = {

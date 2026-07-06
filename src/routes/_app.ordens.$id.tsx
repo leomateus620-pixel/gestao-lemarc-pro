@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { useUserRole } from "@/hooks/useUserRole";
+import { toast as toastFn } from "sonner";
 import { maskCNPJ } from "@/lib/cnpj";
 import { GlassCard } from "@/components/app/GlassCard";
 import { SectionHeader } from "@/components/app/SectionHeader";
@@ -114,6 +116,7 @@ function OrdemPage() {
 
 function OrdemDetalhe() {
   const { id } = Route.useParams();
+  const { isAdmin, isTecnico } = useUserRole();
   const fetcher = useServerFn(getServiceOrder);
   const { data: order } = useSuspenseQuery(
     queryOptions({
@@ -127,9 +130,12 @@ function OrdemDetalhe() {
   const updateStatus = useServerFn(updateServiceOrderStatus);
   const mutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => updateStatus({ data: { id: order.id, status } }),
-    onSuccess: () => {
+    onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", id] });
+      if (isTecnico && status === "finished") {
+        toastFn.success("OS finalizada e enviada para revisão.");
+      }
     },
   });
 
@@ -137,6 +143,11 @@ function OrdemDetalhe() {
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+
+  // Técnico não avança além de "finished". Também não abre a apuração financeira.
+  const showActionCard =
+    action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review"));
+  const tecnicoFinalize = isTecnico && order.status === "running";
 
   return (
     <>
@@ -231,14 +242,22 @@ function OrdemDetalhe() {
         </div>
       </GlassCard>
 
-      {action.next && (
+      {showActionCard && action.next && (
         <GlassCard className="mt-4 p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
             Próxima ação
           </p>
           <h2 className="font-display text-lg font-black text-foreground">{action.label}</h2>
           <div className="mt-3">
-            {action.next === "finished" ? (
+            {tecnicoFinalize ? (
+              <PrimaryCTA
+                onClick={() => mutation.mutate("finished")}
+                icon={Calculator}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? "Finalizando..." : "Finalizar OS"}
+              </PrimaryCTA>
+            ) : action.next === "finished" ? (
               <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
                 Finalizar OS
               </PrimaryCTA>
@@ -255,11 +274,25 @@ function OrdemDetalhe() {
         </GlassCard>
       )}
 
-      <FinalizeServiceOrderDialog
-        order={order}
-        open={finalizeOpen}
-        onOpenChange={setFinalizeOpen}
-      />
+      {isTecnico && (order.status === "finished" || order.status === "review" || order.status === "approved") && (
+        <GlassCard className="mt-4 p-4 text-center">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Concluído</p>
+          <h2 className="font-display text-lg font-black text-foreground">
+            OS finalizada e enviada para revisão.
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A equipe administrativa fará a apuração e o fechamento.
+          </p>
+        </GlassCard>
+      )}
+
+      {isAdmin && (
+        <FinalizeServiceOrderDialog
+          order={order}
+          open={finalizeOpen}
+          onOpenChange={setFinalizeOpen}
+        />
+      )}
 
       <ServiceOrderTimeControl order={order} />
 
@@ -267,7 +300,7 @@ function OrdemDetalhe() {
 
       <ServiceOrderAttachmentsSection orderId={order.id} />
 
-      <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />
+      {isAdmin && <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />}
 
       {missing.length > 0 && (
         <Section title="Pendências de cadastro" icon={FileText}>

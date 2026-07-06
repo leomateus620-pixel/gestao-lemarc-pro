@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/app/AuthContext";
 
-export type AppRole = "admin" | "operador";
+export type AppRole = "admin" | "operador" | "tecnico";
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -31,10 +31,9 @@ export function useUserRole() {
     };
   }, [user]);
 
-  return {
-    roles,
-    loading,
-    isAdmin: roles.includes("admin"),
-    isOperador: roles.includes("operador") || roles.length === 0,
-  };
+  const isAdmin = roles.includes("admin");
+  const isOperador = roles.includes("operador");
+  // Enquanto os papéis não carregam, não decide (evita flash de UI técnica para admin).
+  const isTecnico = !loading && !isAdmin && !isOperador;
+  return { roles, loading, isAdmin, isOperador, isTecnico };
 }
