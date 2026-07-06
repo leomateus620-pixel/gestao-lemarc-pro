@@ -37,6 +37,7 @@ function PrecificacaoContent() {
   const { data: technicians } = useTechniciansQuery();
   const technician = technicians.find((item) => item.id === id);
   if (!technician) throw notFound();
+  const tech = technician;
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -83,21 +84,21 @@ function PrecificacaoContent() {
     const parsed100 = rate100.trim() ? parseCurrencyInput(rate100) : normalCents * 2;
     mutation.mutate({
       id,
-      full_name: technician.full_name,
-      role: technician.role,
-      phone: technician.phone,
-      email: technician.email,
-      cpf: technician.cpf,
-      specialty: technician.specialty,
-      active: technician.active,
-      kind: technician.kind,
-      default_availability: technician.default_availability,
+      full_name: tech.full_name,
+      role: tech.role,
+      phone: tech.phone,
+      email: tech.email,
+      cpf: tech.cpf,
+      specialty: tech.specialty,
+      active: tech.active,
+      kind: tech.kind,
+      default_availability: tech.default_availability,
       hourly_rate_cents: normalCents,
       hourly_rate_50_cents: parsed50,
       hourly_rate_100_cents: parsed100,
       pricing_notes: notes.trim() || null,
-      internal_notes: technician.internal_notes,
-      user_id: technician.user_id,
+      internal_notes: tech.internal_notes,
+      user_id: tech.user_id,
     });
   }
 
