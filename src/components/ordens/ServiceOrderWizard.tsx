@@ -712,6 +712,16 @@ function ClientStep({
             />
           </div>
           <div className="space-y-2">
+            <FieldLabel>CNPJ (opcional)</FieldLabel>
+            <Input
+              value={maskCNPJ(newCnpj)}
+              onChange={(e) => setNewCnpj(onlyDigits(e.target.value).slice(0, 14))}
+              placeholder="00.000.000/0000-00"
+              inputMode="numeric"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-2">
             <FieldLabel>Unidade (opcional)</FieldLabel>
             <Input
               value={newUnit}
@@ -720,6 +730,11 @@ function ClientStep({
               className={inputCls}
             />
           </div>
+          {newError && (
+            <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100">
+              {newError}
+            </p>
+          )}
           <Button
             type="button"
             onClick={() => clientMutation.mutate()}
