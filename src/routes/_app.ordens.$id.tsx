@@ -154,6 +154,16 @@ function OrdemDetalhe() {
     Boolean((order as unknown as { signature?: unknown }).signature) ||
     Boolean(order.signature_waiver_reason);
 
+  // Admin: sabe se a apuração já foi finalizada (para esconder o CTA de revisão).
+  const financialsFetcher = useServerFn(getOrderFinancials);
+  const { data: financialsData } = useQuery({
+    queryKey: ["order-financials", order.id],
+    queryFn: () => financialsFetcher({ data: { orderId: order.id } }),
+    enabled: isAdmin,
+    staleTime: 15_000,
+  });
+  const alreadyFinalized = Boolean(financialsData?.financials?.finalized_at);
+
   async function handleTecnicoFinish() {
     const orderId = order!.id;
     if (!hasSignature) {
@@ -174,7 +184,15 @@ function OrdemDetalhe() {
   // Técnico não avança além de "finished". Também não abre a apuração financeira.
   const tecnicoFinalize = isTecnico && order.status === "running";
   const adminReview =
-    isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review");
+    isAdmin &&
+    !alreadyFinalized &&
+    (order.status === "running" || order.status === "finished" || order.status === "review");
+  const tecnicoDone =
+    isTecnico &&
+    (order.status === "finished" ||
+      order.status === "review" ||
+      order.status === "approved" ||
+      order.status === "cancelled");
   const showActionCard =
     adminReview ||
     (action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review")));
@@ -344,7 +362,7 @@ function OrdemDetalhe() {
         />
       )}
 
-      <ServiceOrderTimeControl order={order} />
+      {!tecnicoDone && <ServiceOrderTimeControl order={order} />}
 
       <SignatureBlock order={order} />
 

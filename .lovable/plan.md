@@ -1,40 +1,42 @@
 ## Diagnóstico
 
-Quando o técnico finaliza a OS, `updateServiceOrderStatus({status:"finished"})` muda o status direto para `finished`. Ao abrir essa OS, o administrador vê a rota `flow.finished`, cujo botão é **"Enviar para revisão"** e apenas dispara `mutation.mutate("review")` — pulando o `FinalizeServiceOrderDialog` (a tela de apuração, deslocamento, materiais, revisão e fechamento).
-
-Na sequência, `flow.review` mostra **"Aprovar para cobrança"** e vai direto a `approved`, também sem passar pelo diálogo.
-
-Ou seja: hoje o diálogo de revisão só abre quando `action.next === "finished"` (isto é, quando o próprio admin sai de `running`). Se o técnico já deixou a OS em `finished`, o admin nunca mais chega a ele — daí "a revisão não abre os campos" e a OS aparece já finalizada (anexo 3), sem chance de editar deslocamento/valores.
-
-O backend está OK: `finalizeServiceOrder` continua sendo a chamada correta para consolidar tudo (labor entries, deslocamento, materiais, `worked_minutes`, `hour_rate`, `finished_at`, `closed_at`). Só precisamos reconduzir o admin ao diálogo.
+1. **Botão "Revisar e finalizar" continua ativo após revisão**: `finalizeServiceOrder` grava `service_order_financials.finalized_at` mas mantém `status = "finished"`. A UI usa apenas `order.status` para decidir se `adminReview` está ativo, então após salvar a apuração o card continua aparecendo.
+2. **Técnico continua vendo o Controle de tempo após a finalização**: `<ServiceOrderTimeControl />` é renderizado incondicionalmente em `_app.ordens.$id.tsx`.
+3. **Técnico vê OSs de outros**: `TechnicianHome` chama `useServiceOrdersQuery()` sem filtrar por técnico logado; qualquer OS que o RLS deixar passar aparece em "Últimas OS".
+4. **Aba "Ordens" na bottom nav do técnico**: `/ordens` está listada em `TECNICO_ROUTES`, mas a rota tem `RequireAdmin` — o técnico vê a aba, clica e leva um bloqueio. Regra pedida: pós-finalização, o técnico só vê a OS no menu "Início".
 
 ## Correção
 
-Em `src/routes/_app.ordens.$id.tsx`:
+### 1. Esconder "Revisar e finalizar" após apuração salva (`src/routes/_app.ordens.$id.tsx`)
 
-1. **Reabrir o diálogo de revisão para admin em `finished` e `review`**
-   - Definir `adminReview = isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review")`.
-   - No card "Próxima ação", quando `adminReview` for verdadeiro, o botão principal chama `setFinalizeOpen(true)` (ícone `Calculator`) — em vez de disparar transição de status.
-   - Ajustar o rótulo do card:
-     - `running` → "Finalizar OS" (mantém).
-     - `finished` → "Revisar e finalizar OS" (subtítulo: "Confira valores, adicione deslocamento e feche a OS").
-     - `review` → "Revisar e finalizar OS".
-   - `showActionCard` passa a considerar também admin em `finished`/`review` (hoje já é verdade, mas sem passar pelo diálogo). Nenhuma outra transição da máquina de estados é alterada.
+- Buscar `getOrderFinancials(order.id)` (já importado) com `useQuery` no admin. Definir `alreadyFinalized = Boolean(financials?.finalized_at)`.
+- `adminReview = isAdmin && !alreadyFinalized && (status === "running" | "finished" | "review")`.
+- Quando `alreadyFinalized` for verdadeiro, o card "Próxima ação" some para o admin. A OS mostra apenas os totais consolidados (o `FinancialBlock` já cobre isso e tem o botão "Editar" via `onEdit`, que continua permitindo reabrir a apuração se necessário).
 
-2. **Rota `flow` intocada** — o admin não vai mais usar `finished → review → approved` pela CTA principal. `finalizeServiceOrder` continua deixando o status em `finished` após a revisão, o que é o comportamento existente para o fluxo do admin.
+### 2. Esconder Controle de tempo para técnico após finalização (`_app.ordens.$id.tsx`)
 
-3. **Técnico continua igual**: `tecnicoFinalize` (status `running`) abre a assinatura + `mutate("finished")`. Card verde "OS finalizada e enviada para revisão." segue como está.
+- Renderizar `<ServiceOrderTimeControl />` apenas quando `!(isTecnico && (status === "finished" || "review" || "approved" || "cancelled"))`. Admin continua vendo (pode reabrir se preciso).
+- O card verde "OS finalizada e enviada para revisão." já existente permanece como única sinalização para o técnico.
 
-4. **Nada muda no backend, RLS, servidor, ou no `FinalizeServiceOrderDialog`**.
+### 3. Filtrar OSs por técnico logado (`src/routes/_app.dashboard.tsx` → `TechnicianHome`)
+
+- Descobrir o `technician.id` correspondente ao `user.id` logado (via `useTechniciansQuery` + match por `user_id`).
+- Filtrar `orders` para manter só as em que o técnico faz parte de `getOrderTechnicians(order)` (por id) ou é o `technician_id` legado.
+- "OS em execução" segue mostrando só status ativos; "Últimas OS" passa a listar as OSs finalizadas/aprovadas/canceladas do próprio técnico — atendendo "uma vez finalizada, só aparece no menu Início".
+
+### 4. Remover aba "Ordens" da navegação do técnico (`src/components/app/BottomNav.tsx`)
+
+- `TECNICO_ROUTES` passa a conter apenas `/dashboard` e `/mais`. A rota `/ordens/:id` continua funcionando quando o técnico abre a OS a partir de "Início".
 
 ## Fora de escopo
 
-- Estados `approved`/`cancelled`.
-- Alterações no servidor ou nas políticas RLS.
-- Fluxo do técnico após finalizar.
+- Alterações no `finalizeServiceOrder`, RLS, ou máquina de estados.
+- Fluxo do admin em `approved`/`cancelled`.
+- Listagem/relatórios do admin.
 
 ## Validação
 
-- Técnico finaliza OS #X → status vai a `finished`, ele vê card "OS finalizada e enviada para revisão." (como no anexo 2).
-- Admin abre a mesma OS #X: card "Próxima ação" mostra **"Revisar e finalizar OS"** → clique abre o `FinalizeServiceOrderDialog` (Apontamentos / Deslocamento / Revisão), permitindo editar valores, adicionar deslocamento e concluir. Ao confirmar, `finalizeServiceOrder` roda e a OS fica `finished` com totais preenchidos.
-- OS criada e finalizada pelo próprio admin (fluxo antigo, anexo 1) continua idêntica.
+- Admin abre OS finalizada pelo técnico → card "Revisar e finalizar OS" aparece → clica, edita valores/deslocamento, confirma → dialog fecha, card some, `FinancialBlock` mostra totais consolidados (com botão "Editar" para reabrir se preciso).
+- Técnico abre OS já finalizada → vê hero + card verde "OS finalizada"; sem controle de tempo, sem botão de reabrir.
+- Técnico no /dashboard vê só OSs em que está cadastrado, tanto em "OS em execução" quanto em "Últimas OS" (finalizadas inclusas).
+- BottomNav do técnico mostra Início e Mais; toque em uma OS de "Últimas OS" abre `/ordens/{id}` normalmente.
