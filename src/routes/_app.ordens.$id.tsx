@@ -116,8 +116,7 @@ function OrdemPage() {
 
 function OrdemDetalhe() {
   const { id } = Route.useParams();
-  const { isAdmin, isTecnico, loading: roleLoading } = useUserRole();
-  const navigate = (typeof window !== "undefined") ? undefined : undefined; // placeholder
+  const { isAdmin, isTecnico } = useUserRole();
   const fetcher = useServerFn(getServiceOrder);
   const { data: order } = useSuspenseQuery(
     queryOptions({
