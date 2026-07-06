@@ -13,7 +13,8 @@ import {
 import { AppShell } from "@/components/app/AppShell";
 import { useAuth } from "@/components/app/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
+import { useServiceOrdersQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
+import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { Plus, ClipboardCheck } from "lucide-react";
 import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
@@ -52,13 +53,28 @@ function DashboardRouter() {
 }
 
 function TechnicianHome() {
-  const { displayName } = useAuth();
+  const { displayName, user } = useAuth();
   const { data: orders } = useServiceOrdersQuery();
+  const { data: technicians } = useTechniciansQuery();
   const firstName = (displayName || "Técnico").split(" ")[0];
-  const myActive = orders.filter((o) =>
+  const myTechnicianIds = useMemo(() => {
+    if (!user?.id) return new Set<string>();
+    return new Set(technicians.filter((t) => t.user_id === user.id).map((t) => t.id));
+  }, [technicians, user?.id]);
+  const myOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        const techs = getOrderTechnicians(o);
+        if (techs.some((t) => myTechnicianIds.has(t.id))) return true;
+        if (o.technician_id && myTechnicianIds.has(o.technician_id)) return true;
+        return false;
+      }),
+    [orders, myTechnicianIds],
+  );
+  const myActive = myOrders.filter((o) =>
     ["pending", "dispatched", "transit", "running"].includes(o.status),
   );
-  const myRecent = orders.slice(0, 6);
+  const myRecent = myOrders.slice(0, 6);
   return (
     <main className="mx-auto max-w-3xl space-y-5 pb-6">
       <section className="lemarc-hero-gradient rounded-2xl border border-primary/25 bg-primary/[0.06] p-5">
