@@ -418,6 +418,9 @@ export const createTechnician = createServerFn({ method: "POST" })
   .inputValidator((data: TechnicianInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    if (data.access_email !== undefined) {
+      data = { ...data, user_id: await resolveAccessEmail(sb, data.access_email) };
+    }
     const payload = {
       ...fullTechnicianPayload(data),
       created_by: context.userId,
@@ -443,6 +446,9 @@ export const updateTechnician = createServerFn({ method: "POST" })
   .inputValidator((data: TechnicianUpdateInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    if (data.access_email !== undefined) {
+      data = { ...data, user_id: await resolveAccessEmail(sb, data.access_email) };
+    }
     const before = await sb
       .from("technicians")
       .select(TECHNICIAN_FULL_SELECT)
