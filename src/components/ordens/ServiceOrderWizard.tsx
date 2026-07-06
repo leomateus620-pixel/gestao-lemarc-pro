@@ -28,12 +28,12 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
-import { maskCNPJ, onlyDigits } from "@/lib/cnpj";
+import { isValidCNPJ, maskCNPJ, onlyDigits } from "@/lib/cnpj";
 import {
-  createClient as createClientFn,
   createServiceOrder,
   createTechnician,
 } from "@/lib/api/serviceOrders.functions";
+import { createCompany } from "@/lib/api/clients.functions";
 import {
   priorityLabel,
   serviceTypeLabel,
