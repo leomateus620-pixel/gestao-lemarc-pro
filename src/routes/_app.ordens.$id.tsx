@@ -43,6 +43,7 @@ import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
 import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeControl";
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
+import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
@@ -263,6 +264,8 @@ function OrdemDetalhe() {
       <ServiceOrderTimeControl order={order} />
 
       <SignatureBlock order={order} />
+
+      <ServiceOrderAttachmentsSection orderId={order.id} />
 
       <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />
 

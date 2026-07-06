@@ -265,6 +265,60 @@ export type Database = {
         }
         Relationships: []
       }
+      service_order_attachments: {
+        Row: {
+          caption: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          service_order_id: string
+          technician_id: string | null
+        }
+        Insert: {
+          caption?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          service_order_id: string
+          technician_id?: string | null
+        }
+        Update: {
+          caption?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          service_order_id?: string
+          technician_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_attachments_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_order_attachments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_order_financials: {
         Row: {
           created_at: string
