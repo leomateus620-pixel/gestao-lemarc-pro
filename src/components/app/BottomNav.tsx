@@ -35,7 +35,7 @@ const items = [
   { to: "/mais", label: "Mais", mobileLabel: "Mais", compactLabel: "Mais", icon: MoreHorizontal },
 ] as const;
 
-const TECNICO_ROUTES = new Set<string>(["/dashboard", "/ordens"]);
+const TECNICO_ROUTES = new Set<string>(["/dashboard", "/mais"]);
 
 export function BottomNav() {
   const { isAdmin, isOperador, loading } = useUserRole();
