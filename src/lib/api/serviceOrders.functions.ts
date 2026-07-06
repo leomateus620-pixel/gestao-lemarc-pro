@@ -107,6 +107,38 @@ function fullTechnicianPayload(data: TechnicianInput) {
   };
 }
 
+async function enrichWithAccessEmail(sb: any, techs: TechnicianLite[]): Promise<TechnicianLite[]> {
+  const ids = Array.from(new Set(techs.map((t) => t.user_id).filter(Boolean))) as string[];
+  if (ids.length === 0) return techs;
+  const { data, error } = await sb.from("profiles").select("user_id, email").in("user_id", ids);
+  if (error) return techs;
+  const map = new Map<string, string | null>();
+  for (const row of (data ?? []) as { user_id: string; email: string | null }[]) {
+    map.set(row.user_id, row.email ?? null);
+  }
+  return techs.map((t) => ({ ...t, access_email: t.user_id ? (map.get(t.user_id) ?? null) : null }));
+}
+
+async function resolveAccessEmail(
+  sb: any,
+  email: string | null | undefined,
+): Promise<string | null> {
+  const trimmed = (email ?? "").trim();
+  if (!trimmed) return null;
+  const { data, error } = await sb
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", trimmed)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.user_id) {
+    throw new Error(
+      "Nenhum usuário encontrado com este e-mail. Peça para o colaborador entrar uma vez em /login com este e-mail e tente novamente.",
+    );
+  }
+  return data.user_id as string;
+}
+
 function normalize(row: any): ServiceOrder {
   const assigned = Array.isArray(row?.assigned_technicians) ? row.assigned_technicians : [];
   const technicians = assigned
