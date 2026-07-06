@@ -37,4 +37,3 @@ export function useUserRole() {
   const isTecnico = !loading && !isAdmin && !isOperador;
   return { roles, loading, isAdmin, isOperador, isTecnico };
 }
-}
