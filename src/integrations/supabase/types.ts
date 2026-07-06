@@ -963,7 +963,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "operador"
+      app_role: "admin" | "operador" | "tecnico"
       billing_status: "pending" | "ready" | "billed" | "cancelled"
       displacement_type: "none" | "per_km" | "fixed"
       service_order_status:
@@ -1112,7 +1112,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "operador"],
+      app_role: ["admin", "operador", "tecnico"],
       billing_status: ["pending", "ready", "billed", "cancelled"],
       displacement_type: ["none", "per_km", "fixed"],
       service_order_status: [
