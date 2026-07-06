@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/app/AuthContext";
 
-export type AppRole = "admin" | "operador";
+export type AppRole = "admin" | "operador" | "tecnico";
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -35,6 +35,10 @@ export function useUserRole() {
     roles,
     loading,
     isAdmin: roles.includes("admin"),
-    isOperador: roles.includes("operador") || roles.length === 0,
+    isOperador: roles.includes("operador"),
+    // Técnico: papel explícito 'tecnico'. Sem papel + não admin = tratamos como técnico (fallback seguro).
+    isTecnico:
+      roles.includes("tecnico") ||
+      (!roles.includes("admin") && !roles.includes("operador") && roles.length >= 0),
   };
 }
