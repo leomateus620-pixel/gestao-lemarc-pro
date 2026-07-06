@@ -1,52 +1,62 @@
 ## Objetivo
+Adicionar o perfil `tecnico` com acesso restrito ao fluxo operacional da OS (Início, criar OS, executar, assinar, fotografar, finalizar), bloqueando menus administrativos, valores financeiros e a etapa de revisão/cobrança. Manter `admin` intacto.
 
-Permitir editar as configurações de precificação do colaborador — em especial o **Valor/Hora** — a partir de uma rota dedicada e enxuta, acessível diretamente do card "Precificação" no perfil.
+## 1. Modelo de papéis (Supabase)
+Migration:
+- Adicionar valor `'tecnico'` ao enum `public.app_role` (`ALTER TYPE ... ADD VALUE IF NOT EXISTS 'tecnico'`).
+- Criar função `public.current_user_is_admin()` e `public.current_user_is_tecnico()` (SECURITY DEFINER, usam `has_role(auth.uid(), ...)`).
+- Ajustar `handle_new_user` (ou trigger de bootstrap) para atribuir `'tecnico'` por padrão em `user_roles` quando um novo usuário for criado e não houver admin ainda existente / regra: primeiro usuário do sistema = admin; demais novos = `tecnico`. Nunca rebaixar admins existentes (INSERT ... ON CONFLICT DO NOTHING).
+- RLS: adicionar policies restritivas para o papel técnico:
+  - `service_order_financials`, `service_order_labor_entries`: SELECT/UPDATE apenas para `admin` (bloqueia técnico).
+  - `service_orders`: técnico só lê OS onde é `created_by` ou está vinculado em `service_order_technicians`.
+  - `clients` / `client_units`: técnico apenas SELECT (necessário para o wizard) e INSERT (para criar cliente/unidade dentro do fluxo da OS). UPDATE/DELETE apenas admin.
+  - `technicians`, `technician_rate_history`: SELECT admin-only; técnico só lê seu próprio registro (via `user_id = auth.uid()`).
+  - `service_order_signatures`, `service_order_attachments`, `service_order_time_sessions`: técnico pode CRUD apenas em OS que lhe pertence.
+- Manter `service_role` com GRANT ALL onde já existe.
 
-Hoje já existe `/colaboradores/$id/editar` (wizard completo com `focus=rate`), mas o usuário quer um caminho direto, rápido e específico para editar o valor da hora sem passar pelo wizard multi-etapas.
+## 2. Server functions
+- `src/lib/api/serviceOrders.functions.ts`: em `listServiceOrders` / `getServiceOrder`, quando o usuário for técnico, filtrar apenas OS onde ele é técnico atribuído ou `created_by`, e remover `hour_rate` do payload retornado.
+- `src/lib/api/financials.functions.ts`: adicionar guard `if (!isAdmin) throw` em todas as leituras/escritas financeiras (`getOrderFinancials`, updates de displacement/materials, aprovações).
+- `updateServiceOrderStatus`: para técnico, permitir transições até `review` (finalizar → review), bloquear `approved` e edições após.
+- `updateTechnician`, `createClient` administrativos: bloquear se não-admin (exceto `createClient` mínimo usado pelo wizard, mantido acessível para técnico).
+- Adicionar helper `assertAdmin(context)` reutilizável.
 
-## O que será feito
+## 3. Hook de papel
+- Substituir `RoleContext` mockado por leitura real de `useUserRole()` (já existente). Expor `role: 'admin' | 'tecnico'`, `isAdmin`, `isTecnico`.
+- `RoleSwitcher` só aparece para admin (para QA); técnico não pode alternar.
 
-### 1. Nova rota dedicada
-Arquivo: `src/routes/_app.colaboradores.$id.precificacao.tsx`
-- URL: `/colaboradores/$id/precificacao`
-- Título: "Editar precificação — Gestão Lemarc"
-- `AppShell` com `back`, envolto em `Suspense`
+## 4. Route guards
+- Criar `src/lib/auth/requireAdminRoute.ts` com helper `beforeLoad` que redireciona não-admin para `/dashboard`.
+- Aplicar em `_app.ordens.index`, `_app.ordens.$id.imprimir`, `_app.clientes.*`, `_app.colaboradores.*`, `_app.relatorios*`, `_app.mais`.
+- Em `_app.ordens.$id.tsx`: permitir acesso a técnico apenas se ele for atribuído/criador; caso contrário redirect.
+- `_app.ordens.nova.tsx`: permitido para ambos.
 
-### 2. Formulário compacto (na própria rota)
-Campos, todos em pt-BR:
-- **Valor normal (R$/h)** — obrigatório, input monetário (mesmo `parseCurrencyInput` já usado no wizard)
-- **Hora extra 50% (R$/h)** — opcional; placeholder sugerido = valor normal × 1,5
-- **Hora extra 100% (R$/h)** — opcional; placeholder sugerido = valor normal × 2
-- **Observação de precificação** — textarea curto
+## 5. UI — navegação e telas
+- `BottomNav.tsx`: filtrar itens pelo papel. Técnico vê apenas `Início` + `Sair` (ícone LogOut à direita). Layout responsivo mantido.
+- `_app.dashboard.tsx`: renderizar variante `TechnicianHome` quando `isTecnico`, com:
+  - Botão grande "Nova OS" → `/ordens/nova`.
+  - Lista "Minhas OS ativas" (pendentes/em execução/em pausa atribuídas ao técnico).
+  - Sem cards financeiros, sem KPIs administrativos, sem métricas de faturamento.
+  - Empty states pt-BR: "Nenhuma OS atribuída a você.", "Crie uma nova OS para iniciar um atendimento."
+- `_app.ordens.$id.tsx`:
+  - Ocultar bloco `FinancialSummary` (linhas ~490+), coluna de `hourly_rate_cents` na tabela de labor, "Aprovar para cobrança" e a transição `review → approved` quando técnico.
+  - Em `ServiceOrderTimeHistory` passar prop `hideMoney` para técnico.
+- `FinalizeServiceOrderDialog.tsx`: variante enxuta para técnico — apenas notas de execução + confirmar finalização; sem revisar valores. Após submit, exibir toast "OS finalizada e enviada para revisão." e navegar para `/dashboard`.
+- `ServiceOrderWizard.tsx`: manter todos campos operacionais; se houver campo financeiro exposto (tarifa/horas), esconder para técnico.
 
-Comportamento:
-- Pré-carrega valores atuais via `useTechniciansQuery`
-- Botão primário "Salvar precificação" (`updateTechnician`)
-- Botão secundário "Cancelar" → volta ao perfil
-- Toast de sucesso/erro, invalida `["technicians"]`, `["service-orders"]`, `["technician-labor-history"]`, `["order-financials"]`, `["report-orders"]`
-- Redireciona para `/colaboradores/$id` após salvar
-- Se colaborador não existe → `notFound()`
-- Reutiliza helpers `centsToInput` / `parseCurrencyInput` extraindo-os para `src/components/colaboradores/format.ts` (ou inline se já disponíveis) — sem duplicar lógica do wizard
+## 6. Localização e UX
+Todo texto novo em pt-BR. Mobile-first, botões grandes, sem menções a "valores", "faturamento", "cobrança" em telas de técnico.
 
-### 3. Integração no perfil
-Em `src/routes/_app.colaboradores.$id.tsx`:
-- Adicionar botão "Editar" (ícone `PenLine`) no header do painel **Precificação** apontando para a nova rota
-- O CTA amarelo "Definir agora" (quando `hourlyRateCents == null`) passa a apontar para `/colaboradores/$id/precificacao` (mais direto que abrir o wizard inteiro)
-- Manter o botão "Editar" geral do topo apontando para `/editar` (wizard completo) — sem regressão
-
-### 4. Rota do wizard (sem alteração funcional)
-`/colaboradores/$id/editar?focus=rate` continua funcionando; a nova rota é um atalho focado, não substituição.
+## 7. Validação
+- `bunx tsgo` para tipo.
+- Playwright: login (usar sessão injetada), rota `/dashboard` como técnico (simular alterando role via SQL de teste), tentar `/clientes` → redirecionado, criar OS, iniciar/pausar/finalizar, conferir ausência de valores.
+- Admin: percorrer `/relatorios`, `/ordens/$id` (ver financeiro), aprovar cobrança.
 
 ## Detalhes técnicos
-
-- Sem migração: usa `updateTechnician` já existente em `src/lib/api/serviceOrders.functions.ts`
-- Sem novos endpoints, sem mudanças de RLS
-- `routeTree.gen.ts` é regenerado pelo plugin — não editar manualmente
-- Nada muda em OS, relatórios ou PDF
+- Não editar `types.ts` manualmente — será regenerado após a migration.
+- `assertAdmin` chama `context.supabase.rpc('has_role', { _user_id: context.userId, _role: 'admin' })`.
+- Rotas técnicas usam `beforeLoad` async chamando um `getMyRole` serverFn cacheável em `queryClient` para evitar flash.
+- Manter todas policies existentes; adicionar restritivas (`AS RESTRICTIVE`) somente onde necessário para não quebrar admin.
 
 ## Entregáveis
-
-- [ ] `src/routes/_app.colaboradores.$id.precificacao.tsx` (novo)
-- [ ] Botão "Editar" no card Precificação em `_app.colaboradores.$id.tsx`
-- [ ] CTA "Definir valor/hora" redirecionado para a nova rota
-- [ ] Validação: salvar valor/hora reflete no perfil e nas OS futuras
+Migration + serverFn guards + hooks + guards de rota + variante TechnicianHome + BottomNav filtrado + finalize dialog reduzido + ocultação de financeiro na OS. Admin sem regressão.
