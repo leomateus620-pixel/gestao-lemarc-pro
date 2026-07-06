@@ -471,11 +471,13 @@ function ClientStep({
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const createCli = useServerFn(createClientFn);
+  const createCli = useServerFn(createCompany);
   const [mode, setMode] = useState<"select" | "new">("select");
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
+  const [newCnpj, setNewCnpj] = useState("");
+  const [newError, setNewError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -498,14 +500,33 @@ function ClientStep({
   );
 
   const clientMutation = useMutation({
-    mutationFn: () => createCli({ data: { name: newName, unit: newUnit || null } }),
-    onSuccess: (row) => {
+    mutationFn: () => {
+      const cnpjDigits = onlyDigits(newCnpj);
+      if (cnpjDigits && !isValidCNPJ(cnpjDigits)) {
+        throw new Error("CNPJ inválido.");
+      }
+      return createCli({
+        data: {
+          name: newName.trim(),
+          cnpj: cnpjDigits || null,
+          ...(newUnit.trim() ? { units: [{ name: newUnit.trim(), is_primary: true }] } : {}),
+        },
+      });
+    },
+    onSuccess: (row: { id: string }) => {
+      setNewError(null);
       onCreated(row.id);
       set("unitId", "");
       setNewName("");
       setNewUnit("");
+      setNewCnpj("");
       setMode("select");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client-units"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Não foi possível salvar o cliente.";
+      setNewError(msg);
     },
   });
 
