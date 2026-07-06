@@ -28,12 +28,12 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
-import { maskCNPJ, onlyDigits } from "@/lib/cnpj";
+import { isValidCNPJ, maskCNPJ, onlyDigits } from "@/lib/cnpj";
 import {
-  createClient as createClientFn,
   createServiceOrder,
   createTechnician,
 } from "@/lib/api/serviceOrders.functions";
+import { createCompany } from "@/lib/api/clients.functions";
 import {
   priorityLabel,
   serviceTypeLabel,
@@ -471,11 +471,13 @@ function ClientStep({
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const createCli = useServerFn(createClientFn);
+  const createCli = useServerFn(createCompany);
   const [mode, setMode] = useState<"select" | "new">("select");
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
+  const [newCnpj, setNewCnpj] = useState("");
+  const [newError, setNewError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -498,14 +500,33 @@ function ClientStep({
   );
 
   const clientMutation = useMutation({
-    mutationFn: () => createCli({ data: { name: newName, unit: newUnit || null } }),
-    onSuccess: (row) => {
+    mutationFn: () => {
+      const cnpjDigits = onlyDigits(newCnpj);
+      if (cnpjDigits && !isValidCNPJ(cnpjDigits)) {
+        throw new Error("CNPJ inválido.");
+      }
+      return createCli({
+        data: {
+          name: newName.trim(),
+          cnpj: cnpjDigits || null,
+          ...(newUnit.trim() ? { units: [{ name: newUnit.trim(), is_primary: true }] } : {}),
+        },
+      });
+    },
+    onSuccess: (row: { id: string }) => {
+      setNewError(null);
       onCreated(row.id);
       set("unitId", "");
       setNewName("");
       setNewUnit("");
+      setNewCnpj("");
       setMode("select");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client-units"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Não foi possível salvar o cliente.";
+      setNewError(msg);
     },
   });
 
@@ -691,6 +712,16 @@ function ClientStep({
             />
           </div>
           <div className="space-y-2">
+            <FieldLabel>CNPJ (opcional)</FieldLabel>
+            <Input
+              value={maskCNPJ(newCnpj)}
+              onChange={(e) => setNewCnpj(onlyDigits(e.target.value).slice(0, 14))}
+              placeholder="00.000.000/0000-00"
+              inputMode="numeric"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-2">
             <FieldLabel>Unidade (opcional)</FieldLabel>
             <Input
               value={newUnit}
@@ -699,6 +730,11 @@ function ClientStep({
               className={inputCls}
             />
           </div>
+          {newError && (
+            <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100">
+              {newError}
+            </p>
+          )}
           <Button
             type="button"
             onClick={() => clientMutation.mutate()}
