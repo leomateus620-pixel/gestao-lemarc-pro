@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { useAuth } from "@/components/app/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useServiceOrdersQuery } from "@/hooks/useServiceOrders";
+import { Plus, ClipboardCheck } from "lucide-react";
 import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { EmptyOperations } from "@/components/dashboard/EmptyOperations";
