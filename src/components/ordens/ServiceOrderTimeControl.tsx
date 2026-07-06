@@ -75,6 +75,31 @@ export function ServiceOrderTimeControl({ order }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao iniciar"),
   });
 
+  const bulkStartMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(
+        ids.map((technicianId) => startFn({ data: { orderId: order.id, technicianId } })),
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length === ids.length) {
+        const first = failed[0] as PromiseRejectedResult;
+        throw first.reason instanceof Error
+          ? first.reason
+          : new Error("Falha ao iniciar o serviço.");
+      }
+      return { started: ids.length - failed.length };
+    },
+    onSuccess: ({ started }) => {
+      toast.success(
+        started > 1
+          ? `Serviço iniciado para ${started} técnicos.`
+          : "Serviço iniciado.",
+      );
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao iniciar"),
+  });
+
   const [pauseOpen, setPauseOpen] = useState(false);
   const [pauseTech, setPauseTech] = useState<string | null>(null);
   const pauseMut = useMutation({
@@ -148,6 +173,11 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const pauseTechName =
     pauseTech ? technicians.find((t) => t.id === pauseTech)?.full_name ?? null : null;
 
+  // Regra: 1–2 técnicos → botão único inicia para toda a equipe.
+  //        3+ técnicos  → cada técnico inicia individualmente (fluxo atual).
+  const allIdle = technicians.every((t) => getTechnicianState(sessions, t.id).state === "idle");
+  const showBulkStart = technicians.length >= 1 && technicians.length <= 2 && allIdle;
+
   return (
     <GlassCard className="mt-4 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -165,6 +195,28 @@ export function ServiceOrderTimeControl({ order }: Props) {
           {stateBadge.label}
         </span>
       </div>
+
+      {showBulkStart && (
+        <div className="mt-3">
+          <Button
+            className="min-h-12 w-full gap-2"
+            onClick={() => bulkStartMut.mutate(technicians.map((t) => t.id))}
+            disabled={bulkStartMut.isPending}
+          >
+            <Play size={16} />
+            {bulkStartMut.isPending
+              ? "Iniciando..."
+              : technicians.length === 1
+                ? "Iniciar serviço"
+                : "Iniciar serviço para toda a equipe"}
+          </Button>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {technicians.length === 1
+              ? "Inicia o cronômetro para o técnico responsável."
+              : "Inicia o cronômetro para os dois técnicos ao mesmo tempo."}
+          </p>
+        </div>
+      )}
 
       {technicians.length > 1 && (
         <div className="mt-3">

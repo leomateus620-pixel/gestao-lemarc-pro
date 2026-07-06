@@ -45,7 +45,9 @@ import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
 import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeControl";
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
+import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
+import { finishWork } from "@/lib/api/timeSessions.functions";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
@@ -128,21 +130,46 @@ function OrdemDetalhe() {
 
   const queryClient = useQueryClient();
   const updateStatus = useServerFn(updateServiceOrderStatus);
+  const finishWorkFn = useServerFn(finishWork);
   const mutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => updateStatus({ data: { id: order.id, status } }),
     onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["order-time-sessions", id] });
       if (isTecnico && status === "finished") {
         toastFn.success("OS finalizada e enviada para revisão.");
       }
     },
+    onError: (e: unknown) =>
+      toastFn.error(e instanceof Error ? e.message : "Não foi possível atualizar a OS."),
   });
 
   const action = flow[order.status];
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
+  const hasSignature =
+    Boolean((order as unknown as { signature?: unknown }).signature) ||
+    Boolean(order.signature_waiver_reason);
+
+  async function handleTecnicoFinish() {
+    const orderId = order!.id;
+    if (!hasSignature) {
+      toastFn.error("Colete a assinatura do responsável antes de finalizar a OS.");
+      setSignOpen(true);
+      return;
+    }
+    try {
+      // Encerra qualquer cronômetro aberto antes de mudar o status.
+      await finishWorkFn({ data: { orderId, technicianId: null } });
+    } catch (e) {
+      // Não bloqueia a finalização se não houver sessão aberta.
+      void e;
+    }
+    mutation.mutate("finished");
+  }
 
   // Técnico não avança além de "finished". Também não abre a apuração financeira.
   const showActionCard =
@@ -251,7 +278,7 @@ function OrdemDetalhe() {
           <div className="mt-3">
             {tecnicoFinalize ? (
               <PrimaryCTA
-                onClick={() => mutation.mutate("finished")}
+                onClick={handleTecnicoFinish}
                 icon={Calculator}
                 disabled={mutation.isPending}
               >
@@ -291,6 +318,15 @@ function OrdemDetalhe() {
           order={order}
           open={finalizeOpen}
           onOpenChange={setFinalizeOpen}
+        />
+      )}
+
+      {isTecnico && (
+        <SignatureCaptureDialog
+          orderId={order.id}
+          orderNumber={order.number}
+          open={signOpen}
+          onOpenChange={setSignOpen}
         />
       )}
 

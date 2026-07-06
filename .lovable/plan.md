@@ -1,34 +1,47 @@
 ## Diagnóstico
 
-O menu inferior (`BottomNav`) hoje faz:
+1. **"Iniciar serviço" pede um clique por técnico.**
+   `ServiceOrderTimeControl` cria uma sessão só para o técnico selecionado. Quando são 2 pessoas, o técnico tem que trocar o `select`, clicar de novo e às vezes esquece — daí a sensação de bug.
 
-```tsx
-const visibleItems =
-  loading || !isTecnico ? items : items.filter((i) => TECNICO_ROUTES.has(i.to));
-```
-
-Enquanto `useUserRole()` está `loading = true` (uma consulta a `user_roles` em cada navegação/refresh), o técnico vê a **barra completa** com Ordens, Clientes, Colaboradores, Relatórios e Mais; assim que o papel resolve, tudo colapsa para só "Início". É o "flash" e a sensação de instabilidade que aparece a cada rota, refresh e retorno de app em background. Além disso, a lista atual só tem `/dashboard` para técnico, o que impede o técnico de acessar suas OS pelo menu.
+2. **Ao clicar "Finalizar serviço" acontece um erro silencioso.**
+   No topo da OS, "Finalizar serviço" chama `updateServiceOrderStatus({status:'finished'})`. O servidor **exige assinatura** (`Antes de finalizar a OS, colete a assinatura do responsável…`). A `useMutation` não tem `onError`, então nada é exibido; o usuário toca em outras coisas e acaba em `/ordens` (barra inferior nova) achando que foi redirecionado por causa do "Finalizar". Também não checamos se ainda existe alguém com o cronômetro rodando.
 
 ## Correção
 
-1. **BottomNav** (`src/components/app/BottomNav.tsx`):
-   - Durante `loading`, tratar o usuário como técnico (renderizar apenas os itens permitidos ao técnico). Isso elimina o flash — o pior caso vira "mostrei só Início e depois liberei mais itens quando confirmado admin", nunca o inverso.
-   - Trocar `TECNICO_ROUTES` para incluir os itens que fazem sentido no fluxo do técnico: `/dashboard` e `/ordens` (para ele acompanhar/abrir/finalizar as OS). Continuam ocultos: Clientes, Colaboradores, Relatórios, Mais.
-   - Recalcular `grid-template-columns` com `visibleItems.length` (já feito) para o layout ficar centralizado com 1 ou 2 itens.
+### 1. Iniciar serviço em lote (1–2 técnicos)
 
-2. **Cache do papel** (`src/hooks/useUserRole.ts`):
-   - Guardar o resultado por `user.id` numa constante de módulo (mapa) para que, ao navegar entre rotas, o hook retorne imediatamente `loading=false` com o papel já conhecido, evitando refetch em toda montagem. Invalidar no `SIGNED_OUT`.
-   - Manter o comportamento seguro: `isTecnico` só é `true` quando o papel foi confirmado (não é o default sob loading).
+Em `src/components/ordens/ServiceOrderTimeControl.tsx`:
 
-3. **Sem mudanças** em rotas, RLS, ou outros componentes.
+- Se `technicians.length <= 2` **e nenhum** técnico está com sessão `running`, mostrar um **único botão principal** "Iniciar serviço para toda a equipe" que executa `startWork` para cada técnico em paralelo (`Promise.all`, ignorando os que já estejam ativos). Toast único: "Serviço iniciado para X técnicos.".
+- Se algum já iniciou, cair para os botões individuais atuais (permitir o companheiro iniciar depois).
+- Se `technicians.length >= 3`, manter o fluxo atual (um botão por técnico, com o `select`).
+- Mesma lógica aplicada a **retomar** quando todos estão pausados (opcional, só se ficar trivial — se não, deixar de fora deste plano).
+- Nada muda no servidor (`startWork` continua por técnico).
 
-## Resultado esperado
+### 2. Finalizar serviço para técnico — sem erro cego, sem redirect
 
-- Técnico (Marcio) em qualquer rota / refresh: menu inferior mostra somente **Início** e **Ordens**, sem piscar os demais itens.
-- Admin continua vendo os 6 itens; no primeiríssimo carregamento pode ver só os 2 do técnico por uma fração de segundo até o papel resolver, mas nunca o contrário.
-- Navegação entre páginas dentro da mesma sessão fica instantânea (papel cacheado).
+Em `src/routes/_app.ordens.$id.tsx`:
+
+- Na `useMutation` de `updateServiceOrderStatus`, adicionar `onError` com `toast.error(e.message)` em pt-BR — assim o técnico vê o motivo real ("colete a assinatura…") em vez de nada.
+- Antes de disparar `mutation.mutate("finished")` no botão do técnico:
+  - Se **não houver assinatura ativa nem waiver**, abrir automaticamente o diálogo de coleta de assinatura (`SignatureCaptureDialog`) em vez de chamar o backend. Após a assinatura ser salva, disparar `finished` na sequência.
+  - Se ainda houver sessão de tempo em execução para algum técnico, encerrar automaticamente essas sessões (`finishWork` por técnico ativo) antes de mudar o status. Toast informativo: "Encerrando cronômetro antes de finalizar…".
+- Em `onSuccess` do `status === "finished"` para técnico: **não navegar**. Continuar mostrando a mesma OS com o card "OS finalizada e enviada para revisão." (já existe). Invalidar caches: `service-order`, `service-orders`, `order-time-sessions`.
+- Nada muda para o admin (ele continua usando o `FinalizeServiceOrderDialog`).
+
+### 3. Guarda-corpo contra redirect indesejado
+
+- Nenhum código atual navega para `/ordens` após finalizar; a percepção do usuário vem do menu inferior (que agora inclui `/ordens`). Manter `/ordens` no menu — o técnico agora precisa dele — mas garantir que o botão "Finalizar" nunca perca o contexto da OS (fica na mesma rota `/ordens/$id`).
+
+## Fora de escopo
+
+- Alterações no servidor `updateServiceOrderStatus` ou nas políticas RLS.
+- Mudar o fluxo do admin (revisão/aprovação continua igual).
 
 ## Validação
 
-- Login Marcio → recarregar `/dashboard`, `/ordens`, entrar em uma OS: barra sempre com 2 itens, sem flash.
-- Login admin → barra com 6 itens após o load inicial; navegações subsequentes sem refetch.
+- OS com 1 técnico + Marcio (2): botão único "Iniciar serviço para toda a equipe" cria sessões para ambos.
+- OS com 3+ técnicos: botões individuais como hoje.
+- Marcio clica "Finalizar serviço" sem assinatura → abre o diálogo de assinatura; após assinar, OS vai a `finished`, aparece "OS finalizada e enviada para revisão." e ele permanece em `/ordens/$id`. Nada de erro silencioso.
+- Marcio clica "Finalizar serviço" com cronômetro rodando → sistema encerra a sessão, finaliza a OS e mostra o card final.
+- Admin não vê mudança de comportamento.
