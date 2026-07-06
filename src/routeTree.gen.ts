@@ -30,6 +30,7 @@ import { Route as AppClientesIdIndexRouteImport } from './routes/_app.clientes.$
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
 import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
+import { Route as AppColaboradoresIdPrecificacaoRouteImport } from './routes/_app.colaboradores.$id.precificacao'
 import { Route as AppColaboradoresIdOrdensRouteImport } from './routes/_app.colaboradores.$id.ordens'
 import { Route as AppColaboradoresIdHorasRouteImport } from './routes/_app.colaboradores.$id.horas'
 import { Route as AppColaboradoresIdEditarRouteImport } from './routes/_app.colaboradores.$id.editar'
@@ -141,6 +142,12 @@ const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
   path: '/imprimir',
   getParentRoute: () => AppOrdensIdRoute,
 } as any)
+const AppColaboradoresIdPrecificacaoRoute =
+  AppColaboradoresIdPrecificacaoRouteImport.update({
+    id: '/precificacao',
+    path: '/precificacao',
+    getParentRoute: () => AppColaboradoresIdRoute,
+  } as any)
 const AppColaboradoresIdOrdensRoute =
   AppColaboradoresIdOrdensRouteImport.update({
     id: '/ordens',
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
   '/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
+  '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -209,6 +217,7 @@ export interface FileRoutesByTo {
   '/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
   '/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
+  '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/_app/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/_app/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
   '/_app/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
+  '/_app/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/_app/relatorios_/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/editar'
     | '/colaboradores/$id/horas'
     | '/colaboradores/$id/ordens'
+    | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
     | '/lovable/email/queue/process'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/editar'
     | '/colaboradores/$id/horas'
     | '/colaboradores/$id/ordens'
+    | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
     | '/lovable/email/queue/process'
@@ -316,6 +328,7 @@ export interface FileRouteTypes {
     | '/_app/colaboradores/$id/editar'
     | '/_app/colaboradores/$id/horas'
     | '/_app/colaboradores/$id/ordens'
+    | '/_app/colaboradores/$id/precificacao'
     | '/_app/ordens/$id/imprimir'
     | '/_app/relatorios_/cliente/$clientId'
     | '/lovable/email/queue/process'
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdensIdImprimirRouteImport
       parentRoute: typeof AppOrdensIdRoute
     }
+    '/_app/colaboradores/$id/precificacao': {
+      id: '/_app/colaboradores/$id/precificacao'
+      path: '/precificacao'
+      fullPath: '/colaboradores/$id/precificacao'
+      preLoaderRoute: typeof AppColaboradoresIdPrecificacaoRouteImport
+      parentRoute: typeof AppColaboradoresIdRoute
+    }
     '/_app/colaboradores/$id/ordens': {
       id: '/_app/colaboradores/$id/ordens'
       path: '/ordens'
@@ -531,12 +551,14 @@ interface AppColaboradoresIdRouteChildren {
   AppColaboradoresIdEditarRoute: typeof AppColaboradoresIdEditarRoute
   AppColaboradoresIdHorasRoute: typeof AppColaboradoresIdHorasRoute
   AppColaboradoresIdOrdensRoute: typeof AppColaboradoresIdOrdensRoute
+  AppColaboradoresIdPrecificacaoRoute: typeof AppColaboradoresIdPrecificacaoRoute
 }
 
 const AppColaboradoresIdRouteChildren: AppColaboradoresIdRouteChildren = {
   AppColaboradoresIdEditarRoute: AppColaboradoresIdEditarRoute,
   AppColaboradoresIdHorasRoute: AppColaboradoresIdHorasRoute,
   AppColaboradoresIdOrdensRoute: AppColaboradoresIdOrdensRoute,
+  AppColaboradoresIdPrecificacaoRoute: AppColaboradoresIdPrecificacaoRoute,
 }
 
 const AppColaboradoresIdRouteWithChildren =
@@ -606,13 +628,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

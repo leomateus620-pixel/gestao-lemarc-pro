@@ -133,9 +133,8 @@ function PerfilContent() {
 
       {rateUndefined && (
         <Link
-          to="/colaboradores/$id/editar"
+          to="/colaboradores/$id/precificacao"
           params={{ id }}
-          search={{ focus: "rate" as const }}
           aria-label="Definir valor/hora do colaborador"
           className="lemarc-pressable lemarc-wizard-card group flex flex-col gap-3 rounded-3xl border border-white/[0.08] px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4"
         >
@@ -174,6 +173,14 @@ function PerfilContent() {
         </Panel>
 
         <Panel title="Precificação" icon={WalletCards}>
+          <Link
+            to="/colaboradores/$id/precificacao"
+            params={{ id }}
+            className="lemarc-pressable inline-flex min-h-9 w-fit items-center gap-2 self-end rounded-full border border-primary/35 bg-primary/12 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-primary hover:bg-primary/20"
+          >
+            <PenLine size={12} />
+            Editar precificação
+          </Link>
           <Info label="Valor normal" value={formatCurrency(collaborator.hourlyRateCents)} />
           <Info label="Hora extra 50%" value={formatCurrency(collaborator.hourlyRate50Cents)} />
           <Info label="Hora extra 100%" value={formatCurrency(collaborator.hourlyRate100Cents)} />
