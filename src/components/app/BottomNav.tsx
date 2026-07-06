@@ -2,28 +2,63 @@ import { Link } from "@tanstack/react-router";
 import { BarChart3, ClipboardList, HardHat, Home, MoreHorizontal, Users } from "lucide-react";
 
 const items = [
-  { to: "/dashboard", label: "Início", icon: Home },
-  { to: "/ordens", label: "Ordens", icon: ClipboardList },
-  { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/colaboradores", label: "Colaboradores", icon: HardHat },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/mais", label: "Mais", icon: MoreHorizontal },
+  { to: "/dashboard", label: "Início", mobileLabel: "Início", compactLabel: "Início", icon: Home },
+  {
+    to: "/ordens",
+    label: "Ordens",
+    mobileLabel: "Ordens",
+    compactLabel: "Ordens",
+    icon: ClipboardList,
+  },
+  {
+    to: "/clientes",
+    label: "Clientes",
+    mobileLabel: "Clientes",
+    compactLabel: "Clientes",
+    icon: Users,
+  },
+  {
+    to: "/colaboradores",
+    label: "Colaboradores",
+    mobileLabel: "Colabs.",
+    compactLabel: "Colabs.",
+    icon: HardHat,
+  },
+  {
+    to: "/relatorios",
+    label: "Relatórios",
+    mobileLabel: "Relatórios",
+    compactLabel: "Relat.",
+    icon: BarChart3,
+  },
+  { to: "/mais", label: "Mais", mobileLabel: "Mais", compactLabel: "Mais", icon: MoreHorizontal },
 ] as const;
 
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.25rem)]">
-      <div className="lemarc-bottom-nav-shell mx-auto mb-2 grid w-full max-w-lg grid-cols-6 gap-1 rounded-3xl p-1.5 sm:max-w-2xl lg:max-w-3xl">
-        {items.map(({ to, label, icon: Icon }) => (
+    <nav
+      aria-label="Navegação principal"
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] sm:px-4"
+    >
+      <div className="lemarc-bottom-nav-shell mx-auto mb-2 grid w-full max-w-lg grid-cols-6 gap-0.5 p-1 sm:max-w-2xl sm:gap-1 sm:p-1.5 lg:max-w-3xl">
+        {items.map(({ to, label, mobileLabel, compactLabel, icon: Icon }) => (
           <Link
             key={to}
             to={to}
+            aria-label={label}
+            title={label}
             activeOptions={{ exact: to === "/dashboard" }}
-            className="lemarc-pressable group flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-2 text-muted-foreground data-[status=active]:bg-primary/15 data-[status=active]:text-primary sm:px-1"
+            className="lemarc-bottom-nav-item lemarc-pressable group"
           >
-            <Icon size={19} />
-            <span className="max-w-full text-center text-[7px] font-black uppercase leading-none [letter-spacing:0] sm:text-[9px]">
+            <Icon aria-hidden="true" className="lemarc-bottom-nav-icon" />
+            <span className="lemarc-bottom-nav-label lemarc-bottom-nav-label--desktop">
               {label}
+            </span>
+            <span className="lemarc-bottom-nav-label lemarc-bottom-nav-label--mobile">
+              {mobileLabel}
+            </span>
+            <span className="lemarc-bottom-nav-label lemarc-bottom-nav-label--compact">
+              {compactLabel}
             </span>
           </Link>
         ))}
