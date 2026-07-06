@@ -1,13 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { IdCard, LogOut, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { useAuth } from "@/components/app/AuthContext";
 import { RoleSwitcher } from "@/components/app/RoleSwitcher";
 import { useRole } from "@/components/app/RoleContext";
 
 export const Route = createFileRoute("/_app/mais")({
   head: () => ({ meta: [{ title: "Mais — Gestão Lemarc" }] }),
-  component: MaisPage,
+  component: () => (
+    <RequireAdmin>
+      <MaisPage />
+    </RequireAdmin>
+  ),
 });
 
 function MaisPage() {

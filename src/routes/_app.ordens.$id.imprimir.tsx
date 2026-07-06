@@ -10,11 +10,16 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 
 export const Route = createFileRoute("/_app/ordens/$id/imprimir")({
   head: ({ params }) => ({ meta: [{ title: `OS #${params.id} — Relatório` }] }),
   staticData: { hideBottomNav: true },
-  component: PrintOSPage,
+  component: () => (
+    <RequireAdmin>
+      <PrintOSPage />
+    </RequireAdmin>
+  ),
 });
 
 function PrintOSPage() {
