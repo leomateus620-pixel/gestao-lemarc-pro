@@ -35,11 +35,14 @@ const items = [
   { to: "/mais", label: "Mais", mobileLabel: "Mais", compactLabel: "Mais", icon: MoreHorizontal },
 ] as const;
 
-const TECNICO_ROUTES = new Set<string>(["/dashboard"]);
+const TECNICO_ROUTES = new Set<string>(["/dashboard", "/ordens"]);
 
 export function BottomNav() {
-  const { isTecnico, loading } = useUserRole();
-  const visibleItems = loading || !isTecnico ? items : items.filter((i) => TECNICO_ROUTES.has(i.to));
+  const { isAdmin, isOperador, loading } = useUserRole();
+  // Enquanto o papel carrega, tratar como técnico para NÃO piscar itens de admin.
+  // Só liberamos a barra completa quando confirmamos admin/operador.
+  const showFull = !loading && (isAdmin || isOperador);
+  const visibleItems = showFull ? items : items.filter((i) => TECNICO_ROUTES.has(i.to));
   const cols = visibleItems.length;
   return (
     <nav
