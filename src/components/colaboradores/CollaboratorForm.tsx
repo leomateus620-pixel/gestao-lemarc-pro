@@ -458,7 +458,7 @@ function buildDraft(initial?: TechnicianLite | null): Draft {
     hourlyRate50: centsToInput(initial?.hourly_rate_50_cents),
     hourlyRate100: centsToInput(initial?.hourly_rate_100_cents),
     pricingNotes: initial?.pricing_notes ?? "",
-    userId: initial?.user_id ?? "",
+    accessEmail: initial?.access_email ?? "",
     internalNotes: initial?.internal_notes ?? "",
   };
 }
