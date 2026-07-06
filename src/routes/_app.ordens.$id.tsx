@@ -155,6 +155,7 @@ function OrdemDetalhe() {
     Boolean(order.signature_waiver_reason);
 
   async function handleTecnicoFinish() {
+    const orderId = order!.id;
     if (!hasSignature) {
       toastFn.error("Colete a assinatura do responsável antes de finalizar a OS.");
       setSignOpen(true);
@@ -162,7 +163,7 @@ function OrdemDetalhe() {
     }
     try {
       // Encerra qualquer cronômetro aberto antes de mudar o status.
-      await finishWorkFn({ data: { orderId: order.id, technicianId: null } });
+      await finishWorkFn({ data: { orderId, technicianId: null } });
     } catch (e) {
       // Não bloqueia a finalização se não houver sessão aberta.
       void e;
