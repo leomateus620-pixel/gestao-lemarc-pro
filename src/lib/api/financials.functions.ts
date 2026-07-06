@@ -151,6 +151,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string }) => data)
   .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     const sb = context.supabase as any;
     const [labor, fin] = await Promise.all([
       sb
@@ -176,6 +177,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
 export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    await assertAdmin(context);
     const sb = context.supabase as any;
     const { data, error } = await sb.from("service_order_financials").select("*");
     if (error) throw new Error(error.message);
@@ -185,6 +187,7 @@ export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET"
 export const listTechnicianLaborHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    await assertAdmin(context);
     const sb = context.supabase as any;
     const { data, error } = await sb
       .from("service_order_labor_entries")
@@ -225,6 +228,7 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: FinalizeOrderInput) => data)
   .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     validateInput(data);
     const sb = context.supabase as any;
 
