@@ -274,13 +274,20 @@
     0 0 0 1px oklch(0.72 0.19 50 / 0.045);
 }
 @utility lemarc-bottom-nav-shell {
-  background: linear-gradient(180deg, oklch(0.245 0.048 252 / 0.985), oklch(0.13 0.036 252 / 0.99));
-  border: 1px solid oklch(1 0 0 / 0.14);
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / 0.09), transparent 38%),
+    linear-gradient(180deg, oklch(0.245 0.048 252 / 0.985), oklch(0.13 0.036 252 / 0.992));
+  border: 1px solid oklch(1 0 0 / 0.16);
+  backdrop-filter: blur(18px) saturate(150%);
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.16),
-    inset 0 -1px 0 oklch(0 0 0 / 0.3),
-    0 18px 42px -24px oklch(0 0 0 / 0.86),
-    0 8px 20px -18px oklch(0.72 0.19 50 / 0.3);
+    inset 0 1px 0 oklch(1 0 0 / 0.18),
+    inset 0 -1px 0 oklch(0 0 0 / 0.34),
+    0 18px 42px -24px oklch(0 0 0 / 0.9),
+    0 8px 20px -18px oklch(0.72 0.19 50 / 0.34),
+    0 0 0 1px oklch(0.72 0.19 50 / 0.045);
 }
 @utility lemarc-liquid-card {
   position: relative;
@@ -945,6 +952,105 @@
   position: relative;
   z-index: 1;
 }
+.lemarc-bottom-nav-item {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-width: 0;
+  height: 3.18rem;
+  touch-action: manipulation;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 0.42rem 0.1rem;
+  color: oklch(0.74 0.025 250);
+  text-align: center;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 0.2s ease,
+    transform 0.16s ease,
+    filter 0.2s ease;
+}
+.lemarc-bottom-nav-item::before {
+  content: "";
+  position: absolute;
+  inset: 0.12rem;
+  z-index: -1;
+  border-radius: 0.9rem;
+  border: 1px solid oklch(0.72 0.19 50 / 0);
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / 0.12), transparent 52%),
+    linear-gradient(145deg, oklch(0.72 0.19 50 / 0.2), oklch(0.72 0.19 50 / 0.08));
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.1),
+    0 10px 22px -18px oklch(0.72 0.19 50 / 0.72);
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+.lemarc-bottom-nav-item:hover,
+.lemarc-bottom-nav-item:focus-visible {
+  color: oklch(0.92 0.012 250);
+}
+.lemarc-bottom-nav-item:focus-visible {
+  outline: none;
+}
+.lemarc-bottom-nav-item:focus-visible::before {
+  opacity: 1;
+  border-color: oklch(0.72 0.19 50 / 0.48);
+}
+.lemarc-bottom-nav-item[data-status="active"] {
+  color: var(--primary);
+  filter: saturate(1.08);
+}
+.lemarc-bottom-nav-item[data-status="active"]::before {
+  border-color: oklch(0.72 0.19 50 / 0.34);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.16),
+    inset 0 -1px 0 oklch(0 0 0 / 0.12),
+    0 12px 26px -18px oklch(0.72 0.19 50 / 0.86),
+    0 0 0 1px oklch(0.72 0.19 50 / 0.08);
+  opacity: 1;
+  transform: scale(1);
+}
+.lemarc-bottom-nav-icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  flex-shrink: 0;
+  stroke-width: 2.35;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.lemarc-bottom-nav-item[data-status="active"] .lemarc-bottom-nav-icon {
+  transform: translateY(-1px);
+}
+.lemarc-bottom-nav-label {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.lemarc-bottom-nav-label--desktop,
+.lemarc-bottom-nav-label--compact {
+  display: none;
+}
 .lemarc-pressable:active {
   transform: scale(0.98);
 }
@@ -964,6 +1070,74 @@
 }
 .lemarc-kinetic-card[data-kinetic-active="true"] .lemarc-card-glare {
   opacity: 0.9;
+}
+@media (max-width: 374px) {
+  .lemarc-bottom-nav-shell {
+    border-radius: 1.15rem;
+  }
+  .lemarc-bottom-nav-item {
+    height: 3.02rem;
+    gap: 0.16rem;
+    border-radius: 0.85rem;
+    padding-inline: 0.06rem;
+  }
+  .lemarc-bottom-nav-item::before {
+    inset: 0.08rem;
+    border-radius: 0.78rem;
+  }
+  .lemarc-bottom-nav-icon {
+    width: 1.02rem;
+    height: 1.02rem;
+  }
+  .lemarc-bottom-nav-label {
+    font-size: 0.44rem;
+  }
+  .lemarc-bottom-nav-label--mobile {
+    display: none;
+  }
+  .lemarc-bottom-nav-label--compact {
+    display: block;
+  }
+}
+@media (min-width: 640px) {
+  .lemarc-bottom-nav-shell {
+    border-radius: 1.5rem;
+  }
+  .lemarc-bottom-nav-item {
+    height: 3.2rem;
+    flex-direction: row;
+    gap: 0.42rem;
+    border-radius: 1rem;
+    padding: 0.55rem 0.4rem;
+  }
+  .lemarc-bottom-nav-item::before {
+    inset: 0.16rem;
+    border-radius: 0.95rem;
+  }
+  .lemarc-bottom-nav-icon {
+    width: 1.12rem;
+    height: 1.12rem;
+  }
+  .lemarc-bottom-nav-label {
+    font-size: 0.6rem;
+  }
+  .lemarc-bottom-nav-label--desktop {
+    display: block;
+  }
+  .lemarc-bottom-nav-label--mobile,
+  .lemarc-bottom-nav-label--compact {
+    display: none;
+  }
+}
+@media (min-width: 1024px) {
+  .lemarc-bottom-nav-item {
+    height: 3.28rem;
+    gap: 0.5rem;
+    padding-inline: 0.65rem;
+  }
+  .lemarc-bottom-nav-label {
+    font-size: 0.64rem;
+  }
 }
 @media (hover: none), (pointer: coarse) {
   .lemarc-app-bg,
@@ -1704,13 +1878,17 @@
   }
   .lemarc-pressable,
   .lemarc-kinetic-card,
-  .lemarc-order-island-row {
+  .lemarc-order-island-row,
+  .lemarc-bottom-nav-item,
+  .lemarc-bottom-nav-item::before,
+  .lemarc-bottom-nav-icon {
     transition: none;
   }
   .lemarc-3d-card,
   .lemarc-kinetic-card,
   .lemarc-order-island-row,
-  .lemarc-order-island-row:hover {
+  .lemarc-order-island-row:hover,
+  .lemarc-bottom-nav-item[data-status="active"] .lemarc-bottom-nav-icon {
     transform: none;
   }
   .lemarc-card-glare {
