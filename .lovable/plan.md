@@ -1,24 +1,26 @@
-## Cadastrar usuário Marcio (técnico)
+## Adicionar login por e-mail e senha na tela /login
 
-### O que será feito
-1. **Reduzir política mínima de senha** no Supabase Auth de 6 para 4 caracteres (via `supabase--configure_auth`) — necessário para aceitar "5656".
-2. **Criar o usuário** `lemarcmanutencao@gmail.com` com senha `5656` diretamente na tabela `auth.users` usando a Auth Admin API através de uma migração/insert seed, com e-mail já confirmado (sem passo de verificação).
-3. **Atribuir papel `tecnico`** em `public.user_roles` (o trigger `handle_new_user_role` já faria isso automaticamente, mas explicitaremos para garantir).
-4. **Criar `profile`** com `full_name = "Marcio"` (trigger `handle_new_user` já popula, garantiremos o nome).
+Manter o botão "Entrar com Google" e adicionar, no mesmo card, um formulário dedicado com e-mail + senha para os técnicos que não usam Google.
 
-### Detalhes técnicos
-- A criação real do usuário em `auth.users` requer chamada `auth.admin.createUser` (não pode ser feita por SQL puro sem hash de senha). Faremos isso via um **server function protegido** executado uma única vez OU via `supabase--insert` chamando função SQL que usa `crypt()` com bcrypt para popular `encrypted_password`. Optaremos por seed SQL:
-  ```sql
-  INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, ...)
-  VALUES (gen_random_uuid(), 'lemarcmanutencao@gmail.com',
-          crypt('5656', gen_salt('bf')), now(), ...);
-  ```
-  Os triggers `handle_new_user` e `handle_new_user_role` cuidam de `profiles` e `user_roles`.
-- Depois: `UPDATE public.profiles SET full_name = 'Marcio'` e garantir `role = 'tecnico'`.
+### UI (dentro do `GlassLoginCard` em `src/routes/login.tsx`)
+- Campos: **E-mail** (input `type="email"`, autoComplete `username`) e **Senha** (input `type="password"` com botão mostrar/ocultar, autoComplete `current-password`).
+- Botão primário laranja **"Entrar"** (loading `Loader2`).
+- Divisor "ou" separando o formulário do botão Google (Google permanece como opção secundária).
+- Mensagem de erro contextual reaproveitando o bloco `AlertCircle` existente (pt-BR: "E-mail ou senha inválidos.", "Informe e-mail e senha.", etc.).
+- Estilo consistente com o tema atual (bg `white/[0.04]`, borda `white/10`, foco laranja) — sem componentes novos, apenas Tailwind + shadcn `Input`/`Label` já disponíveis.
 
-### Aviso de segurança
-Senha de 4 dígitos numéricos é **fraca** e afeta todos os futuros cadastros do sistema. Recomendo trocar depois do primeiro login.
+### Lógica
+- Handler `handleEmailPassword(e)`:
+  - Valida campos não-vazios e formato de e-mail (regex simples).
+  - Chama `supabase.auth.signInWithPassword({ email, password })`.
+  - Em sucesso, o listener `onAuthStateChange` já redireciona para `/dashboard`.
+  - Em erro: mapeia `Invalid login credentials` → "E-mail ou senha inválidos." e demais para mensagem genérica.
+- Um único estado `isSubmitting` bloqueia ambos os fluxos (Google e e-mail/senha) enquanto uma tentativa está em andamento.
+
+### Fora do escopo
+- Não implementar cadastro público, recuperação de senha, nem alterar políticas de auth do Supabase.
+- Não alterar RLS, rotas protegidas, ou o fluxo do técnico já implementado.
 
 ### Validação
-- Confirmar via `supabase--read_query` que existe 1 registro em `auth.users`, `profiles` e `user_roles` para o e-mail.
-- Testar login manual no preview.
+- `bunx tsgo` para tipos.
+- Teste manual com o usuário Marcio (`lemarcmanutencao@gmail.com` / `5656`) já cadastrado → deve entrar e cair no dashboard do técnico.
