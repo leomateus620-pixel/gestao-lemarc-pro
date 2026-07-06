@@ -72,7 +72,11 @@ export const Route = createFileRoute("/_app/ordens/")({
   head: () => ({ meta: [{ title: "Ordens de serviço — Gestão Lemarc" }] }),
   validateSearch: zodValidator(searchSchema),
   errorComponent: OrdensError,
-  component: OrdensPage,
+  component: () => (
+    <RequireAdmin>
+      <OrdensPage />
+    </RequireAdmin>
+  ),
 });
 
 const statusRank: Record<ServiceOrderStatus, number> = {
