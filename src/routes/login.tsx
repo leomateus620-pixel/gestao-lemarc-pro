@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { ServiceOrderProgressCard } from "@/components/login/ServiceOrderProgressCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -27,6 +29,11 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const nav = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -45,6 +52,7 @@ function LoginPage() {
     if (isSubmitting) return;
     setError("");
     setIsSubmitting(true);
+    setGoogleLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
@@ -52,6 +60,7 @@ function LoginPage() {
       if (result.error) {
         setError("Não foi possível iniciar o login com Google. Tente novamente.");
         setIsSubmitting(false);
+        setGoogleLoading(false);
         return;
       }
       if (result.redirected) return;
@@ -60,6 +69,51 @@ function LoginPage() {
       console.error(err);
       setError("Erro inesperado ao acessar o sistema.");
       setIsSubmitting(false);
+      setGoogleLoading(false);
+    }
+  }
+
+  async function handleEmailPassword(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (isSubmitting) return;
+    setError("");
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError("Informe e-mail e senha.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Digite um e-mail válido.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setEmailLoading(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+      if (signInError) {
+        const msg = signInError.message?.toLowerCase() ?? "";
+        if (msg.includes("invalid login credentials")) {
+          setError("E-mail ou senha inválidos.");
+        } else if (msg.includes("email not confirmed")) {
+          setError("E-mail ainda não confirmado. Fale com o administrador.");
+        } else {
+          setError("Não foi possível entrar. Tente novamente.");
+        }
+        setIsSubmitting(false);
+        setEmailLoading(false);
+        return;
+      }
+      // onAuthStateChange redireciona para /dashboard
+    } catch (err) {
+      console.error(err);
+      setError("Erro inesperado ao acessar o sistema.");
+      setIsSubmitting(false);
+      setEmailLoading(false);
     }
   }
 
@@ -86,9 +140,80 @@ function LoginPage() {
             <GlassLoginCard>
               <div className="space-y-5">
                 <p className="text-sm leading-6 text-white/72">
-                  Use sua conta Google corporativa para acessar ordens de serviço, equipes e
-                  histórico operacional.
+                  Técnicos acessam com e-mail e senha. Contas corporativas Google também são
+                  aceitas.
                 </p>
+
+                <form className="space-y-3" onSubmit={handleEmailPassword} noValidate>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
+                      E-mail
+                    </Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="username"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isSubmitting}
+                      placeholder="tecnico@lemarc.com.br"
+                      className="h-11 rounded-xl border-white/10 bg-white/[0.045] text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
+                      Senha
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isSubmitting}
+                        placeholder="Sua senha"
+                        className="h-11 rounded-xl border-white/10 bg-white/[0.045] pr-11 text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        disabled={isSubmitting}
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-white/58 transition hover:bg-white/8 hover:text-white disabled:opacity-50"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="h-[3rem] w-full rounded-xl bg-orange-glow text-[15px] font-bold text-navy-deep transition hover:brightness-110 disabled:opacity-70"
+                  >
+                    {emailLoading ? (
+                      <>
+                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        Entrando...
+                      </>
+                    ) : (
+                      "Entrar"
+                    )}
+                  </Button>
+                </form>
+
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-white/10" />
+                  <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/40">
+                    ou
+                  </span>
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
 
                 <Button
                   className="lemarc-login-google h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep disabled:opacity-70"
@@ -96,7 +221,7 @@ function LoginPage() {
                   onClick={handleGoogle}
                   type="button"
                 >
-                  {isSubmitting ? (
+                  {googleLoading ? (
                     <>
                       <Loader2 aria-hidden="true" className="animate-spin" />
                       Conectando...
