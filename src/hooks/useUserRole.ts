@@ -31,14 +31,10 @@ export function useUserRole() {
     };
   }, [user]);
 
-  return {
-    roles,
-    loading,
-    isAdmin: roles.includes("admin"),
-    isOperador: roles.includes("operador"),
-    // Técnico: papel explícito 'tecnico'. Sem papel + não admin = tratamos como técnico (fallback seguro).
-    isTecnico:
-      roles.includes("tecnico") ||
-      (!roles.includes("admin") && !roles.includes("operador") && roles.length >= 0),
-  };
+  const isAdmin = roles.includes("admin");
+  const isOperador = roles.includes("operador");
+  // Enquanto os papéis não carregam, não decide (evita flash de UI técnica para admin).
+  const isTecnico = !loading && !isAdmin && !isOperador;
+  return { roles, loading, isAdmin, isOperador, isTecnico };
+}
 }
