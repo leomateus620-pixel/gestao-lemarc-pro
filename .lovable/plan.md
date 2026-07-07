@@ -1,40 +1,60 @@
 ## Objetivo
-Tornar o campo `distance_km_from_base` **visível e acessível** na tela `/clientes/$id/editar`, sem redesenho, sem mexer em rotas, banco, criação de OS, finalização, PDF ou relatórios. O campo já existe end-to-end — a correção é de UX/descoberta.
 
-## Escopo
+Reduzir o fluxo de início de OS de 3 cliques (Despachar → Iniciar deslocamento → Iniciar serviço → e ainda um por técnico) para 1 clique único: **"Iniciar serviço"**, que já coloca a OS em `running` e dispara automaticamente o cronômetro de todos os técnicos vinculados.
 
-### 1. `src/components/clientes/ClientUnitsEditor.tsx`
-- **Auto-criar unidade principal implícita** quando o cliente não tem nenhuma unidade: em vez de mostrar só o empty-state, renderizar um card inline "Unidade principal" já aberto, com apenas os campos essenciais visíveis (Nome pré-preenchido com o nome do cliente + campo **Distância da base (km)**), e um botão "Salvar unidade". Assim o admin cadastra a distância mesmo sem "pensar em unidade".
-- **Auto-expandir** a unidade quando o cliente tem exatamente 1 unidade (evita o clique extra que hoje esconde o campo).
-- **Elevar o bloco "Deslocamento padrão"** para o topo do formulário da unidade (hoje fica no fim, depois de endereço/contato/observações). Ordem nova dentro do accordion: Nome + Principal → **Deslocamento padrão (Distância da base)** → CNPJ/Setor → Cidade/UF → Endereço → Contato → Observações.
-- **Ajuste de labels/copy** conforme especificado:
-  - Label: "Distância da base"
-  - Sufixo visual "km" (adornment à direita do input)
-  - Placeholder: "Ex.: 90"
-  - Texto auxiliar: "Usada como sugestão de deslocamento na finalização das OS desta unidade."
-  - Estado vazio no header da unidade colapsada: badge "Distância não definida" (quando `distance_km_from_base == null`) ou "90 km da base" (quando preenchido), para dar sinal visual imediato sem precisar abrir.
+Sem rota nova, sem tela nova, sem alterar controle individual, finalização, assinatura, anexos, PDF, relatórios ou apuração financeira.
 
-### 2. `src/routes/_app.clientes.$id.editar.tsx`
-- **Adicionar âncora/atalho** no card principal: um pequeno chip/botão no cabeçalho "Editar cliente" com texto "Configurar distância da base" que faz `scrollIntoView` para a seção de unidades. Aparece somente quando alguma unidade está sem `distance_km_from_base`.
-- Nenhuma outra alteração de layout, sem mexer em Identificação/Localização/Contato/Observações.
+## Diagnóstico do fluxo atual
 
-### 3. Verificações (sem alterações de código)
-- Confirmar que `updateClientUnit` já persiste `distance_km_from_base` (já persiste — `draftToInput` inclui o campo).
-- Confirmar que `FinalizeServiceOrderDialog` já consome `distance_km_from_base` da unidade + rate global (já consome, conforme implementação anterior).
-- Confirmar que `client_units.distance_km_from_base` existe na tabela (existe, tipo `numeric`).
-- Nenhuma migration nova. Nenhuma mudança em `types.ts`, `clients.functions.ts`, `types/client.ts`.
+- `src/routes/_app.ordens.$id.tsx` (linhas 95-107) define o objeto `flow` que hoje encadeia:
+  - `pending` → botão "Despachar OS" → status `dispatched`
+  - `dispatched` → botão "Iniciar deslocamento" → status `transit`
+  - `transit` → botão "Iniciar serviço" → status `running` (via `updateServiceOrderStatus`)
+- O botão da "Próxima ação" chama `mutation.mutate(action.next)` que só troca o status — **não** cria sessões de trabalho.
+- O técnico ainda precisa abrir `ServiceOrderTimeControl` e clicar no seu próprio botão "Iniciar" para começar o cronômetro (usa `startWork` de `src/lib/api/timeSessions.functions.ts`).
+- `startWork` já promove a OS para `running` quando ela está em `pending`/`dispatched`/`transit` — logo, chamar `startWork` para os técnicos vinculados resolve status + tempo em um só passo, aproveitando lógica existente.
 
-## Fora de escopo
-- Banco de dados, migrations, tipos Supabase.
-- Rotas, autenticação, wizard de criação de cliente (`ClientWizard`).
-- Fluxo de criação/finalização de OS, PDF, relatórios.
-- Redesenho visual — só reordenação dentro do accordion da unidade + um chip de atalho + auto-expand + inline unit para clientes sem unidade.
-- Valor por km (segue global em `system_settings.default_displacement_rate_cents`).
+## Mudanças
 
-## Validação manual
-1. Abrir `/clientes/<Camira>/editar` — cliente sem unidade → aparece card "Unidade principal" já aberto com campo "Distância da base".
-2. Digitar `90` → Salvar unidade → toast de sucesso → reabrir a rota → valor `90` persistido e visível no header ("90 km da base") e no campo.
-3. Criar OS para Camira → abrir finalização → deslocamento sugerido automaticamente com `90 km` × rate global.
-4. Confirmar que a tela de editar cliente não teve mudança em Identificação/Localização/Contato/Observações/Salvar.
-5. Confirmar que nenhum campo de valor por km apareceu por cliente.
-6. Confirmar que `ClientWizard` (criação) permanece inalterado.
+### 1. `src/routes/_app.ordens.$id.tsx` (único arquivo alterado)
+
+- Alterar o mapa `flow` para os três status iniciais apontarem para a mesma ação visual:
+  - `pending`, `dispatched`, `transit` → label "Iniciar serviço", ícone `Play`, `next: "running"`.
+  - Demais entradas (`running`, `finished`, `review`, `approved`, `cancelled`) permanecem exatamente como estão.
+- Adicionar helper `isStartFlow = order.status === "pending" || "dispatched" || "transit"`.
+- Importar `startWork` de `@/lib/api/timeSessions.functions` e criar `startWorkFn = useServerFn(startWork)`.
+- Nova mutação `startServiceMutation`:
+  - Se `technicians.length === 0` → `toast.error("Vincule ao menos um técnico para iniciar o serviço.")` e retorna.
+  - Para cada técnico vinculado, chama `startWorkFn({ data: { orderId, technicianId } })` em `Promise.allSettled`.
+  - Ignora erros com mensagem "Já existe uma sessão de trabalho ativa" (idempotência para técnicos já ativos).
+  - Se **todos** falharem por outro motivo → `toast.error` com a mensagem do primeiro erro real (não quebra a página).
+  - Se pelo menos um técnico iniciou:
+    - Toast: `"Serviço iniciado."` (1 técnico) ou `"Serviço iniciado para a equipe."` (2+); se houve técnicos já ativos ignorados, `"Alguns técnicos já estavam com tempo ativo."`.
+    - Invalida `["service-orders"]`, `["service-order", id]`, `["order-time-sessions", id]`, `["dashboard-technician-time"]` para o `ServiceOrderTimeControl` refletir imediatamente.
+  - Não chama `updateServiceOrderStatus` — o próprio `startWork` promove a OS para `running`.
+- No render do card "Próxima ação":
+  - Quando `isStartFlow`, o `onClick` do `PrimaryCTA` chama `startServiceMutation.mutate()` em vez de `mutation.mutate(action.next)`.
+  - Label e ícone continuam vindo de `flow[order.status]` (agora todos "Iniciar serviço" / `Play`).
+  - `disabled` usa `startServiceMutation.isPending`; texto "Iniciando..." enquanto pendente.
+- Para os demais status (`running` → finalizar, `finished` → revisar, etc.), continua chamando `mutation.mutate(action.next)` — nenhuma alteração.
+
+### 2. Nada mais é alterado
+
+- `ServiceOrderTimeControl.tsx`: **não muda**. Continua mostrando os botões individuais Pausar / Retomar / Encerrar meu tempo / (Iniciar manual para técnico adicionado depois).
+- `timeSessions.functions.ts`: **não muda**. `startWork`, `pauseWork`, `resumeWork`, `finishWork` intactos.
+- `serviceOrders.functions.ts`: **não muda**. `updateServiceOrderStatus` continua existindo para os demais avanços de status.
+- Enum de status, tipos, banco, migrations, RLS: **não muda**.
+- Finalização (`handleTecnicoFinish`, `FinalizeServiceOrderDialog`), assinatura, anexos, PDF, relatórios, apuração financeira, permissões técnico/admin: **não muda**.
+
+## Validação
+
+- Typecheck (`tsgo --noEmit`).
+- Cenário 1 técnico: OS `pending` → card mostra "Iniciar serviço" (sem "Despachar OS" / "Iniciar deslocamento") → 1 clique → OS vira `running`, cronômetro do técnico aparece rodando no controle abaixo, sem 2º clique. Pausar / Retomar / Encerrar funcionam.
+- Cenário 2 técnicos: 1 clique inicia ambos; pausa/retomada individual continuam independentes.
+- Cenário sem técnico: toast "Vincule ao menos um técnico…", OS permanece em `pending`, página não quebra.
+- Cenário OS legada em `dispatched` ou `transit`: card já mostra "Iniciar serviço" e 1 clique promove para `running` + inicia técnicos.
+- Admin/gestor: fluxo de revisão/finalização a partir de `running`/`finished`/`review` continua idêntico; técnico continua sem ver valores financeiros.
+
+## Arquivos alterados
+
+- `src/routes/_app.ordens.$id.tsx` (único).
