@@ -535,43 +535,24 @@ function UnitFormFields({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1">
-          <FieldLabel>Distância (km)</FieldLabel>
-          <Input
-            inputMode="decimal"
-            value={draft.distance_km_from_base}
-            onChange={(e) => set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))}
-            className={inputCls}
-            placeholder="0"
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>Tipo deslocamento</FieldLabel>
-          <select
-            value={draft.default_displacement_type}
-            onChange={(e) =>
-              set("default_displacement_type", e.target.value as DisplacementType | "")
-            }
-            className={cn(inputCls, "w-full px-3")}
-          >
-            <option value="">—</option>
-            <option value="km">Por km</option>
-            <option value="fixed">Valor fixo</option>
-            <option value="none">Sem cobrança</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>Valor (R$)</FieldLabel>
-          <Input
-            inputMode="decimal"
-            value={draft.default_displacement_rate_reais}
-            onChange={(e) =>
-              set("default_displacement_rate_reais", e.target.value.replace(/[^\d.,]/g, ""))
-            }
-            className={inputCls}
-            placeholder="0,00"
-          />
+      <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+        <FieldLabel>Deslocamento padrão</FieldLabel>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-start">
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              Distância da base (km)
+            </label>
+            <Input
+              inputMode="decimal"
+              value={draft.distance_km_from_base}
+              onChange={(e) => set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))}
+              className={inputCls}
+              placeholder="Não definida"
+            />
+          </div>
+          <p className="text-[11px] font-medium leading-snug text-slate-400 sm:pt-6">
+            O valor por km é configurado globalmente nas configurações do sistema.
+          </p>
         </div>
       </div>
 
