@@ -435,10 +435,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           km_total: String(distance).replace(".", ","),
           rate_input: (globalRateCents / 100).toFixed(2).replace(".", ","),
           fixed_input: "",
-          notes: null as unknown as string,
+          notes: "",
         });
-        // notes stored as string in state — normalize:
-        setDisplacement((d) => ({ ...d, notes: "" }));
       }
     }
     setStep(0);
