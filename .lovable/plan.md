@@ -1,60 +1,62 @@
-## Objetivo
+## Diagnóstico
 
-Reduzir o fluxo de início de OS de 3 cliques (Despachar → Iniciar deslocamento → Iniciar serviço → e ainda um por técnico) para 1 clique único: **"Iniciar serviço"**, que já coloca a OS em `running` e dispara automaticamente o cronômetro de todos os técnicos vinculados.
+Confirmei no banco que a OS afetada (ex.: `408aa471…`) tem **duas linhas** em `service_order_technicians` (Juan e Omar), e as políticas de RLS permitem a leitura para admin/dono da OS. Ou seja, os dados estão sendo **salvos corretamente** pelo `createServiceOrder` (payload `technician_ids` já é enviado como array pelo `ServiceOrderWizard`).
 
-Sem rota nova, sem tela nova, sem alterar controle individual, finalização, assinatura, anexos, PDF, relatórios ou apuração financeira.
+O bug está no **caminho de leitura + normalização + fallback**, não no salvamento:
 
-## Diagnóstico do fluxo atual
+1. Em `ORDER_SELECT` (`src/lib/api/serviceOrders.functions.ts`), o embed aninhado usa o mesmo alias `technician:technicians(...)` tanto no nível raiz quanto dentro de `assigned_technicians`. O PostgREST resolve, mas fica sensível a mudanças de FK; sem hint explícito (`!service_order_technicians_technician_id_fkey`) qualquer nova FK futura pode reduzir o retorno silenciosamente. Além disso, quando o embed nested devolve apenas um item por qualquer motivo (linha órfã, técnico inativo filtrado por policy nova, etc.), a UI cai no fallback legado.
+2. `getOrderTechnicians` (`src/lib/serviceOrders/technicians.ts`) devolve `order.technicians` **ou** o legado `order.technician`, sem nunca fundir os dois. Se por qualquer motivo o array M2M vier incompleto (ex.: 1 item), o técnico principal do campo legado nunca é reincorporado, e a UI e o `ServiceOrderTimeControl` ficam com um único técnico — exatamente o sintoma relatado.
+3. `ServiceOrderTimeControl` consome direto o resultado de `getOrderTechnicians`, então herda o mesmo defeito.
 
-- `src/routes/_app.ordens.$id.tsx` (linhas 95-107) define o objeto `flow` que hoje encadeia:
-  - `pending` → botão "Despachar OS" → status `dispatched`
-  - `dispatched` → botão "Iniciar deslocamento" → status `transit`
-  - `transit` → botão "Iniciar serviço" → status `running` (via `updateServiceOrderStatus`)
-- O botão da "Próxima ação" chama `mutation.mutate(action.next)` que só troca o status — **não** cria sessões de trabalho.
-- O técnico ainda precisa abrir `ServiceOrderTimeControl` e clicar no seu próprio botão "Iniciar" para começar o cronômetro (usa `startWork` de `src/lib/api/timeSessions.functions.ts`).
-- `startWork` já promove a OS para `running` quando ela está em `pending`/`dispatched`/`transit` — logo, chamar `startWork` para os técnicos vinculados resolve status + tempo em um só passo, aproveitando lógica existente.
+## Correções
 
-## Mudanças
+Alterar apenas 3 arquivos (sem nova rota, sem nova tabela, sem migração):
 
-### 1. `src/routes/_app.ordens.$id.tsx` (único arquivo alterado)
+### 1. `src/lib/api/serviceOrders.functions.ts`
+- No `ORDER_SELECT`, desambiguar o embed aninhado para não depender de heurística:
+  ```
+  assigned_technicians:service_order_technicians!service_order_technicians_service_order_id_fkey(
+    is_primary, role,
+    technician:technicians!service_order_technicians_technician_id_fkey(
+      id, full_name, role, hourly_rate_cents
+    )
+  )
+  ```
+- Em `normalize()`, garantir deduplicação por `id` e preservar `is_primary`/`assignment_role` corretos ao mesclar (nenhuma mudança de contrato de tipo).
 
-- Alterar o mapa `flow` para os três status iniciais apontarem para a mesma ação visual:
-  - `pending`, `dispatched`, `transit` → label "Iniciar serviço", ícone `Play`, `next: "running"`.
-  - Demais entradas (`running`, `finished`, `review`, `approved`, `cancelled`) permanecem exatamente como estão.
-- Adicionar helper `isStartFlow = order.status === "pending" || "dispatched" || "transit"`.
-- Importar `startWork` de `@/lib/api/timeSessions.functions` e criar `startWorkFn = useServerFn(startWork)`.
-- Nova mutação `startServiceMutation`:
-  - Se `technicians.length === 0` → `toast.error("Vincule ao menos um técnico para iniciar o serviço.")` e retorna.
-  - Para cada técnico vinculado, chama `startWorkFn({ data: { orderId, technicianId } })` em `Promise.allSettled`.
-  - Ignora erros com mensagem "Já existe uma sessão de trabalho ativa" (idempotência para técnicos já ativos).
-  - Se **todos** falharem por outro motivo → `toast.error` com a mensagem do primeiro erro real (não quebra a página).
-  - Se pelo menos um técnico iniciou:
-    - Toast: `"Serviço iniciado."` (1 técnico) ou `"Serviço iniciado para a equipe."` (2+); se houve técnicos já ativos ignorados, `"Alguns técnicos já estavam com tempo ativo."`.
-    - Invalida `["service-orders"]`, `["service-order", id]`, `["order-time-sessions", id]`, `["dashboard-technician-time"]` para o `ServiceOrderTimeControl` refletir imediatamente.
-  - Não chama `updateServiceOrderStatus` — o próprio `startWork` promove a OS para `running`.
-- No render do card "Próxima ação":
-  - Quando `isStartFlow`, o `onClick` do `PrimaryCTA` chama `startServiceMutation.mutate()` em vez de `mutation.mutate(action.next)`.
-  - Label e ícone continuam vindo de `flow[order.status]` (agora todos "Iniciar serviço" / `Play`).
-  - `disabled` usa `startServiceMutation.isPending`; texto "Iniciando..." enquanto pendente.
-- Para os demais status (`running` → finalizar, `finished` → revisar, etc.), continua chamando `mutation.mutate(action.next)` — nenhuma alteração.
+### 2. `src/lib/serviceOrders/technicians.ts`
+Reescrever `getOrderTechnicians` para **fundir** M2M + legado em vez de escolher um dos dois:
+- Começa pela lista `order.technicians` (M2M).
+- Se `order.technician` existir e ainda não estiver na lista, injeta como principal.
+- Se nenhum item estiver marcado `is_primary`, promove o que coincide com `order.technician_id`, ou o primeiro.
+- Deduplica por `id` preservando o primeiro registro (que já traz `is_primary`).
+- Ordena com `is_primary` primeiro, mantendo a ordem estável dos demais.
 
-### 2. Nada mais é alterado
+Isso mantém 100% do comportamento atual quando o M2M já tem tudo, e cobre qualquer regressão de leitura sem esconder o problema.
 
-- `ServiceOrderTimeControl.tsx`: **não muda**. Continua mostrando os botões individuais Pausar / Retomar / Encerrar meu tempo / (Iniciar manual para técnico adicionado depois).
-- `timeSessions.functions.ts`: **não muda**. `startWork`, `pauseWork`, `resumeWork`, `finishWork` intactos.
-- `serviceOrders.functions.ts`: **não muda**. `updateServiceOrderStatus` continua existindo para os demais avanços de status.
-- Enum de status, tipos, banco, migrations, RLS: **não muda**.
-- Finalização (`handleTecnicoFinish`, `FinalizeServiceOrderDialog`), assinatura, anexos, PDF, relatórios, apuração financeira, permissões técnico/admin: **não muda**.
+### 3. `src/components/ordens/ServiceOrderTimeControl.tsx`
+Nenhuma mudança de lógica — só se beneficia automaticamente da correção do `getOrderTechnicians`. Confirmar que `bulkStartMut` continua sendo disparado pelo botão "Iniciar serviço" do `_app.ordens.$id.tsx` (que já usa `technicians.map(...)` via `Promise.allSettled` para iniciar sessão de cada técnico).
+
+## O que NÃO muda
+- `ServiceOrderWizard` (payload já correto).
+- `createServiceOrder` / `setServiceOrderTechnicians` (persistência já correta).
+- Enums, tipos, RLS, políticas, grants, migrações.
+- Fluxo de pausa/retomada individual (`pauseWork`/`resumeWork` continuam por `technicianId`).
+- Finalização, assinatura, anexos, notificações, PDF, relatórios, revisão financeira.
+- Restrição do técnico de ver valores financeiros.
 
 ## Validação
 
-- Typecheck (`tsgo --noEmit`).
-- Cenário 1 técnico: OS `pending` → card mostra "Iniciar serviço" (sem "Despachar OS" / "Iniciar deslocamento") → 1 clique → OS vira `running`, cronômetro do técnico aparece rodando no controle abaixo, sem 2º clique. Pausar / Retomar / Encerrar funcionam.
-- Cenário 2 técnicos: 1 clique inicia ambos; pausa/retomada individual continuam independentes.
-- Cenário sem técnico: toast "Vincule ao menos um técnico…", OS permanece em `pending`, página não quebra.
-- Cenário OS legada em `dispatched` ou `transit`: card já mostra "Iniciar serviço" e 1 clique promove para `running` + inicia técnicos.
-- Admin/gestor: fluxo de revisão/finalização a partir de `running`/`finished`/`review` continua idêntico; técnico continua sem ver valores financeiros.
+Após as alterações vou:
+1. Rodar typecheck (`tsgo --noEmit`).
+2. Consultar `service_order_technicians` no banco para confirmar 2 linhas em OS de teste.
+3. Abrir a OS `408aa471…` no preview autenticado como admin via Playwright, e confirmar:
+   - Cabeçalho da OS lista os dois nomes separados por vírgula.
+   - Seção **Técnicos responsáveis** renderiza os dois cards, com "Principal" no primeiro.
+   - **Controle de tempo da OS** mostra o seletor com os dois técnicos.
+   - Clicar em **Iniciar serviço** dispara `Promise.allSettled` e ambos os cronômetros começam.
+   - Pausar apenas um mantém o outro rodando (via `pauseWork` scoped por `technicianId`).
+4. Repetir com uma OS de 1 técnico só para garantir que segue funcionando.
+5. Recarregar a OS e confirmar persistência.
 
-## Arquivos alterados
-
-- `src/routes/_app.ordens.$id.tsx` (único).
+Todo o conteúdo visível permanece em pt-BR.
