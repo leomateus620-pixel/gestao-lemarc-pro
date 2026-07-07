@@ -484,6 +484,33 @@ function UnitFormFields({
         </label>
       </div>
 
+      <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+        <FieldLabel>Deslocamento padrão</FieldLabel>
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-300">
+            Distância da base
+          </label>
+          <div className="relative">
+            <Input
+              inputMode="decimal"
+              value={draft.distance_km_from_base}
+              onChange={(e) =>
+                set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))
+              }
+              className={cn(inputCls, "pr-12")}
+              placeholder="Ex.: 90"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-black uppercase tracking-[0.08em] text-slate-300">
+              km
+            </span>
+          </div>
+          <p className="text-[11px] font-medium leading-snug text-slate-400">
+            Usada como sugestão de deslocamento na finalização das OS desta unidade. O valor por km
+            é configurado globalmente nas configurações do sistema.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <FieldLabel>CNPJ da unidade</FieldLabel>
@@ -549,27 +576,6 @@ function UnitFormFields({
             onChange={(e) => set("phone", e.target.value)}
             className={inputCls}
           />
-        </div>
-      </div>
-
-      <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-        <FieldLabel>Deslocamento padrão</FieldLabel>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-start">
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-              Distância da base (km)
-            </label>
-            <Input
-              inputMode="decimal"
-              value={draft.distance_km_from_base}
-              onChange={(e) => set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))}
-              className={inputCls}
-              placeholder="Não definida"
-            />
-          </div>
-          <p className="text-[11px] font-medium leading-snug text-slate-400 sm:pt-6">
-            O valor por km é configurado globalmente nas configurações do sistema.
-          </p>
         </div>
       </div>
 
