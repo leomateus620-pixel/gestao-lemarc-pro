@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -118,13 +118,30 @@ function validateDraft(d: UnitDraft): string | null {
 
 export function ClientUnitsEditor({ clientId, units }: { clientId: string; units: ClientUnit[] }) {
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(
+    units.length === 1 ? units[0].id : null,
+  );
   const [creating, setCreating] = useState(false);
   const [newDraft, setNewDraft] = useState<UnitDraft>(emptyDraft);
 
   const createFn = useServerFn(createClientUnit);
   const updateFn = useServerFn(updateClientUnit);
   const deleteFn = useServerFn(deleteClientUnit);
+
+  // Auto-abrir formulário "Unidade principal" quando o cliente ainda não tem
+  // nenhuma unidade — é o único caminho para cadastrar a distância da base.
+  useEffect(() => {
+    if (units.length === 0 && !creating) {
+      setCreating(true);
+      setNewDraft({ ...emptyDraft(), name: "Unidade principal", is_primary: true });
+    }
+    // Auto-expandir quando só existe uma unidade — evita clique extra que
+    // esconde o campo "Distância da base".
+    if (units.length === 1 && expanded === null) {
+      setExpanded(units[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units.length]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["client", clientId] });
@@ -362,6 +379,13 @@ function UnitRow({
             {unit.cnpj && <span className="truncate tabular-nums">{maskCNPJ(unit.cnpj)}</span>}
           </div>
           <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+            {unit.distance_km_from_base != null && unit.distance_km_from_base > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.04em] text-primary">
+                {formatKm(unit.distance_km_from_base)} km da base
+              </span>
+            ) : (
+              <PendingBadge>Distância não definida</PendingBadge>
+            )}
             {pending.length === 0 ? (
               <ReadyBadge>Pronta para OS</ReadyBadge>
             ) : (
@@ -467,6 +491,33 @@ function UnitFormFields({
         </label>
       </div>
 
+      <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+        <FieldLabel>Deslocamento padrão</FieldLabel>
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-300">
+            Distância da base
+          </label>
+          <div className="relative">
+            <Input
+              inputMode="decimal"
+              value={draft.distance_km_from_base}
+              onChange={(e) =>
+                set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))
+              }
+              className={cn(inputCls, "pr-12")}
+              placeholder="Ex.: 90"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-black uppercase tracking-[0.08em] text-slate-300">
+              km
+            </span>
+          </div>
+          <p className="text-[11px] font-medium leading-snug text-slate-400">
+            Usada como sugestão de deslocamento na finalização das OS desta unidade. O valor por km
+            é configurado globalmente nas configurações do sistema.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <FieldLabel>CNPJ da unidade</FieldLabel>
@@ -535,27 +586,6 @@ function UnitFormFields({
         </div>
       </div>
 
-      <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-        <FieldLabel>Deslocamento padrão</FieldLabel>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-start">
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-              Distância da base (km)
-            </label>
-            <Input
-              inputMode="decimal"
-              value={draft.distance_km_from_base}
-              onChange={(e) => set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))}
-              className={inputCls}
-              placeholder="Não definida"
-            />
-          </div>
-          <p className="text-[11px] font-medium leading-snug text-slate-400 sm:pt-6">
-            O valor por km é configurado globalmente nas configurações do sistema.
-          </p>
-        </div>
-      </div>
-
       <div className="space-y-1">
         <FieldLabel>Observações de faturamento</FieldLabel>
         <Textarea
@@ -610,4 +640,11 @@ function getExistingUnitPendingItems(unit: ClientUnit) {
   if (!unit.city?.trim() || !unit.state?.trim()) items.push("Local pendente");
   if (!unit.cnpj?.trim()) items.push("CNPJ opcional");
   return items.slice(0, 3);
+}
+
+function formatKm(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(2).replace(".", ",").replace(/,?0+$/, "");
 }

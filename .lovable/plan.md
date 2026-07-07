@@ -1,91 +1,40 @@
 ## Objetivo
+Tornar o campo `distance_km_from_base` **visível e acessível** na tela `/clientes/$id/editar`, sem redesenho, sem mexer em rotas, banco, criação de OS, finalização, PDF ou relatórios. O campo já existe end-to-end — a correção é de UX/descoberta.
 
-Adicionar deslocamento estável com **distância por unidade** (já existe) e **valor por km global** (novo), pré-preenchendo a finalização da OS automaticamente sem quebrar fluxos atuais.
+## Escopo
 
-## 1. Banco de dados (migração)
+### 1. `src/components/clientes/ClientUnitsEditor.tsx`
+- **Auto-criar unidade principal implícita** quando o cliente não tem nenhuma unidade: em vez de mostrar só o empty-state, renderizar um card inline "Unidade principal" já aberto, com apenas os campos essenciais visíveis (Nome pré-preenchido com o nome do cliente + campo **Distância da base (km)**), e um botão "Salvar unidade". Assim o admin cadastra a distância mesmo sem "pensar em unidade".
+- **Auto-expandir** a unidade quando o cliente tem exatamente 1 unidade (evita o clique extra que hoje esconde o campo).
+- **Elevar o bloco "Deslocamento padrão"** para o topo do formulário da unidade (hoje fica no fim, depois de endereço/contato/observações). Ordem nova dentro do accordion: Nome + Principal → **Deslocamento padrão (Distância da base)** → CNPJ/Setor → Cidade/UF → Endereço → Contato → Observações.
+- **Ajuste de labels/copy** conforme especificado:
+  - Label: "Distância da base"
+  - Sufixo visual "km" (adornment à direita do input)
+  - Placeholder: "Ex.: 90"
+  - Texto auxiliar: "Usada como sugestão de deslocamento na finalização das OS desta unidade."
+  - Estado vazio no header da unidade colapsada: badge "Distância não definida" (quando `distance_km_from_base == null`) ou "90 km da base" (quando preenchido), para dar sinal visual imediato sem precisar abrir.
 
-Coluna `client_units.distance_km_from_base` já existe — reutilizar.
+### 2. `src/routes/_app.clientes.$id.editar.tsx`
+- **Adicionar âncora/atalho** no card principal: um pequeno chip/botão no cabeçalho "Editar cliente" com texto "Configurar distância da base" que faz `scrollIntoView` para a seção de unidades. Aparece somente quando alguma unidade está sem `distance_km_from_base`.
+- Nenhuma outra alteração de layout, sem mexer em Identificação/Localização/Contato/Observações.
 
-Criar tabela global de configurações:
+### 3. Verificações (sem alterações de código)
+- Confirmar que `updateClientUnit` já persiste `distance_km_from_base` (já persiste — `draftToInput` inclui o campo).
+- Confirmar que `FinalizeServiceOrderDialog` já consome `distance_km_from_base` da unidade + rate global (já consome, conforme implementação anterior).
+- Confirmar que `client_units.distance_km_from_base` existe na tabela (existe, tipo `numeric`).
+- Nenhuma migration nova. Nenhuma mudança em `types.ts`, `clients.functions.ts`, `types/client.ts`.
 
-```sql
-CREATE TABLE public.system_settings (
-  key text PRIMARY KEY,
-  value jsonb NOT NULL,
-  updated_by uuid REFERENCES auth.users(id),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-GRANT SELECT ON public.system_settings TO authenticated;
-GRANT ALL ON public.system_settings TO service_role;
-ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+## Fora de escopo
+- Banco de dados, migrations, tipos Supabase.
+- Rotas, autenticação, wizard de criação de cliente (`ClientWizard`).
+- Fluxo de criação/finalização de OS, PDF, relatórios.
+- Redesenho visual — só reordenação dentro do accordion da unidade + um chip de atalho + auto-expand + inline unit para clientes sem unidade.
+- Valor por km (segue global em `system_settings.default_displacement_rate_cents`).
 
--- SELECT: qualquer usuário autenticado (técnicos só leem valor por km durante uso interno; UI não expõe)
-CREATE POLICY "Read settings" ON public.system_settings FOR SELECT TO authenticated USING (true);
--- INSERT/UPDATE: apenas admin
-CREATE POLICY "Admin manage settings" ON public.system_settings FOR ALL TO authenticated
-  USING (has_role(auth.uid(), 'admin')) WITH CHECK (has_role(auth.uid(), 'admin'));
-```
-
-Chave usada: `default_displacement_rate_cents`, valor `{ "cents": 250 }` (R$ 2,50).
-
-Observação: campo legado `client_units.default_displacement_rate_cents` fica intocado (não usaremos mais na UI, mas não removemos para não quebrar código atual).
-
-## 2. Server functions
-
-**Novo** `src/lib/api/systemSettings.functions.ts`:
-- `getDisplacementRateCents()` — `requireSupabaseAuth`, retorna `number | null`.
-- `setDisplacementRateCents({ cents })` — `requireSupabaseAuth` + checa `has_role('admin')`, faz upsert.
-
-**Editar** `src/lib/api/clients.functions.ts`:
-- Garantir que `updateUnit` já persiste `distance_km_from_base` (verificar; ajustar se faltar).
-
-## 3. UI — Configurações globais (admin)
-
-Criar rota admin-only `src/routes/_app.configuracoes.tsx` (guarded via `requireAdmin`) com um único card **"Deslocamento padrão"**:
-- Campo "Valor padrão por km" (input BRL, R$ 2,50 → 250 cents).
-- Texto: "Este valor será aplicado para todos os clientes e unidades."
-- Botão Salvar.
-
-Adicionar entrada no menu "Mais" (`src/routes/_app.mais.tsx`) visível somente para admin: **"Configurações"**.
-
-## 4. UI — Edição de cliente/unidade
-
-Em `src/components/clientes/ClientUnitsEditor.tsx`:
-- Manter/expor claramente o campo **"Distância da base (km)"** dentro de cada unidade (já existe estrutura, garantir label + persistência).
-- Adicionar hint discreto: "O valor por km é configurado globalmente nas configurações do sistema."
-- **Remover da UI** os campos por-unidade `default_displacement_rate_cents` e `default_displacement_type` (banco mantém, UI não expõe). Se aparecerem no `ClientWizard.tsx`, remover também.
-
-## 5. Finalização da OS
-
-Em `FinalizeServiceOrderDialog.tsx`, no efeito de hidratação (quando **não há** financeiro existente e `displacement.type === "none"`):
-
-- Buscar `getDisplacementRateCents()` via `useQuery` (enabled quando dialog abre).
-- Se `order.client_unit?.distance_km_from_base > 0` e `globalRate > 0`:
-  - `type = "per_km"`, `km_total = distância`, `rate_input = BRL(globalRate)`.
-- Exibir Notice: "Deslocamento sugerido com base na distância cadastrada da unidade e no valor padrão por km."
-- Se distância presente mas rate global ausente (admin): Notice warning "Valor padrão por km não configurado."
-- Admin ainda pode editar manualmente (comportamento atual preservado).
-
-Não pré-preencher se já existe `service_order_financials` salvo.
-
-## 6. Permissões / restrições
-
-- Técnico **não** vê a rota `/configuracoes` nem a entrada de menu.
-- Técnico **não** vê o diálogo de finalização (já é restrito hoje) — nada muda.
-- RLS: técnico pode `SELECT` de `system_settings` (leitura silenciosa se algum fluxo interno precisar), mas UI não expõe.
-
-## 7. Validação
-
-- Editar unidade Camira → 90 km → salvar → recarregar → persistiu.
-- Configurações → R$ 2,50/km → salvar → recarregar → persistiu.
-- Criar OS Camira → admin finaliza → step Deslocamento já mostra 90 km, R$ 2,50, total R$ 225,00.
-- Editar manualmente valores → totalização atualiza.
-- OS sem distância → comportamento atual inalterado.
-- Rotas `/clientes*`, `/ordens*`, relatórios, PDF, auth intactos.
-
-## Detalhes técnicos
-
-- Cents salvos como inteiro em `jsonb` (`{ "cents": 250 }`).
-- Parse BRL usa `parseBRLToCents` existente.
-- `getDisplacementRateCents` faz `select value->>'cents'` e converte para número, null se ausente.
-- Hidratação da OS: usar `useQuery` com `queryKey: ["system-settings", "displacement-rate"]` e aguardar antes de resetar `displacement` (efeito atual roda em `open, existing, order, techs, sessions` — adicionar `globalRate` na dep).
+## Validação manual
+1. Abrir `/clientes/<Camira>/editar` — cliente sem unidade → aparece card "Unidade principal" já aberto com campo "Distância da base".
+2. Digitar `90` → Salvar unidade → toast de sucesso → reabrir a rota → valor `90` persistido e visível no header ("90 km da base") e no campo.
+3. Criar OS para Camira → abrir finalização → deslocamento sugerido automaticamente com `90 km` × rate global.
+4. Confirmar que a tela de editar cliente não teve mudança em Identificação/Localização/Contato/Observações/Salvar.
+5. Confirmar que nenhum campo de valor por km apareceu por cliente.
+6. Confirmar que `ClientWizard` (criação) permanece inalterado.
