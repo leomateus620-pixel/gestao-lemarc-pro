@@ -48,6 +48,7 @@ import {
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import { listTimeSessions } from "@/lib/api/timeSessions.functions";
+import { getDisplacementRateCents } from "@/lib/api/systemSettings.functions";
 import { computeClosedWorkedMinutesByTech } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
 import type { ServiceOrder } from "@/types/serviceOrder";
@@ -311,6 +312,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const fetcher = useServerFn(getOrderFinancials);
   const finalizeFn = useServerFn(finalizeServiceOrder);
   const sessionsFn = useServerFn(listTimeSessions);
+  const globalRateFn = useServerFn(getDisplacementRateCents);
   const hasSignature = Boolean(order.signature);
   const hasWaiver = Boolean(order.signature_waiver_reason);
   const signatureOk = hasSignature || hasWaiver;
@@ -328,6 +330,13 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     queryFn: () => sessionsFn({ data: { orderId: order.id } }),
     enabled: open,
     staleTime: 0,
+  });
+
+  const { data: globalRateCents } = useQuery({
+    queryKey: ["system-settings", "displacement-rate"],
+    queryFn: () => globalRateFn(),
+    enabled: open,
+    staleTime: 60_000,
   });
 
   const [step, setStep] = useState<StepIndex>(0);
@@ -416,9 +425,22 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         notes: f.displacement_notes ?? "",
       });
       setGeneralNotes(f.notes ?? "");
+    } else {
+      // Sugestão automática: distância da unidade × valor global por km.
+      const distance = order.client_unit?.distance_km_from_base ?? null;
+      if (distance != null && distance > 0 && globalRateCents != null && globalRateCents > 0) {
+        setDisplacement({
+          type: "per_km",
+          count: "",
+          km_total: String(distance).replace(".", ","),
+          rate_input: (globalRateCents / 100).toFixed(2).replace(".", ","),
+          fixed_input: "",
+          notes: "",
+        });
+      }
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions]);
+  }, [open, existing, order, techs, sessions, globalRateCents]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
@@ -447,6 +469,19 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const displacementCents = computeDisplacementCents(displacementInput);
   const unitDisplacementHint = useMemo(() => buildUnitDisplacementHint(order), [order]);
   const hasAutoCalculatedEntries = computed.some(isAutoCalculatedEntry);
+
+  const unitDistance = order.client_unit?.distance_km_from_base ?? null;
+  const hasAutoDisplacementSuggestion =
+    !existing?.financials &&
+    unitDistance != null &&
+    unitDistance > 0 &&
+    globalRateCents != null &&
+    globalRateCents > 0;
+  const missingGlobalRate =
+    !existing?.financials &&
+    unitDistance != null &&
+    unitDistance > 0 &&
+    (globalRateCents == null || globalRateCents <= 0);
 
   const updateEntry = (i: number, patch: Partial<DraftEntry>) => {
     setEntries((prev) => {
@@ -842,6 +877,20 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 {unitDisplacementHint && (
                   <Notice>
                     <strong>Valor sugerido pela unidade.</strong> {unitDisplacementHint}
+                  </Notice>
+                )}
+
+                {hasAutoDisplacementSuggestion && (
+                  <Notice>
+                    Deslocamento sugerido com base na distância cadastrada da unidade e no valor
+                    padrão por km. Ajuste manualmente se o trajeto real foi diferente.
+                  </Notice>
+                )}
+
+                {missingGlobalRate && (
+                  <Notice tone="warning">
+                    Valor padrão por km não configurado. Defina em Mais → Configurações para que a
+                    sugestão automática funcione.
                   </Notice>
                 )}
 
