@@ -47,7 +47,7 @@ import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeCon
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
-import { finishWork } from "@/lib/api/timeSessions.functions";
+import { finishWork, startWork } from "@/lib/api/timeSessions.functions";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
@@ -96,8 +96,8 @@ const flow: Record<
   ServiceOrderStatus,
   { label: string; next: ServiceOrderStatus | null; icon: typeof Truck }
 > = {
-  pending: { label: "Despachar OS", next: "dispatched", icon: Send },
-  dispatched: { label: "Iniciar deslocamento", next: "transit", icon: Truck },
+  pending: { label: "Iniciar serviço", next: "running", icon: Play },
+  dispatched: { label: "Iniciar serviço", next: "running", icon: Play },
   transit: { label: "Iniciar serviço", next: "running", icon: Play },
   running: { label: "Finalizar serviço", next: "finished", icon: Pause },
   finished: { label: "Enviar para revisão", next: "review", icon: Send },
@@ -131,6 +131,7 @@ function OrdemDetalhe() {
   const queryClient = useQueryClient();
   const updateStatus = useServerFn(updateServiceOrderStatus);
   const finishWorkFn = useServerFn(finishWork);
+  const startWorkFn = useServerFn(startWork);
   const mutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => updateStatus({ data: { id: order.id, status } }),
     onSuccess: (_data, status) => {
@@ -148,6 +149,57 @@ function OrdemDetalhe() {
   const action = flow[order.status];
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
+  const isStartFlow =
+    order.status === "pending" ||
+    order.status === "dispatched" ||
+    order.status === "transit";
+
+  const startServiceMutation = useMutation({
+    mutationFn: async () => {
+      if (technicians.length === 0) {
+        throw new Error("Vincule ao menos um técnico para iniciar o serviço.");
+      }
+      const results = await Promise.allSettled(
+        technicians.map((t) =>
+          startWorkFn({ data: { orderId: order.id, technicianId: t.id } }),
+        ),
+      );
+      let started = 0;
+      let alreadyActive = 0;
+      const otherErrors: string[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          started += 1;
+        } else {
+          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          if (/já existe uma sessão de trabalho ativa/i.test(msg)) alreadyActive += 1;
+          else otherErrors.push(msg);
+        }
+      }
+      if (started === 0 && alreadyActive === 0 && otherErrors.length > 0) {
+        throw new Error(otherErrors[0]);
+      }
+      return { started, alreadyActive, total: technicians.length };
+    },
+    onSuccess: ({ started, alreadyActive, total }) => {
+      queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["service-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["order-time-sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-technician-time"] });
+      if (started === 0 && alreadyActive > 0) {
+        toastFn.info("Alguns técnicos já estavam com tempo ativo.");
+      } else if (alreadyActive > 0) {
+        toastFn.success("Alguns técnicos já estavam com tempo ativo.");
+      } else if (total > 1) {
+        toastFn.success("Serviço iniciado para a equipe.");
+      } else {
+        toastFn.success("Serviço iniciado.");
+      }
+    },
+    onError: (e: unknown) =>
+      toastFn.error(e instanceof Error ? e.message : "Não foi possível iniciar o serviço."),
+  });
+
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
   const hasSignature =
@@ -319,13 +371,23 @@ function OrdemDetalhe() {
                 {adminReviewLabel}
               </PrimaryCTA>
             ) : action.next ? (
-              <PrimaryCTA
-                onClick={() => action.next && mutation.mutate(action.next)}
-                icon={action.icon}
-                disabled={mutation.isPending}
-              >
-                {mutation.isPending ? "Atualizando..." : action.label}
-              </PrimaryCTA>
+              isStartFlow ? (
+                <PrimaryCTA
+                  onClick={() => startServiceMutation.mutate()}
+                  icon={action.icon}
+                  disabled={startServiceMutation.isPending}
+                >
+                  {startServiceMutation.isPending ? "Iniciando..." : action.label}
+                </PrimaryCTA>
+              ) : (
+                <PrimaryCTA
+                  onClick={() => action.next && mutation.mutate(action.next)}
+                  icon={action.icon}
+                  disabled={mutation.isPending}
+                >
+                  {mutation.isPending ? "Atualizando..." : action.label}
+                </PrimaryCTA>
+              )
             ) : null}
           </div>
         </GlassCard>
