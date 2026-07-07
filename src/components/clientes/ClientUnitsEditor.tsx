@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -118,13 +118,30 @@ function validateDraft(d: UnitDraft): string | null {
 
 export function ClientUnitsEditor({ clientId, units }: { clientId: string; units: ClientUnit[] }) {
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(
+    units.length === 1 ? units[0].id : null,
+  );
   const [creating, setCreating] = useState(false);
   const [newDraft, setNewDraft] = useState<UnitDraft>(emptyDraft);
 
   const createFn = useServerFn(createClientUnit);
   const updateFn = useServerFn(updateClientUnit);
   const deleteFn = useServerFn(deleteClientUnit);
+
+  // Auto-abrir formulário "Unidade principal" quando o cliente ainda não tem
+  // nenhuma unidade — é o único caminho para cadastrar a distância da base.
+  useEffect(() => {
+    if (units.length === 0 && !creating) {
+      setCreating(true);
+      setNewDraft({ ...emptyDraft(), name: "Unidade principal", is_primary: true });
+    }
+    // Auto-expandir quando só existe uma unidade — evita clique extra que
+    // esconde o campo "Distância da base".
+    if (units.length === 1 && expanded === null) {
+      setExpanded(units[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units.length]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["client", clientId] });
