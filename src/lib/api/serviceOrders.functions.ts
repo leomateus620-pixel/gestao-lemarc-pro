@@ -20,9 +20,9 @@ const ORDER_SELECT = `
   client:clients!service_orders_client_id_fkey(id, name, unit, cnpj),
   technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
   client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type),
-  assigned_technicians:service_order_technicians(
+  assigned_technicians:service_order_technicians!service_order_technicians_service_order_id_fkey(
     is_primary, role,
-    technician:technicians(id, full_name, role, hourly_rate_cents)
+    technician:technicians!service_order_technicians_technician_id_fkey(id, full_name, role, hourly_rate_cents)
   ),
   signatures:service_order_signatures(
     id, service_order_id, signed_by_name, signed_by_role,
@@ -145,8 +145,14 @@ async function resolveAccessEmail(
 
 function normalize(row: any): ServiceOrder {
   const assigned = Array.isArray(row?.assigned_technicians) ? row.assigned_technicians : [];
+  const seen = new Set<string>();
   const technicians = assigned
-    .filter((a: any) => a?.technician)
+    .filter((a: any) => a?.technician?.id)
+    .filter((a: any) => {
+      if (seen.has(a.technician.id)) return false;
+      seen.add(a.technician.id);
+      return true;
+    })
     .map((a: any) => ({
       id: a.technician.id,
       full_name: a.technician.full_name,
