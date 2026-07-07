@@ -12,10 +12,6 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { useAuth } from "@/components/app/AuthContext";
-import { useUserRole } from "@/hooks/useUserRole";
-import { useServiceOrdersQuery, useTechniciansQuery } from "@/hooks/useServiceOrders";
-import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
-import { Plus, ClipboardCheck } from "lucide-react";
 import { ServiceOrderCard } from "@/components/app/ServiceOrderCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { EmptyOperations } from "@/components/dashboard/EmptyOperations";
@@ -23,12 +19,25 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { OperationTodayCard } from "@/components/dashboard/OperationTodayCard";
 import { OrderTechnicianTimeCard } from "@/components/dashboard/OrderTechnicianTimeCard";
-import { useDashboardTechnicianTimeQuery } from "@/hooks/useServiceOrders";
+import {
+  TechnicianHomeHero,
+  TechnicianHomeSkeleton,
+} from "@/components/dashboard/TechnicianHomeHero";
+import { TechnicianOrderList } from "@/components/dashboard/TechnicianOrderList";
+import { technicianOrderNeedsAction } from "@/components/dashboard/technicianOrderUtils";
+import { TechnicianQuickActionCard } from "@/components/dashboard/TechnicianQuickActionCard";
+import { useUserRole } from "@/hooks/useUserRole";
+import {
+  useDashboardTechnicianTimeQuery,
+  useServiceOrdersQuery,
+  useTechniciansQuery,
+} from "@/hooks/useServiceOrders";
 import { useOperationalDashboard } from "@/hooks/useOperationalDashboard";
 import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
+import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
-import type { ServiceOrder } from "@/types/serviceOrder";
+import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Central de Operação — Gestão Lemarc" }] }),
@@ -38,19 +47,36 @@ export const Route = createFileRoute("/_app/dashboard")({
 function DashboardPage() {
   return (
     <AppShell>
-      <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardRouter />
-      </Suspense>
+      <DashboardRouter />
     </AppShell>
   );
 }
 
 function DashboardRouter() {
   const { isTecnico, loading } = useUserRole();
-  if (loading) return <DashboardSkeleton />;
-  if (isTecnico) return <TechnicianHome />;
-  return <Dashboard />;
+  if (loading) return <TechnicianHomeSkeleton />;
+  if (isTecnico) {
+    return (
+      <Suspense fallback={<TechnicianHomeSkeleton />}>
+        <TechnicianHome />
+      </Suspense>
+    );
+  }
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <Dashboard />
+    </Suspense>
+  );
 }
+
+const technicianVisibleStatuses = new Set<ServiceOrderStatus>([
+  "pending",
+  "dispatched",
+  "transit",
+  "running",
+  "finished",
+  "review",
+]);
 
 function TechnicianHome() {
   const { displayName, user } = useAuth();
@@ -61,71 +87,68 @@ function TechnicianHome() {
     if (!user?.id) return new Set<string>();
     return new Set(technicians.filter((t) => t.user_id === user.id).map((t) => t.id));
   }, [technicians, user?.id]);
-  const myOrders = useMemo(
-    () =>
-      orders.filter((o) => {
-        const techs = getOrderTechnicians(o);
-        if (techs.some((t) => myTechnicianIds.has(t.id))) return true;
-        if (o.technician_id && myTechnicianIds.has(o.technician_id)) return true;
-        return false;
-      }),
-    [orders, myTechnicianIds],
+  const technicianOrders = useMemo(() => {
+    return orders
+      .filter((order) => {
+        if (!technicianVisibleStatuses.has(order.status)) return false;
+
+        const assigned = getOrderTechnicians(order);
+        if (assigned.some((technician) => myTechnicianIds.has(technician.id))) return true;
+        return Boolean(order.technician_id && myTechnicianIds.has(order.technician_id));
+      })
+      .sort(compareTechnicianOrders);
+  }, [orders, myTechnicianIds]);
+  const actionCount = useMemo(
+    () => technicianOrders.filter(technicianOrderNeedsAction).length,
+    [technicianOrders],
   );
-  const myActive = myOrders.filter((o) =>
-    ["pending", "dispatched", "transit", "running"].includes(o.status),
-  );
-  const myRecent = myOrders.slice(0, 6);
   return (
-    <main className="mx-auto max-w-3xl space-y-5 pb-6">
-      <section className="lemarc-hero-gradient rounded-2xl border border-primary/25 bg-primary/[0.06] p-5">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-          Bem-vindo, {firstName}
-        </p>
-        <h1 className="mt-1 font-display text-2xl font-black text-foreground">
-          Central do técnico
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Acompanhe suas ordens de serviço e registre a execução em campo.
-        </p>
-        <Link
-          to="/ordens/nova"
-          className="lemarc-pressable mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-black uppercase tracking-wide text-primary-foreground shadow-lg"
-        >
-          <Plus size={18} /> Nova OS
-        </Link>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="section-title flex items-center gap-2">
-          <ClipboardCheck size={16} className="text-primary" /> OS em execução
-        </h2>
-        {myActive.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-muted-foreground">
-            Nenhuma OS atribuída a você.
-            <br />
-            Crie uma nova OS para iniciar um atendimento.
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {myActive.map((o) => (
-              <ServiceOrderCard key={o.id} order={o} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {myRecent.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="section-title">Últimas OS</h2>
-          <div className="grid gap-3">
-            {myRecent.map((o) => (
-              <ServiceOrderCard key={o.id} order={o} />
-            ))}
-          </div>
-        </section>
-      )}
+    <main className="mx-auto w-full max-w-3xl space-y-3.5 pb-6 sm:space-y-4">
+      <TechnicianHomeHero
+        firstName={firstName}
+        orderCount={technicianOrders.length}
+        actionCount={actionCount}
+      />
+      <TechnicianQuickActionCard />
+      <TechnicianOrderList orders={technicianOrders} actionCount={actionCount} />
     </main>
   );
+}
+
+function compareTechnicianOrders(a: ServiceOrder, b: ServiceOrder) {
+  return (
+    technicianStatusRank(a.status) - technicianStatusRank(b.status) ||
+    technicianPriorityRank(a) - technicianPriorityRank(b) ||
+    dateValueForSort(b.opened_at ?? b.created_at) - dateValueForSort(a.opened_at ?? a.created_at)
+  );
+}
+
+function technicianStatusRank(status: ServiceOrderStatus) {
+  const rank: Record<ServiceOrderStatus, number> = {
+    running: 0,
+    transit: 1,
+    dispatched: 2,
+    pending: 3,
+    finished: 4,
+    review: 5,
+    approved: 6,
+    cancelled: 7,
+  };
+  return rank[status];
+}
+
+function technicianPriorityRank(order: ServiceOrder) {
+  if (order.priority === "urgente") return 0;
+  if (order.priority === "alta") return 1;
+  if (order.priority === "media") return 2;
+  if (order.priority === "baixa") return 3;
+  return 4;
+}
+
+function dateValueForSort(value: string | null | undefined) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function periodSearchParams(period: Period, range?: PeriodRange) {

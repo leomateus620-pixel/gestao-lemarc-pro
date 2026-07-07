@@ -195,9 +195,9 @@ function OrdemDetalhe() {
       order.status === "cancelled");
   const showActionCard =
     adminReview ||
-    (action.next !== null && !(isTecnico && (order.status === "finished" || order.status === "review")));
-  const adminReviewLabel =
-    order.status === "running" ? "Finalizar OS" : "Revisar e finalizar OS";
+    (action.next !== null &&
+      !(isTecnico && (order.status === "finished" || order.status === "review")));
+  const adminReviewLabel = order.status === "running" ? "Finalizar OS" : "Revisar e finalizar OS";
   const adminReviewHint =
     order.status === "running"
       ? "Apure horas, deslocamento e feche a OS."
@@ -304,9 +304,7 @@ function OrdemDetalhe() {
           <h2 className="font-display text-lg font-black text-foreground">
             {adminReview ? adminReviewLabel : action.label}
           </h2>
-          {adminReview && (
-            <p className="mt-1 text-xs text-muted-foreground">{adminReviewHint}</p>
-          )}
+          {adminReview && <p className="mt-1 text-xs text-muted-foreground">{adminReviewHint}</p>}
           <div className="mt-3">
             {tecnicoFinalize ? (
               <PrimaryCTA
@@ -333,17 +331,22 @@ function OrdemDetalhe() {
         </GlassCard>
       )}
 
-      {isTecnico && (order.status === "finished" || order.status === "review" || order.status === "approved") && (
-        <GlassCard className="mt-4 p-4 text-center">
-          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Concluído</p>
-          <h2 className="font-display text-lg font-black text-foreground">
-            OS finalizada e enviada para revisão.
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A equipe administrativa fará a apuração e o fechamento.
-          </p>
-        </GlassCard>
-      )}
+      {isTecnico &&
+        (order.status === "finished" ||
+          order.status === "review" ||
+          order.status === "approved") && (
+          <GlassCard className="mt-4 p-4 text-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+              Concluído
+            </p>
+            <h2 className="font-display text-lg font-black text-foreground">
+              OS finalizada e enviada para revisão.
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              A equipe administrativa fará a apuração e o fechamento.
+            </p>
+          </GlassCard>
+        )}
 
       {isAdmin && (
         <FinalizeServiceOrderDialog
@@ -399,7 +402,7 @@ function OrdemDetalhe() {
       </Section>
 
       <Section title="Linha do tempo" icon={Clock}>
-        <Timeline order={order} />
+        <Timeline order={order} isTecnico={isTecnico} />
       </Section>
     </>
   );
@@ -702,13 +705,16 @@ function Section({
   );
 }
 
-function Timeline({ order }: { order: ServiceOrder }) {
+function Timeline({ order, isTecnico }: { order: ServiceOrder; isTecnico: boolean }) {
   const events: { label: string; iso: string | null }[] = [
     { label: "OS criada", iso: order.opened_at },
     { label: "Serviço iniciado", iso: order.started_at },
     { label: "Serviço finalizado", iso: order.finished_at },
-    { label: "Aprovada para cobrança", iso: order.approved_at },
-    { label: "Fechada", iso: order.closed_at },
+    {
+      label: isTecnico ? "Registro conferido" : "Aprovada para cobrança",
+      iso: order.approved_at,
+    },
+    { label: isTecnico ? "Conclusão operacional" : "Fechada", iso: order.closed_at },
   ];
   return (
     <ol className="space-y-3">

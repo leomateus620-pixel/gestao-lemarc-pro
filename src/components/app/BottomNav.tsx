@@ -35,7 +35,7 @@ const items = [
   { to: "/mais", label: "Mais", mobileLabel: "Mais", compactLabel: "Mais", icon: MoreHorizontal },
 ] as const;
 
-const TECNICO_ROUTES = new Set<string>(["/dashboard", "/mais"]);
+const TECNICO_ROUTES = new Set<string>(["/dashboard"]);
 
 export function BottomNav() {
   const { isAdmin, isOperador, loading } = useUserRole();
@@ -50,7 +50,10 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] sm:px-4"
     >
       <div
-        className="lemarc-bottom-nav-shell mx-auto mb-2 grid w-full max-w-lg gap-0.5 p-1 sm:max-w-2xl sm:gap-1 sm:p-1.5 lg:max-w-3xl"
+        className={
+          "lemarc-bottom-nav-shell mx-auto mb-2 grid w-full gap-0.5 p-1 sm:gap-1 sm:p-1.5 " +
+          (cols === 1 ? "max-w-[11rem]" : "max-w-lg sm:max-w-2xl lg:max-w-3xl")
+        }
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       >
         {visibleItems.map(({ to, label, mobileLabel, compactLabel, icon: Icon }) => (
