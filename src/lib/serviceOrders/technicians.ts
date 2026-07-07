@@ -2,19 +2,56 @@ import type { AssignedTechnician, ServiceOrder, TechnicianLite } from "@/types/s
 import type { ReportOrderRow, ReportTechnician } from "@/types/reports";
 
 /**
- * Returns the list of technicians for a Service Order. Uses the M2M
- * `technicians` array when populated, falling back to the legacy single
- * `technician` field. Returns `[]` when no technician is assigned.
+ * Retorna a lista completa de técnicos vinculados a uma OS mesclando o
+ * relacionamento M2M (`service_order_technicians` → `order.technicians`)
+ * com o campo legado `order.technician`/`order.technician_id`.
+ *
+ * Regras:
+ *  - O M2M é a fonte primária; nunca é descartado quando existe.
+ *  - Se o técnico legado não estiver no M2M, entra como principal.
+ *  - Se ninguém estiver marcado `is_primary`, promove o que coincide com
+ *    `order.technician_id`, ou o primeiro item.
+ *  - Deduplica por `id` preservando o primeiro registro (que já traz
+ *    `is_primary` e `assignment_role`).
+ *  - Ordena com `is_primary` primeiro, mantendo a ordem estável do resto.
  */
 export function getOrderTechnicians(
-  order: Pick<ServiceOrder, "technicians" | "technician"> | null | undefined,
+  order:
+    | Pick<ServiceOrder, "technicians" | "technician" | "technician_id">
+    | null
+    | undefined,
 ): AssignedTechnician[] {
   if (!order) return [];
-  if (order.technicians && order.technicians.length > 0) return order.technicians;
-  if (order.technician) {
-    return [{ ...order.technician, is_primary: true }];
+
+  const merged: AssignedTechnician[] = [];
+  const seen = new Set<string>();
+
+  for (const t of order.technicians ?? []) {
+    if (!t || !t.id || seen.has(t.id)) continue;
+    seen.add(t.id);
+    merged.push(t);
   }
-  return [];
+
+  if (order.technician && !seen.has(order.technician.id)) {
+    seen.add(order.technician.id);
+    merged.push({ ...order.technician, is_primary: true });
+  }
+
+  if (merged.length === 0) return [];
+
+  const hasPrimary = merged.some((t) => t.is_primary);
+  if (!hasPrimary) {
+    const legacyId = order.technician_id ?? order.technician?.id ?? null;
+    const primaryIdx = legacyId ? merged.findIndex((t) => t.id === legacyId) : -1;
+    const idx = primaryIdx >= 0 ? primaryIdx : 0;
+    merged[idx] = { ...merged[idx], is_primary: true };
+  }
+
+  // Ordenação estável: principal primeiro, resto mantém a ordem original.
+  return merged
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => Number(b.t.is_primary) - Number(a.t.is_primary) || a.i - b.i)
+    .map(({ t }) => t);
 }
 
 export function getReportRowTechnicians(row: ReportOrderRow): ReportTechnician[] {
