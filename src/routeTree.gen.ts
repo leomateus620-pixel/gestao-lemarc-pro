@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
 import { Route as AppMaisRouteImport } from './routes/_app.mais'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradores'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
@@ -63,6 +64,11 @@ const AppMaisRoute = AppMaisRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
   getParentRoute: () => AppRoute,
 } as any)
 const AppColaboradoresRoute = AppColaboradoresRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/clientes': typeof AppClientesRouteWithChildren
   '/colaboradores': typeof AppColaboradoresRouteWithChildren
+  '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
   '/relatorios': typeof AppRelatoriosRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
   '/relatorios': typeof AppRelatoriosRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/clientes': typeof AppClientesRouteWithChildren
   '/_app/colaboradores': typeof AppColaboradoresRouteWithChildren
+  '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/mais': typeof AppMaisRoute
   '/_app/relatorios': typeof AppRelatoriosRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/clientes'
     | '/colaboradores'
+    | '/configuracoes'
     | '/dashboard'
     | '/mais'
     | '/relatorios'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/configuracoes'
     | '/dashboard'
     | '/mais'
     | '/relatorios'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/clientes'
     | '/_app/colaboradores'
+    | '/_app/configuracoes'
     | '/_app/dashboard'
     | '/_app/mais'
     | '/_app/relatorios'
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/configuracoes': {
+      id: '/_app/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AppConfiguracoesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/colaboradores': {
@@ -594,6 +613,7 @@ const AppOrdensIdRouteWithChildren = AppOrdensIdRoute._addFileChildren(
 interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRouteWithChildren
   AppColaboradoresRoute: typeof AppColaboradoresRouteWithChildren
+  AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppMaisRoute: typeof AppMaisRoute
   AppRelatoriosRoute: typeof AppRelatoriosRoute
@@ -607,6 +627,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRouteWithChildren,
   AppColaboradoresRoute: AppColaboradoresRouteWithChildren,
+  AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppMaisRoute: AppMaisRoute,
   AppRelatoriosRoute: AppRelatoriosRoute,

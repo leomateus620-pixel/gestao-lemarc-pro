@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { IdCard, LogOut, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
+import { IdCard, LogOut, Settings, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { useAuth } from "@/components/app/AuthContext";
@@ -95,6 +95,13 @@ function MaisPage() {
               className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
             >
               Relatórios
+            </Link>
+            <Link
+              to="/configuracoes"
+              className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
+            >
+              <Settings size={14} />
+              Configurações
             </Link>
           </div>
         </section>
