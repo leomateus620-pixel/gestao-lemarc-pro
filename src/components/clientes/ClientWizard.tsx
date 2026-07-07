@@ -823,42 +823,11 @@ function UnitDraftCard({
             className={inputCls}
           />
         </FormField>
-        <FormField label="Valor/km padrão (R$)">
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            value={
-              unit.default_displacement_rate_cents === null ||
-              unit.default_displacement_rate_cents === undefined
-                ? ""
-                : String(unit.default_displacement_rate_cents / 100)
-            }
-            onChange={(e) =>
-              onUpdate({
-                default_displacement_rate_cents:
-                  e.target.value === "" ? null : Math.round(Number(e.target.value) * 100),
-              })
-            }
-            className={inputCls}
-          />
-        </FormField>
-        <FormField label="Cobrança de deslocamento">
-          <select
-            value={unit.default_displacement_type ?? "km"}
-            onChange={(e) =>
-              onUpdate({
-                default_displacement_type: e.target.value as "km" | "fixed" | "none",
-              })
-            }
-            className={cn(inputCls, "appearance-none px-3 text-sm")}
-          >
-            <option value="km">Por km rodado</option>
-            <option value="fixed">Valor fixo</option>
-            <option value="none">Não cobrar</option>
-          </select>
-        </FormField>
+        <div className="md:col-span-2 flex items-end">
+          <p className="text-[11px] font-medium leading-snug text-slate-400">
+            O valor por km é configurado globalmente nas configurações do sistema.
+          </p>
+        </div>
       </div>
 
       <FormField label="Observações de cobrança / deslocamento" className="mt-3">
