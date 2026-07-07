@@ -470,6 +470,19 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const unitDisplacementHint = useMemo(() => buildUnitDisplacementHint(order), [order]);
   const hasAutoCalculatedEntries = computed.some(isAutoCalculatedEntry);
 
+  const unitDistance = order.client_unit?.distance_km_from_base ?? null;
+  const hasAutoDisplacementSuggestion =
+    !existing?.financials &&
+    unitDistance != null &&
+    unitDistance > 0 &&
+    globalRateCents != null &&
+    globalRateCents > 0;
+  const missingGlobalRate =
+    !existing?.financials &&
+    unitDistance != null &&
+    unitDistance > 0 &&
+    (globalRateCents == null || globalRateCents <= 0);
+
   const updateEntry = (i: number, patch: Partial<DraftEntry>) => {
     setEntries((prev) => {
       const next = [...prev];
@@ -864,6 +877,20 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 {unitDisplacementHint && (
                   <Notice>
                     <strong>Valor sugerido pela unidade.</strong> {unitDisplacementHint}
+                  </Notice>
+                )}
+
+                {hasAutoDisplacementSuggestion && (
+                  <Notice>
+                    Deslocamento sugerido com base na distância cadastrada da unidade e no valor
+                    padrão por km. Ajuste manualmente se o trajeto real foi diferente.
+                  </Notice>
+                )}
+
+                {missingGlobalRate && (
+                  <Notice tone="warning">
+                    Valor padrão por km não configurado. Defina em Mais → Configurações para que a
+                    sugestão automática funcione.
                   </Notice>
                 )}
 
