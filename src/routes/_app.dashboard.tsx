@@ -1,5 +1,7 @@
 import { Suspense, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   AlertTriangle,
@@ -19,6 +21,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { OperationTodayCard } from "@/components/dashboard/OperationTodayCard";
 import { OrderTechnicianTimeCard } from "@/components/dashboard/OrderTechnicianTimeCard";
+import { TechnicianAssignedOrderNotification } from "@/components/dashboard/TechnicianAssignedOrderNotification";
 import {
   TechnicianHomeHero,
   TechnicianHomeSkeleton,
@@ -32,12 +35,21 @@ import {
   useServiceOrdersQuery,
   useTechniciansQuery,
 } from "@/hooks/useServiceOrders";
+import {
+  TECHNICIAN_NOTIFICATIONS_QUERY_KEY,
+  useTechnicianAssignedOrderNotificationsQuery,
+} from "@/hooks/useTechnicianNotifications";
 import { useOperationalDashboard } from "@/hooks/useOperationalDashboard";
+import {
+  dismissServiceOrderNotification,
+  markServiceOrderNotificationRead,
+} from "@/lib/api/notifications.functions";
 import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Central de Operação — Gestão Lemarc" }] }),
@@ -80,8 +92,13 @@ const technicianVisibleStatuses = new Set<ServiceOrderStatus>([
 
 function TechnicianHome() {
   const { displayName, user } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: orders } = useServiceOrdersQuery();
   const { data: technicians } = useTechniciansQuery();
+  const { data: notifications = [] } = useTechnicianAssignedOrderNotificationsQuery();
+  const markRead = useServerFn(markServiceOrderNotificationRead);
+  const dismissNotification = useServerFn(dismissServiceOrderNotification);
   const firstName = (displayName || "Técnico").split(" ")[0];
   const myTechnicianIds = useMemo(() => {
     if (!user?.id) return new Set<string>();
@@ -102,16 +119,71 @@ function TechnicianHome() {
     () => technicianOrders.filter(technicianOrderNeedsAction).length,
     [technicianOrders],
   );
+  const currentNotification = notifications[0] ?? null;
+  const readMutation = useMutation({
+    mutationFn: (id: string) => markRead({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TECHNICIAN_NOTIFICATIONS_QUERY_KEY });
+    },
+  });
+  const dismissMutation = useMutation({
+    mutationFn: (id: string) => dismissNotification({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TECHNICIAN_NOTIFICATIONS_QUERY_KEY });
+    },
+  });
+  const notificationBusy = readMutation.isPending || dismissMutation.isPending;
+
+  async function handleOpenAssignedOrder() {
+    if (!currentNotification || notificationBusy) return;
+    try {
+      await readMutation.mutateAsync(currentNotification.id);
+      navigate({
+        to: "/ordens/$id",
+        params: { id: currentNotification.service_order_id },
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível abrir a notificação desta OS.",
+      );
+    }
+  }
+
+  async function handleDismissNotification() {
+    if (!currentNotification || notificationBusy) return;
+    try {
+      await dismissMutation.mutateAsync(currentNotification.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível dispensar a notificação.",
+      );
+    }
+  }
+
+  function handleNotificationOpenChange(open: boolean) {
+    if (!open) void handleDismissNotification();
+  }
+
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-3.5 pb-6 sm:space-y-4">
-      <TechnicianHomeHero
-        firstName={firstName}
-        orderCount={technicianOrders.length}
-        actionCount={actionCount}
+    <>
+      <main className="mx-auto w-full max-w-3xl space-y-3.5 pb-6 sm:space-y-4">
+        <TechnicianHomeHero
+          firstName={firstName}
+          orderCount={technicianOrders.length}
+          actionCount={actionCount}
+        />
+        <TechnicianQuickActionCard />
+        <TechnicianOrderList orders={technicianOrders} actionCount={actionCount} />
+      </main>
+      <TechnicianAssignedOrderNotification
+        notification={currentNotification}
+        open={Boolean(currentNotification)}
+        busy={notificationBusy}
+        onOpenChange={handleNotificationOpenChange}
+        onOpenOrder={handleOpenAssignedOrder}
+        onDismiss={handleDismissNotification}
       />
-      <TechnicianQuickActionCard />
-      <TechnicianOrderList orders={technicianOrders} actionCount={actionCount} />
-    </main>
+    </>
   );
 }
 

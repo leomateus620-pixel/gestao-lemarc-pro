@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Supabase generated types lag behind incremental migrations in this app. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { syncServiceOrderAssignmentNotifications } from "@/lib/api/notifications.functions";
 import type { Database } from "@/integrations/supabase/types";
 import type {
   ServiceOrder,
@@ -116,7 +117,10 @@ async function enrichWithAccessEmail(sb: any, techs: TechnicianLite[]): Promise<
   for (const row of (data ?? []) as { user_id: string; email: string | null }[]) {
     map.set(row.user_id, row.email ?? null);
   }
-  return techs.map((t) => ({ ...t, access_email: t.user_id ? (map.get(t.user_id) ?? null) : null }));
+  return techs.map((t) => ({
+    ...t,
+    access_email: t.user_id ? (map.get(t.user_id) ?? null) : null,
+  }));
 }
 
 async function resolveAccessEmail(
@@ -204,6 +208,32 @@ type CreateInput = {
   scheduled_for?: string | null;
 };
 
+async function syncAssignmentNotificationsSafely({
+  supabase,
+  serviceOrderId,
+  technicianIds,
+  previousTechnicianIds,
+  createdBy,
+}: {
+  supabase: any;
+  serviceOrderId: string;
+  technicianIds: string[];
+  previousTechnicianIds?: string[];
+  createdBy: string;
+}) {
+  try {
+    await syncServiceOrderAssignmentNotifications({
+      supabase,
+      serviceOrderId,
+      technicianIds,
+      previousTechnicianIds,
+      createdBy,
+    });
+  } catch (error) {
+    console.warn("[service-order-notifications] Falha ao sincronizar notificação de OS", error);
+  }
+}
+
 export const createServiceOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: CreateInput) => data)
@@ -211,6 +241,7 @@ export const createServiceOrder = createServerFn({ method: "POST" })
     const ids = (data.technician_ids ?? []).filter(Boolean);
     const uniqueIds = Array.from(new Set(ids));
     const primaryId = uniqueIds[0] ?? data.technician_id ?? null;
+    const notificationIds = uniqueIds.length > 0 ? uniqueIds : primaryId ? [primaryId] : [];
     const { data: row, error } = await context.supabase
       .from("service_orders")
       .insert({
@@ -246,6 +277,12 @@ export const createServiceOrder = createServerFn({ method: "POST" })
         await context.supabase.from("service_orders").delete().eq("id", row.id);
         throw new Error(`Falha ao vincular técnicos: ${linkErr.message}`);
       }
+      await syncAssignmentNotificationsSafely({
+        supabase: context.supabase,
+        serviceOrderId: row.id,
+        technicianIds: notificationIds,
+        createdBy: context.userId,
+      });
       // Re-fetch so the response carries the new assignments.
       const { data: full, error: refetchErr } = await context.supabase
         .from("service_orders")
@@ -254,6 +291,14 @@ export const createServiceOrder = createServerFn({ method: "POST" })
         .single();
       if (refetchErr) throw new Error(refetchErr.message);
       return normalize(full);
+    }
+    if (notificationIds.length > 0) {
+      await syncAssignmentNotificationsSafely({
+        supabase: context.supabase,
+        serviceOrderId: row.id,
+        technicianIds: notificationIds,
+        createdBy: context.userId,
+      });
     }
     return normalize(row);
   });
@@ -264,6 +309,26 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ids = Array.from(new Set((data.technician_ids ?? []).filter(Boolean)));
     const primaryId = ids[0] ?? null;
+    const { data: previousLinks, error: previousErr } = await context.supabase
+      .from("service_order_technicians")
+      .select("technician_id")
+      .eq("service_order_id", data.id);
+    if (previousErr) throw new Error(previousErr.message);
+
+    let previousIds = Array.from(
+      new Set(
+        ((previousLinks ?? []) as { technician_id: string }[]).map((link) => link.technician_id),
+      ),
+    );
+    if (previousIds.length === 0) {
+      const { data: legacyOrder, error: legacyErr } = await context.supabase
+        .from("service_orders")
+        .select("technician_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (legacyErr) throw new Error(legacyErr.message);
+      if (legacyOrder?.technician_id) previousIds = [legacyOrder.technician_id];
+    }
 
     // Replace existing links with the new set.
     const { error: delErr } = await context.supabase
@@ -297,6 +362,13 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (refetchErr) throw new Error(refetchErr.message);
+    await syncAssignmentNotificationsSafely({
+      supabase: context.supabase,
+      serviceOrderId: data.id,
+      technicianIds: ids,
+      previousTechnicianIds: previousIds,
+      createdBy: context.userId,
+    });
     return normalize(full);
   });
 
