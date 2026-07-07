@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Building2, FileText, Loader2, MapPin, Phone, Save } from "lucide-react";
+import { Building2, FileText, Loader2, MapPin, Phone, Route as RouteIcon, Save } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
@@ -42,6 +42,14 @@ function Edit() {
   const qc = useQueryClient();
   const c = data?.client as ClientFull;
   const units = data?.units ?? [];
+  const needsDistance =
+    units.length === 0 ||
+    units.some((u) => u.distance_km_from_base == null || Number(u.distance_km_from_base) <= 0);
+  const scrollToUnits = () => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById("client-units-section");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const [draft, setDraft] = useState({
     name: c.name,
@@ -108,6 +116,15 @@ function Edit() {
               Atualize apenas o que mudou. As unidades continuam em uma seção própria para manter OS
               e histórico vinculados corretamente.
             </p>
+            {needsDistance && (
+              <button
+                type="button"
+                onClick={scrollToUnits}
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/12 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em] text-primary transition hover:bg-primary/20"
+              >
+                <RouteIcon size={13} /> Configurar distância da base
+              </button>
+            )}
           </div>
           <label className="lemarc-client-active-toggle flex cursor-pointer items-center justify-between gap-4 rounded-2xl p-3 lg:min-w-[18rem]">
             <span>
@@ -242,7 +259,9 @@ function Edit() {
         </FormSection>
       </GlassCard>
 
-      <ClientUnitsEditor clientId={id} units={units} />
+      <div id="client-units-section" className="scroll-mt-24">
+        <ClientUnitsEditor clientId={id} units={units} />
+      </div>
 
       {mut.isError && (
         <div className="rounded-2xl border border-rose-300/30 bg-rose-500/12 px-4 py-3 text-sm font-semibold text-rose-100">
