@@ -641,3 +641,10 @@ function getExistingUnitPendingItems(unit: ClientUnit) {
   if (!unit.cnpj?.trim()) items.push("CNPJ opcional");
   return items.slice(0, 3);
 }
+
+function formatKm(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(2).replace(".", ",").replace(/,?0+$/, "");
+}
