@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier -- Arquivo gerado pelo Supabase; manter diffs manuais pequenos. */
 export type Json =
   | string
   | number
@@ -566,66 +565,6 @@ export type Database = {
           },
           {
             foreignKeyName: "service_order_technicians_technician_id_fkey"
-            columns: ["technician_id"]
-            isOneToOne: false
-            referencedRelation: "technicians"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      service_order_notifications: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          dismissed_at: string | null
-          id: string
-          message: string | null
-          metadata: Json
-          read_at: string | null
-          service_order_id: string
-          technician_id: string
-          title: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          dismissed_at?: string | null
-          id?: string
-          message?: string | null
-          metadata?: Json
-          read_at?: string | null
-          service_order_id: string
-          technician_id: string
-          title: string
-          type?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          dismissed_at?: string | null
-          id?: string
-          message?: string | null
-          metadata?: Json
-          read_at?: string | null
-          service_order_id?: string
-          technician_id?: string
-          title?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_order_notifications_service_order_id_fkey"
-            columns: ["service_order_id"]
-            isOneToOne: false
-            referencedRelation: "service_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_order_notifications_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
