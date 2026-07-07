@@ -379,6 +379,13 @@ function UnitRow({
             {unit.cnpj && <span className="truncate tabular-nums">{maskCNPJ(unit.cnpj)}</span>}
           </div>
           <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+            {unit.distance_km_from_base != null && unit.distance_km_from_base > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.04em] text-primary">
+                {formatKm(unit.distance_km_from_base)} km da base
+              </span>
+            ) : (
+              <PendingBadge>Distância não definida</PendingBadge>
+            )}
             {pending.length === 0 ? (
               <ReadyBadge>Pronta para OS</ReadyBadge>
             ) : (
