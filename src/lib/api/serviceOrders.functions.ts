@@ -451,6 +451,18 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
     return normalize(row);
   });
 
+export const deleteServiceOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin } = await sb.rpc("is_admin");
+    if (!isAdmin) throw new Error("Ação restrita ao administrador.");
+    const { error } = await sb.from("service_orders").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const, id: data.id };
+  });
+
 // ---------- Clients ----------
 
 export const listClients = createServerFn({ method: "GET" })

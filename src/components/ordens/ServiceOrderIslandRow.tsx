@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -14,6 +15,7 @@ import {
   Loader2,
   MapPin,
   Receipt,
+  Trash2,
   UserRound,
   Wrench,
   type LucideIcon,
@@ -28,8 +30,20 @@ import {
 } from "@/lib/serviceOrders/technicians";
 import type { OrderFinancials } from "@/types/financials";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { deleteServiceOrder } from "@/lib/api/serviceOrders.functions";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   priorityLabel,
   serviceTypeLabel,
@@ -553,9 +567,43 @@ function OrderActionBar({
   actionLabel?: string;
   isClosedOrder: boolean;
 }) {
+  const { isAdmin } = useUserRole();
+  const queryClient = useQueryClient();
+  const deleteFn = useServerFn(deleteServiceOrder);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteFn({ data: { id: order.id } });
+      toast.success(`OS #${order.number} excluída.`);
+      await queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      setConfirmOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao excluir OS.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="mt-2.5 flex flex-col gap-2 border-t border-white/[0.08] pt-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <p className="lemarc-technical-label text-slate-300">Ações da OS</p>
+      <div className="flex items-center gap-2">
+        <p className="lemarc-technical-label text-slate-300">Ações da OS</p>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={deleting}
+            className="lemarc-pressable inline-flex min-h-7 items-center gap-1 rounded-full border border-destructive/60 bg-destructive/15 px-2 text-[10px] font-black uppercase tracking-[0.06em] text-rose-100 hover:border-destructive hover:bg-destructive/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/70 disabled:opacity-60"
+            aria-label={`Excluir OS ${order.number}`}
+          >
+            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Excluir OS
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
         <ActionLink to="/ordens/$id" params={{ id: order.id }} icon={ExternalLink} primary>
           Abrir OS
@@ -567,6 +615,30 @@ function OrderActionBar({
         )}
         {isClosedOrder && <OrderPdfActionButton order={order} />}
       </div>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir OS #{order.number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. Todos os dados vinculados (horas, anexos,
+              assinaturas, financeiro) também serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo…" : "Excluir OS"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

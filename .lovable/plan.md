@@ -1,26 +1,36 @@
-## Causa raiz
+## Objetivo
+1. Zerar as 52 OS existentes no banco, sem afetar cadastros (clientes, colaboradores, unidades, taxas, usuários, configurações) nem fluxos/cálculos, que são todos derivados de OS ativas.
+2. Adicionar um botão vermelho pequeno "Excluir OS" ao lado do texto "Ações da OS" no card expandido da tela **Ordens**, restrito a administradores, com confirmação e revalidação da lista.
 
-`src/routes/_app.colaboradores.$id.tsx` é registrado como **layout pai** de todas as rotas filhas (`/editar`, `/horas`, `/ordens`, `/precificacao`), porque no roteamento flat do TanStack Router qualquer arquivo `foo.$id.tsx` com irmãos `foo.$id.<algo>.tsx` vira layout. Como seu `component: ColaboradorPerfilPage` não chama `<Outlet />`, o filho monta mas nunca aparece na tela. Ao navegar para `/colaboradores/:id/editar` você continua vendo o perfil, sem nenhum campo editável e sem erro no console — exatamente o "erro silencioso" que você descreveu.
+## Parte 1 — Limpeza do banco
 
-O mesmo padrão em `clientes` já funciona porque lá existe `_app.clientes.$id.index.tsx` (perfil como index, sem virar layout).
+Migração única com um `DELETE FROM public.service_orders` (as 7 tabelas filhas — `service_order_technicians`, `service_order_labor_entries`, `service_order_financials`, `service_order_time_sessions`, `service_order_signatures`, `service_order_attachments`, `service_order_notifications` — já têm FK `ON DELETE CASCADE`, então são limpas automaticamente).
 
-## Correção
+Também limpo `public.service_order_notifications` residuais e `technician_rate_history` **não é** afetado (histórico de valor/hora do colaborador se preserva, como pedido).
 
-1. **Renomear** `src/routes/_app.colaboradores.$id.tsx` → `src/routes/_app.colaboradores.$id.index.tsx`. Nenhuma outra mudança de conteúdo — o `createFileRoute("/_app/colaboradores/$id")` é gerado a partir do nome e passa a ser rota index (não-layout).
-2. **Não criar** arquivo `_app.colaboradores.$id.route.tsx`. As filhas (`editar`, `horas`, `ordens`, `precificacao`) passam a ser rotas irmãs independentes, cada uma com seu próprio `AppShell` — comportamento já esperado por elas hoje.
-3. O `routeTree.gen.ts` é regenerado automaticamente pelo plugin do Vite.
+Não toco em: `clients`, `client_units`, `technicians`, `user_roles`, `profiles`, `system_settings`, `technician_rate_history`, buckets de storage (arquivos ficarão órfãos mas invisíveis — a UI só lista o que a OS referencia; posso limpar depois se você quiser).
 
-## Verificação
+Todos os cálculos (dashboard, relatórios, KPIs, faturamento) são funções puras sobre a lista de OS retornada do banco — com zero OS elas simplesmente exibem estado vazio, sem quebrar.
 
-Rodar Playwright autenticado navegando para `/colaboradores/536c0e43-1031-42d6-a9dd-74240c134528/editar` e confirmar:
-- Aparecem os inputs do wizard (Nome, Telefone, E-mail, CPF...).
-- Preencher um campo → estado atualiza (`document.querySelectorAll('input').length > 0`).
-- Salvar → volta ao perfil e mostra o valor novo.
-- Rotas irmãs continuam funcionando: `/precificacao`, `/horas`, `/ordens`.
-- Perfil em `/colaboradores/:id` continua abrindo normalmente (agora como index).
+## Parte 2 — Botão "Excluir OS"
 
-Nada mais é tocado. Fluxos de OS, tempo, pausa, finalização, assinatura, anexos, PDF, relatórios e financeiro seguem intactos.
+### Backend
+Novo `deleteServiceOrder` em `src/lib/api/serviceOrders.functions.ts`:
+- `createServerFn({ method: "POST" })` + `requireSupabaseAuth`
+- valida `{ id: string }`
+- checa `is_admin` via RPC; caso contrário lança "Ação restrita ao administrador"
+- executa `supabase.from("service_orders").delete().eq("id", id)` (cascata cuida do resto)
+
+### Frontend
+Em `src/components/ordens/ServiceOrderIslandRow.tsx`, no componente `OrderActionBar`:
+- Ao lado do rótulo "Ações da OS", renderizar um botão pequeno vermelho "Excluir OS" (ícone `Trash2`), visível apenas quando `useUserRole()` indicar admin.
+- Ao clicar: abrir `AlertDialog` (shadcn) confirmando "Excluir a OS #<número>? Esta ação é irreversível."
+- Confirmar → chama `deleteServiceOrder` via `useServerFn`, mostra toast, invalida a query `service-orders` do React Query para atualizar a listagem.
+- Estado de loading no botão; erros exibidos via `toast.error`.
+
+Nenhuma alteração em rotas, wizard, dashboard, relatórios ou cálculos financeiros.
 
 ## Arquivos alterados
-
-- Renomear `src/routes/_app.colaboradores.$id.tsx` → `src/routes/_app.colaboradores.$id.index.tsx` (conteúdo inalterado).
+- Migração SQL (novo arquivo)
+- `src/lib/api/serviceOrders.functions.ts` — adiciona `deleteServiceOrder`
+- `src/components/ordens/ServiceOrderIslandRow.tsx` — botão + diálogo de confirmação
