@@ -12,6 +12,32 @@ import { lovable } from "@/integrations/lovable/index";
 
 const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
+const GOOGLE_RESTRICTED_MESSAGE =
+  "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.";
+
+async function ensureGoogleAdminOrSignOut(user: {
+  id: string;
+  app_metadata?: { provider?: string; providers?: string[] } | null;
+}): Promise<boolean> {
+  const provider = user.app_metadata?.provider;
+  const providers = user.app_metadata?.providers ?? [];
+  const isGoogle = provider === "google" || providers.includes("google");
+  if (!isGoogle) return true;
+
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (error || !data) {
+    await supabase.auth.signOut();
+    return false;
+  }
+  return true;
+}
+
 export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
