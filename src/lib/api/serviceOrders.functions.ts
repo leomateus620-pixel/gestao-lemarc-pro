@@ -534,21 +534,18 @@ export const updateTechnician = createServerFn({ method: "POST" })
     const priorRate100 = before.error ? null : (before.data?.hourly_rate_100_cents ?? null);
     const priorUserId = before.error ? null : (before.data?.user_id ?? null);
 
-    // Vínculo com usuário: só mexer quando o admin realmente enviou access_email
-    // e o valor for diferente do vínculo atual. Campo vazio = manter vínculo,
-    // a menos que access_email tenha sido enviado como "" e antes existisse um user.
+    // Vínculo com usuário: manter vínculo atual por padrão. Só resolve novo
+    // e-mail quando access_email vier preenchido, e só desvincula quando o
+    // caller enviar explicitamente user_id: null (botão "Remover vínculo").
+    let finalUserId: string | null = priorUserId;
     if (data.access_email !== undefined) {
       const trimmed = (data.access_email ?? "").trim();
-      if (trimmed.length === 0) {
-        // Segurança: nunca desvincula por campo vazio ao editar.
-        // Para remover o vínculo, o admin deve enviar user_id: null explicitamente.
-        data = { ...data, user_id: priorUserId };
-      } else {
-        data = { ...data, user_id: await resolveAccessEmail(sb, trimmed) };
+      if (trimmed.length > 0) {
+        finalUserId = await resolveAccessEmail(sb, trimmed);
       }
-    } else {
-      data = { ...data, user_id: data.user_id !== undefined ? data.user_id : priorUserId };
     }
+    if (data.user_id === null) finalUserId = null;
+    data = { ...data, user_id: finalUserId };
 
     const { id, ...values } = data;
     const full = await sb
