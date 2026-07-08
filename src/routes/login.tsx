@@ -112,7 +112,8 @@ function LoginPage() {
         return;
       }
       if (result.redirected) return;
-      nav({ to: "/dashboard", replace: true });
+      // Sessão foi definida no fluxo popup. Validação de admin acontece via
+      // onAuthStateChange (SIGNED_IN) — não navegar direto aqui.
     } catch (err) {
       console.error(err);
       setError("Erro inesperado ao acessar o sistema.");
