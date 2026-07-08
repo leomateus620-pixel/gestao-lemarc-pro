@@ -90,12 +90,12 @@ const STEP_ITEMS: StepItem[] = [
 ];
 
 const CONTROL_CLASS =
-  "h-10 rounded-lg border-white/15 bg-white/[0.07] text-sm text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors placeholder:text-slate-500 focus-visible:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/25";
+  "h-11 rounded-xl border-white/12 bg-slate-950/25 text-sm text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-colors placeholder:text-slate-500 hover:border-white/18 focus-visible:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/18";
 
 const SELECT_CLASS =
-  "h-10 w-full rounded-lg border border-white/15 bg-[#141f31] px-3 text-sm font-semibold text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] outline-none transition-colors focus:border-primary/70 focus:ring-2 focus:ring-primary/25";
+  "h-11 w-full rounded-xl border border-white/12 bg-[#111b2a] px-3 text-sm font-semibold text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:border-white/18 focus:border-primary/55 focus:ring-2 focus:ring-primary/18";
 
-const LABEL_CLASS = "text-[0.68rem] font-black uppercase tracking-[0.08em] text-slate-300";
+const LABEL_CLASS = "text-[0.68rem] font-bold uppercase tracking-[0.08em] text-slate-300/90";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -221,7 +221,7 @@ function FieldGroup({
 
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.055] px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+    <div className="min-w-24 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
       <div className="text-[0.62rem] font-black uppercase tracking-[0.08em] text-slate-400">
         {label}
       </div>
@@ -242,8 +242,8 @@ function StepIntro({
   children: ReactNode;
 }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/15 text-primary shadow-[0_12px_24px_-18px_rgba(255,153,51,0.85)]">
+    <div className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-[0_10px_22px_-20px_rgba(255,153,51,0.65)]">
         <Icon size={17} />
       </div>
       <div className="min-w-0">
@@ -266,7 +266,7 @@ function Notice({
       ? "border-amber-300/35 bg-amber-400/10 text-amber-100"
       : tone === "danger"
         ? "border-rose-300/35 bg-rose-400/10 text-rose-100"
-        : "border-sky-300/25 bg-sky-400/10 text-sky-100";
+        : "border-slate-400/20 bg-slate-400/10 text-slate-100";
   const Icon = tone === "info" ? Info : AlertTriangle;
 
   return (
@@ -571,10 +571,10 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bottom-0 left-0 top-auto flex h-[calc(100dvh-0.5rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-3xl border-white/15 bg-[#0b1321] p-0 text-slate-50 shadow-[0_-24px_70px_-32px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.16)] sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[96vw] sm:max-w-[68rem] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl">
-        <DialogHeader className="space-y-0 border-b border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03)),radial-gradient(circle_at_100%_0%,rgba(255,153,51,0.16),transparent_34%)] px-4 pb-4 pt-5 text-left sm:px-6 sm:pb-5">
+      <DialogContent className="bottom-0 left-0 top-auto flex h-[calc(100dvh-0.5rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-3xl border-white/14 bg-[#0d1726] p-0 text-slate-50 shadow-[0_-24px_70px_-34px_rgba(0,0,0,0.82),inset_0_1px_0_rgba(255,255,255,0.12)] sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[96vw] sm:max-w-[68rem] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl">
+        <DialogHeader className="space-y-0 border-b border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.075),rgba(255,255,255,0.025)),radial-gradient(circle_at_100%_0%,rgba(255,153,51,0.10),transparent_36%)] px-4 pb-4 pt-5 text-left sm:px-6 sm:pb-5">
           <div className="flex min-w-0 items-start gap-3 pr-9">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-[0_16px_34px_-22px_rgba(255,153,51,0.9)]">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/24 bg-primary/10 text-primary shadow-[0_14px_30px_-24px_rgba(255,153,51,0.7)]">
               <Calculator size={20} />
             </div>
             <div className="min-w-0">
@@ -601,7 +601,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           </div>
         </DialogHeader>
 
-        <nav className="border-b border-white/10 bg-[#0f1a2a]/95 px-4 py-3 sm:px-6">
+        <nav className="border-b border-white/10 bg-[#101a29]/95 px-4 py-3 sm:px-6">
           <ol className="grid grid-cols-3 gap-2">
             {STEP_ITEMS.map(({ i, label, helper, icon: Icon }) => {
               const active = step === i;
@@ -616,12 +616,12 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                     disabled={disabled}
                     onClick={() => setStep(i)}
                     className={cn(
-                      "flex h-full w-full min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left transition sm:px-3",
+                      "flex h-full w-full min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left transition-[border-color,background-color,color,box-shadow] duration-200 sm:px-3",
                       active
-                        ? "border-primary/55 bg-primary/14 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_14px_28px_-24px_rgba(255,153,51,0.9)]"
+                        ? "border-primary/42 bg-primary/[0.105] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_12px_24px_-22px_rgba(255,153,51,0.65)]"
                         : complete
-                          ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
-                          : "border-white/10 bg-white/[0.035] text-slate-400",
+                          ? "border-slate-300/18 bg-white/[0.055] text-slate-100"
+                          : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/18 hover:bg-white/[0.045]",
                       disabled && "cursor-not-allowed opacity-55",
                     )}
                   >
@@ -629,9 +629,9 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border",
                         active
-                          ? "border-primary/40 bg-primary/18"
+                          ? "border-primary/35 bg-primary/14"
                           : complete
-                            ? "border-emerald-300/25 bg-emerald-300/12"
+                            ? "border-white/14 bg-white/[0.055] text-slate-200"
                             : "border-white/10 bg-white/[0.04]",
                       )}
                     >
@@ -651,7 +651,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         </nav>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-          <div key={step} className="lemarc-page-enter space-y-4 pb-2">
+          <div key={step} className="lemarc-page-enter space-y-4 pb-3">
             {step === 0 && (
               <>
                 <StepIntro icon={UserRound} title="Apontamentos dos técnicos">
@@ -681,11 +681,11 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                     return (
                       <article
                         key={entry.uid}
-                        className="rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.075),rgba(255,255,255,0.028))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_42px_-34px_rgba(0,0,0,0.9)] sm:p-4"
+                        className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(255,255,255,0.024))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_34px_-34px_rgba(0,0,0,0.82)] sm:p-4"
                       >
                         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex min-w-0 gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.055] text-primary">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.045] text-primary/90">
                               <UserRound size={17} />
                             </div>
                             <div className="min-w-0">
@@ -697,7 +697,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                                   {entry.role || tech?.assignment_role || "Função não informada"}
                                 </span>
                                 {autoCalculated && (
-                                  <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/25 bg-sky-300/10 px-2 py-0.5 text-[0.68rem] font-black text-sky-100">
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.055] px-2 py-0.5 text-[0.68rem] font-black text-slate-200">
                                     <Clock3 size={11} /> Calculado pelo controle de tempo
                                   </span>
                                 )}
@@ -727,7 +727,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                           </div>
                         </header>
 
-                        <div className="mt-4 grid gap-3 md:grid-cols-12">
+                        <div className="mt-4 grid gap-x-3 gap-y-4 md:grid-cols-12">
                           <FieldGroup label="Técnico" className="md:col-span-4">
                             <select
                               className={SELECT_CLASS}
@@ -826,7 +826,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   })}
                 </div>
 
-                <div className="rounded-2xl border border-dashed border-white/14 bg-white/[0.03] p-3 sm:p-4">
+                <div className="rounded-2xl border border-dashed border-white/14 bg-white/[0.025] p-3 sm:p-4">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="font-display text-sm font-black text-slate-50">
@@ -844,7 +844,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                           variant="secondary"
                           size="sm"
                           onClick={() => addEntry(t.id)}
-                          className="lemarc-secondary-action h-9"
+                          className="lemarc-secondary-action h-10"
                         >
                           <Plus size={13} /> Lançar para {shortName(t.full_name)}
                         </Button>
@@ -894,7 +894,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   </Notice>
                 )}
 
-                <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid gap-2.5 md:grid-cols-3">
                   {(["none", "per_km", "fixed"] as DisplacementType[]).map((t) =>
                     (() => {
                       const copy = displacementOptionCopy(t);
@@ -908,17 +908,17 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                           aria-pressed={active}
                           onClick={() => setDisplacement((d) => ({ ...d, type: t }))}
                           className={cn(
-                            "group flex min-h-24 items-start gap-3 rounded-2xl border p-3 text-left transition",
+                            "group flex min-h-24 items-start gap-3 rounded-2xl border p-3 text-left transition-[border-color,background-color,box-shadow] duration-200",
                             active
-                              ? "border-primary/60 bg-primary/14 text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_34px_-26px_rgba(255,153,51,0.8)]"
-                              : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/18 hover:bg-white/[0.06]",
+                              ? "border-primary/40 bg-primary/[0.095] text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_28px_-24px_rgba(255,153,51,0.55)]"
+                              : "border-white/10 bg-white/[0.035] text-slate-300 hover:border-white/18 hover:bg-white/[0.055]",
                           )}
                         >
                           <span
                             className={cn(
                               "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border",
                               active
-                                ? "border-primary/45 bg-primary/18 text-primary"
+                                ? "border-primary/35 bg-primary/14 text-primary"
                                 : "border-white/10 bg-white/[0.045] text-slate-400",
                             )}
                           >
@@ -939,13 +939,13 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   )}
                 </div>
 
-                <section className="rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] sm:p-4">
+                <section className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(255,255,255,0.022))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-4">
                   {displacement.type === "none" && (
-                    <div className="flex items-start gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm text-emerald-100">
-                      <BadgeCheck size={18} className="mt-0.5 shrink-0" />
+                    <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-200">
+                      <BadgeCheck size={18} className="mt-0.5 shrink-0 text-slate-300" />
                       <div>
                         <div className="font-black">Sem custo de deslocamento</div>
-                        <p className="mt-1 text-xs leading-5 text-emerald-100/80">
+                        <p className="mt-1 text-xs leading-5 text-slate-400">
                           A OS seguirá para revisão apenas com mão de obra e materiais disponíveis.
                         </p>
                       </div>
@@ -1011,7 +1011,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                     </FieldGroup>
                   )}
 
-                  <div className="mt-4 flex flex-col gap-1 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-4 flex flex-col gap-1 rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(255,153,51,0.10),rgba(255,255,255,0.035))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm font-bold text-slate-200">Total do deslocamento</span>
                     <span className="font-display text-lg font-black tabular-nums text-primary">
                       {formatBRL(displacementCents)}
@@ -1035,7 +1035,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 </StepIntro>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.75fr)]">
-                  <section className="rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] sm:p-4">
+                  <section className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(255,255,255,0.022))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h4 className="font-display text-base font-black text-slate-50">
@@ -1062,7 +1062,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                         return (
                           <div
                             key={e.uid}
-                            className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"
+                            className="rounded-2xl border border-white/10 bg-white/[0.035] p-3"
                           >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
@@ -1098,7 +1098,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                     </div>
                   </section>
 
-                  <section className="rounded-2xl border border-primary/35 bg-[radial-gradient(circle_at_100%_0%,rgba(255,153,51,0.18),transparent_42%),linear-gradient(145deg,rgba(255,255,255,0.10),rgba(255,255,255,0.035))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_22px_52px_-32px_rgba(0,0,0,0.95)]">
+                  <section className="rounded-2xl border border-primary/24 bg-[radial-gradient(circle_at_100%_0%,rgba(255,153,51,0.12),transparent_42%),linear-gradient(145deg,rgba(255,255,255,0.075),rgba(255,255,255,0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_44px_-34px_rgba(0,0,0,0.86)]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-primary">
@@ -1108,7 +1108,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                           {formatBRL(totals.grandTotalCents)}
                         </div>
                       </div>
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/35 bg-primary/15 text-primary">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/28 bg-primary/12 text-primary">
                         <ReceiptText size={20} />
                       </div>
                     </div>
@@ -1131,7 +1131,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                       )}
                     </div>
 
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3 text-xs leading-5 text-slate-300">
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-xs leading-5 text-slate-300">
                       <div className="mb-1 flex items-center gap-2 font-black text-slate-100">
                         <Truck size={14} /> Deslocamento
                       </div>
@@ -1161,12 +1161,12 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           </div>
         </div>
 
-        <DialogFooter className="mt-0 flex flex-col gap-3 border-t border-white/10 bg-[#0f1a2a]/95 px-4 py-3 shadow-[0_-16px_34px_-30px_rgba(0,0,0,0.9)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <DialogFooter className="mt-0 flex flex-col gap-3 border-t border-white/10 bg-[#101a29]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-14px_30px_-28px_rgba(0,0,0,0.82)] sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pb-3">
           <div className={cn("grid gap-2 sm:flex", step > 0 ? "grid-cols-2" : "grid-cols-1")}>
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="w-full text-slate-300 hover:bg-white/[0.08] hover:text-slate-50 sm:w-auto"
+              className="h-11 w-full rounded-xl text-slate-300 hover:bg-white/[0.08] hover:text-slate-50 sm:w-auto"
             >
               Cancelar
             </Button>
@@ -1174,7 +1174,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
               <Button
                 variant="secondary"
                 onClick={() => setStep((s) => Math.max(0, s - 1) as StepIndex)}
-                className="lemarc-secondary-action w-full sm:w-auto"
+                className="lemarc-secondary-action h-11 w-full rounded-xl sm:w-auto"
               >
                 <ArrowLeft size={15} />
                 Voltar
@@ -1189,7 +1189,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 (step === 0 && (!stepEntriesValid || !stepRatesValid)) ||
                 (step === 1 && !stepDisplacementValid)
               }
-              className="lemarc-primary-action w-full sm:w-auto"
+              className="lemarc-primary-action h-11 w-full rounded-xl px-5 sm:w-auto"
             >
               {step === 1 ? "Ir para revisão" : "Continuar"}
               <ArrowRight size={15} />
@@ -1201,7 +1201,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   type="button"
                   variant="secondary"
                   onClick={() => setCaptureOpen(true)}
-                  className="lemarc-secondary-action w-full sm:w-auto"
+                  className="lemarc-secondary-action h-11 w-full rounded-xl sm:w-auto"
                 >
                   <FileText size={15} />
                   Coletar assinatura
@@ -1215,7 +1215,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 title={
                   !signatureOk ? "Colete a assinatura do responsável antes de finalizar" : undefined
                 }
-                className="lemarc-primary-action w-full min-w-[13rem] sm:w-auto"
+                className="lemarc-primary-action h-11 w-full min-w-[13rem] rounded-xl px-5 font-black shadow-[0_18px_34px_-24px_rgba(255,153,51,0.72)] sm:w-auto"
               >
                 {mutation.isPending ? (
                   <>
