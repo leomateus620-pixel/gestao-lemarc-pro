@@ -200,42 +200,6 @@ function TechnicianHome() {
   );
 }
 
-function compareTechnicianOrders(a: ServiceOrder, b: ServiceOrder) {
-  return (
-    technicianStatusRank(a.status) - technicianStatusRank(b.status) ||
-    technicianPriorityRank(a) - technicianPriorityRank(b) ||
-    dateValueForSort(b.opened_at ?? b.created_at) - dateValueForSort(a.opened_at ?? a.created_at)
-  );
-}
-
-function technicianStatusRank(status: ServiceOrderStatus) {
-  const rank: Record<ServiceOrderStatus, number> = {
-    running: 0,
-    transit: 1,
-    dispatched: 2,
-    pending: 3,
-    finished: 4,
-    review: 5,
-    approved: 6,
-    cancelled: 7,
-  };
-  return rank[status];
-}
-
-function technicianPriorityRank(order: ServiceOrder) {
-  if (order.priority === "urgente") return 0;
-  if (order.priority === "alta") return 1;
-  if (order.priority === "media") return 2;
-  if (order.priority === "baixa") return 3;
-  return 4;
-}
-
-function dateValueForSort(value: string | null | undefined) {
-  if (!value) return 0;
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function periodSearchParams(period: Period, range?: PeriodRange) {
   if (period !== "custom") return { period };
   return { period, from: range?.from, to: range?.to };
