@@ -84,15 +84,6 @@ function DashboardRouter() {
   );
 }
 
-const technicianVisibleStatuses = new Set<ServiceOrderStatus>([
-  "pending",
-  "dispatched",
-  "transit",
-  "running",
-  "finished",
-  "review",
-]);
-
 function TechnicianHome() {
   const { displayName, user } = useAuth();
   const navigate = useNavigate();
