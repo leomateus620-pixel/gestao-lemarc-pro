@@ -1,59 +1,51 @@
-## Problema
+# Restringir "Entrar com Google" a administradores
 
-Ao abrir uma OS com dois técnicos, apenas o **técnico principal** (a primeira pessoa selecionada, gravada em `service_orders.technician_id`) vê a OS na "Central do técnico". O técnico secundário recebe a notificação, mas quando fecha, a OS não aparece na home.
+## Objetivo
+O botão "Entrar com Google" deve autenticar somente e-mails que já possuem o papel `admin` no sistema. Qualquer outra conta Google (mesmo que consiga passar pelo consentimento do Google) deve ser deslogada imediatamente e ver uma mensagem clara. Login por e-mail + senha (usado pelos técnicos) continua funcionando normalmente.
 
-## Causa raiz
+## Administradores atuais (permitidos via Google)
+- leomateus620@gmail.com
+- eduardo.s.qt@gmail.com
+- lemarcfino@gmail.com
+- marciop.freddi@gmail.com
 
-O dashboard filtra `myOrders` com esta lógica:
+Técnicos (`lemarcmanutencao`, `floresdouglas321`, `jar-1983`) continuam usando e-mail e senha — sem alteração.
 
-```
-assigned.some(t => myTechnicianIds.has(t.id))   // via embed assigned_technicians
-|| order.technician_id === myTechnicianId       // fallback pela coluna legada
-```
+## Como será feito
 
-O embed `assigned_technicians` vem de `service_order_technicians`, cuja política RLS de SELECT atualmente permite apenas:
+### 1. Validação pós-Google no `src/routes/login.tsx`
+Após `lovable.auth.signInWithOAuth("google", …)` retornar com sessão setada (fluxo popup do preview) OU quando o `onAuthStateChange` disparar `SIGNED_IN` com provider Google:
 
-```
-is_admin() OR user_owns_order(service_order_id)
-```
+1. Consultar `public.user_roles` para o `user.id` atual.
+2. Se **não** contiver `admin`:
+   - Chamar `supabase.auth.signOut()` (limpa a sessão recém-criada).
+   - Exibir mensagem: *"Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha."*
+   - **Não** navegar para `/dashboard`.
+3. Se contiver `admin`: fluxo normal (redireciona para `/dashboard`).
 
-Ou seja, o técnico não pode ler nenhuma linha da tabela de vínculos. Resultado: o embed volta vazio para ambos os técnicos. Sobra o fallback `order.technician_id`, que só bate para o **primeiro** técnico (o marcado como `is_primary` / gravado na coluna legada). O secundário fica invisível.
+O listener `onAuthStateChange` já existente na página será ajustado para:
+- Só redirecionar em `SIGNED_IN` quando a validação de role passar.
+- Cobrir o caso do fluxo full-page (redirect) em que o retorno da Google acontece via `SIGNED_IN` no mount da página.
 
-A RLS de `service_orders` já usa `user_is_order_technician(id)`, então a OS em si é retornada para os dois. O bug está isolado à RLS da tabela de vínculos.
+### 2. Rejeição também em `AuthContext` (defesa em profundidade)
+No `src/components/app/AuthContext.tsx`, no evento `SIGNED_IN`, se o provider for `google` e o usuário não tiver papel `admin`, executar `signOut()` automaticamente. Isso protege qualquer rota autenticada caso alguém contorne a validação da página de login (ex.: sessão restaurada).
 
-## Correção
+Implementação simples: consulta única a `user_roles` logo após set da sessão; usa o `roleCache` do `useUserRole` para não repetir chamadas.
 
-Uma única migration ampliando a política SELECT de `public.service_order_technicians` para incluir o técnico atribuído à OS:
+### 3. Sem mudanças de backend / RLS
+- `user_roles` já tem SELECT para `authenticated` — a validação roda como o próprio usuário logado (RLS permite ler as próprias linhas).
+- Não desabilitar provider Google no backend (técnicos-admin futuros precisam do fluxo Google).
+- Fluxo de e-mail + senha permanece intocado.
 
-```sql
-DROP POLICY IF EXISTS "View order technicians (admin or order owner)"
-  ON public.service_order_technicians;
+## Fluxos preservados
+- Login e-mail/senha dos técnicos: sem alteração.
+- Logout: sem alteração.
+- Rotas protegidas `_authenticated/*`: sem alteração.
+- Papéis existentes e RLS de outras tabelas: sem alteração.
 
-CREATE POLICY "View order technicians"
-ON public.service_order_technicians
-FOR SELECT
-TO authenticated
-USING (
-  public.is_admin()
-  OR public.user_owns_order(service_order_id)
-  OR public.user_is_order_technician(service_order_id)
-);
-```
+## Detalhes técnicos
+Arquivos a editar:
+- `src/routes/login.tsx` — validação após Google + mensagem de bloqueio.
+- `src/components/app/AuthContext.tsx` — verificação de segurança no `onAuthStateChange`.
 
-Efeito:
-- Admin e criador continuam vendo tudo (nada muda).
-- Cada técnico atribuído passa a enxergar as linhas de vínculo da própria OS (incluindo a dos colegas de equipe — necessário para o card "Controle de tempo" já listar os dois).
-- Sem mudança nas policies de INSERT/UPDATE/DELETE (a manutenção do vínculo continua restrita a admin/dono).
-
-## Escopo
-
-- **Backend:** 1 migration nova em `supabase/migrations/` com o `DROP POLICY` + `CREATE POLICY` acima. Sem alterar tabelas, GRANTs, colunas ou outras policies.
-- **Frontend:** nenhuma alteração. O `useMemo` de `myOrders` (que já checa `assigned_technicians` primeiro) passa a funcionar para os dois técnicos automaticamente. O card "Controle de tempo da OS" também se beneficia (deixa de depender de embed vazio).
-- **Fluxos preservados:** listagem admin de OS, wizard de criação/edição, notificações, exclusão de OS, cálculos financeiros, histórico de tempo — nada é tocado.
-
-## Verificação
-
-Após aplicar a migration:
-1. Confirmar via consulta que a policy nova está ativa em `pg_policy`.
-2. Abrir a OS #1055 no perfil do Juan e no perfil do Douglas — a OS deve aparecer em ambos na "Central do técnico" e o card "Controle de tempo" deve listar os dois técnicos em cada perfil.
-3. Perfil de admin/operador continua vendo tudo como antes.
+Nenhuma migration, nenhuma alteração em `serviceOrders`, nenhum ajuste em componentes de OS/Dashboard.

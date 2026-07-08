@@ -37,15 +37,37 @@ function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) nav({ to: "/dashboard", replace: true });
+    let cancelled = false;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (cancelled || !data.session) return;
+      const ok = await ensureGoogleAdminOrSignOut(data.session.user);
+      if (!cancelled && ok) nav({ to: "/dashboard", replace: true });
+      else if (!cancelled && !ok) {
+        setError(
+          "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
+        );
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
-        nav({ to: "/dashboard", replace: true });
+        void (async () => {
+          const ok = await ensureGoogleAdminOrSignOut(session.user);
+          if (cancelled) return;
+          if (ok) nav({ to: "/dashboard", replace: true });
+          else {
+            setError(
+              "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
+            );
+            setIsSubmitting(false);
+            setGoogleLoading(false);
+          }
+        })();
       }
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, [nav]);
 
   async function handleGoogle() {
