@@ -45,6 +45,7 @@ import {
   markServiceOrderNotificationRead,
 } from "@/lib/api/notifications.functions";
 import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
+import { getRecentServiceOrders } from "@/lib/serviceOrders/recentOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
@@ -346,7 +347,7 @@ function Dashboard() {
   const periodText = periodContextLabel(period, periodRange);
   const periodSearch = periodSearchParams(period, periodRange);
   const summaries = useMemo(() => buildCardSummaries(metrics), [metrics]);
-  const recent = useMemo(() => orders.slice(0, 4), [orders]);
+  const recent = useMemo(() => getRecentServiceOrders(orders, 4), [orders]);
   const recentOrderIds = useMemo(() => recent.map((order) => order.id), [recent]);
   const { data: technicianTimeData } = useDashboardTechnicianTimeQuery(recentOrderIds);
   const technicianTimeByOrder = useMemo(
@@ -491,7 +492,7 @@ function Dashboard() {
               Ver todas
             </Link>
           </div>
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="grid gap-3.5 xl:grid-cols-2 xl:gap-4">
             {recent.map((order) => (
               <ServiceOrderCard key={order.id} order={order}>
                 <OrderTechnicianTimeCard order={order} data={technicianTimeByOrder[order.id]} />

@@ -152,12 +152,12 @@ export function ServiceOrderCard({
       tabIndex={0}
       onClick={openOrder}
       onKeyDown={onKeyDown}
-      className="group/order block cursor-pointer rounded-[1.5rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="service-order-card-link group/order block cursor-pointer rounded-[1.5rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`Abrir OS ${order.number}`}
     >
       <div
         ref={physics.ref}
-        className="lemarc-kinetic-card relative overflow-hidden rounded-[1.5rem] border border-white/[0.12] bg-[linear-gradient(180deg,oklch(1_0_0/0.055),transparent_32%),linear-gradient(155deg,oklch(0.245_0.04_252/0.96),oklch(0.125_0.034_252/0.94))] p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.14),inset_0_-1px_0_oklch(0_0_0/0.28),0_20px_44px_-30px_oklch(0_0_0/0.9),0_6px_18px_-20px_var(--lemarc-card-glow)] backdrop-blur-xl transition-all duration-300 hover:border-[color-mix(in_oklab,var(--lemarc-card-accent)_28%,white_10%)] sm:p-5"
+        className="lemarc-kinetic-card lemarc-service-order-card relative overflow-hidden rounded-[1.5rem] border border-white/[0.16] bg-[linear-gradient(180deg,oklch(1_0_0/0.065),transparent_34%),linear-gradient(155deg,oklch(0.245_0.04_252/0.98),oklch(0.118_0.033_252/0.97))] p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.16),inset_0_-1px_0_oklch(0_0_0/0.34),0_24px_54px_-34px_oklch(0_0_0/0.92),0_8px_22px_-22px_var(--lemarc-card-glow)] backdrop-blur-xl transition-all duration-300 hover:border-[color-mix(in_oklab,var(--lemarc-card-accent)_32%,white_12%)] sm:p-5"
         data-kinetic-active={physics.active}
         style={style}
         {...physics.handlers}
@@ -165,7 +165,7 @@ export function ServiceOrderCard({
         <div aria-hidden="true" className="lemarc-card-glare lemarc-card-glare-subtle" />
         <div
           aria-hidden="true"
-          className="absolute bottom-5 left-0 top-5 w-[2px] rounded-r-full bg-gradient-to-b from-[color-mix(in_oklab,var(--lemarc-card-accent)_78%,white_10%)] via-[color-mix(in_oklab,var(--lemarc-card-accent)_44%,transparent)] to-transparent"
+          className="lemarc-service-order-card-rail absolute bottom-5 left-0 top-5 w-[2px] rounded-r-full bg-gradient-to-b from-[color-mix(in_oklab,var(--lemarc-card-accent)_78%,white_10%)] via-[color-mix(in_oklab,var(--lemarc-card-accent)_42%,transparent)] to-transparent"
         />
 
         <div className="relative pl-3 sm:pl-4">
@@ -274,7 +274,7 @@ export function ServiceOrderCard({
 
           {children}
 
-          <div className="mt-3.5 flex flex-col gap-2 rounded-[1rem] border border-white/[0.09] bg-white/[0.035] p-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.09)] sm:flex-row sm:items-center sm:justify-end">
+          <div className="lemarc-service-order-card-actions mt-3.5 flex flex-col gap-2 rounded-[1rem] border border-white/[0.11] bg-white/[0.04] p-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.1)] sm:flex-row sm:items-center sm:justify-end">
             {isClosedOrder && <OrderPdfButton order={order} className="w-full sm:w-auto" />}
             <OpenOrderButton onOpen={openOrder} />
           </div>
