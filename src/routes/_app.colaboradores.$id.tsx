@@ -10,8 +10,6 @@ import {
   PenLine,
   Phone,
   ShieldOff,
-  AlertTriangle,
-  ArrowRight,
   UserRound,
   WalletCards,
   type LucideIcon,
@@ -96,8 +94,18 @@ function PerfilContent() {
               <h1 className="truncate font-display text-2xl font-black leading-tight text-white sm:text-3xl">
                 {collaborator.name}
               </h1>
-              <p className="mt-1 text-sm font-bold text-slate-300">
-                {collaborator.role ?? "Função não informada"} · {collaborator.status}
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-300">
+                <span>{collaborator.role ?? "Função não informada"} · {collaborator.status}</span>
+                {rateUndefined && (
+                  <Link
+                    to="/colaboradores/$id/editar"
+                    params={{ id }}
+                    search={{ focus: "rate" }}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/12 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-200 hover:bg-amber-400/20"
+                  >
+                    Valor/hora pendente
+                  </Link>
+                )}
               </p>
             </div>
           </div>
@@ -130,36 +138,6 @@ function PerfilContent() {
           <Metric label="OS abertas" value={String(collaborator.ordersOpen)} />
         </div>
       </section>
-
-      {rateUndefined && (
-        <Link
-          to="/colaboradores/$id/precificacao"
-          params={{ id }}
-          aria-label="Definir valor/hora do colaborador"
-          className="lemarc-pressable lemarc-wizard-card group flex flex-col gap-3 rounded-3xl border border-white/[0.08] px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-        >
-          <span className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-amber-400/30 bg-amber-400/10 text-amber-300">
-              <AlertTriangle size={18} strokeWidth={2.4} />
-            </span>
-            <span className="min-w-0">
-              <p className="lemarc-technical-label text-amber-300/90">
-                Pendência de cadastro
-              </p>
-              <p className="mt-1 font-display text-base font-black uppercase tracking-[0.04em] text-white">
-                Definir valor/hora
-              </p>
-              <p className="mt-0.5 truncate text-xs font-semibold text-slate-300">
-                Necessário para apontamento de horas em novas OS.
-              </p>
-            </span>
-          </span>
-          <span className="lemarc-primary-action inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] sm:w-auto">
-            Definir agora
-            <ArrowRight size={14} strokeWidth={2.6} />
-          </span>
-        </Link>
-      )}
 
       <section className="grid gap-3 lg:grid-cols-[1fr_0.9fr]">
         <Panel title="Dados principais" icon={UserRound}>
