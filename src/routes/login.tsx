@@ -12,6 +12,32 @@ import { lovable } from "@/integrations/lovable/index";
 
 const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
+const GOOGLE_RESTRICTED_MESSAGE =
+  "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.";
+
+async function ensureGoogleAdminOrSignOut(user: {
+  id: string;
+  app_metadata?: { provider?: string; providers?: string[] } | null;
+}): Promise<boolean> {
+  const provider = user.app_metadata?.provider;
+  const providers = user.app_metadata?.providers ?? [];
+  const isGoogle = provider === "google" || providers.includes("google");
+  if (!isGoogle) return true;
+
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (error || !data) {
+    await supabase.auth.signOut();
+    return false;
+  }
+  return true;
+}
+
 export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
@@ -37,15 +63,37 @@ function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) nav({ to: "/dashboard", replace: true });
+    let cancelled = false;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (cancelled || !data.session) return;
+      const ok = await ensureGoogleAdminOrSignOut(data.session.user);
+      if (!cancelled && ok) nav({ to: "/dashboard", replace: true });
+      else if (!cancelled && !ok) {
+        setError(
+          "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
+        );
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
-        nav({ to: "/dashboard", replace: true });
+        void (async () => {
+          const ok = await ensureGoogleAdminOrSignOut(session.user);
+          if (cancelled) return;
+          if (ok) nav({ to: "/dashboard", replace: true });
+          else {
+            setError(
+              "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
+            );
+            setIsSubmitting(false);
+            setGoogleLoading(false);
+          }
+        })();
       }
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, [nav]);
 
   async function handleGoogle() {
@@ -64,7 +112,8 @@ function LoginPage() {
         return;
       }
       if (result.redirected) return;
-      nav({ to: "/dashboard", replace: true });
+      // Sessão foi definida no fluxo popup. Validação de admin acontece via
+      // onAuthStateChange (SIGNED_IN) — não navegar direto aqui.
     } catch (err) {
       console.error(err);
       setError("Erro inesperado ao acessar o sistema.");
