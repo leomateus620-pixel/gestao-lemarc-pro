@@ -540,14 +540,14 @@ export const updateTechnician = createServerFn({ method: "POST" })
     if (data.access_email !== undefined) {
       const trimmed = (data.access_email ?? "").trim();
       if (trimmed.length === 0) {
-        // Só limpa se explicitamente veio vazio E havia vínculo antes.
-        data = { ...data, user_id: priorUserId ? null : priorUserId };
+        // Segurança: nunca desvincula por campo vazio ao editar.
+        // Para remover o vínculo, o admin deve enviar user_id: null explicitamente.
+        data = { ...data, user_id: priorUserId };
       } else {
         data = { ...data, user_id: await resolveAccessEmail(sb, trimmed) };
       }
     } else {
-      // Não tocar em user_id
-      data = { ...data, user_id: priorUserId };
+      data = { ...data, user_id: data.user_id !== undefined ? data.user_id : priorUserId };
     }
 
     const { id, ...values } = data;
