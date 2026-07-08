@@ -25,11 +25,19 @@ import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { PauseServiceOrderDialog } from "./PauseServiceOrderDialog";
 import { ServiceOrderTimeHistory } from "./ServiceOrderTimeHistory";
+import { useAuth } from "@/components/app/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type Props = { order: ServiceOrder };
 
 export function ServiceOrderTimeControl({ order }: Props) {
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
+  const { user } = useAuth();
+  const { isTecnico } = useUserRole();
+  const myTechId = useMemo(
+    () => (user ? technicians.find((t) => t.user_id === user.id)?.id ?? null : null),
+    [technicians, user],
+  );
   const queryClient = useQueryClient();
   const listFn = useServerFn(listTimeSessions);
   const startFn = useServerFn(startWork);
@@ -45,10 +53,18 @@ export function ServiceOrderTimeControl({ order }: Props) {
 
   const [selectedTech, setSelectedTech] = useState<string>("");
   useEffect(() => {
-    if (!selectedTech && technicians.length > 0) {
-      setSelectedTech(technicians.find((t) => t.is_primary)?.id ?? technicians[0].id);
+    if (technicians.length === 0) return;
+    // Técnico logado sempre opera o próprio cartão.
+    if (isTecnico && myTechId && selectedTech !== myTechId) {
+      setSelectedTech(myTechId);
+      return;
     }
-  }, [selectedTech, technicians]);
+    if (!selectedTech) {
+      const preferred =
+        myTechId ?? technicians.find((t) => t.is_primary)?.id ?? technicians[0].id;
+      setSelectedTech(preferred);
+    }
+  }, [selectedTech, technicians, isTecnico, myTechId]);
 
   // Live tick to keep chronometer moving.
   const [tick, setTick] = useState(0);
@@ -173,6 +189,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const pauseTechName =
     pauseTech ? technicians.find((t) => t.id === pauseTech)?.full_name ?? null : null;
 
+  const lockToSelf = isTecnico && !!myTechId;
+
   // Regra: 1–2 técnicos → botão único inicia para toda a equipe.
   //        3+ técnicos  → cada técnico inicia individualmente (fluxo atual).
   const allIdle = technicians.every((t) => getTechnicianState(sessions, t.id).state === "idle");
@@ -218,7 +236,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
         </div>
       )}
 
-      {technicians.length > 1 && (
+      {technicians.length > 1 && !lockToSelf && (
         <div className="mt-3">
           <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
             Técnico
@@ -240,7 +258,9 @@ export function ServiceOrderTimeControl({ order }: Props) {
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {
           const st = getTechnicianState(sessions, t.id);
-          const isSelected = t.id === selectedTech || technicians.length === 1;
+          const isSelected = lockToSelf
+            ? t.id === myTechId
+            : t.id === selectedTech || technicians.length === 1;
           return (
             <div
               key={t.id}
