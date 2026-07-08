@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,9 +47,11 @@ import {
 import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
 import { getRecentServiceOrders } from "@/lib/serviceOrders/recentOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import { splitTechnicianHomeOrders } from "@/lib/serviceOrders/technicianHomeOrders";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
+import { TechnicianOrderCard } from "@/components/dashboard/TechnicianOrderCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -101,21 +103,22 @@ function TechnicianHome() {
   const markRead = useServerFn(markServiceOrderNotificationRead);
   const dismissNotification = useServerFn(dismissServiceOrderNotification);
   const firstName = (displayName || "Técnico").split(" ")[0];
+  const [showOlder, setShowOlder] = useState(false);
   const myTechnicianIds = useMemo(() => {
     if (!user?.id) return new Set<string>();
     return new Set(technicians.filter((t) => t.user_id === user.id).map((t) => t.id));
   }, [technicians, user?.id]);
-  const technicianOrders = useMemo(() => {
-    return orders
-      .filter((order) => {
-        if (!technicianVisibleStatuses.has(order.status)) return false;
-
-        const assigned = getOrderTechnicians(order);
-        if (assigned.some((technician) => myTechnicianIds.has(technician.id))) return true;
-        return Boolean(order.technician_id && myTechnicianIds.has(order.technician_id));
-      })
-      .sort(compareTechnicianOrders);
+  const myOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const assigned = getOrderTechnicians(order);
+      if (assigned.some((technician) => myTechnicianIds.has(technician.id))) return true;
+      return Boolean(order.technician_id && myTechnicianIds.has(order.technician_id));
+    });
   }, [orders, myTechnicianIds]);
+  const { primary: technicianOrders, older: olderOrders } = useMemo(
+    () => splitTechnicianHomeOrders(myOrders),
+    [myOrders],
+  );
   const actionCount = useMemo(
     () => technicianOrders.filter(technicianOrderNeedsAction).length,
     [technicianOrders],
@@ -175,6 +178,24 @@ function TechnicianHome() {
         />
         <TechnicianQuickActionCard />
         <TechnicianOrderList orders={technicianOrders} actionCount={actionCount} />
+        {olderOrders.length > 0 && (
+          <section className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setShowOlder((v) => !v)}
+              className="w-full rounded-full border border-[color:var(--on-app-bg)]/10 bg-white/45 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.1em] text-[color:var(--on-app-bg-muted)] transition hover:bg-white/65"
+            >
+              {showOlder ? "Ocultar OS anteriores" : `Ver OS anteriores (${olderOrders.length})`}
+            </button>
+            {showOlder && (
+              <div className="grid gap-2.5">
+                {olderOrders.map((order) => (
+                  <TechnicianOrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </main>
       <TechnicianAssignedOrderNotification
         notification={currentNotification}
