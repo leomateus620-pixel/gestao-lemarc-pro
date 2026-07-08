@@ -35,6 +35,7 @@ type Draft = {
   pricingNotes: string;
   accessEmail: string;
   internalNotes: string;
+  unlinkAccess: boolean;
 };
 
 export function CollaboratorForm({
@@ -105,6 +106,7 @@ export function CollaboratorForm({
       pricing_notes: clean(draft.pricingNotes),
       internal_notes: clean(draft.internalNotes),
       access_email: draft.accessEmail.trim().toLowerCase() || null,
+      ...(draft.unlinkAccess ? { user_id: null } : {}),
     });
   }
 
@@ -310,19 +312,49 @@ export function CollaboratorForm({
               label="Acesso (opcional)"
               title="Vincular usuário do sistema"
             />
+            {initial?.user_id && !draft.unlinkAccess && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/10 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200">
+                    Usuário vinculado
+                  </p>
+                  <p className="mt-0.5 truncate text-sm font-bold text-white">
+                    {initial.access_email ?? "usuário do sistema"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    set("unlinkAccess", true);
+                    set("accessEmail", "");
+                  }}
+                  className="lemarc-pressable shrink-0 rounded-full border border-rose-300/40 bg-rose-400/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-400/20"
+                >
+                  Remover vínculo
+                </button>
+              </div>
+            )}
+            {draft.unlinkAccess && (
+              <div className="rounded-2xl border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-xs font-semibold text-rose-100">
+                Vínculo será removido ao salvar. Preencha outro e-mail abaixo para substituir.
+              </div>
+            )}
             <div className="lemarc-form-panel rounded-2xl p-4">
               <p className="text-sm font-black text-white">
                 Informe o e-mail de login do colaborador para que as OS designadas apareçam no painel dele.
               </p>
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                 O colaborador precisa ter entrado ao menos uma vez em <strong>/login</strong> com este e-mail.
-                Deixe em branco para remover o vínculo.
+                Deixar em branco mantém o vínculo atual — use "Remover vínculo" para desvincular.
               </p>
             </div>
             <Field label="E-mail de acesso">
               <Input
                 value={draft.accessEmail}
-                onChange={(event) => set("accessEmail", event.target.value)}
+                onChange={(event) => {
+                  set("accessEmail", event.target.value);
+                  if (draft.unlinkAccess && event.target.value.trim()) set("unlinkAccess", false);
+                }}
                 type="email"
                 inputMode="email"
                 autoComplete="off"
@@ -460,6 +492,7 @@ function buildDraft(initial?: TechnicianLite | null): Draft {
     pricingNotes: initial?.pricing_notes ?? "",
     accessEmail: initial?.access_email ?? "",
     internalNotes: initial?.internal_notes ?? "",
+    unlinkAccess: false,
   };
 }
 
