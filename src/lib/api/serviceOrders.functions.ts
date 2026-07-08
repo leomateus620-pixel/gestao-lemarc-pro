@@ -524,15 +524,31 @@ export const updateTechnician = createServerFn({ method: "POST" })
   .inputValidator((data: TechnicianUpdateInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    if (data.access_email !== undefined) {
-      data = { ...data, user_id: await resolveAccessEmail(sb, data.access_email) };
-    }
     const before = await sb
       .from("technicians")
       .select(TECHNICIAN_FULL_SELECT)
       .eq("id", data.id)
       .maybeSingle();
     const priorRate = before.error ? null : (before.data?.hourly_rate_cents ?? null);
+    const priorRate50 = before.error ? null : (before.data?.hourly_rate_50_cents ?? null);
+    const priorRate100 = before.error ? null : (before.data?.hourly_rate_100_cents ?? null);
+    const priorUserId = before.error ? null : (before.data?.user_id ?? null);
+
+    // Vínculo com usuário: só mexer quando o admin realmente enviou access_email
+    // e o valor for diferente do vínculo atual. Campo vazio = manter vínculo,
+    // a menos que access_email tenha sido enviado como "" e antes existisse um user.
+    if (data.access_email !== undefined) {
+      const trimmed = (data.access_email ?? "").trim();
+      if (trimmed.length === 0) {
+        // Só limpa se explicitamente veio vazio E havia vínculo antes.
+        data = { ...data, user_id: priorUserId ? null : priorUserId };
+      } else {
+        data = { ...data, user_id: await resolveAccessEmail(sb, trimmed) };
+      }
+    } else {
+      // Não tocar em user_id
+      data = { ...data, user_id: priorUserId };
+    }
 
     const { id, ...values } = data;
     const full = await sb
@@ -543,12 +559,19 @@ export const updateTechnician = createServerFn({ method: "POST" })
       .single();
 
     if (!full.error) {
-      if (priorRate !== data.hourly_rate_cents) {
+      const newRate = data.hourly_rate_cents ?? null;
+      const newRate50 = data.hourly_rate_50_cents ?? null;
+      const newRate100 = data.hourly_rate_100_cents ?? null;
+      const rateChanged =
+        (data.hourly_rate_cents !== undefined && newRate !== priorRate) ||
+        (data.hourly_rate_50_cents !== undefined && newRate50 !== priorRate50) ||
+        (data.hourly_rate_100_cents !== undefined && newRate100 !== priorRate100);
+      if (rateChanged) {
         await sb.from("technician_rate_history").insert({
           technician_id: id,
-          hourly_rate_cents: data.hourly_rate_cents ?? null,
-          hourly_rate_50_cents: data.hourly_rate_50_cents ?? null,
-          hourly_rate_100_cents: data.hourly_rate_100_cents ?? null,
+          hourly_rate_cents: newRate,
+          hourly_rate_50_cents: newRate50,
+          hourly_rate_100_cents: newRate100,
           starts_at: new Date().toISOString(),
           notes: data.pricing_notes ?? null,
           created_by: context.userId,
