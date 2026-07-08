@@ -34,7 +34,7 @@ import {
 } from "@/lib/serviceOrders/collaborators";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_app/colaboradores/$id")({
+export const Route = createFileRoute("/_app/colaboradores/$id/")({
   head: () => ({ meta: [{ title: "Perfil do colaborador — Gestão Lemarc" }] }),
   component: ColaboradorPerfilPage,
 });
