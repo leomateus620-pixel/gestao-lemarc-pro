@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -14,6 +15,7 @@ import {
   Loader2,
   MapPin,
   Receipt,
+  Trash2,
   UserRound,
   Wrench,
   type LucideIcon,
@@ -28,8 +30,20 @@ import {
 } from "@/lib/serviceOrders/technicians";
 import type { OrderFinancials } from "@/types/financials";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { deleteServiceOrder } from "@/lib/api/serviceOrders.functions";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   priorityLabel,
   serviceTypeLabel,
