@@ -482,8 +482,8 @@ function Dashboard() {
       {orders.length === 0 && <EmptyOperations />}
 
       {recent.length > 0 && (
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between px-1">
+        <section className="admin-recent-orders-section mt-6">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <h2 className="section-title flex items-center gap-2">
               <RouteIcon size={14} />
               Ordens recentes
@@ -492,9 +492,9 @@ function Dashboard() {
               Ver todas
             </Link>
           </div>
-          <div className="grid gap-3.5 xl:grid-cols-2 xl:gap-4">
+          <div className="admin-recent-orders-grid grid items-start gap-4 md:gap-5 xl:grid-cols-2">
             {recent.map((order) => (
-              <ServiceOrderCard key={order.id} order={order}>
+              <ServiceOrderCard key={order.id} order={order} variant="dashboard">
                 <OrderTechnicianTimeCard order={order} data={technicianTimeByOrder[order.id]} />
               </ServiceOrderCard>
             ))}
