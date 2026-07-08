@@ -24,7 +24,7 @@ export function TechnicianOrderList({ orders, actionCount }: Props) {
       {orders.length === 0 ? (
         <div className="rounded-[1.1rem] border border-dashed border-white/12 bg-[linear-gradient(180deg,oklch(1_0_0/0.06),oklch(1_0_0/0.025)),oklch(0.13_0.034_252/0.84)] p-5 text-center shadow-[inset_0_1px_0_oklch(1_0_0/0.1)]">
           <p className="font-display text-base font-black text-white">
-            Nenhuma OS atribuída a você.
+            Nenhuma OS recente atribuída a você.
           </p>
           <p className="mt-1 text-sm font-medium text-slate-400">
             Crie uma nova OS para iniciar um atendimento.

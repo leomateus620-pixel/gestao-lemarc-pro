@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,9 +47,11 @@ import {
 import { groupDashboardTechnicianTimeByOrder } from "@/lib/serviceOrders/dashboardTechnicianTime";
 import { getRecentServiceOrders } from "@/lib/serviceOrders/recentOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import { splitTechnicianHomeOrders } from "@/lib/serviceOrders/technicianHomeOrders";
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import { periodContextLabel, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
+import { TechnicianOrderCard } from "@/components/dashboard/TechnicianOrderCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -82,15 +84,6 @@ function DashboardRouter() {
   );
 }
 
-const technicianVisibleStatuses = new Set<ServiceOrderStatus>([
-  "pending",
-  "dispatched",
-  "transit",
-  "running",
-  "finished",
-  "review",
-]);
-
 function TechnicianHome() {
   const { displayName, user } = useAuth();
   const navigate = useNavigate();
@@ -101,21 +94,22 @@ function TechnicianHome() {
   const markRead = useServerFn(markServiceOrderNotificationRead);
   const dismissNotification = useServerFn(dismissServiceOrderNotification);
   const firstName = (displayName || "Técnico").split(" ")[0];
+  const [showOlder, setShowOlder] = useState(false);
   const myTechnicianIds = useMemo(() => {
     if (!user?.id) return new Set<string>();
     return new Set(technicians.filter((t) => t.user_id === user.id).map((t) => t.id));
   }, [technicians, user?.id]);
-  const technicianOrders = useMemo(() => {
-    return orders
-      .filter((order) => {
-        if (!technicianVisibleStatuses.has(order.status)) return false;
-
-        const assigned = getOrderTechnicians(order);
-        if (assigned.some((technician) => myTechnicianIds.has(technician.id))) return true;
-        return Boolean(order.technician_id && myTechnicianIds.has(order.technician_id));
-      })
-      .sort(compareTechnicianOrders);
+  const myOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const assigned = getOrderTechnicians(order);
+      if (assigned.some((technician) => myTechnicianIds.has(technician.id))) return true;
+      return Boolean(order.technician_id && myTechnicianIds.has(order.technician_id));
+    });
   }, [orders, myTechnicianIds]);
+  const { primary: technicianOrders, older: olderOrders } = useMemo(
+    () => splitTechnicianHomeOrders(myOrders),
+    [myOrders],
+  );
   const actionCount = useMemo(
     () => technicianOrders.filter(technicianOrderNeedsAction).length,
     [technicianOrders],
@@ -175,6 +169,24 @@ function TechnicianHome() {
         />
         <TechnicianQuickActionCard />
         <TechnicianOrderList orders={technicianOrders} actionCount={actionCount} />
+        {olderOrders.length > 0 && (
+          <section className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setShowOlder((v) => !v)}
+              className="w-full rounded-full border border-[color:var(--on-app-bg)]/10 bg-white/45 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.1em] text-[color:var(--on-app-bg-muted)] transition hover:bg-white/65"
+            >
+              {showOlder ? "Ocultar OS anteriores" : `Ver OS anteriores (${olderOrders.length})`}
+            </button>
+            {showOlder && (
+              <div className="grid gap-2.5">
+                {olderOrders.map((order) => (
+                  <TechnicianOrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </main>
       <TechnicianAssignedOrderNotification
         notification={currentNotification}
@@ -186,42 +198,6 @@ function TechnicianHome() {
       />
     </>
   );
-}
-
-function compareTechnicianOrders(a: ServiceOrder, b: ServiceOrder) {
-  return (
-    technicianStatusRank(a.status) - technicianStatusRank(b.status) ||
-    technicianPriorityRank(a) - technicianPriorityRank(b) ||
-    dateValueForSort(b.opened_at ?? b.created_at) - dateValueForSort(a.opened_at ?? a.created_at)
-  );
-}
-
-function technicianStatusRank(status: ServiceOrderStatus) {
-  const rank: Record<ServiceOrderStatus, number> = {
-    running: 0,
-    transit: 1,
-    dispatched: 2,
-    pending: 3,
-    finished: 4,
-    review: 5,
-    approved: 6,
-    cancelled: 7,
-  };
-  return rank[status];
-}
-
-function technicianPriorityRank(order: ServiceOrder) {
-  if (order.priority === "urgente") return 0;
-  if (order.priority === "alta") return 1;
-  if (order.priority === "media") return 2;
-  if (order.priority === "baixa") return 3;
-  return 4;
-}
-
-function dateValueForSort(value: string | null | undefined) {
-  if (!value) return 0;
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function periodSearchParams(period: Period, range?: PeriodRange) {
