@@ -1,36 +1,33 @@
-## Objetivo
-1. Zerar as 52 OS existentes no banco, sem afetar cadastros (clientes, colaboradores, unidades, taxas, usuários, configurações) nem fluxos/cálculos, que são todos derivados de OS ativas.
-2. Adicionar um botão vermelho pequeno "Excluir OS" ao lado do texto "Ações da OS" no card expandido da tela **Ordens**, restrito a administradores, com confirmação e revalidação da lista.
+## Problema
 
-## Parte 1 — Limpeza do banco
+No card **"Controle de tempo da OS"** (arquivo `src/components/ordens/ServiceOrderTimeControl.tsx`), o técnico selecionado por padrão é o `is_primary` (Douglas). Como as ações (Iniciar / Pausar / Retomar / Encerrar meu tempo) só aparecem para o técnico marcado como `selectedTech`, quando o **Juan** entra no perfil dele e abre a mesma OS, ele vê o cartão do Douglas selecionado e não consegue mexer no próprio cronômetro sem trocar o dropdown manualmente. No perfil do Douglas funciona por coincidência (ele é o primary).
 
-Migração única com um `DELETE FROM public.service_orders` (as 7 tabelas filhas — `service_order_technicians`, `service_order_labor_entries`, `service_order_financials`, `service_order_time_sessions`, `service_order_signatures`, `service_order_attachments`, `service_order_notifications` — já têm FK `ON DELETE CASCADE`, então são limpas automaticamente).
+Já validei também que o botão **"Iniciar serviço"** do card **"Próxima ação"** (em `src/routes/_app.ordens.$id.tsx`, `startServiceMutation`) já dispara `startWork` para **todos** os técnicos vinculados via `Promise.allSettled` — então esse fluxo em si está correto, só precisa que cada perfil enxergue o próprio cronômetro rodando.
 
-Também limpo `public.service_order_notifications` residuais e `technician_rate_history` **não é** afetado (histórico de valor/hora do colaborador se preserva, como pedido).
+## Correção (frontend apenas, sem tocar rota/DB/fluxos)
 
-Não toco em: `clients`, `client_units`, `technicians`, `user_roles`, `profiles`, `system_settings`, `technician_rate_history`, buckets de storage (arquivos ficarão órfãos mas invisíveis — a UI só lista o que a OS referencia; posso limpar depois se você quiser).
+Editar somente `src/components/ordens/ServiceOrderTimeControl.tsx`:
 
-Todos os cálculos (dashboard, relatórios, KPIs, faturamento) são funções puras sobre a lista de OS retornada do banco — com zero OS elas simplesmente exibem estado vazio, sem quebrar.
+1. Importar `useAuth` (`@/components/app/AuthContext`) e `useUserRole` (`@/hooks/useUserRole`).
+2. Calcular `myTechId = technicians.find(t => t.user_id === user?.id)?.id ?? null`.
+3. Ajustar o `useEffect` de auto-seleção do `selectedTech` com esta ordem de preferência:
+   - `myTechId` (o técnico do usuário logado), se existir;
+   - senão, o `is_primary`;
+   - senão, `technicians[0]`.
+4. Para papel **técnico** (`isTecnico && myTechId`):
+   - Forçar `selectedTech = myTechId` (ignorar troca) e **ocultar o `<select>` de Técnico**, já que o técnico só opera o próprio tempo.
+   - Trocar a regra atual `isSelected = t.id === selectedTech || technicians.length === 1` para `isSelected = t.id === myTechId` — garante que os botões de ação apareçam sempre na linha do próprio técnico, independente do padrão de dropdown.
+5. Admin/operador continuam com o comportamento atual (dropdown livre, podendo alternar entre técnicos).
 
-## Parte 2 — Botão "Excluir OS"
+Nada disso muda:
+- Rotas (`_app.ordens.$id.tsx`, `_app.colaboradores.*`, etc.).
+- Schema, RLS, políticas ou server functions (`timeSessions.functions.ts` permanece igual).
+- Fluxo do card "Próxima ação" (o loop de `startWork` para todos os técnicos já está correto).
+- Botão de exclusão de OS, wizard de edição de colaborador, ou qualquer outro fluxo já consolidado.
 
-### Backend
-Novo `deleteServiceOrder` em `src/lib/api/serviceOrders.functions.ts`:
-- `createServerFn({ method: "POST" })` + `requireSupabaseAuth`
-- valida `{ id: string }`
-- checa `is_admin` via RPC; caso contrário lança "Ação restrita ao administrador"
-- executa `supabase.from("service_orders").delete().eq("id", id)` (cascata cuida do resto)
+## Como validar
 
-### Frontend
-Em `src/components/ordens/ServiceOrderIslandRow.tsx`, no componente `OrderActionBar`:
-- Ao lado do rótulo "Ações da OS", renderizar um botão pequeno vermelho "Excluir OS" (ícone `Trash2`), visível apenas quando `useUserRole()` indicar admin.
-- Ao clicar: abrir `AlertDialog` (shadcn) confirmando "Excluir a OS #<número>? Esta ação é irreversível."
-- Confirmar → chama `deleteServiceOrder` via `useServerFn`, mostra toast, invalida a query `service-orders` do React Query para atualizar a listagem.
-- Estado de loading no botão; erros exibidos via `toast.error`.
-
-Nenhuma alteração em rotas, wizard, dashboard, relatórios ou cálculos financeiros.
-
-## Arquivos alterados
-- Migração SQL (novo arquivo)
-- `src/lib/api/serviceOrders.functions.ts` — adiciona `deleteServiceOrder`
-- `src/components/ordens/ServiceOrderIslandRow.tsx` — botão + diálogo de confirmação
+1. Como **Juan**, abrir a OS `/ordens/<id>` → o cartão "Juan Husch" já aparece como selecionado, com **"Iniciar serviço" / "Pausar" / "Retomar"** habilitados; o dropdown de técnico não aparece.
+2. Clicar em "Iniciar serviço" no card **"Próxima ação"** → cronômetros de Juan **e** Douglas ficam ativos no banco (`service_order_time_sessions`).
+3. Como **Douglas**, abrir a mesma OS → cartão do Douglas selecionado, ele controla apenas o próprio tempo; vê o cartão do Juan com badge "Ativo/Pausado" mas sem botões.
+4. Como **admin**, abrir a OS → dropdown de técnico visível, mantém comportamento atual.
