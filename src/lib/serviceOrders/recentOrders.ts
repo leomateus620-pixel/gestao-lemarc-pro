@@ -6,7 +6,7 @@ export type RecentServiceOrderLike = {
   updated_at?: string | null;
 };
 
-const RECENT_DATE_FIELDS = ["opened_at", "created_at", "updated_at"] as const;
+const RECENT_DATE_FIELDS = ["created_at", "opened_at", "updated_at"] as const;
 
 function validTimestamp(value: string | null | undefined) {
   if (!value) return null;
@@ -27,9 +27,8 @@ export function getRecentServiceOrders<T extends RecentServiceOrderLike>(
   limit = 4,
 ) {
   return orders
-    .map((order, index) => ({
+    .map((order) => ({
       order,
-      index,
       timestamp: recentOrderTimestamp(order),
     }))
     .sort((a, b) => {
@@ -39,9 +38,7 @@ export function getRecentServiceOrders<T extends RecentServiceOrderLike>(
       if (a.timestamp !== null && b.timestamp === null) return -1;
       if (a.timestamp === null && b.timestamp !== null) return 1;
       if (a.order.number !== b.order.number) return b.order.number - a.order.number;
-      const idCompare = a.order.id.localeCompare(b.order.id, "pt-BR");
-      if (idCompare !== 0) return idCompare;
-      return a.index - b.index;
+      return a.order.id.localeCompare(b.order.id, "pt-BR");
     })
     .slice(0, Math.max(0, limit))
     .map((item) => item.order);
