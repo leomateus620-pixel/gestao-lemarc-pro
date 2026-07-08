@@ -1,33 +1,59 @@
 ## Problema
 
-No card **"Controle de tempo da OS"** (arquivo `src/components/ordens/ServiceOrderTimeControl.tsx`), o técnico selecionado por padrão é o `is_primary` (Douglas). Como as ações (Iniciar / Pausar / Retomar / Encerrar meu tempo) só aparecem para o técnico marcado como `selectedTech`, quando o **Juan** entra no perfil dele e abre a mesma OS, ele vê o cartão do Douglas selecionado e não consegue mexer no próprio cronômetro sem trocar o dropdown manualmente. No perfil do Douglas funciona por coincidência (ele é o primary).
+Ao abrir uma OS com dois técnicos, apenas o **técnico principal** (a primeira pessoa selecionada, gravada em `service_orders.technician_id`) vê a OS na "Central do técnico". O técnico secundário recebe a notificação, mas quando fecha, a OS não aparece na home.
 
-Já validei também que o botão **"Iniciar serviço"** do card **"Próxima ação"** (em `src/routes/_app.ordens.$id.tsx`, `startServiceMutation`) já dispara `startWork` para **todos** os técnicos vinculados via `Promise.allSettled` — então esse fluxo em si está correto, só precisa que cada perfil enxergue o próprio cronômetro rodando.
+## Causa raiz
 
-## Correção (frontend apenas, sem tocar rota/DB/fluxos)
+O dashboard filtra `myOrders` com esta lógica:
 
-Editar somente `src/components/ordens/ServiceOrderTimeControl.tsx`:
+```
+assigned.some(t => myTechnicianIds.has(t.id))   // via embed assigned_technicians
+|| order.technician_id === myTechnicianId       // fallback pela coluna legada
+```
 
-1. Importar `useAuth` (`@/components/app/AuthContext`) e `useUserRole` (`@/hooks/useUserRole`).
-2. Calcular `myTechId = technicians.find(t => t.user_id === user?.id)?.id ?? null`.
-3. Ajustar o `useEffect` de auto-seleção do `selectedTech` com esta ordem de preferência:
-   - `myTechId` (o técnico do usuário logado), se existir;
-   - senão, o `is_primary`;
-   - senão, `technicians[0]`.
-4. Para papel **técnico** (`isTecnico && myTechId`):
-   - Forçar `selectedTech = myTechId` (ignorar troca) e **ocultar o `<select>` de Técnico**, já que o técnico só opera o próprio tempo.
-   - Trocar a regra atual `isSelected = t.id === selectedTech || technicians.length === 1` para `isSelected = t.id === myTechId` — garante que os botões de ação apareçam sempre na linha do próprio técnico, independente do padrão de dropdown.
-5. Admin/operador continuam com o comportamento atual (dropdown livre, podendo alternar entre técnicos).
+O embed `assigned_technicians` vem de `service_order_technicians`, cuja política RLS de SELECT atualmente permite apenas:
 
-Nada disso muda:
-- Rotas (`_app.ordens.$id.tsx`, `_app.colaboradores.*`, etc.).
-- Schema, RLS, políticas ou server functions (`timeSessions.functions.ts` permanece igual).
-- Fluxo do card "Próxima ação" (o loop de `startWork` para todos os técnicos já está correto).
-- Botão de exclusão de OS, wizard de edição de colaborador, ou qualquer outro fluxo já consolidado.
+```
+is_admin() OR user_owns_order(service_order_id)
+```
 
-## Como validar
+Ou seja, o técnico não pode ler nenhuma linha da tabela de vínculos. Resultado: o embed volta vazio para ambos os técnicos. Sobra o fallback `order.technician_id`, que só bate para o **primeiro** técnico (o marcado como `is_primary` / gravado na coluna legada). O secundário fica invisível.
 
-1. Como **Juan**, abrir a OS `/ordens/<id>` → o cartão "Juan Husch" já aparece como selecionado, com **"Iniciar serviço" / "Pausar" / "Retomar"** habilitados; o dropdown de técnico não aparece.
-2. Clicar em "Iniciar serviço" no card **"Próxima ação"** → cronômetros de Juan **e** Douglas ficam ativos no banco (`service_order_time_sessions`).
-3. Como **Douglas**, abrir a mesma OS → cartão do Douglas selecionado, ele controla apenas o próprio tempo; vê o cartão do Juan com badge "Ativo/Pausado" mas sem botões.
-4. Como **admin**, abrir a OS → dropdown de técnico visível, mantém comportamento atual.
+A RLS de `service_orders` já usa `user_is_order_technician(id)`, então a OS em si é retornada para os dois. O bug está isolado à RLS da tabela de vínculos.
+
+## Correção
+
+Uma única migration ampliando a política SELECT de `public.service_order_technicians` para incluir o técnico atribuído à OS:
+
+```sql
+DROP POLICY IF EXISTS "View order technicians (admin or order owner)"
+  ON public.service_order_technicians;
+
+CREATE POLICY "View order technicians"
+ON public.service_order_technicians
+FOR SELECT
+TO authenticated
+USING (
+  public.is_admin()
+  OR public.user_owns_order(service_order_id)
+  OR public.user_is_order_technician(service_order_id)
+);
+```
+
+Efeito:
+- Admin e criador continuam vendo tudo (nada muda).
+- Cada técnico atribuído passa a enxergar as linhas de vínculo da própria OS (incluindo a dos colegas de equipe — necessário para o card "Controle de tempo" já listar os dois).
+- Sem mudança nas policies de INSERT/UPDATE/DELETE (a manutenção do vínculo continua restrita a admin/dono).
+
+## Escopo
+
+- **Backend:** 1 migration nova em `supabase/migrations/` com o `DROP POLICY` + `CREATE POLICY` acima. Sem alterar tabelas, GRANTs, colunas ou outras policies.
+- **Frontend:** nenhuma alteração. O `useMemo` de `myOrders` (que já checa `assigned_technicians` primeiro) passa a funcionar para os dois técnicos automaticamente. O card "Controle de tempo da OS" também se beneficia (deixa de depender de embed vazio).
+- **Fluxos preservados:** listagem admin de OS, wizard de criação/edição, notificações, exclusão de OS, cálculos financeiros, histórico de tempo — nada é tocado.
+
+## Verificação
+
+Após aplicar a migration:
+1. Confirmar via consulta que a policy nova está ativa em `pg_policy`.
+2. Abrir a OS #1055 no perfil do Juan e no perfil do Douglas — a OS deve aparecer em ambos na "Central do técnico" e o card "Controle de tempo" deve listar os dois técnicos em cada perfil.
+3. Perfil de admin/operador continua vendo tudo como antes.
