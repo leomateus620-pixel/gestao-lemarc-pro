@@ -136,18 +136,6 @@ function dateFromIso(iso: string | null | undefined): string {
   }).format(d);
 }
 
-function addMinutesToHm(hm: string, minutes: number): string {
-  const [h, m] = hm.split(":").map(Number);
-  const total =
-    (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0) + Math.max(0, minutes);
-  const capped = Math.min(23 * 60 + 59, total);
-  const hh = Math.floor(capped / 60)
-    .toString()
-    .padStart(2, "0");
-  const mm = (capped % 60).toString().padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
 function shortName(fullName: string) {
   return fullName.trim().split(/\s+/)[0] || fullName;
 }
