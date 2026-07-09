@@ -694,6 +694,45 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
   workBox(workItems);
 
   section("Execução e valores");
+  const orderedEntries = [...entries].sort((a, b) => {
+    const byDate = a.work_date.localeCompare(b.work_date);
+    if (byDate !== 0) return byDate;
+    return a.start_time.localeCompare(b.start_time);
+  });
+  const groupedTechs = new Map<string, LaborEntry[]>();
+  for (const e of orderedEntries) {
+    const key = e.technician_id ?? e.technician?.id ?? "sem-tecnico";
+    const list = groupedTechs.get(key) ?? [];
+    list.push(e);
+    groupedTechs.set(key, list);
+  }
+  const tableRows: string[][] = [];
+  for (const [, list] of groupedTechs) {
+    for (const entry of list) {
+      tableRows.push([
+        entry.technician?.full_name ?? EMPTY,
+        entry.role ?? EMPTY,
+        fmtEntryDateTime(entry, entry.start_time),
+        fmtEntryDateTime(entry, entry.end_time),
+        formatHHmm(entry.duration_minutes),
+        formatBRL(entry.hourly_rate_cents),
+        formatBRL(entry.subtotal_cents),
+      ]);
+    }
+    if (list.length > 1) {
+      const totalMin = list.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
+      const totalCents = list.reduce((a, e) => a + (e.subtotal_cents ?? 0), 0);
+      tableRows.push([
+        `Subtotal · ${list[0].technician?.full_name ?? EMPTY}`,
+        "",
+        "",
+        "",
+        formatHHmm(totalMin),
+        "—",
+        formatBRL(totalCents),
+      ]);
+    }
+  }
   table(
     [
       { label: "Técnico", width: 43 },
@@ -704,17 +743,16 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
       { label: "R$/h", width: 24, align: "right" },
       { label: "Total", width: contentWidth - 43 - 24 - 28 - 28 - 15 - 24, align: "right" },
     ],
-    entries.map((entry) => [
-      entry.technician?.full_name ?? EMPTY,
-      entry.role ?? EMPTY,
-      fmtEntryDateTime(entry, entry.start_time),
-      fmtEntryDateTime(entry, entry.end_time),
-      formatHHmm(entry.duration_minutes),
-      formatBRL(entry.hourly_rate_cents),
-      formatBRL(entry.subtotal_cents),
-    ]),
+    tableRows,
     "Sem apontamentos registrados.",
   );
+  txt(
+    "Horas trabalhadas não incluem intervalos de pausa. O total financeiro é calculado apenas sobre as horas efetivamente trabalhadas.",
+    marginX,
+    y + 1,
+    { size: 6.4, color: LEMARC_COLORS.slateSoft, maxWidth: contentWidth },
+  );
+  y += 5;
 
   drawTotalsAndSignature();
 
