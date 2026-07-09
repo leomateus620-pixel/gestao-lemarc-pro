@@ -60,6 +60,9 @@ const STYLES = `
 .os-pdf th, .os-pdf td { padding: 4px 5px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 .os-pdf th { background: #f1f5f9; text-align: left; text-transform: uppercase; font-size: 7.2px; letter-spacing: 0.04em; color: #334155; }
 .os-pdf td.num, .os-pdf th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.os-pdf tr.techSubtotal td { background: #eef2ff; color: #0b2545; font-weight: 800; border-bottom: 1.2px solid #cbd5e1; }
+.os-pdf tr.techSubtotal td.label { text-transform: uppercase; font-size: 7.2px; letter-spacing: 0.06em; }
+.os-pdf .execNote { margin-top: 4px; color: #64748b; font-size: 7.4px; font-style: italic; }
 .os-pdf .totalsSignatureGroup { margin-top: 7px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; break-inside: avoid; page-break-inside: avoid; }
 .os-pdf .totalsBox, .os-pdf .signatureBox { border: 1.4px solid #cbd5e1; border-radius: 7px; background: #f8fafc; padding: 7px 9px; }
 .os-pdf .boxTitle { color: #0b2545; font-size: 8.6px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
@@ -149,15 +152,34 @@ export function ServiceOrderReportDocument({
 }: Props) {
   const techs = getOrderTechnicians(order);
   const primary = techs.find((t) => t.is_primary) ?? techs[0];
-  const executedDescriptions = entries
-    .map((entry, index) => {
-      const description = entry.description?.trim();
-      if (!description) return null;
-      const technician = entry.technician?.full_name ? `${entry.technician.full_name}: ` : "";
-      return `${index + 1}. ${technician}${description}`;
-    })
-    .filter(Boolean)
-    .join("\n");
+
+  // Agrupa entries por técnico preservando a ordem por data/hora.
+  const orderedEntries = [...entries].sort((a, b) => {
+    const byDate = a.work_date.localeCompare(b.work_date);
+    if (byDate !== 0) return byDate;
+    return a.start_time.localeCompare(b.start_time);
+  });
+  const grouped = new Map<string, LaborEntry[]>();
+  for (const e of orderedEntries) {
+    const key = e.technician_id ?? e.technician?.id ?? "sem-tecnico";
+    const list = grouped.get(key) ?? [];
+    list.push(e);
+    grouped.set(key, list);
+  }
+
+  // Resumo executado: N intervalos e horas por técnico (não repete "Calculado automaticamente").
+  const executedSummaryLines: string[] = [];
+  let summaryIndex = 1;
+  for (const [, list] of grouped) {
+    const name = list[0].technician?.full_name ?? "Técnico";
+    const totalMin = list.reduce((acc, e) => acc + (e.duration_minutes ?? 0), 0);
+    const intervalos = list.length;
+    executedSummaryLines.push(
+      `${summaryIndex}. ${name}: ${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"} · ${formatHHmm(totalMin)} trabalhadas`,
+    );
+    summaryIndex += 1;
+  }
+  const executedDescriptions = executedSummaryLines.join("\n");
 
   const workNotes = financials?.notes?.trim();
   const unitName = order.client_unit?.name ?? order.client?.unit ?? EMPTY;
@@ -238,38 +260,61 @@ export function ServiceOrderReportDocument({
         {entries.length === 0 ? (
           <div className="sigMissing">Sem apontamentos registrados.</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "24%" }}>Técnico</th>
-                <th style={{ width: "14%" }}>Função</th>
-                <th style={{ width: "18%" }}>Início</th>
-                <th style={{ width: "18%" }}>Fim</th>
-                <th className="num" style={{ width: "8%" }}>
-                  Horas
-                </th>
-                <th className="num" style={{ width: "9%" }}>
-                  R$/h
-                </th>
-                <th className="num" style={{ width: "9%" }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{entry.technician?.full_name ?? EMPTY}</td>
-                  <td>{entry.role ?? EMPTY}</td>
-                  <td>{fmtEntryDateTime(entry, entry.start_time)}</td>
-                  <td>{fmtEntryDateTime(entry, entry.end_time)}</td>
-                  <td className="num">{formatHHmm(entry.duration_minutes)}</td>
-                  <td className="num">{formatBRL(entry.hourly_rate_cents)}</td>
-                  <td className="num">{formatBRL(entry.subtotal_cents)}</td>
+          <>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: "24%" }}>Técnico</th>
+                  <th style={{ width: "14%" }}>Função</th>
+                  <th style={{ width: "18%" }}>Início</th>
+                  <th style={{ width: "18%" }}>Fim</th>
+                  <th className="num" style={{ width: "8%" }}>
+                    Horas
+                  </th>
+                  <th className="num" style={{ width: "9%" }}>
+                    R$/h
+                  </th>
+                  <th className="num" style={{ width: "9%" }}>
+                    Total
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {[...grouped.entries()].flatMap(([techKey, list]) => {
+                  const rows = list.map((entry) => (
+                    <tr key={entry.id}>
+                      <td>{entry.technician?.full_name ?? EMPTY}</td>
+                      <td>{entry.role ?? EMPTY}</td>
+                      <td>{fmtEntryDateTime(entry, entry.start_time)}</td>
+                      <td>{fmtEntryDateTime(entry, entry.end_time)}</td>
+                      <td className="num">{formatHHmm(entry.duration_minutes)}</td>
+                      <td className="num">{formatBRL(entry.hourly_rate_cents)}</td>
+                      <td className="num">{formatBRL(entry.subtotal_cents)}</td>
+                    </tr>
+                  ));
+                  if (list.length > 1) {
+                    const totalMin = list.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
+                    const totalCents = list.reduce((a, e) => a + (e.subtotal_cents ?? 0), 0);
+                    rows.push(
+                      <tr key={`${techKey}-subtotal`} className="techSubtotal">
+                        <td colSpan={4} className="label">
+                          Subtotal · {list[0].technician?.full_name ?? EMPTY}
+                        </td>
+                        <td className="num">{formatHHmm(totalMin)}</td>
+                        <td className="num">—</td>
+                        <td className="num">{formatBRL(totalCents)}</td>
+                      </tr>,
+                    );
+                  }
+                  return rows;
+                })}
+              </tbody>
+            </table>
+            <div className="execNote">
+              Horas trabalhadas não incluem intervalos de pausa. O total financeiro é calculado
+              apenas sobre as horas efetivamente trabalhadas.
+            </div>
+          </>
         )}
 
         <div className="totalsSignatureGroup">
