@@ -657,14 +657,25 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
     { label: "Técnico responsável", value: primary?.full_name ?? EMPTY },
   ]);
 
-  const executedDescriptions = entries
-    .map((entry, index) => {
-      const description = entry.description?.trim();
-      if (!description) return null;
-      const technician = entry.technician?.full_name ? `${entry.technician.full_name}: ` : "";
-      return `${index + 1}. ${technician}${description}`;
-    })
-    .filter((description): description is string => Boolean(description));
+  // Resumo executado: intervalos e horas por técnico.
+  const executedSummaryMap = new Map<string, LaborEntry[]>();
+  for (const e of entries) {
+    const key = e.technician_id ?? e.technician?.id ?? "sem-tecnico";
+    const list = executedSummaryMap.get(key) ?? [];
+    list.push(e);
+    executedSummaryMap.set(key, list);
+  }
+  const executedDescriptions: string[] = [];
+  let summaryIdx = 1;
+  for (const [, list] of executedSummaryMap) {
+    const name = list[0].technician?.full_name ?? "Técnico";
+    const totalMin = list.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
+    const intervalos = list.length;
+    executedDescriptions.push(
+      `${summaryIdx}. ${name}: ${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"} · ${formatHHmm(totalMin)} trabalhadas`,
+    );
+    summaryIdx += 1;
+  }
 
   const workItems: WorkItem[] = [
     {
