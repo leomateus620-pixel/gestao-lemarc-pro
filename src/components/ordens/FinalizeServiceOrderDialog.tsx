@@ -49,9 +49,9 @@ import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import { listTimeSessions } from "@/lib/api/timeSessions.functions";
 import { getDisplacementRateCents } from "@/lib/api/systemSettings.functions";
-import { computeClosedWorkedMinutesByTech } from "@/lib/serviceOrders/timeSessions";
+import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
-import type { ServiceOrder } from "@/types/serviceOrder";
+import type { AssignedTechnician, ServiceOrder } from "@/types/serviceOrder";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 
 type Props = {
@@ -159,7 +159,84 @@ function formatDateBR(value: string) {
 }
 
 function isAutoCalculatedEntry(entry: DraftEntry) {
-  return entry.description === "Calculado automaticamente pelo controle de tempo";
+  if (!entry.description) return false;
+  return (
+    entry.description === "Calculado automaticamente pelo controle de tempo" ||
+    entry.description.startsWith("Intervalo ") ||
+    entry.description === "Trabalho executado"
+  );
+}
+
+/**
+ * Gera um DraftEntry por sessão de trabalho fechada, preservando o intervalo
+ * real (start/end) de cada bloco iniciado→pausado ou retomado→finalizado.
+ * Pausas ficam automaticamente fora, porque cada linha grava exatamente uma
+ * janela ativa. Técnicos sem sessões recebem uma linha de fallback (duração
+ * zero) para que o admin ajuste manualmente antes de finalizar.
+ */
+function buildEntriesFromSessions(
+  sessions: TimeSession[],
+  techs: AssignedTechnician[],
+  fallbackDate: string,
+  fallbackStart: string,
+  fallbackEnd: string,
+): DraftEntry[] {
+  const out: DraftEntry[] = [];
+  for (const t of techs) {
+    const rateInput =
+      t.hourly_rate_cents != null
+        ? (t.hourly_rate_cents / 100).toFixed(2).replace(".", ",")
+        : "";
+    const techSessions = sessions
+      .filter(
+        (s) =>
+          s.kind === "work" &&
+          s.technician_id === t.id &&
+          s.ended_at != null &&
+          (s.duration_minutes ?? 0) > 0,
+      )
+      .sort((a, b) => a.started_at.localeCompare(b.started_at));
+
+    if (techSessions.length === 0) {
+      out.push({
+        uid: uid(),
+        technician_id: t.id,
+        role: t.assignment_role ?? null,
+        work_date: fallbackDate,
+        start_time: fallbackStart,
+        end_time: fallbackEnd,
+        hourly_rate_cents: t.hourly_rate_cents ?? 0,
+        rate_input: rateInput,
+        description: null,
+      });
+      continue;
+    }
+
+    techSessions.forEach((s, idx) => {
+      const workDate = dateFromIso(s.started_at);
+      const startTime = timeFromIso(s.started_at);
+      const endDate = dateFromIso(s.ended_at);
+      let endTime = timeFromIso(s.ended_at);
+      // Edge case: sessão atravessa meia-noite. Encerra 23:59 e deixa admin ajustar.
+      if (endDate !== workDate) endTime = "23:59";
+      if (endTime <= startTime) return; // sessão inválida/curta, ignora
+      out.push({
+        uid: uid(),
+        technician_id: t.id,
+        role: t.assignment_role ?? null,
+        work_date: workDate,
+        start_time: startTime,
+        end_time: endTime,
+        hourly_rate_cents: t.hourly_rate_cents ?? 0,
+        rate_input: rateInput,
+        description:
+          techSessions.length > 1
+            ? `Intervalo ${idx + 1} de ${techSessions.length}`
+            : "Trabalho executado",
+      });
+    });
+  }
+  return out;
 }
 
 function buildUnitDisplacementHint(order: ServiceOrder) {
@@ -325,7 +402,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
-  const { data: sessions = [] } = useQuery({
+  const { data: sessions, isFetched: sessionsFetched } = useQuery({
     queryKey: ["order-time-sessions", order.id],
     queryFn: () => sessionsFn({ data: { orderId: order.id } }),
     enabled: open,
@@ -361,13 +438,18 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   // Hydrate when dialog opens.
   useEffect(() => {
     if (!open) return;
+    // Aguardar as sessões carregarem antes de auto-preencher: sem esse gate
+    // o primeiro render usava fallback (start→finished_at) e incluía a pausa
+    // no cálculo.
+    const existingEntries = existing?.entries ?? [];
+    if (existingEntries.length === 0 && !sessionsFetched) return;
+
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
     const fallbackStart = timeFromIso(order.started_at ?? order.opened_at);
     const rawEnd = timeFromIso(order.finished_at ?? new Date().toISOString());
     // Nunca inventar horário de saída: se saída <= entrada, deixa igual à entrada
     // (duração 0) e obriga o técnico a ajustar antes de finalizar.
     const fallbackEnd = rawEnd > fallbackStart ? rawEnd : fallbackStart;
-    const existingEntries = existing?.entries ?? [];
 
     if (existingEntries.length > 0) {
       setEntries(
@@ -384,28 +466,17 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
         })),
       );
     } else {
-      // Prefer prefill from real time sessions (líquido, sem contar pausa).
-      const workedByTech = computeClosedWorkedMinutesByTech(sessions);
+      // Gera uma linha por sessão de trabalho fechada (intervalo real
+      // iniciado→pausado ou retomado→finalizado). Pausas ficam de fora
+      // automaticamente porque cada linha representa uma janela ativa.
       setEntries(
-        techs.map((t) => {
-          const minutes = workedByTech[t.id] ?? 0;
-          const start = fallbackStart;
-          const end = minutes > 0 ? addMinutesToHm(start, minutes) : fallbackEnd;
-          return {
-            uid: uid(),
-            technician_id: t.id,
-            role: t.assignment_role ?? null,
-            work_date: fallbackDate,
-            start_time: start,
-            end_time: end,
-            hourly_rate_cents: t.hourly_rate_cents ?? 0,
-            rate_input:
-              t.hourly_rate_cents != null
-                ? (t.hourly_rate_cents / 100).toFixed(2).replace(".", ",")
-                : "",
-            description: minutes > 0 ? "Calculado automaticamente pelo controle de tempo" : null,
-          };
-        }),
+        buildEntriesFromSessions(
+          sessions ?? [],
+          techs,
+          fallbackDate,
+          fallbackStart,
+          fallbackEnd,
+        ),
       );
     }
 
@@ -440,7 +511,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       }
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions, globalRateCents]);
+  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
