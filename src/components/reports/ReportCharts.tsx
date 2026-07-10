@@ -7,6 +7,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -31,10 +33,10 @@ export function ReportChartCard({
   action?: ReactNode;
 }) {
   return (
-    <section className={cn("lemarc-report-card flex min-h-[268px] flex-col p-4 sm:p-5", className)}>
+    <section className={cn("lemarc-report-card flex min-h-[250px] flex-col p-4 sm:p-5", className)}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-[13px] font-black uppercase tracking-[0.12em] text-white sm:text-sm">
+          <h3 className="font-display text-sm font-black leading-tight text-white sm:text-[15px]">
             {title}
           </h3>
           {subtitle && (
@@ -77,6 +79,21 @@ const CHART_COLORS = [
   "oklch(0.72 0.13 280)",
   "oklch(0.75 0.12 185)",
 ];
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "var(--status-pending)",
+  dispatched: "var(--status-transit)",
+  transit: "var(--status-transit)",
+  running: "var(--status-running)",
+  finished: "var(--status-done)",
+  review: "var(--status-review)",
+  approved: "var(--status-done)",
+  cancelled: "var(--destructive)",
+};
+
+function statusColor(key: string, index: number) {
+  return STATUS_COLORS[key] ?? CHART_COLORS[index % CHART_COLORS.length];
+}
 
 const GRID_STROKE = "oklch(1 0 0 / 0.095)";
 const AXIS_STROKE = "oklch(0.82 0.018 250 / 0.82)";
@@ -171,7 +188,7 @@ export function HorizontalBarList({
           <div key={d.key} className="group">
             <div className="flex items-baseline justify-between gap-3 text-[12px]">
               <span
-                className="min-w-0 truncate font-bold leading-tight text-slate-100"
+                className="min-w-0 line-clamp-2 break-words font-bold leading-tight text-slate-100"
                 title={d.label}
               >
                 {d.label}
@@ -182,7 +199,7 @@ export function HorizontalBarList({
             </div>
             <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-black/28 ring-1 ring-white/[0.07]">
               <div
-                className="h-full rounded-full shadow-lg transition-[width,filter] duration-300 group-hover:brightness-110"
+                className="lemarc-report-chart-bar h-full rounded-full shadow-lg transition-[width,filter] duration-200 group-hover:brightness-110"
                 style={{
                   width: `${width}%`,
                   background: `linear-gradient(90deg, ${color}, color-mix(in oklab, ${color} 68%, white 18%))`,
@@ -202,7 +219,14 @@ export function StatusDonut({ data }: { data: GroupBucket[] }) {
   if (!data.length || total <= 0) return <ChartEmptyState />;
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+    <div
+      className="flex flex-col items-center gap-4 sm:flex-row sm:items-center"
+      role="img"
+      aria-label={`Distribuição de ${total} ordens de serviço por status`}
+    >
+      <span className="sr-only">
+        {data.map((item) => `${item.label}: ${item.value}`).join("; ")}
+      </span>
       <div className="relative h-44 w-44 shrink-0 sm:h-48 sm:w-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -218,7 +242,7 @@ export function StatusDonut({ data }: { data: GroupBucket[] }) {
               isAnimationActive={!reducedMotion}
             >
               {data.map((_, i) => (
-                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                <Cell key={i} fill={statusColor(data[i].key, i)} />
               ))}
             </Pie>
             <Tooltip content={<TooltipCard />} />
@@ -241,7 +265,7 @@ export function StatusDonut({ data }: { data: GroupBucket[] }) {
           >
             <span
               className="inline-block size-2.5 shrink-0 rounded-sm"
-              style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
+              style={{ background: statusColor(d.key, i) }}
             />
             <span className="min-w-0 flex-1 truncate font-semibold text-slate-100" title={d.label}>
               {d.label}
@@ -258,52 +282,133 @@ export function TrendArea({
   data,
   metric = "orders",
   formatter,
+  axisFormatter,
 }: {
   data: TrendPoint[];
   metric?: "orders" | "hours" | "value";
   formatter?: (v: number) => string;
+  axisFormatter?: (v: number) => string;
 }) {
   const reducedMotion = usePrefersReducedMotion();
   if (!data.length || data.every((d) => d[metric] <= 0)) return <ChartEmptyState />;
 
   return (
-    <ResponsiveContainer width="100%" height={238}>
-      <AreaChart data={data} margin={{ top: 10, right: 16, bottom: 4, left: -8 }}>
-        <defs>
-          <linearGradient id={`trendFill-${metric}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0.58} />
-            <stop offset="72%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0.08} />
-            <stop offset="100%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="4 6" stroke={GRID_STROKE} vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
-          axisLine={false}
-          tickLine={false}
-          minTickGap={12}
-        />
-        <YAxis
-          tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
-          axisLine={false}
-          tickLine={false}
-          width={42}
-        />
-        <Tooltip content={<TooltipCard formatter={formatter} />} />
-        <Area
-          type="monotone"
-          dataKey={metric}
-          name={metric === "orders" ? "OS" : metric === "hours" ? "Horas" : "Valor"}
-          stroke="oklch(0.82 0.18 62)"
-          strokeWidth={3}
-          fill={`url(#trendFill-${metric})`}
-          dot={{ r: 3, strokeWidth: 2, fill: "oklch(0.13 0.035 252)" }}
-          activeDot={{ r: 5, strokeWidth: 2, fill: "oklch(0.9 0.14 72)" }}
-          isAnimationActive={!reducedMotion}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+    <div
+      className="h-[220px] w-full sm:h-[238px]"
+      role="img"
+      aria-label={`Evolução de ${metric === "orders" ? "ordens" : metric === "hours" ? "horas" : "valor estimado"} no período`}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: -8 }}>
+          <defs>
+            <linearGradient id={`trendFill-${metric}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0.58} />
+              <stop offset="72%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0.08} />
+              <stop offset="100%" stopColor="oklch(0.78 0.19 55)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="4 6" stroke={GRID_STROKE} vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={12}
+          />
+          <YAxis
+            tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
+            tickFormatter={axisFormatter}
+            axisLine={false}
+            tickLine={false}
+            width={42}
+          />
+          <Tooltip content={<TooltipCard formatter={formatter} />} />
+          <Area
+            type="monotone"
+            dataKey={metric}
+            name={metric === "orders" ? "OS" : metric === "hours" ? "Horas" : "Valor"}
+            stroke="oklch(0.82 0.18 62)"
+            strokeWidth={3}
+            fill={`url(#trendFill-${metric})`}
+            dot={{ r: 3, strokeWidth: 2, fill: "oklch(0.13 0.035 252)" }}
+            activeDot={{ r: 5, strokeWidth: 2, fill: "oklch(0.9 0.14 72)" }}
+            isAnimationActive={!reducedMotion}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function TrendComparison({ data }: { data: TrendPoint[] }) {
+  const reducedMotion = usePrefersReducedMotion();
+  if (!data.length || data.every((point) => point.orders <= 0)) return <ChartEmptyState />;
+
+  return (
+    <div
+      className="w-full"
+      role="img"
+      aria-label="Comparação mensal entre ordens abertas e ordens concluídas"
+    >
+      <span className="sr-only">
+        {data
+          .map((point) => `${point.label}: ${point.orders} abertas e ${point.completed} concluídas`)
+          .join("; ")}
+      </span>
+      <ul
+        className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-slate-200"
+        aria-label="Legenda do gráfico"
+      >
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 rounded-sm bg-primary" aria-hidden="true" />
+          Abertas
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 rounded-full bg-status-done" aria-hidden="true" />
+          Concluídas
+        </li>
+      </ul>
+      <div className="h-[220px] w-full sm:h-[238px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: -8 }}>
+            <CartesianGrid strokeDasharray="4 6" stroke={GRID_STROKE} vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
+              axisLine={false}
+              tickLine={false}
+              minTickGap={12}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
+              axisLine={false}
+              tickLine={false}
+              width={36}
+            />
+            <Tooltip content={<TooltipCard />} cursor={{ fill: "oklch(1 0 0 / 0.045)" }} />
+            <Bar
+              dataKey="orders"
+              name="Abertas"
+              fill="var(--primary)"
+              radius={[6, 6, 2, 2]}
+              maxBarSize={40}
+              isAnimationActive={!reducedMotion}
+            />
+            <Line
+              type="monotone"
+              dataKey="completed"
+              name="Concluídas"
+              stroke="var(--status-done)"
+              strokeWidth={2.5}
+              dot={{ r: 3, strokeWidth: 2, fill: "oklch(0.13 0.035 252)" }}
+              activeDot={{ r: 5, strokeWidth: 2, fill: "var(--status-done)" }}
+              isAnimationActive={!reducedMotion}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -320,45 +425,51 @@ export function VerticalBars({
   if (!data.length || !hasUsableValues(data)) return <ChartEmptyState label={emptyLabel} />;
 
   return (
-    <ResponsiveContainer width="100%" height={238}>
-      <BarChart
-        data={data}
-        margin={{ top: 10, right: 14, bottom: 4, left: -8 }}
-        barCategoryGap="26%"
-      >
-        <CartesianGrid strokeDasharray="4 6" stroke={GRID_STROKE} vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fill: AXIS_STROKE, fontSize: 10, fontWeight: 700 }}
-          tickFormatter={truncateAxisLabel}
-          axisLine={false}
-          tickLine={false}
-          interval={0}
-          angle={-12}
-          dy={8}
-          height={58}
-        />
-        <YAxis
-          tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
-          axisLine={false}
-          tickLine={false}
-          width={42}
-        />
-        <Tooltip
-          content={<TooltipCard formatter={formatter} />}
-          cursor={{ fill: "oklch(1 0 0 / 0.055)" }}
-        />
-        <Bar
-          dataKey="value"
-          radius={[8, 8, 2, 2]}
-          maxBarSize={54}
-          isAnimationActive={!reducedMotion}
+    <div
+      className="h-[220px] w-full sm:h-[238px]"
+      role="img"
+      aria-label="Gráfico de barras do período"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          margin={{ top: 10, right: 14, bottom: 4, left: -8 }}
+          barCategoryGap="26%"
         >
-          {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+          <CartesianGrid strokeDasharray="4 6" stroke={GRID_STROKE} vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: AXIS_STROKE, fontSize: 10, fontWeight: 700 }}
+            tickFormatter={truncateAxisLabel}
+            axisLine={false}
+            tickLine={false}
+            interval={0}
+            angle={-12}
+            dy={8}
+            height={58}
+          />
+          <YAxis
+            tick={{ fill: AXIS_STROKE, fontSize: 11, fontWeight: 700 }}
+            axisLine={false}
+            tickLine={false}
+            width={42}
+          />
+          <Tooltip
+            content={<TooltipCard formatter={formatter} />}
+            cursor={{ fill: "oklch(1 0 0 / 0.055)" }}
+          />
+          <Bar
+            dataKey="value"
+            radius={[8, 8, 2, 2]}
+            maxBarSize={54}
+            isAnimationActive={!reducedMotion}
+          >
+            {data.map((_, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

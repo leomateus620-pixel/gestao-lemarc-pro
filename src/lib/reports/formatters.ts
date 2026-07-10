@@ -17,16 +17,33 @@ const DATE_TIME = new Intl.DateTimeFormat("pt-BR", {
   timeStyle: "short",
 });
 
+const COMPACT_NUMBER = new Intl.NumberFormat("pt-BR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export const DATA_UNAVAILABLE_LABEL = "Não disponível";
+
 export function formatCurrency(value: number, precise = false) {
-  return (precise ? BRL_PRECISE : BRL).format(Number.isFinite(value) ? value : 0);
+  if (!Number.isFinite(value)) return DATA_UNAVAILABLE_LABEL;
+  return (precise ? BRL_PRECISE : BRL).format(value);
 }
 
 export function formatNumber(value: number) {
+  if (!Number.isFinite(value)) return DATA_UNAVAILABLE_LABEL;
   return NUMBER.format(Math.round(value));
 }
 
+export function formatCompactNumber(value: number) {
+  if (!Number.isFinite(value)) return DATA_UNAVAILABLE_LABEL;
+  return COMPACT_NUMBER.format(value);
+}
+
 export function formatHours(minutes: number | null | undefined) {
-  const m = Math.max(0, Math.round(minutes ?? 0));
+  if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) {
+    return DATA_UNAVAILABLE_LABEL;
+  }
+  const m = Math.max(0, Math.round(minutes));
   const h = Math.floor(m / 60);
   const r = m % 60;
   if (h === 0) return `${r}min`;
@@ -34,7 +51,10 @@ export function formatHours(minutes: number | null | undefined) {
 }
 
 export function formatHoursDecimal(minutes: number | null | undefined) {
-  const v = (minutes ?? 0) / 60;
+  if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) {
+    return DATA_UNAVAILABLE_LABEL;
+  }
+  const v = minutes / 60;
   return NUMBER.format(Math.round(v * 10) / 10);
 }
 

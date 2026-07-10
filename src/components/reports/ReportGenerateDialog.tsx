@@ -36,7 +36,11 @@ import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
 import { buildManagerialReport, describePeriod } from "@/lib/reports/managerial";
 import { downloadManagerialReportPdf } from "@/lib/reports/managerialDownload";
 import { useAuth } from "@/components/app/AuthContext";
-import { reportSearchSchema, searchToFilters } from "@/lib/reports/filters";
+import {
+  createDefaultReportFilters,
+  reportSearchSchema,
+  searchToFilters,
+} from "@/lib/reports/filters";
 
 const STATUS_KEYS = Object.keys(statusLabel) as ServiceOrderStatus[];
 const PRIORITY_KEYS = Object.keys(priorityLabel) as ServicePriority[];
@@ -51,25 +55,6 @@ const QUICK_PERIODS: { key: PeriodKey; label: string; hint: string }[] = [
   { key: "last30", label: "Últimos 30 dias", hint: "Janela móvel" },
   { key: "custom", label: "Personalizado", hint: "Escolha datas" },
 ];
-
-function defaultFilters(): ReportFilters {
-  return {
-    period: "month",
-    from: null,
-    to: null,
-    clientId: null,
-    unitId: null,
-    technicianId: null,
-    status: null,
-    priority: null,
-    serviceType: null,
-    billingStatus: null,
-    onlyWithRate: null,
-    onlyCompleted: null,
-    onlyAwaitingBilling: null,
-    onlyWithObservations: null,
-  };
-}
 
 function buildPrintUrl(f: ReportFilters): string {
   const sp = new URLSearchParams();
@@ -101,7 +86,7 @@ export function ReportGenerateDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="lemarc-report-action h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
+        <Button className="lemarc-report-action-primary h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
           <FileDown size={16} /> Gerar relatório gerencial
         </Button>
       </DialogTrigger>
@@ -124,7 +109,7 @@ export function ReportGenerateDialog() {
 
 function DialogBody({ onClose }: { onClose: () => void }) {
   const initialFilters = useMemo(() => {
-    if (typeof window === "undefined") return defaultFilters();
+    if (typeof window === "undefined") return createDefaultReportFilters();
     const raw = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     return searchToFilters(reportSearchSchema.parse(raw));
   }, []);

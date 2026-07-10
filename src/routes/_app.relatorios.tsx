@@ -1,5 +1,5 @@
 import { Suspense, useMemo } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import {
   AlertTriangle,
@@ -7,21 +7,28 @@ import {
   Clock,
   DollarSign,
   PercentCircle,
+  PlayCircle,
   Receipt,
   RefreshCcw,
   Timer,
   TrendingUp,
   Wrench,
-  PlayCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
-import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
-import { reportSearchSchema, searchToFilters } from "@/lib/reports/filters";
-import { useReportOrdersQuery } from "@/hooks/useReports";
-import { computeOverview, computeSeries } from "@/lib/reports/metrics";
+import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import {
+  countActiveFilters,
+  getPeriodLabel,
+  reportSearchSchema,
+  searchToFilters,
+} from "@/lib/reports/filters";
+import { useReportOrdersQuery } from "@/hooks/useReports";
+import { computeDataQuality, computeOverview, computeSeries } from "@/lib/reports/metrics";
+import { getReportEmptyState } from "@/lib/reports/presentation";
+import {
+  DATA_UNAVAILABLE_LABEL,
   formatCurrency,
   formatHours,
   formatHoursDecimal,
@@ -30,13 +37,9 @@ import {
 } from "@/lib/reports/formatters";
 import { ReportsKpiGrid, ReportsKpiSkeleton, type Kpi } from "@/components/reports/ReportsKpiGrid";
 import { ReportsFilters } from "@/components/reports/ReportsFilters";
-import {
-  HorizontalBarList,
-  ReportChartCard,
-  StatusDonut,
-  TrendArea,
-  VerticalBars,
-} from "@/components/reports/ReportCharts";
+import { ReportChartCard, StatusDonut, TrendComparison } from "@/components/reports/ReportCharts";
+import { ReportBreakdowns } from "@/components/reports/ReportBreakdowns";
+import { ReportDataQuality } from "@/components/reports/ReportDataQuality";
 import { ReportOrdersMobileList, ReportOrdersTable } from "@/components/reports/ReportOrdersTable";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { ClientReportDrawer } from "@/components/reports/ClientReportDrawer";
@@ -59,16 +62,21 @@ function RelatoriosError({ error }: { error: Error }) {
   const router = useRouter();
   return (
     <AppShell title="Relatórios">
-      <EmptyState
-        icon={AlertTriangle}
-        title="Não foi possível carregar os relatórios"
-        text={error.message ?? "Falha inesperada ao buscar dados."}
-        action={
-          <Button onClick={() => router.invalidate()} className="gap-2">
-            <RefreshCcw size={15} /> Tentar novamente
-          </Button>
-        }
-      />
+      <div className="lemarc-report-page pt-2">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Não foi possível carregar os relatórios"
+          text={
+            error.message || "A consulta falhou. Tente novamente sem alterar os filtros atuais."
+          }
+          action={
+            <Button onClick={() => router.invalidate()} className="gap-2">
+              <RefreshCcw size={15} aria-hidden="true" />
+              Tentar novamente
+            </Button>
+          }
+        />
+      </div>
     </AppShell>
   );
 }
@@ -76,51 +84,46 @@ function RelatoriosError({ error }: { error: Error }) {
 function RelatoriosPage() {
   return (
     <AppShell title="Relatórios">
-      <div className="lemarc-report-page space-y-5">
+      <main className="lemarc-report-page space-y-4 pt-2 sm:space-y-5">
         <PageHeader />
         <Suspense fallback={<LoadingState />}>
           <RelatoriosContent />
         </Suspense>
-      </div>
+      </main>
     </AppShell>
   );
 }
 
 function PageHeader() {
   return (
-    <div className="lemarc-report-hero mt-2">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-            Relatórios operacionais
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-black leading-none text-white sm:text-4xl">
-            Cobrança & produtividade
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-300/84">
-            Métricas reais de OS, horas, valor e cobrança calculadas direto da base operacional, com
-            filtros, exportação e visão por cliente.
-          </p>
-        </div>
-        <Suspense fallback={null}>
-          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2 lg:flex lg:items-center">
-            <ReportGenerateDialog />
-            <ClientReportDrawer />
-          </div>
-        </Suspense>
+    <header className="lemarc-report-hero">
+      <div className="min-w-0 max-w-3xl">
+        <p className="lemarc-report-section-kicker text-primary">Relatórios operacionais</p>
+        <h1 className="lemarc-report-page-title mt-1.5 text-white">Cobrança e produtividade</h1>
+        <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-relaxed text-slate-200/86 sm:text-sm">
+          Acompanhe ordens, horas, valores e pendências com dados da operação e filtros por período.
+        </p>
       </div>
-    </div>
+    </header>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Carregando dados do relatório</span>
+      <div
+        className="lemarc-report-card h-36 animate-pulse motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2" aria-hidden="true">
+        <div className="lemarc-report-card h-12 animate-pulse motion-reduce:animate-none" />
+        <div className="lemarc-report-card h-12 animate-pulse motion-reduce:animate-none" />
+      </div>
       <ReportsKpiSkeleton />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="lemarc-report-card h-[268px] animate-pulse rounded-2xl" />
-        ))}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3" aria-hidden="true">
+        <div className="lemarc-report-card h-[300px] animate-pulse motion-reduce:animate-none lg:col-span-2" />
+        <div className="lemarc-report-card h-[300px] animate-pulse motion-reduce:animate-none" />
       </div>
     </div>
   );
@@ -128,58 +131,81 @@ function LoadingState() {
 
 function RelatoriosContent() {
   const search = Route.useSearch();
+  const navigate = useNavigate();
   const filters = useMemo(() => searchToFilters(search), [search]);
   const { data: rows } = useReportOrdersQuery(filters);
 
   const overview = useMemo(() => computeOverview(rows), [rows]);
   const series = useMemo(() => computeSeries(rows), [rows]);
-  const hasReportedMinutes = rows.some((r) => (r.worked_minutes ?? 0) > 0);
-  const hasDerivedMinutes = rows.some((r) => r.worked_minutes_source === "derived");
-  const hasEstimatedValues = rows.some((r) => r.estimated_value > 0);
+  const quality = useMemo(() => computeDataQuality(rows), [rows]);
+  const activeFilters = countActiveFilters(filters);
+  const emptyState = getReportEmptyState(activeFilters);
+  const hasReportedMinutes = rows.some((row) => (row.worked_minutes ?? 0) > 0);
+  const hasDerivedMinutes = quality.derivedWorkedMinutes > 0;
+  const hasEstimatedValues = rows.some((row) => row.estimated_value > 0);
+
+  const hoursHint = hasReportedMinutes
+    ? hasDerivedMinutes
+      ? "Total registrado nas OS; alguns tempos foram calculados entre início e conclusão."
+      : "Total de horas registradas nas ordens de serviço."
+    : hasDerivedMinutes
+      ? "Calculado entre o início e a conclusão quando não houve lançamento manual."
+      : "Nenhuma hora foi registrada nas ordens do período.";
 
   const kpis: Kpi[] = [
     {
       label: "OS no período",
       value: formatNumber(overview.totalOrders),
-      hint: `${overview.finishedOrders} concluídas · ${overview.runningOrders} em execução`,
+      hint: `${formatNumber(overview.finishedOrders)} concluídas · ${formatNumber(overview.runningOrders)} em campo`,
       icon: Wrench,
       tone: "primary",
+      featured: true,
+      wideOnMobile: true,
     },
     {
       label: "Horas trabalhadas",
-      value: `${formatHoursDecimal(overview.totalHours * 60)}h`,
-      hint: hasReportedMinutes
-        ? "Soma de worked_minutes informado nas OS."
-        : hasDerivedMinutes
-          ? "Derivado de start → finish (worked_minutes ausente)."
-          : "Sem horas trabalhadas registradas no período.",
+      value:
+        hasReportedMinutes || hasDerivedMinutes
+          ? `${formatHoursDecimal(overview.totalHours * 60)}h`
+          : DATA_UNAVAILABLE_LABEL,
+      hint: hoursHint,
       icon: Clock,
+      unavailable: !hasReportedMinutes && !hasDerivedMinutes,
+      wideOnMobile: true,
     },
     {
       label: "Valor estimado",
-      value: formatCurrency(overview.estimatedValue),
-      hint: overview.ordersMissingRate
-        ? `${overview.ordersMissingRate} OS sem valor/hora`
-        : hasEstimatedValues
-          ? "Pré-cobrança baseada em hour_rate"
-          : "Configure hour_rate nas OS para ver valores",
+      value: hasEstimatedValues ? formatCurrency(overview.estimatedValue) : DATA_UNAVAILABLE_LABEL,
+      hint:
+        overview.ordersMissingRate > 0
+          ? `${overview.ordersMissingRate} OS com horas, mas sem valor/hora cadastrado.`
+          : hasEstimatedValues
+            ? "Estimativa calculada com as horas e o valor/hora cadastrados."
+            : "Não há horas e valor/hora suficientes para estimar o período.",
       icon: DollarSign,
       tone: "success",
       alert: overview.ordersMissingRate > 0 || (!hasEstimatedValues && rows.length > 0),
+      unavailable: !hasEstimatedValues,
+      wideOnMobile: true,
     },
     {
-      label: "Tempo médio",
-      value: overview.avgLeadTimeMinutes !== null ? formatHours(overview.avgLeadTimeMinutes) : "—",
+      label: "Tempo médio de conclusão",
+      value:
+        overview.avgLeadTimeMinutes !== null
+          ? formatHours(overview.avgLeadTimeMinutes)
+          : DATA_UNAVAILABLE_LABEL,
       hint:
         overview.avgLeadTimeMinutes !== null
-          ? "Abertura até fechamento"
-          : "Sem OS fechada no período",
+          ? "Da abertura ao fechamento das ordens concluídas."
+          : "Não há OS fechada suficiente para este cálculo.",
       icon: Timer,
+      unavailable: overview.avgLeadTimeMinutes === null,
+      wideOnMobile: true,
     },
     {
       label: "Aguardando cobrança",
       value: formatNumber(overview.pendingBilling),
-      hint: "OS prontas para conferência",
+      hint: "Ordens prontas para conferência financeira.",
       icon: Receipt,
       tone: "warning",
       alert: overview.pendingBilling > 0,
@@ -187,111 +213,112 @@ function RelatoriosContent() {
     {
       label: "Taxa de conclusão",
       value: formatPercent(overview.completionRate),
-      hint: `${overview.finishedOrders} de ${overview.totalOrders} OS`,
+      hint: `${formatNumber(overview.finishedOrders)} de ${formatNumber(overview.totalOrders)} ordens concluídas.`,
       icon: PercentCircle,
       tone: "success",
     },
     {
-      label: "Ticket médio",
-      value: overview.avgTicket > 0 ? formatCurrency(overview.avgTicket) : "—",
-      hint: overview.avgTicket > 0 ? "Valor médio por OS concluída" : "Sem OS concluída com valor",
+      label: "Ticket médio estimado",
+      value: overview.avgTicket > 0 ? formatCurrency(overview.avgTicket) : DATA_UNAVAILABLE_LABEL,
+      hint:
+        overview.avgTicket > 0
+          ? "Valor estimado médio por OS concluída."
+          : "Não há OS concluída com valor estimado.",
       icon: TrendingUp,
+      unavailable: overview.avgTicket <= 0,
     },
     {
-      label: "Em execução",
+      label: "OS em campo",
       value: formatNumber(overview.runningOrders),
-      hint: "OS abertas no campo agora",
+      hint: "Ordens despachadas, em trânsito ou em execução.",
       icon: PlayCircle,
       tone: "primary",
     },
   ];
 
-  const kpiTextForPrint = kpis.slice(0, 4).map((k) => ({ label: k.label, value: k.value }));
+  const kpiTextForPrint = kpis.slice(0, 4).map((kpi) => ({
+    label: kpi.label,
+    value: kpi.value,
+  }));
+
+  const showPendingBilling = () =>
+    navigate({
+      to: "/relatorios",
+      search: ((previous: Record<string, unknown>) => ({
+        ...previous,
+        onlyAwaitingBilling: true,
+      })) as never,
+      replace: true,
+    });
 
   return (
-    <div className="space-y-5">
-      <div className="lemarc-report-card p-3 sm:p-3.5">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <ReportsFilters filters={filters} routePath="/relatorios" />
-          <ReportExportActions
-            rows={rows}
-            title="Relatório operacional Lemarc"
-            subtitle={`Período: ${filters.period} · ${rows.length} OS`}
-            kpis={kpiTextForPrint}
-          />
-        </div>
+    <div className="space-y-5 sm:space-y-6">
+      <div className="lemarc-report-card p-4 sm:p-5">
+        <ReportsFilters filters={filters} routePath="/relatorios" />
       </div>
 
+      <section aria-labelledby="report-actions-title" className="lemarc-report-command-panel">
+        <div className="min-w-0">
+          <p className="lemarc-report-section-kicker">Ações principais</p>
+          <h2 id="report-actions-title" className="text-sm font-black text-white">
+            Gere o documento adequado à análise
+          </h2>
+          <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-300/82">
+            O relatório gerencial é a ação principal; a visão por cliente permanece como
+            alternativa.
+          </p>
+        </div>
+        <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 lg:w-auto">
+          <ReportGenerateDialog />
+          <ClientReportDrawer />
+        </div>
+      </section>
+
       {rows.length === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title="Sem OS no período"
-          text="Ajuste o período ou limpe os filtros para visualizar dados operacionais."
-        />
+        <EmptyState icon={Receipt} title={emptyState.title} text={emptyState.description} />
       ) : (
         <>
           <ReportsKpiGrid kpis={kpis} />
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <ReportChartCard
-              title="Evolução mensal"
-              subtitle="OS abertas por mês"
-              className="lg:col-span-2"
-            >
-              <TrendArea data={series.trend} metric="orders" />
-            </ReportChartCard>
-            <ReportChartCard title="OS por status" subtitle="Distribuição operacional">
-              <StatusDonut data={series.byStatus} />
-            </ReportChartCard>
-          </div>
+          <section aria-labelledby="report-comparison-title" className="space-y-3">
+            <div className="lemarc-report-section-heading">
+              <div className="min-w-0">
+                <p className="lemarc-report-section-kicker">Comparativo</p>
+                <h2 id="report-comparison-title" className="lemarc-report-section-title">
+                  Volume e situação das ordens
+                </h2>
+              </div>
+              <span className="text-[11px] font-bold text-slate-700">
+                {formatNumber(rows.length)} registro{rows.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              <ReportChartCard
+                title="Abertas e concluídas"
+                subtitle="Agrupadas pelo mês de abertura dentro do período filtrado"
+                className="lg:col-span-2"
+              >
+                <TrendComparison data={series.trend} />
+              </ReportChartCard>
+              <ReportChartCard title="OS por status" subtitle="Distribuição operacional atual">
+                <StatusDonut data={series.byStatus} />
+              </ReportChartCard>
+            </div>
+          </section>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <ReportChartCard
-              title="Horas por técnico"
-              subtitle="Top 8 · contabiliza a duração total da OS para cada técnico vinculado"
-            >
-              <HorizontalBarList
-                data={series.byTechnicianHours}
-                valueFormatter={(v) => `${formatHoursDecimal(v * 60)}h`}
-                emptyLabel="Sem horas informadas nas OS do período."
-              />
-            </ReportChartCard>
-            <ReportChartCard title="OS por cliente" subtitle="Top 8">
-              <HorizontalBarList data={series.byClient} />
-            </ReportChartCard>
-            <ReportChartCard title="Valor estimado por cliente" subtitle="Pré-cobrança · top 8">
-              <HorizontalBarList
-                data={series.byClientValue}
-                valueFormatter={(v) => formatCurrency(v)}
-                emptyLabel="Configure hour_rate nas OS para ver valores."
-              />
-            </ReportChartCard>
-            <ReportChartCard title="Tipos de serviço" subtitle="Recorrência">
-              <VerticalBars data={series.byServiceType} />
-            </ReportChartCard>
-            <ReportChartCard title="OS por prioridade">
-              <HorizontalBarList data={series.byPriority} />
-            </ReportChartCard>
-            <ReportChartCard
-              title="Tempo médio por técnico"
-              subtitle="Abertura → fechamento (menor é melhor)"
-            >
-              <HorizontalBarList
-                data={series.avgLeadByTechnician}
-                valueFormatter={(v) => formatHours(v)}
-                emptyLabel="Sem fechamentos suficientes para calcular tempo médio."
-              />
-            </ReportChartCard>
-          </div>
+          <ReportBreakdowns series={series} />
 
-          <section className="space-y-3 pb-8">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <h2 className="font-display text-sm font-black uppercase tracking-[0.12em] text-slate-900">
-                <CheckCircle2 className="mr-1.5 inline-block text-primary" size={15} />
-                Ordens de serviço no período
-              </h2>
-              <span className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-600">
-                {rows.length} registros
+          <section id="report-orders" aria-labelledby="report-orders-title" className="space-y-3">
+            <div className="lemarc-report-section-heading">
+              <div className="min-w-0">
+                <p className="lemarc-report-section-kicker">Registros operacionais</p>
+                <h2 id="report-orders-title" className="lemarc-report-section-title">
+                  Ordens de serviço no período
+                </h2>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+                <CheckCircle2 size={14} className="text-primary" aria-hidden="true" />
+                {formatNumber(rows.length)} registro{rows.length === 1 ? "" : "s"}
               </span>
             </div>
             <div className="hidden lg:block">
@@ -300,6 +327,26 @@ function RelatoriosContent() {
             <div className="lg:hidden">
               <ReportOrdersMobileList rows={rows} />
             </div>
+          </section>
+
+          <ReportDataQuality quality={quality} onShowPendingBilling={showPendingBilling} />
+
+          <section aria-labelledby="report-export-title" className="lemarc-report-export-panel">
+            <div className="min-w-0">
+              <p className="lemarc-report-section-kicker">Exportação</p>
+              <h2 id="report-export-title" className="text-sm font-black text-white">
+                Leve os resultados para conferência
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-300/82">
+                As exportações respeitam o período e os filtros visíveis acima.
+              </p>
+            </div>
+            <ReportExportActions
+              rows={rows}
+              title="Relatório operacional Lemarc"
+              subtitle={`Período: ${getPeriodLabel(filters.period)} · ${formatNumber(rows.length)} OS`}
+              kpis={kpiTextForPrint}
+            />
           </section>
         </>
       )}

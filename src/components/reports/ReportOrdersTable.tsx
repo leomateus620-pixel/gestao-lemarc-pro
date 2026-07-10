@@ -4,10 +4,16 @@ import { CheckCircle2, FileDown, MoreVertical, Send, XCircle } from "lucide-reac
 import type { ReportOrderRow, BillingStatus } from "@/types/reports";
 import { StatusBadge, type OrderStatus } from "@/components/app/StatusBadge";
 import { BillingStatusBadge } from "./BillingStatusBadge";
-import { formatCurrency, formatDate, formatHours } from "@/lib/reports/formatters";
+import {
+  DATA_UNAVAILABLE_LABEL,
+  formatCurrency,
+  formatDate,
+  formatHours,
+} from "@/lib/reports/formatters";
 import {
   priorityLabel,
   serviceTypeLabel,
+  statusLabel,
   type ServiceOrderStatus,
   type ServicePriority,
 } from "@/types/serviceOrder";
@@ -70,13 +76,15 @@ function technicianCompact(r: ReportOrderRow): string {
 }
 
 function timeLabel(r: ReportOrderRow) {
-  return r.worked_minutes === null ? "Sem horas" : formatHours(r.worked_minutes);
+  return r.worked_minutes_effective > 0 ? formatHours(r.worked_minutes_effective) : "Não informado";
 }
 
 function valueLabel(r: ReportOrderRow) {
   if (r.estimated_value > 0) return formatCurrency(r.estimated_value);
-  if (r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) <= 0) return "Sem hour_rate";
-  return "—";
+  if (r.worked_minutes_effective > 0 && (r.hour_rate ?? 0) <= 0) {
+    return "Valor/hora ausente";
+  }
+  return DATA_UNAVAILABLE_LABEL;
 }
 
 function ReportPriorityBadge({ priority }: { priority: ServicePriority | null }) {
@@ -109,7 +117,7 @@ function BillingActions({ id, current }: { id: string; current: BillingStatus })
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="grid size-9 place-items-center rounded-lg border border-white/0 text-slate-300 transition hover:border-white/10 hover:bg-white/10 hover:text-white"
+          className="grid size-10 place-items-center rounded-lg border border-white/0 text-slate-300 transition hover:border-white/10 hover:bg-white/10 hover:text-white"
           aria-label="Ações de cobrança"
         >
           <MoreVertical size={16} />
@@ -233,7 +241,7 @@ export function ReportOrdersTable({ rows }: { rows: ReportOrderRow[] }) {
                         className="max-w-[136px] whitespace-normal text-center leading-tight"
                       />
                     ) : (
-                      <Muted>{r.status}</Muted>
+                      <Muted>{statusLabel[r.status]}</Muted>
                     )}
                   </Td>
                   <Td>
@@ -250,7 +258,7 @@ export function ReportOrdersTable({ rows }: { rows: ReportOrderRow[] }) {
                     {timeLabel(r)}
                   </Td>
                   <Td className="text-right font-bold tabular-nums text-slate-100">
-                    {valueLabel(r) === "—" ? <Muted>—</Muted> : valueLabel(r)}
+                    {r.estimated_value > 0 ? valueLabel(r) : <Muted>{valueLabel(r)}</Muted>}
                   </Td>
                   <Td>
                     <BillingStatusBadge status={r.billing_status} />
@@ -327,7 +335,7 @@ export function ReportOrdersMobileList({ rows }: { rows: ReportOrderRow[] }) {
                 }
                 wide
               />
-              <MobileFact label="Técnicos" value={technicianCompact(r)} />
+              <MobileFact label="Técnicos" value={technicianCompact(r)} wide />
               <MobileFact
                 label="Prioridade"
                 value={<ReportPriorityBadge priority={r.priority} />}
@@ -342,13 +350,18 @@ export function ReportOrdersMobileList({ rows }: { rows: ReportOrderRow[] }) {
               <button
                 type="button"
                 onClick={() => setExpanded(isOpen ? null : r.id)}
-                className="rounded-full border border-primary/25 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-primary transition hover:bg-primary/10"
+                className="h-10 rounded-full border border-primary/25 px-3 text-[10px] font-black uppercase tracking-[0.08em] text-primary transition hover:bg-primary/10"
+                aria-expanded={isOpen}
+                aria-controls={`report-order-details-${r.id}`}
               >
                 {isOpen ? "Menos" : "Detalhes"}
               </button>
             </div>
             {isOpen && (
-              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
+              <div
+                id={`report-order-details-${r.id}`}
+                className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-3 text-[11px]"
+              >
                 <MobileFact
                   label="Unidade"
                   value={
@@ -397,7 +410,7 @@ function MobileFact({
       </div>
       <div
         className={cn(
-          "mt-1 min-w-0 truncate font-semibold text-slate-100",
+          "mt-1 min-w-0 break-words font-semibold leading-snug text-slate-100",
           strong && "font-display font-black tabular-nums text-white",
         )}
         title={typeof value === "string" ? value : undefined}

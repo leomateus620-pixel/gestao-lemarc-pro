@@ -96,11 +96,21 @@ export type ReportOverview = {
   ordersMissingRate: number;
 };
 
+export type ReportDataQuality = {
+  withoutUnit: number;
+  withoutTechnician: number;
+  withoutWorkedMinutes: number;
+  withoutHourlyRate: number;
+  pendingBilling: number;
+  derivedWorkedMinutes: number;
+};
+
 export type GroupBucket = { key: string; label: string; value: number };
 export type TrendPoint = {
   month: string;
   label: string;
   orders: number;
+  completed: number;
   hours: number;
   value: number;
 };

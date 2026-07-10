@@ -63,6 +63,29 @@ export const reportSearchSchema = z.object({
 
 export type ReportSearch = z.infer<typeof reportSearchSchema>;
 
+export function createDefaultReportFilters(clientId: string | null = null): ReportFilters {
+  return {
+    period: "month",
+    from: null,
+    to: null,
+    clientId,
+    unitId: null,
+    technicianId: null,
+    status: null,
+    priority: null,
+    serviceType: null,
+    billingStatus: null,
+    onlyWithRate: null,
+    onlyCompleted: null,
+    onlyAwaitingBilling: null,
+    onlyWithObservations: null,
+  };
+}
+
+export function resetReportFilters(filters: ReportFilters, preserveClient = false): ReportFilters {
+  return createDefaultReportFilters(preserveClient ? (filters.clientId ?? null) : null);
+}
+
 export function searchToFilters(search: ReportSearch): ReportFilters {
   return {
     period: search.period,
@@ -92,6 +115,10 @@ export const PERIOD_OPTIONS: { key: ReportFilters["period"]; label: string }[] =
   { key: "all", label: "Tudo" },
   { key: "custom", label: "Personalizado" },
 ];
+
+export function getPeriodLabel(period: ReportFilters["period"]): string {
+  return PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? "Período selecionado";
+}
 
 function parseLocalDate(s: string | null | undefined): Date | null {
   if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
