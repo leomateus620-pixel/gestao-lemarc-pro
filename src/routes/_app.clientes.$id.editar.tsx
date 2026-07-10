@@ -3,7 +3,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Building2, FileText, Loader2, MapPin, Phone, Route as RouteIcon, Save } from "lucide-react";
+import {
+  Building2,
+  FileText,
+  Loader2,
+  MapPin,
+  Phone,
+  Route as RouteIcon,
+  Save,
+} from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
@@ -102,14 +110,12 @@ function Edit() {
   });
 
   return (
-    <div className="space-y-5 pb-28 sm:pb-32">
+    <div className="space-y-5 pb-28 md:pb-0">
       <GlassCard className="lemarc-wizard-card space-y-4 p-4 sm:space-y-5 sm:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-              Cadastro do cliente
-            </p>
-            <h1 className="mt-1 font-display text-2xl font-black leading-tight text-white sm:text-3xl">
+            <p className="lemarc-context-label">Cadastro do cliente</p>
+            <h1 className="mt-1 font-display text-2xl font-bold leading-tight text-white sm:text-3xl">
               Editar cliente
             </h1>
             <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-300">
@@ -120,7 +126,7 @@ function Edit() {
               <button
                 type="button"
                 onClick={scrollToUnits}
-                className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/12 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em] text-primary transition hover:bg-primary/20"
+                className="lemarc-pressable mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-primary/35 bg-primary/10 px-3 text-xs font-bold text-primary hover:bg-primary/15"
               >
                 <RouteIcon size={13} /> Configurar distância da base
               </button>
@@ -283,7 +289,7 @@ function Edit() {
           disabled={!valid || mut.isPending}
           onClick={() => mut.mutate()}
           className={cn(
-            "lemarc-pressable flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 font-display text-sm font-black uppercase tracking-wider text-primary-foreground disabled:opacity-40",
+            "lemarc-primary-action lemarc-pressable flex h-14 flex-1 items-center justify-center gap-2 rounded-xl px-5 font-display text-sm font-bold disabled:opacity-40",
             valid && !mut.isPending && "lemarc-orange-glow",
           )}
         >
@@ -297,7 +303,7 @@ function Edit() {
 
 function Label({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.08em]">
+    <label className="lemarc-form-label text-xs font-semibold">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>

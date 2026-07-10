@@ -4,6 +4,10 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { Activity, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import {
+  OperationalFilterBar,
+  OperationalPageHeader,
+} from "@/components/app/OperationalListChrome";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { EmptyState } from "@/components/app/EmptyState";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
@@ -168,165 +172,150 @@ function OrdensList() {
       }),
     });
 
-  const hasActiveFilters =
-    status !== "todas" ||
-    priority !== "todas" ||
-    client !== "all" ||
-    technician !== "all" ||
-    period !== "all" ||
-    filtro !== "none" ||
-    q.trim() !== "";
+  const activeFilterCount = [
+    status !== "todas",
+    priority !== "todas",
+    client !== "all",
+    technician !== "all",
+    period !== "all",
+    filtro !== "none",
+    sort !== "recentes",
+  ].filter(Boolean).length;
+  const resetFilters = () =>
+    navigate({
+      search: {
+        status: "todas",
+        priority: "todas",
+        client: "all",
+        technician: "all",
+        sort: "recentes",
+        period: "all",
+        from: "",
+        to: "",
+        filtro: "none",
+        q: "",
+      },
+    });
 
   return (
     <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
-      <section className="lemarc-wizard-card p-3 sm:p-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:items-end">
-          <div className="min-w-0">
-            <p className="lemarc-technical-label">Operação Lemarc</p>
-            <h1 className="mt-0.5 font-display text-lg font-black leading-tight text-white sm:text-2xl">
-              Ordens de Serviço
-            </h1>
-            <p className="mt-0.5 max-w-2xl text-[12px] font-medium leading-snug text-slate-300 sm:text-[13px]">
-              Acompanhamento das OS abertas, em campo, finalizadas e em revisão.
-            </p>
-          </div>
+      <OperationalPageHeader
+        eyebrow="Operação Lemarc"
+        title="Ordens de serviço"
+        description="Acompanhe abertura, atendimento, revisão e cobrança sem perder o contexto operacional."
+        action={
           <Link
             to="/ordens/nova"
-            className="lemarc-primary-action lemarc-pressable inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 font-display text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:px-3.5 sm:text-[11px]"
+            className="lemarc-primary-action lemarc-pressable inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 font-display text-xs font-bold sm:px-4"
           >
-            <Plus size={15} />
+            <Plus size={16} />
             <span className="hidden sm:inline">Nova OS</span>
             <span className="sm:hidden">Nova</span>
           </Link>
-        </div>
-
-        <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll">
-          <Kpi label="Total" value={kpis.total} />
-          <Kpi label="Abertas" value={kpis.open} />
-          <Kpi label="Em campo" value={kpis.inField} />
-          <Kpi label="Em revisão" value={kpis.review} />
-          <Kpi label="Finalizadas" value={kpis.done} />
-          <Kpi
-            label="Horas apuradas"
-            value={formatHHmm(kpis.realMinutes)}
-            hint={
+        }
+        metrics={[
+          { label: "Total", value: kpis.total },
+          { label: "Abertas", value: kpis.open },
+          { label: "Em campo", value: kpis.inField },
+          { label: "Em revisão", value: kpis.review },
+          { label: "Finalizadas", value: kpis.done },
+          {
+            label: "Horas",
+            value: formatHHmm(kpis.realMinutes),
+            evidence: "Apurado",
+            detail:
               kpis.estimatedMinutes > 0
-                ? `Estimado: ${formatHHmm(kpis.estimatedMinutes)}`
-                : undefined
-            }
-          />
-          <Kpi
-            label="Valor apurado"
-            value={formatBRL(kpis.realValueCents)}
-            hint={
+                ? `${formatHHmm(kpis.estimatedMinutes)} estimado`
+                : "Sem estimativa pendente",
+          },
+          {
+            label: "Valor",
+            value: formatBRL(kpis.realValueCents),
+            evidence: "Apurado",
+            detail:
               kpis.estimatedValueCents > 0
-                ? `Estimado: ${formatBRL(kpis.estimatedValueCents)}`
-                : undefined
-            }
-          />
-        </div>
-      </section>
+                ? `${formatBRL(kpis.estimatedValueCents)} estimado`
+                : "Sem estimativa pendente",
+          },
+        ]}
+      />
 
-      <section className="lemarc-horizontal-row flex-col gap-2 p-2.5 lg:grid lg:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.6fr)] lg:items-center lg:gap-3 xl:grid-cols-[minmax(20rem,0.75fr)_minmax(0,1.8fr)]">
-        <div className="relative min-w-0 flex-1 lg:flex-none">
-          <Search
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <Input
-            value={q}
-            onChange={(event) => setSearch({ q: event.target.value })}
-            placeholder="Buscar OS..."
-            className="lemarc-form-control h-10 rounded-full pl-9"
-          />
-        </div>
-        <div className="flex w-full gap-1.5 overflow-x-auto pb-1 lemarc-smart-scroll lg:flex-wrap lg:justify-end lg:overflow-visible lg:pb-0">
-          <MetricPeriodFilter
-            value={period as Period}
-            range={periodRange}
-            onChange={setPeriodWithRange}
-            label="Período"
-          />
-          <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
-            <option value="todas">Status</option>
-            <option value="pendente">Pendentes</option>
-            <option value="andamento">Em campo</option>
-            <option value="revisao">Em revisão</option>
-            <option value="concluida">Finalizadas</option>
-            <option value="cancelada">Canceladas</option>
-          </Select>
-          <Select
-            value={priority}
-            onChange={(value) => setSearch({ priority: value as PriorityFilter })}
-          >
-            <option value="todas">Prioridade</option>
-            <option value="baixa">Baixa</option>
-            <option value="media">Média</option>
-            <option value="alta">Alta</option>
-            <option value="urgente">Urgente</option>
-          </Select>
-          <Select value={client} onChange={(value) => setSearch({ client: value })}>
-            <option value="all">Cliente</option>
-            {options.clients.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
-          <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
-            <option value="all">Técnico</option>
-            {options.technicians.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
-          <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
-            <option value="recentes">Mais recentes</option>
-            <option value="status">Status</option>
-            <option value="prioridade">Prioridade</option>
-            <option value="cliente">Cliente</option>
-            <option value="previsao">Previsão de início</option>
-            <option value="maior-tempo">Maior tempo</option>
-            <option value="maior-valor">Maior valor</option>
-          </Select>
-        </div>
-      </section>
+      <OperationalFilterBar
+        activeCount={activeFilterCount}
+        resultLabel={`${filtered.length} ${filtered.length === 1 ? "ordem" : "ordens"} na lista`}
+        onReset={resetFilters}
+        search={
+          <div className="relative min-w-0">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <Input
+              value={q}
+              onChange={(event) => setSearch({ q: event.target.value })}
+              placeholder="Buscar OS..."
+              className="lemarc-form-control h-11 rounded-xl pl-9"
+            />
+          </div>
+        }
+      >
+        <MetricPeriodFilter
+          value={period as Period}
+          range={periodRange}
+          onChange={setPeriodWithRange}
+          label="Período"
+          className="lemarc-period-filter"
+        />
+        <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
+          <option value="todas">Status</option>
+          <option value="pendente">Pendentes</option>
+          <option value="andamento">Em campo</option>
+          <option value="revisao">Em revisão</option>
+          <option value="concluida">Finalizadas</option>
+          <option value="cancelada">Canceladas</option>
+        </Select>
+        <Select
+          value={priority}
+          onChange={(value) => setSearch({ priority: value as PriorityFilter })}
+        >
+          <option value="todas">Prioridade</option>
+          <option value="baixa">Baixa</option>
+          <option value="media">Média</option>
+          <option value="alta">Alta</option>
+          <option value="urgente">Urgente</option>
+        </Select>
+        <Select value={client} onChange={(value) => setSearch({ client: value })}>
+          <option value="all">Cliente</option>
+          {options.clients.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </Select>
+        <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
+          <option value="all">Técnico</option>
+          {options.technicians.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </Select>
+        <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
+          <option value="recentes">Mais recentes</option>
+          <option value="status">Status</option>
+          <option value="prioridade">Prioridade</option>
+          <option value="cliente">Cliente</option>
+          <option value="previsao">Previsão de início</option>
+          <option value="maior-tempo">Maior tempo</option>
+          <option value="maior-valor">Maior valor</option>
+        </Select>
+      </OperationalFilterBar>
 
-      {(hasActiveFilters || filtro !== "none") && (
+      {filtro !== "none" && (
         <section className="flex flex-wrap items-center gap-2 px-1">
-          <p className="text-[11px] font-bold text-slate-400">
-            {filtered.length} {filtered.length === 1 ? "ordem" : "ordens"} na lista
-          </p>
-          {filtro !== "none" && (
-            <span className="rounded-full border border-primary/40 bg-primary/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-primary">
-              {filtro === "alertas" ? "Alertas operacionais" : "OS incompletas"}
-            </span>
-          )}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={() =>
-                navigate({
-                  search: {
-                    status: "todas",
-                    priority: "todas",
-                    client: "all",
-                    technician: "all",
-                    sort: "recentes",
-                    period: "all",
-                    from: "",
-                    to: "",
-                    filtro: "none",
-                    q: "",
-                  },
-                })
-              }
-              className="lemarc-pressable rounded-full border border-white/[0.12] bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/40 hover:bg-primary/12"
-            >
-              Limpar filtros
-            </button>
-          )}
+          <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-[11px] font-bold text-amber-100">
+            {filtro === "alertas" ? "Alertas operacionais" : "OS incompletas"}
+          </span>
         </section>
       )}
 
@@ -542,18 +531,6 @@ function buildFilterOptions(orders: ServiceOrder[]) {
   return { clients: clientOptions, technicians: technicianOptions };
 }
 
-function Kpi({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
-  return (
-    <div className="lemarc-compact-metric min-w-[6.75rem] !px-2.5 !py-1.5 sm:min-w-[7.5rem]">
-      <p className="lemarc-technical-label">{label}</p>
-      <p className="mt-0.5 font-display text-sm font-black text-white tabular-nums sm:text-base">
-        {value}
-      </p>
-      {hint && <p className="mt-0.5 text-[9px] font-bold text-amber-200/85 tabular-nums">{hint}</p>}
-    </div>
-  );
-}
-
 function Select({
   value,
   onChange,
@@ -567,7 +544,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="lemarc-form-control h-10 min-w-[8.75rem] rounded-full px-3 text-[11px] font-bold text-white lg:min-w-[9.25rem] xl:min-w-[9.75rem]"
+      className="lemarc-filter-control lemarc-form-control h-10 rounded-xl px-3 text-[11px] font-bold text-white"
     >
       {children}
     </select>

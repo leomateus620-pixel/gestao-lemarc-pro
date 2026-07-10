@@ -127,30 +127,30 @@ export function ClientWizard() {
   }, [step]);
 
   return (
-    <div className="mt-2 space-y-4 pb-28 sm:space-y-5 sm:pb-32">
+    <div className="mt-2 space-y-4 pb-28 sm:space-y-5 md:pb-0">
       <Stepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div ref={flowRef} className="overflow-x-clip">
-        <div
-          className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-          style={{
-            width: `${STEPS.length * 100}%`,
-            transform: `translateX(-${(step * 100) / STEPS.length}%)`,
-          }}
-        >
-          <Slot index={0} active={step === 0}>
+      <div ref={flowRef} className="min-w-0">
+        {step === 0 && (
+          <div data-client-step-panel="0" className="lemarc-step-panel min-w-0 pb-2">
             <CompanyStep draft={draft} set={set} cnpjOk={cnpjOk} />
-          </Slot>
-          <Slot index={1} active={step === 1}>
+          </div>
+        )}
+        {step === 1 && (
+          <div data-client-step-panel="1" className="lemarc-step-panel min-w-0 pb-2">
             <LocationStep draft={draft} set={set} />
-          </Slot>
-          <Slot index={2} active={step === 2}>
+          </div>
+        )}
+        {step === 2 && (
+          <div data-client-step-panel="2" className="lemarc-step-panel min-w-0 pb-2">
             <UnitsStep draft={draft} set={set} />
-          </Slot>
-          <Slot index={3} active={step === 3}>
+          </div>
+        )}
+        {step === 3 && (
+          <div data-client-step-panel="3" className="lemarc-step-panel min-w-0 pb-2">
             <ReviewStep draft={draft} />
-          </Slot>
-        </div>
+          </div>
+        )}
       </div>
 
       {mutation.isError && (
@@ -177,7 +177,7 @@ export function ClientWizard() {
             else setStep((s) => Math.min(STEPS.length - 1, s + 1));
           }}
           className={cn(
-            "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-display text-sm font-black uppercase tracking-wider transition disabled:opacity-55 sm:h-14",
+            "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 font-display text-sm font-bold disabled:opacity-55 sm:h-14",
             canNext && !mutation.isPending && "lemarc-orange-glow hover:-translate-y-0.5",
           )}
         >
@@ -191,27 +191,6 @@ export function ClientWizard() {
           {mutation.isPending ? "Salvando..." : isLast ? "Cadastrar empresa" : "Continuar"}
         </button>
       </FormFlowActions>
-    </div>
-  );
-}
-
-function Slot({
-  children,
-  index,
-  active,
-}: {
-  children: ReactNode;
-  index: number;
-  active: boolean;
-}) {
-  return (
-    <div
-      data-client-step-panel={index}
-      aria-hidden={!active}
-      className="px-0 pb-2 sm:px-1"
-      style={{ flex: `0 0 ${100 / STEPS.length}%`, width: `${100 / STEPS.length}%` }}
-    >
-      {children}
     </div>
   );
 }
@@ -261,7 +240,7 @@ function Stepper({
               </span>
               <span
                 className={cn(
-                  "hidden min-w-0 truncate text-[10px] font-black uppercase tracking-[0.1em] sm:block lg:text-[11px]",
+                  "hidden min-w-0 truncate text-[11px] font-bold sm:block lg:text-xs",
                   current ? "text-white" : done ? "text-emerald-50" : "text-slate-300",
                 )}
               >
@@ -271,7 +250,7 @@ function Stepper({
           );
         })}
       </div>
-      <p className="mt-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-primary sm:hidden">
+      <p className="mt-3 text-center text-xs font-bold text-primary sm:hidden">
         Etapa {step + 1} de {STEPS.length} · {STEPS[step]}
       </p>
     </GlassCard>
@@ -289,8 +268,8 @@ function StepHeader({
 }) {
   return (
     <div className="max-w-3xl">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">{eyebrow}</p>
-      <h2 className="mt-1 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+      <p className="lemarc-context-label">{eyebrow}</p>
+      <h2 className="mt-1 font-display text-xl font-bold leading-tight text-white sm:text-2xl">
         {title}
       </h2>
       {description && <p className="lemarc-form-help mt-1.5 text-sm font-medium">{description}</p>}
@@ -300,7 +279,7 @@ function StepHeader({
 
 function Label({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.08em]">
+    <label className="lemarc-form-label text-xs font-semibold">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>

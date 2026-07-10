@@ -66,7 +66,9 @@ export function AppShell({
                   </Link>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="hidden truncate font-display text-[15px] font-black uppercase tracking-wide text-white drop-shadow-sm md:block">
+                  <div
+                    className={`${back ? "block" : "hidden md:block"} truncate font-display text-sm font-bold text-white drop-shadow-sm sm:text-[15px]`}
+                  >
                     {isHome ? "Gestão Lemarc" : title}
                   </div>
                   <div className="hidden truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300 lg:block">

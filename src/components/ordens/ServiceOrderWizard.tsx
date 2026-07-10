@@ -29,10 +29,7 @@ import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
 import { isValidCNPJ, maskCNPJ, onlyDigits } from "@/lib/cnpj";
-import {
-  createServiceOrder,
-  createTechnician,
-} from "@/lib/api/serviceOrders.functions";
+import { createServiceOrder, createTechnician } from "@/lib/api/serviceOrders.functions";
 import { createCompany } from "@/lib/api/clients.functions";
 import {
   priorityLabel,
@@ -104,6 +101,7 @@ export function ServiceOrderWizard({
   const { data: units } = useAllUnitsQuery();
   const { data: technicians } = useTechniciansQuery();
 
+  const flowRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>({
     title: "",
@@ -123,14 +121,19 @@ export function ServiceOrderWizard({
 
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (step === 0) titleRef.current?.focus();
-  }, [step]);
-
-  // Sempre rolar para o topo ao mudar de etapa, em ambos os sentidos.
-  useEffect(() => {
     if (typeof window === "undefined") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    const focusTimer = window.setTimeout(
+      () => {
+        const target = flowRef.current?.querySelector<HTMLElement>(
+          "[data-autofocus], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])",
+        );
+        target?.focus({ preventScroll: true });
+      },
+      reduce ? 0 : 160,
+    );
+    return () => window.clearTimeout(focusTimer);
   }, [step]);
 
   const validity = useMemo(() => {
@@ -188,18 +191,14 @@ export function ServiceOrderWizard({
     <div className="mt-2 space-y-5">
       <WizardStepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
 
-      <div className="overflow-x-clip">
-        <div
-          className="flex w-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-          style={{
-            width: `${STEPS.length * 100}%`,
-            transform: `translateX(-${(step * 100) / STEPS.length}%)`,
-          }}
-        >
-          <StepSlot>
+      <div ref={flowRef} className="min-w-0">
+        {step === 0 && (
+          <div data-order-step-panel="0" className="lemarc-step-panel min-w-0 pb-2">
             <BasicInfoStep draft={draft} set={set} titleRef={titleRef} />
-          </StepSlot>
-          <StepSlot>
+          </div>
+        )}
+        {step === 1 && (
+          <div data-order-step-panel="1" className="lemarc-step-panel min-w-0 pb-2">
             <ClientStep
               draft={draft}
               set={set}
@@ -207,8 +206,10 @@ export function ServiceOrderWizard({
               units={units}
               onCreated={(id) => set("clientId", id)}
             />
-          </StepSlot>
-          <StepSlot>
+          </div>
+        )}
+        {step === 2 && (
+          <div data-order-step-panel="2" className="lemarc-step-panel min-w-0 pb-2">
             <TechnicianStep
               draft={draft}
               set={set}
@@ -218,14 +219,18 @@ export function ServiceOrderWizard({
                 set("noTech", false);
               }}
             />
-          </StepSlot>
-          <StepSlot>
+          </div>
+        )}
+        {step === 3 && (
+          <div data-order-step-panel="3" className="lemarc-step-panel min-w-0 pb-2">
             <ServiceTypeStep draft={draft} set={set} />
-          </StepSlot>
-          <StepSlot>
+          </div>
+        )}
+        {step === 4 && (
+          <div data-order-step-panel="4" className="lemarc-step-panel min-w-0 pb-2">
             <ReviewStep draft={draft} clients={clients} units={units} technicians={technicians} />
-          </StepSlot>
-        </div>
+          </div>
+        )}
       </div>
 
       {orderMutation.isError && (
@@ -242,17 +247,6 @@ export function ServiceOrderWizard({
         onBack={goBack}
         onNext={goNext}
       />
-    </div>
-  );
-}
-
-function StepSlot({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="px-1 pb-2"
-      style={{ flex: `0 0 ${100 / STEPS.length}%`, width: `${100 / STEPS.length}%` }}
-    >
-      {children}
     </div>
   );
 }
@@ -303,7 +297,7 @@ function WizardStepper({
               </span>
               <span
                 className={cn(
-                  "hidden min-w-0 truncate text-[10px] font-black uppercase tracking-[0.1em] sm:block lg:text-[11px]",
+                  "hidden min-w-0 truncate text-[11px] font-bold sm:block lg:text-xs",
                   current ? "text-white" : done ? "text-emerald-50" : "text-slate-300",
                 )}
               >
@@ -313,7 +307,7 @@ function WizardStepper({
           );
         })}
       </div>
-      <p className="mt-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-primary sm:hidden">
+      <p className="mt-3 text-center text-xs font-bold text-primary sm:hidden">
         Etapa {step + 1} de {STEPS.length} · {STEPS[step]}
       </p>
     </GlassCard>
@@ -351,7 +345,7 @@ function StepFooter({
         onClick={onNext}
         disabled={!canGoNext || loading}
         className={cn(
-          "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 font-display text-sm font-black uppercase tracking-wider transition disabled:opacity-55 sm:h-14",
+          "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 font-display text-sm font-bold disabled:opacity-55 sm:h-14",
           canGoNext && !loading && "lemarc-orange-glow hover:-translate-y-0.5 active:scale-[0.98]",
         )}
       >
@@ -364,7 +358,7 @@ function StepFooter({
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.16em]">
+    <label className="lemarc-form-label text-xs font-semibold">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
@@ -1288,8 +1282,8 @@ function StepHeader({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
-      <h2 className="mt-1 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+      <p className="lemarc-context-label">{eyebrow}</p>
+      <h2 className="mt-1 font-display text-xl font-bold leading-tight text-white sm:text-2xl">
         {title}
       </h2>
       {description && <p className="lemarc-form-help mt-1.5 text-sm font-medium">{description}</p>}

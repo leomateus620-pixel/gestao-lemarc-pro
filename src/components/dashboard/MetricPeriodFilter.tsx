@@ -93,7 +93,7 @@ export function MetricPeriodFilter({
                 aria-pressed={active}
                 onClick={() => selectPreset(it.key)}
                 className={cn(
-                  "min-h-9 shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
+                  "min-h-9 shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
                   active
                     ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
                     : "text-muted-foreground hover:bg-white/[0.07] hover:text-foreground",
