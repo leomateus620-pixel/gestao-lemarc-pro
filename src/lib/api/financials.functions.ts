@@ -298,7 +298,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const sb = context.supabase as any;
-    const [labor, fin] = await Promise.all([
+    const [labor, fin, sessionsRes] = await Promise.all([
       sb
         .from("service_order_labor_entries")
         .select(LABOR_SELECT)
@@ -310,13 +310,177 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
         .select("*")
         .eq("service_order_id", data.orderId)
         .maybeSingle(),
+      sb
+        .from("service_order_time_sessions")
+        .select(TIME_SESSION_SELECT)
+        .eq("service_order_id", data.orderId)
+        .eq("kind", "work")
+        .not("ended_at", "is", null)
+        .order("started_at", { ascending: true }),
     ]);
     if (labor.error) throw new Error(labor.error.message);
     if (fin.error) throw new Error(fin.error.message);
-    return {
-      entries: (labor.data ?? []).map(normalizeLabor),
-      financials: normalizeFinancials(fin.data),
-    };
+
+    const storedEntries = (labor.data ?? []).map(normalizeLabor);
+    const financials = normalizeFinancials(fin.data);
+    const rawSessions = sessionsRes?.error ? [] : (sessionsRes?.data ?? []);
+    const closedWorkSessions: ClosedWorkSession[] = rawSessions
+      .filter(
+        (s: any) =>
+          s.kind === "work" &&
+          s.technician_id &&
+          s.started_at &&
+          s.ended_at &&
+          (s.duration_minutes ?? 0) > 0,
+      )
+      .map((s: any) => ({
+        id: s.id,
+        technician_id: s.technician_id,
+        started_at: s.started_at,
+        ended_at: s.ended_at,
+        duration_minutes: s.duration_minutes ?? 0,
+      }));
+
+    if (closedWorkSessions.length === 0) {
+      // No time-tracking data — trust manually entered labor entries.
+      return { entries: storedEntries, financials };
+    }
+
+    // Fetch technician fallback for sessions whose tech has no existing entry.
+    const missingTechIds = Array.from(
+      new Set(
+        closedWorkSessions
+          .map((s) => s.technician_id)
+          .filter((id) => !storedEntries.some((e) => e.technician_id === id)),
+      ),
+    );
+    const techFallback = new Map<
+      string,
+      { id: string; full_name: string; role: string | null; hourly_rate_cents: number | null }
+    >();
+    if (missingTechIds.length > 0) {
+      const { data: techRows, error: techErr } = await sb
+        .from("technicians")
+        .select("id, full_name, role, hourly_rate_cents")
+        .in("id", missingTechIds);
+      if (!techErr && techRows) {
+        for (const t of techRows) {
+          techFallback.set(t.id, {
+            id: t.id,
+            full_name: t.full_name,
+            role: t.role ?? null,
+            hourly_rate_cents: t.hourly_rate_cents ?? null,
+          });
+        }
+      }
+    }
+
+    const derivedEntries = deriveEntriesFromSessions(
+      data.orderId,
+      closedWorkSessions,
+      storedEntries,
+      techFallback,
+    );
+
+    // Self-heal: only when derived diverges from stored and we have a rate for
+    // every entry. Never touch the DB when we'd overwrite with zeroed rates.
+    const allHaveRates = derivedEntries.every((e) => e.hourly_rate_cents > 0);
+    let effectiveFinancials = financials;
+    if (entriesDiverge(storedEntries, derivedEntries) && allHaveRates) {
+      try {
+        const totalLaborMinutes = derivedEntries.reduce((a, e) => a + e.duration_minutes, 0);
+        const totalLaborCents = derivedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+
+        const inserts = derivedEntries.map((e) => ({
+          service_order_id: data.orderId,
+          technician_id: e.technician_id,
+          role: e.role,
+          work_date: e.work_date,
+          start_time: e.start_time.length === 5 ? `${e.start_time}:00` : e.start_time,
+          end_time: e.end_time.length === 5 ? `${e.end_time}:00` : e.end_time,
+          duration_minutes: e.duration_minutes,
+          hourly_rate_cents: e.hourly_rate_cents,
+          subtotal_cents: e.subtotal_cents,
+          description: e.description,
+          created_by: context.userId,
+        }));
+
+        const { error: delErr } = await sb
+          .from("service_order_labor_entries")
+          .delete()
+          .eq("service_order_id", data.orderId);
+        if (!delErr) {
+          const { error: insErr } = await sb
+            .from("service_order_labor_entries")
+            .insert(inserts);
+          if (!insErr && financials) {
+            const displacementCents = financials.displacement_total_cents ?? 0;
+            const materialsCents = financials.materials_total_cents ?? 0;
+            const grand = totalLaborCents + displacementCents + materialsCents;
+            const { data: updated, error: upErr } = await sb
+              .from("service_order_financials")
+              .update({
+                total_labor_minutes: totalLaborMinutes,
+                total_labor_cents: totalLaborCents,
+                grand_total_cents: grand,
+              })
+              .eq("service_order_id", data.orderId)
+              .select("*")
+              .maybeSingle();
+            if (!upErr && updated) {
+              effectiveFinancials = normalizeFinancials(updated);
+            } else if (financials) {
+              effectiveFinancials = {
+                ...financials,
+                total_labor_minutes: totalLaborMinutes,
+                total_labor_cents: totalLaborCents,
+                grand_total_cents: grand,
+              };
+            }
+
+            // Reflect on the OS legacy fields as well.
+            const weightedRate =
+              totalLaborMinutes > 0
+                ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
+                : null;
+            await sb
+              .from("service_orders")
+              .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
+              .eq("id", data.orderId);
+
+            // Re-fetch canonical entries so IDs are real (not "derived:*").
+            const { data: refreshed } = await sb
+              .from("service_order_labor_entries")
+              .select(LABOR_SELECT)
+              .eq("service_order_id", data.orderId)
+              .order("work_date", { ascending: true })
+              .order("start_time", { ascending: true });
+            if (refreshed) {
+              return {
+                entries: refreshed.map(normalizeLabor),
+                financials: effectiveFinancials,
+              };
+            }
+          }
+        }
+      } catch {
+        // Self-heal is best-effort; fall through to derived response.
+      }
+    } else if (financials) {
+      // No self-heal but derived may still differ; ensure returned totals match derived.
+      const totalLaborMinutes = derivedEntries.reduce((a, e) => a + e.duration_minutes, 0);
+      const totalLaborCents = derivedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+      const displacementCents = financials.displacement_total_cents ?? 0;
+      const materialsCents = financials.materials_total_cents ?? 0;
+      effectiveFinancials = {
+        ...financials,
+        total_labor_minutes: totalLaborMinutes,
+        total_labor_cents: totalLaborCents,
+        grand_total_cents: totalLaborCents + displacementCents + materialsCents,
+      };
+    }
+
+    return { entries: derivedEntries, financials: effectiveFinancials };
   });
 
 export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET" })
