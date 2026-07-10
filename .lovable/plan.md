@@ -1,79 +1,59 @@
 ## Diagnóstico
 
-Confirmado no banco a origem do bug:
+Na OS #1061 (Leonardo · 18:43→18:50 pausa · 19:39→20:11 fim = 39 min), o PDF mostra **1 linha** com início 18:43 e fim **19:23** (= 18:43 + 40 min). A causa: essa OS foi finalizada **antes** do fix anterior, então o banco (`service_order_labor_entries`) guarda **uma única linha por técnico** com `end_time = start_time + duração total`. O PDF apenas renderiza o que está salvo — por isso divergência de horário e ausência das pausas.
 
-**Sessões de tempo (corretas)** — OS `e98ad7ca…`:
-- Douglas: 231 min (08:10→12:01) + 201 min (14:09→17:30) + 41 min (17:34→18:15) = **473 min**
-- João: 231 min + 201 min = **432 min**
+O fix anterior corrigiu apenas o *fluxo de finalização futuro*, mas OSes já finalizadas continuam com dados colapsados. Precisa também:
+1. tornar o PDF fiel ao histórico real (`service_order_time_sessions`), mesmo quando os `labor_entries` estão colapsados;
+2. reconciliar linhas antigas silenciosamente, sem exigir reabrir a OS.
 
-**Labor entries (o que vai para o PDF)** — armazenam **1 linha por técnico com um único intervalo `start_time → end_time`**:
-- Douglas: `08:10 → 16:25` → `duration = 495 min = 08:15`
-- João: `08:10 → 16:25` → `duration = 495 min = 08:15`
+## Solução
 
-A causa é estrutural: cada técnico grava **um único par início/fim**, e o cálculo é `fim − início`. Isso é impossível de conciliar com pausas. A tela ao vivo (`ServiceOrderTimeControl` / histórico) usa `computeTechnicianWorkedMinutes(sessions,…)` e está correta — o problema mora no **fluxo de finalização** (`FinalizeServiceOrderDialog` + `finalizeServiceOrder`) e, por consequência, no PDF.
+Fonte da verdade sempre = `service_order_time_sessions` (sessões work fechadas). `labor_entries` passa a ser cache derivado.
 
-O prefill em `FinalizeServiceOrderDialog` até tenta usar `computeClosedWorkedMinutesByTech(sessions)` para calcular minutos líquidos, mas:
-1. Colapsa tudo em `start = order.started_at`, `end = start + minutos` — perde os intervalos reais e o registro das pausas.
-2. Se `sessions` ainda não chegou no primeiro render, o fallback usa `order.started_at → order.finished_at` (inclui pausas). É exatamente o estado da OS de teste.
-3. O usuário pode ajustar os horários e a duração passa a ser recomputada como `end − start`, escondendo qualquer pausa.
+### 1. `getOrderFinancials` — derivação robusta (`src/lib/api/financials.functions.ts`)
 
-## Correção
+No handler, após buscar labor_entries e financials, também buscar `service_order_time_sessions` da OS. Se houver ≥1 sessão `kind='work'` com `ended_at`:
 
-Objetivo: fazer com que cada intervalo real de trabalho (entre iniciar/retomar e pausar/finalizar) vire **uma linha de labor entry**. A tabela já tem `start_time, end_time, duration_minutes`, então **não há mudança de schema, RLS, policies, storage nem rotas**.
+- Reconstruir a lista de entries a partir das sessões: **uma linha por sessão fechada**, com `work_date`/`start_time`/`end_time` em America/Sao_Paulo derivados de `started_at`/`ended_at`, `duration_minutes = session.duration_minutes`, `hourly_rate_cents` reaproveitado do labor_entry existente do mesmo técnico (ou do cadastro do técnico como fallback), `description = "Intervalo N de M"` ou `"Trabalho executado"`.
+- Recalcular `subtotal_cents` por linha e `total_labor_minutes` / `total_labor_cents` / `grand_total_cents` na resposta.
+- Se os valores derivados divergirem dos armazenados, disparar um **self-heal** no mesmo handler (apenas para admins): `delete` + `insert` em `labor_entries` e `update` em `service_order_financials` (mantendo tipo de deslocamento, materiais, notas). Falhas de self-heal são engolidas — resposta ao cliente sempre usa os valores derivados.
 
-### 1. Prefill do diálogo de finalização — `src/components/ordens/FinalizeServiceOrderDialog.tsx`
+Isso corrige de imediato a exibição no PDF/tela e, na primeira leitura pós-deploy, normaliza os dados na nuvem sem migration manual.
 
-Substituir a lógica atual (uma entry por técnico com `start + workedMinutes`) por:
+### 2. Preservar entries manuais
 
-- Para cada técnico da OS, iterar sobre `sessions.filter(s => s.kind === 'work' && s.ended_at && s.technician_id === t.id)` **em ordem cronológica**.
-- Para cada sessão fechada, gerar um `DraftEntry` com:
-  - `work_date = data local (America/Sao_Paulo) do started_at`
-  - `start_time = HH:mm de started_at`
-  - `end_time = HH:mm de ended_at`
-  - `hourly_rate_cents = t.hourly_rate_cents`
-  - `description = 'Trabalho — intervalo N'` (curto e claro; substitui o texto genérico "Calculado automaticamente")
-- Sessões que atravessam meia-noite: dividir em duas entries (uma até 23:59, outra a partir de 00:00 no dia seguinte) para respeitar `computeDurationMinutes` (que exige mesmo dia). Caso muito raro, mas cobre o edge case sem quebrar validação.
-- Fallback quando `sessions` está vazio (OS sem tracking usada): manter a entry única atual (uma por técnico) — não regride OSs antigas.
-- Aguardar `sessions` carregar antes de gerar entries automáticas: usar `isLoading` do `useQuery` e não hidratar até `sessions` estar definido (evita o fallback errado que gerou este bug).
+Só reconstruir quando existirem sessões `work` fechadas. OSes finalizadas manualmente (sem controle de tempo) continuam com o que foi digitado. Se o total de minutos das sessões == soma atual de entries e o número de linhas bate, pular self-heal (evita escrita desnecessária).
 
-Efeitos colaterais benéficos:
-- O usuário ainda pode editar manualmente cada linha, remover, adicionar (nada muda no editor).
-- A duração vira a soma dos intervalos ativos — pausas ficam automaticamente fora.
-- `finalizeServiceOrder` no backend **não muda** (já aceita array de entries).
+### 3. PDF — sem mudança estrutural
 
-### 2. Melhorias no PDF — `src/components/reports/print/ServiceOrderReportDocument.tsx`
+`ServiceOrderReportDocument.tsx` e `serviceOrderDownload.ts` já agrupam por técnico e mostram intervalos + subtotal. Verificar apenas que:
+- os horários exibidos usam `America/Sao_Paulo` (já usam).
+- o texto "Serviço executado" reflete N intervalos e horas líquidas (já implementado).
+- inclui a nota "Horas trabalhadas não incluem intervalos de pausa" (já incluída).
 
-A tabela já mostra Técnico / Início / Fim / Horas / R$/h / Total por linha. Com múltiplas entries por técnico, ela naturalmente exibirá cada intervalo ativo. Adicionar:
+Nenhuma edição de layout necessária depois do fix na origem.
 
-- **Agrupamento por técnico**: linhas do mesmo técnico em sequência, com uma **linha de subtotal por técnico** (Horas trabalhadas líquidas + Total do técnico) logo abaixo dos intervalos dele.
-- **Linhas de pausa entre intervalos**: entre duas entries consecutivas do mesmo técnico, inserir uma linha discreta em cinza claro, formato `Pausa — <motivo> · <HH:mm início> → <HH:mm fim> (<duração>)`. As pausas vêm de `sessions` (já disponível: hoje o PDF não recebe sessions — precisará ser passado via loader/serverFn de impressão; ver seção "Detalhes técnicos" abaixo).
-- Reforçar no rodapé da seção: "Horas trabalhadas não incluem intervalos de pausa. Totais financeiros calculados apenas sobre horas efetivamente trabalhadas."
-- Ajustes visuais: leve destaque no total geral, espaçamento das colunas, ancoragem tabular-nums (a maior parte já está em `STYLES`, ampliar `.grand` e adicionar `.techSubtotal`, `.pauseRow`).
-- Trocar "Calculado automaticamente pelo controle de tempo" (na seção "Serviço executado") por um resumo curto derivado das entries: "N intervalos · HH:mm trabalhadas".
+### 4. Diálogo Finalizar
 
-### 3. Tela da OS — `src/components/ordens/ServiceOrderTimeControl.tsx` e `ServiceOrderTimeHistory.tsx`
+Sem mudanças — `buildEntriesFromSessions` já gera uma linha por sessão fechada. Se admin reabrir a OS pós-deploy, os entries já virão corretos do backend.
 
-Já usam `computeTechnicianWorkedMinutes`/`buildTimeline` que estão corretos. Fazer apenas duas checagens:
+## Fora do escopo
 
-- Garantir que ações incompatíveis não aparecem quando um técnico já finalizou (não permitir botão "Retomar" para técnico com `state === 'finished'`; conferir `getTechnicianState`).
-- Se a OS já foi finalizada como um todo (`status in ('finished','review','approved')`), esconder ações de start/pause/resume para todos os técnicos.
-
-Nenhuma mudança de rota, RLS, tabela ou storage.
-
-### 4. Dados existentes
-
-Não migrar automaticamente. A OS de teste (e qualquer OS finalizada com valores incorretos) pode ser corrigida abrindo novamente o diálogo de finalização — o prefill agora carrega os intervalos reais a partir das sessions, e o admin confirma. Documento no PR.
-
-## Critérios de aceite (a validar depois da implementação)
-
-- OS teste (Douglas + João, pausa almoço): PDF passa a mostrar 2 linhas por técnico e subtotais 06:07 (ou o valor real das sessions — no banco atual Douglas tem 07:53 pois há sessões extras após 16:25; se o cenário do usuário for reproduzido com pausa única, o resultado bate com 06:07 e R$ 519,92 / R$ 458,75 / R$ 978,67).
-- Total geral da OS = soma dos totais por técnico, sem contar pausa.
-- Cenários adicionais: sem pausa (1 linha), 1 pausa (2 linhas), múltiplas pausas (N linhas), técnicos com horários distintos, técnico finalizado + outro em andamento (não bloqueia; entries só entram para técnicos com sessões fechadas), OS totalmente encerrada.
-- Sem regressão em criar/abrir/pausar/retomar/finalizar OS e no fluxo de assinatura.
+- Migração SQL manual dos dados antigos: substituída pelo self-heal do handler.
+- Alterações em RLS, rotas, `time_sessions` schema, ou fluxo de execução da OS na tela ao vivo.
+- Ajustes visuais no PDF.
 
 ## Detalhes técnicos
 
-- `FinalizeServiceOrderDialog` já faz `useQuery(listTimeSessions)`; basta usar as sessões (não `computeClosedWorkedMinutesByTech`) para gerar entries.
-- `ServiceOrderReportDocument` recebe hoje `entries: LaborEntry[]`. Para exibir pausas, passar também `sessions: TimeSession[]`. As chamadas de impressão em `src/lib/reports/serviceOrderDownload.ts` e `src/routes/_app.ordens.$id.imprimir.tsx` (a verificar) precisam buscar as sessões (já existe `listTimeSessions`) e repassar. Se o formato do documento ficar mais claro reagrupando por técnico dentro do próprio componente, faço lá — sem tocar em types compartilhados.
-- Fuso: usar `Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })` já usado no arquivo para derivar `work_date`, `start_time`, `end_time` a partir dos ISO das sessions.
-- Preservar `LaborEntryInput` como está — o backend `finalizeServiceOrder` já persiste várias linhas por técnico sem alteração.
+Arquivos alterados:
+- `src/lib/api/financials.functions.ts`
+  - Adicionar consulta a `service_order_time_sessions` (kind=work, ended_at not null) no `getOrderFinancials`.
+  - Nova função `deriveEntriesFromSessions(sessions, existingEntries, technicians)` que retorna `LaborEntry[]` derivadas.
+  - Comparar contagem de intervalos e soma de `duration_minutes` — se divergir do stored, executar `delete`+`insert` em `labor_entries` e recomputar/`update` em `service_order_financials` (mantendo `displacement_*`, `materials_total_cents`, `notes`).
+  - Retornar sempre os entries derivados quando houver sessões; senão, os entries do banco.
+
+Validação:
+- OS #1061: PDF deve passar a mostrar 2 linhas (18:43→18:50 · 00:07 e 19:39→20:11 · 00:32), subtotal Leonardo = 00:39, totais coerentes com o card "Total trabalhado" na tela ao vivo.
+- OS finalizadas sem sessões (manuais): PDF permanece igual ao que já mostra.
+- Reabrir a OS #1061 no diálogo Finalizar: entries já hidratam com 2 linhas.
+- Typecheck limpo.
