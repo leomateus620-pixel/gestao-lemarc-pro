@@ -145,6 +145,7 @@ export function ServiceOrderIslandRow({
     hasValue,
     hasTrackedTime,
   });
+  const detailsId = `ordem-${order.id}-detalhes`;
 
   return (
     <article
@@ -160,22 +161,23 @@ export function ServiceOrderIslandRow({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="block w-full min-w-0 rounded-[1rem] border border-white/[0.07] bg-black/[0.075] px-2.5 py-2 text-left outline-none transition-colors hover:border-white/[0.12] focus-visible:ring-2 focus-visible:ring-primary/70 sm:px-3 lg:py-2.5"
+          className="relative block w-full min-w-0 rounded-[1rem] border border-white/[0.07] bg-black/[0.075] py-2 pl-2.5 pr-9 text-left outline-none transition-colors hover:border-white/[0.12] focus-visible:ring-2 focus-visible:ring-primary/70 sm:pl-3 lg:py-2.5"
           aria-expanded={expanded}
+          aria-controls={detailsId}
           aria-label={`${expanded ? "Recolher" : "Expandir"} OS ${order.number}`}
         >
           <span className="grid min-w-0 gap-1.5 lg:hidden">
             <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
                 <OrderIdentity number={order.number} />
-                <span className="truncate font-display text-[14px] font-black leading-tight text-white">
+                <span className="min-w-0 break-words font-display text-[14px] font-bold leading-tight text-white">
                   {clientName}
                 </span>
               </span>
               <OrderStatusCluster status={order.status} priority={order.priority} compact />
             </span>
 
-            <span className="block min-w-0 truncate text-[12px] font-bold leading-snug text-slate-100">
+            <span className="block min-w-0 break-words text-[12px] font-semibold leading-snug text-slate-100">
               {title} · <span className="text-slate-300">{serviceType}</span>
             </span>
 
@@ -220,6 +222,14 @@ export function ServiceOrderIslandRow({
             <InlineMetric label="Tempo" value={timeSummary.short} tabular />
             <InlineMetric label={valueSummary.kind} value={valueSummary.short} tabular />
           </span>
+          <ChevronDown
+            size={15}
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 transition-transform duration-200 ease-out motion-reduce:transition-none",
+              expanded && "rotate-180",
+            )}
+          />
         </button>
 
         {!expanded && (
@@ -235,64 +245,60 @@ export function ServiceOrderIslandRow({
         {!expanded && collapsedHints.length > 0 && <DesktopHintRail hints={collapsedHints} />}
       </div>
 
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-        )}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="lemarc-order-expanded-ruler mt-2.5 border-t border-white/[0.08] pt-2.5">
-            <div className="grid gap-2.5 lg:grid-cols-[1.02fr_1fr_1.05fr]">
-              <OrderExpandedSection icon={Building2} title="Identificação">
-                <OrderExpandedRow label="Cliente" value={clientName} strong />
-                <OrderExpandedRow label="Unidade" value={unitName} />
-                <OrderExpandedRow label="Local" value={localName} icon={MapPin} />
-                <OrderExpandedRow
-                  label="Solicitante"
-                  value={clean(order.requester_name) ?? "Não informado"}
-                  icon={UserRound}
-                />
-              </OrderExpandedSection>
+      {expanded && (
+        <div
+          id={detailsId}
+          className="lemarc-order-expanded-ruler lemarc-step-panel mt-2.5 border-t border-white/[0.08] pt-2.5"
+        >
+          <div className="grid gap-2.5 lg:grid-cols-[1.02fr_1fr_1.05fr]">
+            <OrderExpandedSection icon={Building2} title="Identificação">
+              <OrderExpandedRow label="Cliente" value={clientName} strong />
+              <OrderExpandedRow label="Unidade" value={unitName} />
+              <OrderExpandedRow label="Local" value={localName} icon={MapPin} />
+              <OrderExpandedRow
+                label="Solicitante"
+                value={clean(order.requester_name) ?? "Não informado"}
+                icon={UserRound}
+              />
+            </OrderExpandedSection>
 
-              <OrderExpandedSection icon={Wrench} title="Operação">
-                <OrderExpandedRow label="Chamado" value={title} strong />
-                <OrderExpandedRow label="Tipo" value={serviceType} />
-                <OrderExpandedRow
-                  label="Status"
-                  value={statusLabel[order.status]}
-                  icon={BadgeCheck}
-                />
-                <OrderExpandedRow
-                  label="Prioridade"
-                  value={order.priority ? priorityLabel[order.priority] : "Não informada"}
-                />
-                <OrderExpandedRow
-                  label="Técnicos"
-                  value={
-                    <span title={technicianTitle}>
-                      {technicianTitle} · {technicianDetail}
-                    </span>
-                  }
-                  icon={HardHat}
-                />
-              </OrderExpandedSection>
+            <OrderExpandedSection icon={Wrench} title="Operação">
+              <OrderExpandedRow label="Chamado" value={title} strong />
+              <OrderExpandedRow label="Tipo" value={serviceType} />
+              <OrderExpandedRow
+                label="Status"
+                value={statusLabel[order.status]}
+                icon={BadgeCheck}
+              />
+              <OrderExpandedRow
+                label="Prioridade"
+                value={order.priority ? priorityLabel[order.priority] : "Não informada"}
+              />
+              <OrderExpandedRow
+                label="Técnicos"
+                value={
+                  <span title={technicianTitle}>
+                    {technicianTitle} · {technicianDetail}
+                  </span>
+                }
+                icon={HardHat}
+              />
+            </OrderExpandedSection>
 
-              <OrderExpandedSection icon={Clock3} title="Tempo e cobrança">
-                <OrderExpandedRow label="Abertura" value={openedAt} tabular />
-                <OrderExpandedRow label="Início" value={startedAt} tabular />
-                <OrderExpandedRow label="Finalização" value={closedAt} tabular />
-                <OrderExpandedRow label="Tempo total" value={timeSummary.full} strong tabular />
-                <OrderExpandedRow label="Mão de obra" value={valueSummary.labor} tabular />
-                <OrderExpandedRow label="Valor total" value={valueSummary.full} strong tabular />
-                <OrderExpandedRow label="Cobrança" value={billingStatus} strong />
-              </OrderExpandedSection>
-            </div>
-
-            <OrderActionBar order={order} actionLabel={actionLabel} isClosedOrder={isClosedOrder} />
+            <OrderExpandedSection icon={Clock3} title="Tempo e cobrança">
+              <OrderExpandedRow label="Abertura" value={openedAt} tabular />
+              <OrderExpandedRow label="Início" value={startedAt} tabular />
+              <OrderExpandedRow label="Finalização" value={closedAt} tabular />
+              <OrderExpandedRow label="Tempo total" value={timeSummary.full} strong tabular />
+              <OrderExpandedRow label="Mão de obra" value={valueSummary.labor} tabular />
+              <OrderExpandedRow label="Valor total" value={valueSummary.full} strong tabular />
+              <OrderExpandedRow label="Cobrança" value={billingStatus} strong />
+            </OrderExpandedSection>
           </div>
+
+          <OrderActionBar order={order} actionLabel={actionLabel} isClosedOrder={isClosedOrder} />
         </div>
-      </div>
+      )}
     </article>
   );
 }
@@ -512,14 +518,12 @@ function OrderExpandedSection({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-[0.95rem] border border-white/[0.075] bg-white/[0.028] p-2.5 shadow-[inset_0_1px_0_oklch(1_0_0/0.07)]">
+    <section className="min-w-0 border-l border-white/[0.1] pl-3 first:border-l-0 first:pl-0">
       <div className="flex items-center gap-1.5">
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-primary/22 bg-primary/10 text-primary shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]">
+        <span className="grid size-6 shrink-0 place-items-center text-primary">
           <Icon size={13} />
         </span>
-        <h4 className="font-display text-[11px] font-black uppercase tracking-[0.06em] text-white">
-          {title}
-        </h4>
+        <h4 className="font-display text-xs font-bold text-white">{title}</h4>
       </div>
       <dl className="mt-1.5 divide-y divide-white/[0.05]">{children}</dl>
     </section>
@@ -620,8 +624,8 @@ function OrderActionBar({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir OS #{order.number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é irreversível. Todos os dados vinculados (horas, anexos,
-              assinaturas, financeiro) também serão apagados.
+              Esta ação é irreversível. Todos os dados vinculados (horas, anexos, assinaturas,
+              financeiro) também serão apagados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

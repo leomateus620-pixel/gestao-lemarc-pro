@@ -118,9 +118,7 @@ function validateDraft(d: UnitDraft): string | null {
 
 export function ClientUnitsEditor({ clientId, units }: { clientId: string; units: ClientUnit[] }) {
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState<string | null>(
-    units.length === 1 ? units[0].id : null,
-  );
+  const [expanded, setExpanded] = useState<string | null>(units.length === 1 ? units[0].id : null);
   const [creating, setCreating] = useState(false);
   const [newDraft, setNewDraft] = useState<UnitDraft>(emptyDraft);
 
@@ -501,9 +499,7 @@ function UnitFormFields({
             <Input
               inputMode="decimal"
               value={draft.distance_km_from_base}
-              onChange={(e) =>
-                set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))
-              }
+              onChange={(e) => set("distance_km_from_base", e.target.value.replace(/[^\d.,]/g, ""))}
               className={cn(inputCls, "pr-12")}
               placeholder="Ex.: 90"
             />
@@ -609,7 +605,7 @@ function UnitFormFields({
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="lemarc-form-label text-[10px] font-black uppercase tracking-[0.08em]">
+    <label className="lemarc-form-label text-xs font-semibold">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
