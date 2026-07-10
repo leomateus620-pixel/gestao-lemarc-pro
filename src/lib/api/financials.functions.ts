@@ -27,6 +27,151 @@ const LABOR_SELECT = `
   technician:technicians(id, full_name, role)
 `;
 
+const TIME_SESSION_SELECT = `
+  id, service_order_id, technician_id, kind, started_at, ended_at,
+  duration_minutes, end_reason
+`;
+
+type ClosedWorkSession = {
+  id: string;
+  technician_id: string;
+  started_at: string;
+  ended_at: string;
+  duration_minutes: number;
+};
+
+const SP_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const SP_TIME = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+function spDate(iso: string): string {
+  return SP_DATE.format(new Date(iso));
+}
+function spTime(iso: string): string {
+  return SP_TIME.format(new Date(iso));
+}
+
+function minutesBetween(a: string, b: string): number {
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (!Number.isFinite(ta) || !Number.isFinite(tb) || tb <= ta) return 0;
+  return Math.max(0, Math.round((tb - ta) / 60000));
+}
+
+/**
+ * Rebuild LaborEntry list from closed work sessions (source of truth).
+ * One entry per closed work interval (started→paused / resumed→finished).
+ * Pauses are automatically excluded because each row is a single active window.
+ */
+function deriveEntriesFromSessions(
+  orderId: string,
+  sessions: ClosedWorkSession[],
+  existingEntries: LaborEntry[],
+  technicianFallback: Map<
+    string,
+    { id: string; full_name: string; role: string | null; hourly_rate_cents: number | null }
+  >,
+): LaborEntry[] {
+  // Rate + technician object per technician_id, prefer existing labor entry.
+  const rateByTech = new Map<string, number>();
+  const techObjByTech = new Map<string, LaborEntry["technician"]>();
+  const roleByTech = new Map<string, string | null>();
+  for (const e of existingEntries) {
+    if (!e.technician_id) continue;
+    if (!rateByTech.has(e.technician_id) && e.hourly_rate_cents > 0) {
+      rateByTech.set(e.technician_id, e.hourly_rate_cents);
+    }
+    if (!techObjByTech.has(e.technician_id) && e.technician) {
+      techObjByTech.set(e.technician_id, e.technician);
+    }
+    if (!roleByTech.has(e.technician_id)) {
+      roleByTech.set(e.technician_id, e.role);
+    }
+  }
+  for (const [id, t] of technicianFallback) {
+    if (!rateByTech.has(id) && t.hourly_rate_cents != null) {
+      rateByTech.set(id, t.hourly_rate_cents);
+    }
+    if (!techObjByTech.has(id)) {
+      techObjByTech.set(id, { id: t.id, full_name: t.full_name, role: t.role });
+    }
+  }
+
+  // Group + sort per tech.
+  const byTech = new Map<string, ClosedWorkSession[]>();
+  for (const s of sessions) {
+    const list = byTech.get(s.technician_id) ?? [];
+    list.push(s);
+    byTech.set(s.technician_id, list);
+  }
+
+  const out: LaborEntry[] = [];
+  for (const [techId, list] of byTech) {
+    list.sort((a, b) => a.started_at.localeCompare(b.started_at));
+    const rate = rateByTech.get(techId) ?? 0;
+    const techObj = techObjByTech.get(techId) ?? null;
+    const role = roleByTech.get(techId) ?? null;
+    list.forEach((s, idx) => {
+      const workDate = spDate(s.started_at);
+      const endDate = spDate(s.ended_at);
+      const startTime = spTime(s.started_at);
+      // Edge case: session crosses midnight — clamp end to 23:59:59.
+      const endTime = endDate !== workDate ? "23:59:59" : spTime(s.ended_at);
+      const duration =
+        s.duration_minutes && s.duration_minutes > 0
+          ? s.duration_minutes
+          : minutesBetween(s.started_at, s.ended_at);
+      const subtotal = computeSubtotalCents(duration, rate);
+      out.push({
+        id: `derived:${s.id}`,
+        service_order_id: orderId,
+        technician_id: techId,
+        role,
+        work_date: workDate,
+        start_time: startTime,
+        end_time: endTime,
+        duration_minutes: duration,
+        hourly_rate_cents: rate,
+        subtotal_cents: subtotal,
+        description:
+          list.length > 1 ? `Intervalo ${idx + 1} de ${list.length}` : "Trabalho executado",
+        technician: techObj,
+      });
+    });
+  }
+
+  // Sort globally by date/time so PDF and UI render chronologically.
+  out.sort((a, b) => {
+    const d = a.work_date.localeCompare(b.work_date);
+    if (d !== 0) return d;
+    return a.start_time.localeCompare(b.start_time);
+  });
+  return out;
+}
+
+function entriesDiverge(existing: LaborEntry[], derived: LaborEntry[]): boolean {
+  if (existing.length !== derived.length) return true;
+  const totalExisting = existing.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
+  const totalDerived = derived.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
+  if (totalExisting !== totalDerived) return true;
+  // Compare start/end/duration ordered.
+  const key = (e: LaborEntry) =>
+    `${e.technician_id}|${e.work_date}|${e.start_time.slice(0, 5)}|${e.end_time.slice(0, 5)}|${e.duration_minutes}`;
+  const setE = new Set(existing.map(key));
+  for (const d of derived) if (!setE.has(key(d))) return true;
+  return false;
+}
+
 const TECHNICIAN_HISTORY_SELECT = `
   id, service_order_id, technician_id, role, work_date, start_time, end_time,
   duration_minutes, hourly_rate_cents, subtotal_cents, description,
