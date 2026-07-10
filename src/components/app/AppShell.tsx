@@ -37,7 +37,7 @@ export function AppShell({
   return (
     <div className="lemarc-app-bg min-h-[100dvh] overflow-x-hidden">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col">
-        <header className="fixed inset-x-0 top-0 z-50 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-6 lg:px-8">
+        <header className="lemarc-app-header fixed inset-x-0 top-0 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-7xl">
             <div
               className={
@@ -45,7 +45,7 @@ export function AppShell({
                 " rounded-[1.15rem] px-2.5 py-2 sm:rounded-2xl sm:px-3 sm:py-2.5"
               }
             >
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 {back ? (
                   <button
                     onClick={() => router.history.back()}
@@ -78,7 +78,7 @@ export function AppShell({
                   (!back && (
                     <Link
                       to="/ordens/nova"
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
+                      className="lemarc-pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
                       aria-label="Nova OS"
                     >
                       <Plus size={18} />
@@ -98,7 +98,7 @@ export function AppShell({
                 )}
                 <button
                   onClick={handleSignOut}
-                  className="lemarc-pressable grid size-8 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:size-9"
+                  className="lemarc-pressable grid size-10 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   aria-label="Sair"
                   title="Sair"
                 >

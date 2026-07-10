@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -19,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useReportLookupsQuery } from "@/hooks/useReports";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { PERIOD_OPTIONS } from "@/lib/reports/filters";
 import type { PeriodKey } from "@/types/reports";
 
@@ -28,6 +30,7 @@ export function ClientReportDrawer() {
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState<string>("");
   const [period, setPeriod] = useState<PeriodKey>("month");
+  const isMobile = useIsMobile();
 
   function go() {
     if (!clientId) return;
@@ -42,19 +45,25 @@ export function ClientReportDrawer() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button className="lemarc-report-action-primary h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
+        <Button className="lemarc-report-action h-11 w-full gap-2 rounded-xl px-4 font-black sm:w-auto">
           <FileText size={16} />
           Relatório por cliente
         </Button>
       </SheetTrigger>
       <SheetContent
-        side="right"
-        className="w-full max-w-md border-white/10 bg-[#101a29] text-foreground"
+        side={isMobile ? "bottom" : "right"}
+        className={
+          "flex w-full flex-col border-white/10 bg-[#101a29] p-0 text-foreground " +
+          (isMobile ? "max-h-[82dvh] rounded-t-[1.5rem]" : "h-full max-w-md")
+        }
       >
-        <SheetHeader>
+        <SheetHeader className="border-b border-white/10 px-5 pb-4 pt-5 text-left">
           <SheetTitle className="font-display text-white">Gerar relatório por cliente</SheetTitle>
+          <SheetDescription className="pr-8 text-xs leading-relaxed text-slate-300/82">
+            Escolha o cliente e o período para abrir o detalhamento operacional.
+          </SheetDescription>
         </SheetHeader>
-        <div className="mt-4 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <div>
             <Label className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
               Cliente
@@ -90,7 +99,7 @@ export function ClientReportDrawer() {
             </Select>
           </div>
         </div>
-        <SheetFooter className="mt-6">
+        <SheetFooter className="border-t border-white/10 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:pb-5">
           <Button
             className="lemarc-report-action-primary h-11 w-full rounded-xl font-black"
             disabled={!clientId}

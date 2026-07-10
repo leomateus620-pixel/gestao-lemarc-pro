@@ -1,7 +1,8 @@
 import type { ReportOrderRow } from "@/types/reports";
 import { billingStatusLabel } from "@/types/reports";
 import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
-import { formatCurrency, formatDateTime, formatHours } from "./formatters";
+import { formatDateTime } from "./formatters";
+import { formatTempo, formatValor } from "./labels";
 import { getReportRowTechnicians } from "@/lib/serviceOrders/technicians";
 
 function technicianCsv(r: ReportOrderRow): string {
@@ -11,13 +12,13 @@ function technicianCsv(r: ReportOrderRow): string {
 }
 
 const CSV_HEADERS = [
-  "Numero",
+  "Número",
   "Titulo",
   "Cliente",
   "CNPJ Cliente",
   "Unidade",
   "CNPJ Unidade",
-  "Tecnicos",
+  "Técnicos",
   "Status",
   "Prioridade",
   "Tipo",
@@ -25,7 +26,7 @@ const CSV_HEADERS = [
   "Fechamento",
   "Tempo",
   "Valor estimado (R$)",
-  "Cobranca",
+  "Cobrança",
   "Faturada em",
   "Referencia",
 ];
@@ -58,8 +59,10 @@ export function ordersToCsv(rows: ReportOrderRow[]): string {
         type,
         formatDateTime(r.opened_at),
         formatDateTime(r.closed_at),
-        formatHours(r.worked_minutes),
-        (Math.round(r.estimated_value * 100) / 100).toString().replace(".", ","),
+        formatTempo(r),
+        r.estimated_value > 0
+          ? (Math.round(r.estimated_value * 100) / 100).toString().replace(".", ",")
+          : "",
         billingStatusLabel[r.billing_status],
         formatDateTime(r.billed_at),
         r.invoice_reference ?? "",
@@ -92,7 +95,7 @@ export type PrintPayload = {
 
 export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
   const win = window.open("", "_blank", "width=1000,height=720");
-  if (!win) return;
+  if (!win) return false;
   const css = `
     @page { size: A4; margin: 16mm; }
     * { box-sizing: border-box; }
@@ -133,8 +136,8 @@ export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
         <td>${escapeHtml(type)}</td>
         <td>${formatDateTime(r.opened_at)}</td>
         <td>${formatDateTime(r.closed_at)}</td>
-        <td class="num">${formatHours(r.worked_minutes)}</td>
-        <td class="num">${formatCurrency(r.estimated_value)}</td>
+        <td class="num">${formatTempo(r)}</td>
+        <td class="num">${formatValor(r)}</td>
         <td>${billingStatusLabel[r.billing_status]}</td>
       </tr>`;
     })
@@ -156,6 +159,7 @@ export function printReport({ title, subtitle, kpis, rows }: PrintPayload) {
     <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200));</script>
   </body></html>`);
   win.document.close();
+  return true;
 }
 
 function escapeHtml(s: string): string {

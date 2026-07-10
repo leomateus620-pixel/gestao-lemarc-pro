@@ -1,18 +1,15 @@
 import type {
   GroupBucket,
+  ReportDataQuality,
   ReportOrderRow,
   ReportOverview,
   ReportSeries,
   TrendPoint,
 } from "@/types/reports";
-import {
-  priorityLabel,
-  serviceTypeLabel,
-  statusLabel,
-} from "@/types/serviceOrder";
+import { priorityLabel, serviceTypeLabel, statusLabel } from "@/types/serviceOrder";
 import { groupMinutesByTechnician } from "@/lib/serviceOrders/technicians";
 
-const CLOSED_STATUSES = new Set(["finished", "approved", "cancelled"]);
+const COMPLETED_STATUSES = new Set(["finished", "approved"]);
 const PENDING_BILLING_STATUSES = new Set(["finished", "review", "approved"]);
 
 export function computeOrderRow(row: {
@@ -108,6 +105,38 @@ export function computeOverview(rows: ReportOrderRow[]): ReportOverview {
   };
 }
 
+export function computeDataQuality(rows: ReportOrderRow[]): ReportDataQuality {
+  let withoutUnit = 0;
+  let withoutTechnician = 0;
+  let withoutWorkedMinutes = 0;
+  let withoutHourlyRate = 0;
+  let pendingBilling = 0;
+  let derivedWorkedMinutes = 0;
+
+  for (const row of rows) {
+    if (!row.client_unit_id && !row.client_unit_name) withoutUnit++;
+    if (!row.technicians.length && !row.technician_id) withoutTechnician++;
+    if (row.worked_minutes_effective <= 0) withoutWorkedMinutes++;
+    if ((row.hour_rate ?? 0) <= 0) withoutHourlyRate++;
+    if (row.worked_minutes_source === "derived") derivedWorkedMinutes++;
+    if (
+      row.billing_status === "ready" ||
+      (PENDING_BILLING_STATUSES.has(row.status) && row.billing_status === "pending")
+    ) {
+      pendingBilling++;
+    }
+  }
+
+  return {
+    withoutUnit,
+    withoutTechnician,
+    withoutWorkedMinutes,
+    withoutHourlyRate,
+    pendingBilling,
+    derivedWorkedMinutes,
+  };
+}
+
 function bucket(
   rows: ReportOrderRow[],
   keyFn: (r: ReportOrderRow) => string | null,
@@ -198,10 +227,18 @@ export function computeSeries(rows: ReportOrderRow[]): ReportSeries {
     const hours = r.worked_minutes_effective / 60;
     if (cur) {
       cur.orders++;
+      if (COMPLETED_STATUSES.has(r.status)) cur.completed++;
       cur.hours += hours;
       cur.value += r.estimated_value;
     } else {
-      trendMap.set(month, { month, label, orders: 1, hours, value: r.estimated_value });
+      trendMap.set(month, {
+        month,
+        label,
+        orders: 1,
+        completed: COMPLETED_STATUSES.has(r.status) ? 1 : 0,
+        hours,
+        value: r.estimated_value,
+      });
     }
   }
   const trend = Array.from(trendMap.values()).sort((a, b) => a.month.localeCompare(b.month));
