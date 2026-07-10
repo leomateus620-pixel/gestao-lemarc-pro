@@ -321,7 +321,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
     if (labor.error) throw new Error(labor.error.message);
     if (fin.error) throw new Error(fin.error.message);
 
-    const storedEntries = (labor.data ?? []).map(normalizeLabor);
+    const storedEntries: LaborEntry[] = (labor.data ?? []).map(normalizeLabor);
     const financials = normalizeFinancials(fin.data);
     const rawSessions = sessionsRes?.error ? [] : (sessionsRes?.data ?? []);
     const closedWorkSessions: ClosedWorkSession[] = rawSessions
