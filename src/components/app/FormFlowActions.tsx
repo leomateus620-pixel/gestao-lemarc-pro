@@ -10,14 +10,9 @@ import type { ReactNode } from "react";
  */
 export function FormFlowActions({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)] md:static md:z-auto md:pb-0">
-      {/* Faixa de fade para suavizar a leitura do conteúdo logo acima. */}
-      <div
-        aria-hidden
-        className="pointer-events-none -mb-px h-5 bg-gradient-to-b from-transparent to-[oklch(0.13_0.034_252)] md:hidden"
-      />
-      <div className="pointer-events-auto border-t border-white/10 bg-[oklch(0.13_0.034_252)] shadow-[0_-18px_42px_-28px_rgba(0,0,0,0.9)] md:rounded-2xl md:border md:bg-[oklch(0.15_0.034_252)] md:shadow-[inset_0_1px_0_oklch(1_0_0/0.08)]">
-        <div className="mx-auto flex w-full max-w-3xl gap-2 px-4 py-2.5 sm:gap-3 sm:px-5 sm:py-3">
+    <div className="lemarc-form-flow-actions pointer-events-none fixed inset-x-0 bottom-0 z-40 pt-3 md:static md:z-auto">
+      <div className="pointer-events-auto border-t border-white/10 bg-[oklch(0.13_0.034_252)] shadow-[0_-16px_36px_-28px_rgba(0,0,0,0.9)] lg:rounded-xl lg:border">
+        <div className="mx-auto flex w-full max-w-5xl gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2.5 sm:gap-3 sm:px-5 sm:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pt-3 md:pb-3 lg:px-4">
           {children}
         </div>
       </div>

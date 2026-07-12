@@ -1,0 +1,7 @@
+@import "../../src/styles.css";
+@source "../../src";
+@source "./nova-os-responsive.tsx";
+
+body {
+  margin: 0;
+}

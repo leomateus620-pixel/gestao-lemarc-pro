@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarClock,
   Check,
+  CheckCircle2,
   ClipboardCheck,
   Cog,
   FileText,
@@ -17,6 +18,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  TriangleAlert,
   UserRound,
   X,
   Zap,
@@ -24,7 +26,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/app/GlassCard";
 import { FormFlowActions } from "@/components/app/FormFlowActions";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { useClientsFullQuery, useAllUnitsQuery } from "@/hooks/useClients";
@@ -39,23 +40,17 @@ import {
   type ServiceType,
 } from "@/types/serviceOrder";
 import { cn } from "@/lib/utils";
-
-type Draft = {
-  title: string;
-  description: string;
-  location: string;
-  scheduled: string;
-  clientId: string;
-  unitId: string;
-  techIds: string[];
-  noTech: boolean;
-  requesterName: string;
-  type: ServiceType;
-  typeOther: string;
-  priority: ServicePriority;
-};
-
-const STEPS = ["Dados", "Cliente", "Técnico", "Serviço", "Revisão"] as const;
+import {
+  SERVICE_ORDER_STEPS,
+  canSubmitServiceOrder,
+  getWizardActionLabel,
+  getPreviousWizardStep,
+  getWizardStepState,
+  getWizardValidationIssues,
+  getWizardValidity,
+  type ServiceOrderWizardDraft as Draft,
+  type WizardValidationIssue,
+} from "@/lib/serviceOrders/wizard";
 
 const serviceTypes = Object.entries(serviceTypeLabel) as [ServiceType, string][];
 const priorities = Object.entries(priorityLabel) as [ServicePriority, string][];
@@ -103,6 +98,7 @@ export function ServiceOrderWizard({
 
   const flowRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
+  const [attemptedStep, setAttemptedStep] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft>({
     title: "",
     description: "",
@@ -123,7 +119,7 @@ export function ServiceOrderWizard({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    flowRef.current?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
     const focusTimer = window.setTimeout(
       () => {
         const target = flowRef.current?.querySelector<HTMLElement>(
@@ -136,17 +132,8 @@ export function ServiceOrderWizard({
     return () => window.clearTimeout(focusTimer);
   }, [step]);
 
-  const validity = useMemo(() => {
-    return [
-      draft.title.trim().length >= 3,
-      Boolean(draft.clientId),
-      (draft.techIds.length > 0 || draft.noTech) && draft.requesterName.trim().length >= 2,
-      Boolean(draft.type) &&
-        Boolean(draft.priority) &&
-        (draft.type !== "outro" || draft.typeOther.trim().length >= 3),
-      true,
-    ];
-  }, [draft]);
+  const validationIssues = useMemo(() => getWizardValidationIssues(draft), [draft]);
+  const validity = useMemo(() => getWizardValidity(draft), [draft]);
 
   const createOrder = useServerFn(createServiceOrder);
   const orderMutation = useMutation({
@@ -173,43 +160,78 @@ export function ServiceOrderWizard({
   });
 
   const canGoNext = validity[step];
-  const isLast = step === STEPS.length - 1;
+  const isLast = step === SERVICE_ORDER_STEPS.length - 1;
 
   function goNext() {
-    if (!canGoNext) return;
-    if (isLast) {
-      orderMutation.mutate();
+    if (orderMutation.isPending) return;
+    if (!canGoNext) {
+      setAttemptedStep(step);
+      window.requestAnimationFrame(() => {
+        flowRef.current?.querySelector<HTMLElement>("[data-invalid='true']")?.focus();
+      });
       return;
     }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (isLast) {
+      if (canSubmitServiceOrder(canGoNext, orderMutation.isPending)) orderMutation.mutate();
+      return;
+    }
+    setAttemptedStep(null);
+    setStep((s) => Math.min(s + 1, SERVICE_ORDER_STEPS.length - 1));
   }
   function goBack() {
-    setStep((s) => Math.max(s - 1, 0));
+    setAttemptedStep(null);
+    setStep((s) => getPreviousWizardStep(s));
   }
 
-  return (
-    <div className="mt-2 space-y-5">
-      <WizardStepper step={step} validity={validity} onJump={(i) => i <= step && setStep(i)} />
+  const visibleIssues = attemptedStep === step ? validationIssues[step] : [];
 
-      <div ref={flowRef} className="min-w-0">
+  return (
+    <div className="lemarc-os-wizard mx-auto mt-1 w-full max-w-5xl space-y-4 sm:space-y-5">
+      <WizardStepper
+        step={step}
+        validity={validity}
+        onJump={(i) => {
+          if (i > step) return;
+          setAttemptedStep(null);
+          setStep(i);
+        }}
+      />
+
+      <div ref={flowRef} className="min-w-0 scroll-mt-[var(--lemarc-header-content-offset)]">
         {step === 0 && (
-          <div data-order-step-panel="0" className="lemarc-step-panel min-w-0 pb-2">
-            <BasicInfoStep draft={draft} set={set} titleRef={titleRef} />
+          <div
+            role="tabpanel"
+            aria-labelledby="order-step-0"
+            data-order-step-panel="0"
+            className="lemarc-step-panel min-w-0"
+          >
+            <BasicInfoStep draft={draft} set={set} titleRef={titleRef} issues={visibleIssues} />
           </div>
         )}
         {step === 1 && (
-          <div data-order-step-panel="1" className="lemarc-step-panel min-w-0 pb-2">
+          <div
+            role="tabpanel"
+            aria-labelledby="order-step-1"
+            data-order-step-panel="1"
+            className="lemarc-step-panel min-w-0"
+          >
             <ClientStep
               draft={draft}
               set={set}
               clients={clients}
               units={units}
               onCreated={(id) => set("clientId", id)}
+              issues={visibleIssues}
             />
           </div>
         )}
         {step === 2 && (
-          <div data-order-step-panel="2" className="lemarc-step-panel min-w-0 pb-2">
+          <div
+            role="tabpanel"
+            aria-labelledby="order-step-2"
+            data-order-step-panel="2"
+            className="lemarc-step-panel min-w-0"
+          >
             <TechnicianStep
               draft={draft}
               set={set}
@@ -218,20 +240,55 @@ export function ServiceOrderWizard({
                 set("techIds", Array.from(new Set([...draft.techIds, id])));
                 set("noTech", false);
               }}
+              issues={visibleIssues}
             />
           </div>
         )}
         {step === 3 && (
-          <div data-order-step-panel="3" className="lemarc-step-panel min-w-0 pb-2">
-            <ServiceTypeStep draft={draft} set={set} />
+          <div
+            role="tabpanel"
+            aria-labelledby="order-step-3"
+            data-order-step-panel="3"
+            className="lemarc-step-panel min-w-0"
+          >
+            <ServiceTypeStep draft={draft} set={set} issues={visibleIssues} />
           </div>
         )}
         {step === 4 && (
-          <div data-order-step-panel="4" className="lemarc-step-panel min-w-0 pb-2">
-            <ReviewStep draft={draft} clients={clients} units={units} technicians={technicians} />
+          <div
+            role="tabpanel"
+            aria-labelledby="order-step-4"
+            data-order-step-panel="4"
+            className="lemarc-step-panel min-w-0"
+          >
+            <ReviewStep
+              draft={draft}
+              clients={clients}
+              units={units}
+              technicians={technicians}
+              onEdit={setStep}
+            />
           </div>
         )}
       </div>
+
+      {visibleIssues.length > 0 && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="lemarc-validation-summary flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm"
+        >
+          <TriangleAlert aria-hidden="true" size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">Revise esta etapa para continuar:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+              {visibleIssues.map((issue) => (
+                <li key={issue.field}>{issue.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {orderMutation.isError && (
         <p className="text-sm text-rose-300">
@@ -261,56 +318,44 @@ function WizardStepper({
   onJump: (i: number) => void;
 }) {
   return (
-    <GlassCard className="lemarc-wizard-card p-2.5 sm:p-4">
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
-        {STEPS.map((label, i) => {
-          const done = i < step;
+    <nav aria-label="Etapas da criação da ordem de serviço" className="lemarc-wizard-stepper">
+      <div className="lemarc-wizard-progress" aria-hidden="true">
+        <span style={{ width: `${(step / (SERVICE_ORDER_STEPS.length - 1)) * 100}%` }} />
+      </div>
+      <ol className="grid grid-cols-5 gap-1 sm:gap-2">
+        {SERVICE_ORDER_STEPS.map(({ shortLabel, label }, i) => {
+          const state = getWizardStepState(i, step, validity[i]);
+          const done = state === "complete";
           const current = i === step;
           const enabled = i <= step;
           return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => onJump(i)}
-              disabled={!enabled}
-              aria-current={current ? "step" : undefined}
-              className={cn(
-                "group flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-not-allowed disabled:opacity-100 sm:px-3",
-                current
-                  ? "border-primary bg-primary/18 text-white shadow-[0_12px_26px_-18px_hsl(var(--primary)/0.9)]"
-                  : done
-                    ? "border-emerald-300/35 bg-emerald-500/13 text-white"
-                    : "border-white/10 bg-white/[0.035] text-slate-300/85",
-              )}
-            >
-              <span
-                className={cn(
-                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]",
-                  current
-                    ? "bg-primary text-primary-foreground"
-                    : done
-                      ? "bg-emerald-400/22 text-emerald-100"
-                      : "bg-white/[0.08] text-slate-300",
-                )}
+            <li key={label} className="relative min-w-0">
+              <button
+                id={`order-step-${i}`}
+                type="button"
+                onClick={() => onJump(i)}
+                disabled={!enabled}
+                aria-current={current ? "step" : undefined}
+                aria-label={`Etapa ${i + 1} de ${SERVICE_ORDER_STEPS.length}: ${label}${done ? ", concluída" : current ? ", atual" : ", indisponível"}`}
+                className="lemarc-wizard-step"
+                data-state={state}
               >
-                {done && validity[i] ? <Check size={14} /> : i + 1}
-              </span>
-              <span
-                className={cn(
-                  "hidden min-w-0 truncate text-[11px] font-bold sm:block lg:text-xs",
-                  current ? "text-white" : done ? "text-emerald-50" : "text-slate-300",
-                )}
-              >
-                {label}
-              </span>
-            </button>
+                <span className="lemarc-wizard-step-index">
+                  {done ? <Check aria-hidden="true" size={15} /> : i + 1}
+                </span>
+                <span className="lemarc-wizard-step-copy">
+                  <span className="sm:hidden">{shortLabel}</span>
+                  <span className="hidden sm:inline">{label}</span>
+                </span>
+              </button>
+            </li>
           );
         })}
-      </div>
-      <p className="mt-3 text-center text-xs font-bold text-primary sm:hidden">
-        Etapa {step + 1} de {STEPS.length} · {STEPS[step]}
+      </ol>
+      <p className="mt-2 text-center text-xs font-semibold text-slate-200 sm:hidden">
+        Etapa {step + 1} de {SERVICE_ORDER_STEPS.length} · {SERVICE_ORDER_STEPS[step].label}
       </p>
-    </GlassCard>
+    </nav>
   );
 }
 
@@ -343,25 +388,47 @@ function StepFooter({
       <button
         type="button"
         onClick={onNext}
-        disabled={!canGoNext || loading}
+        disabled={loading}
         className={cn(
           "lemarc-primary-action lemarc-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 font-display text-sm font-bold disabled:opacity-55 sm:h-14",
-          canGoNext && !loading && "lemarc-orange-glow hover:-translate-y-0.5 active:scale-[0.98]",
+          canGoNext && !loading && "hover:-translate-y-0.5 active:scale-[0.98]",
+          !canGoNext && !loading && "lemarc-primary-action--attention",
         )}
       >
         {isLast ? <ClipboardCheck size={18} /> : <ArrowRight size={18} />}
-        {loading ? "Criando OS..." : isLast ? "Criar ordem de serviço" : "Continuar"}
+        {getWizardActionLabel(isLast, loading)}
       </button>
     </FormFlowActions>
   );
 }
 
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function FieldLabel({
+  children,
+  required,
+  htmlFor,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  htmlFor?: string;
+}) {
   return (
-    <label className="lemarc-form-label text-xs font-semibold">
+    <label htmlFor={htmlFor} className="lemarc-form-label text-xs font-semibold">
       {children}
       {required && <span className="ml-1 text-primary">*</span>}
     </label>
+  );
+}
+
+function FieldError({ id, children }: { id: string; children?: React.ReactNode }) {
+  if (!children) return null;
+  return (
+    <p
+      id={id}
+      className="lemarc-field-error mt-1.5 flex items-center gap-1.5 text-xs font-semibold"
+    >
+      <TriangleAlert aria-hidden="true" size={13} />
+      {children}
+    </p>
   );
 }
 
@@ -382,32 +449,51 @@ function BasicInfoStep({
   draft,
   set,
   titleRef,
+  issues,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   titleRef: React.RefObject<HTMLInputElement | null>;
+  issues: WizardValidationIssue[];
 }) {
+  const titleError = issues.find((issue) => issue.field === "title")?.message;
+  const scheduledLabel = draft.scheduled
+    ? new Date(draft.scheduled).toLocaleString("pt-BR", {
+        dateStyle: "long",
+        timeStyle: "short",
+      })
+    : "Nenhuma previsão selecionada";
   return (
-    <GlassCard className="lemarc-wizard-card space-y-6 p-5 pb-8 sm:p-6 sm:pb-8">
+    <section className="lemarc-os-wizard-surface space-y-6 p-4 sm:p-6 lg:p-7">
       <StepHeader
         eyebrow="Etapa 1 · Dados iniciais"
         title="Conte o essencial da OS"
         description="Quanto melhor o contexto, mais ágil a execução em campo."
       />
       <div className="space-y-2">
-        <FieldLabel required>Título do serviço</FieldLabel>
+        <FieldLabel htmlFor="order-title" required>
+          Título do serviço
+        </FieldLabel>
         <Input
+          id="order-title"
           ref={titleRef}
           value={draft.title}
           onChange={(e) => set("title", e.target.value)}
-          placeholder="Ex.: Manutenção preventiva do compressor 02"
+          placeholder="Ex.: Manutenção do compressor 02"
           className={cn(inputCls, "h-14 text-base font-semibold")}
+          aria-invalid={Boolean(titleError)}
+          aria-describedby={titleError ? "order-title-error" : "order-title-hint"}
+          data-invalid={titleError ? "true" : undefined}
         />
-        <FieldHint>Mínimo 3 caracteres. Use um título curto e específico.</FieldHint>
+        <div id="order-title-hint">
+          <FieldHint>Mínimo 3 caracteres. Use um título curto e específico.</FieldHint>
+        </div>
+        <FieldError id="order-title-error">{titleError}</FieldError>
       </div>
       <div className="space-y-2">
-        <FieldLabel>Descrição inicial</FieldLabel>
+        <FieldLabel htmlFor="order-description">Descrição inicial</FieldLabel>
         <Textarea
+          id="order-description"
           value={draft.description}
           onChange={(e) => set("description", e.target.value)}
           placeholder="Sintomas, escopo, ferramentas, EPI necessário…"
@@ -416,8 +502,9 @@ function BasicInfoStep({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <FieldLabel>Local / setor</FieldLabel>
+          <FieldLabel htmlFor="order-location">Local / setor</FieldLabel>
           <Input
+            id="order-location"
             value={draft.location}
             onChange={(e) => set("location", e.target.value)}
             placeholder="Ex.: Casa de máquinas"
@@ -425,17 +512,22 @@ function BasicInfoStep({
           />
         </div>
         <div className="space-y-2">
-          <FieldLabel>Previsão de início</FieldLabel>
+          <FieldLabel htmlFor="order-scheduled">Previsão de início</FieldLabel>
           <Input
+            id="order-scheduled"
             type="datetime-local"
             value={draft.scheduled}
             onChange={(e) => set("scheduled", e.target.value)}
-            className={cn(inputCls, "[color-scheme:dark]")}
+            className={cn(inputCls, "lemarc-datetime-control [color-scheme:dark]")}
           />
-          <FieldHint>Quando a execução está prevista para começar.</FieldHint>
+          <p className="lemarc-datetime-value" aria-live="polite">
+            <CalendarClock aria-hidden="true" size={13} />
+            {scheduledLabel}
+          </p>
+          <FieldHint>A previsão é opcional e só será salva após sua escolha.</FieldHint>
         </div>
       </div>
-    </GlassCard>
+    </section>
   );
 }
 
@@ -447,6 +539,7 @@ function ClientStep({
   clients,
   units,
   onCreated,
+  issues,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
@@ -463,6 +556,7 @@ function ClientStep({
     default_displacement_rate_cents?: number | null;
   }[];
   onCreated: (id: string) => void;
+  issues: WizardValidationIssue[];
 }) {
   const queryClient = useQueryClient();
   const createCli = useServerFn(createCompany);
@@ -492,6 +586,8 @@ function ClientStep({
     () => units.filter((u) => u.client_id === draft.clientId),
     [units, draft.clientId],
   );
+  const selectedClient = clients.find((client) => client.id === draft.clientId);
+  const clientError = issues.find((issue) => issue.field === "clientId")?.message;
 
   const clientMutation = useMutation({
     mutationFn: () => {
@@ -525,7 +621,7 @@ function ClientStep({
   });
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
+    <section className="lemarc-os-wizard-surface space-y-5 p-4 sm:p-6 lg:p-7">
       <StepHeader
         eyebrow="Etapa 2 · Cliente"
         title="Para quem é esta ordem?"
@@ -542,6 +638,31 @@ function ClientStep({
 
       {mode === "select" ? (
         <div className="space-y-3">
+          {selectedClient && (
+            <div className="lemarc-selected-summary flex items-start gap-3 rounded-xl px-3.5 py-3">
+              <CheckCircle2
+                aria-hidden="true"
+                size={18}
+                className="mt-0.5 shrink-0 text-emerald-300"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-emerald-200">Cliente selecionado</p>
+                <p className="mt-0.5 break-words text-sm font-semibold text-white">
+                  {selectedClient.name}
+                </p>
+                {(selectedClient.unit || selectedClient.cnpj) && (
+                  <p className="mt-0.5 break-words text-xs text-slate-300">
+                    {[
+                      selectedClient.unit,
+                      selectedClient.cnpj ? maskCNPJ(selectedClient.cnpj) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="relative">
             <Search size={15} className={searchIconCls} />
             <Input
@@ -549,9 +670,30 @@ function ClientStep({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar cliente ou unidade…"
               className={cn(inputCls, "pl-10")}
+              aria-label="Buscar cliente por nome, unidade ou CNPJ"
             />
           </div>
-          <div className="lemarc-form-panel max-h-[min(22rem,52vh)] space-y-1.5 overflow-y-auto rounded-2xl p-1.5 pr-2">
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+            <span>{filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`}</span>
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="min-h-11 rounded-lg px-2 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+          <div
+            className="lemarc-selection-list space-y-1.5"
+            role="listbox"
+            aria-label="Clientes encontrados"
+            aria-invalid={Boolean(clientError)}
+            aria-describedby={clientError ? "order-client-error" : undefined}
+            tabIndex={clientError ? -1 : undefined}
+            data-invalid={clientError ? "true" : undefined}
+          >
             {filtered.length === 0 && (
               <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
                 Nenhum cliente encontrado. Use “Cadastrar novo”.
@@ -563,19 +705,21 @@ function ClientStep({
                 <button
                   key={c.id}
                   type="button"
+                  role="option"
+                  aria-selected={active}
                   onClick={() => {
                     set("clientId", c.id);
                     set("unitId", "");
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                    "lemarc-selection-row flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     active
                       ? "lemarc-choice-card-active"
-                      : "lemarc-choice-card hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07]",
+                      : "lemarc-choice-card hover:border-white/25 hover:bg-white/[0.07]",
                   )}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-white">{c.name}</div>
+                    <div className="break-words text-sm font-semibold text-white">{c.name}</div>
                     {c.unit && (
                       <div className="truncate text-[11px] font-semibold text-slate-300">
                         {c.unit}
@@ -596,24 +740,32 @@ function ClientStep({
               );
             })}
           </div>
+          <FieldError id="order-client-error">{clientError}</FieldError>
 
           {draft.clientId && selectedUnits.length > 0 && (
-            <div className="lemarc-form-panel space-y-2 rounded-2xl p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                Unidade do cliente
-              </p>
+            <div className="lemarc-wizard-subsection space-y-3 border-t border-white/10 pt-5">
+              <div>
+                <p className="text-sm font-semibold text-white">Unidade do cliente</p>
+                <p className="mt-0.5 text-xs text-slate-300">
+                  Vinculada ao cliente selecionado acima.
+                </p>
+              </div>
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => set("unitId", "")}
+                  aria-pressed={draft.unitId === ""}
                   className={cn(
-                    "rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                    "lemarc-selection-row min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     draft.unitId === ""
                       ? "lemarc-choice-card-active text-white"
                       : "lemarc-choice-card text-slate-300 hover:border-white/25 hover:text-white",
                   )}
                 >
-                  Sem unidade específica
+                  <span className="flex items-center justify-between gap-2">
+                    Sem unidade específica
+                    {draft.unitId === "" && <Check aria-hidden="true" size={14} />}
+                  </span>
                 </button>
                 {selectedUnits.map((u) => {
                   const active = draft.unitId === u.id;
@@ -622,14 +774,18 @@ function ClientStep({
                       key={u.id}
                       type="button"
                       onClick={() => set("unitId", u.id)}
+                      aria-pressed={active}
                       className={cn(
-                        "rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                        "lemarc-selection-row min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                         active
                           ? "lemarc-choice-card-active text-white"
                           : "lemarc-choice-card text-slate-300 hover:border-white/25 hover:text-white",
                       )}
                     >
-                      <div className="truncate">{u.name}</div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="break-words">{u.name}</span>
+                        {active && <Check aria-hidden="true" size={14} className="shrink-0" />}
+                      </div>
                       {u.cnpj && (
                         <div className="truncate font-mono text-[10px] font-semibold text-slate-400">
                           {maskCNPJ(u.cnpj)}
@@ -658,8 +814,8 @@ function ClientStep({
                     selected.default_displacement_rate_cents != null;
                   if (!hasExtra) return null;
                   return (
-                    <div className="mt-2 rounded-2xl border border-primary/25 bg-primary/10 p-3 text-[11px] font-semibold text-slate-100">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">
+                    <div className="mt-2 border-l-2 border-primary/60 bg-primary/[0.07] px-3 py-2.5 text-xs font-medium text-slate-100">
+                      <p className="text-xs font-semibold text-primary">
                         Dados da unidade selecionada
                       </p>
                       <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
@@ -695,7 +851,7 @@ function ClientStep({
           )}
         </div>
       ) : (
-        <div className="lemarc-form-panel space-y-4 rounded-2xl p-4">
+        <div className="space-y-4 border-t border-white/10 pt-5">
           <div className="space-y-2">
             <FieldLabel required>Nome do cliente</FieldLabel>
             <Input
@@ -733,14 +889,14 @@ function ClientStep({
             type="button"
             onClick={() => clientMutation.mutate()}
             disabled={!newName.trim() || clientMutation.isPending}
-            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-black uppercase tracking-wider"
+            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-semibold"
           >
             <Plus size={16} />
             {clientMutation.isPending ? "Salvando..." : "Salvar e selecionar"}
           </Button>
         </div>
       )}
-    </GlassCard>
+    </section>
   );
 }
 
@@ -751,11 +907,13 @@ function TechnicianStep({
   set,
   technicians,
   onCreated,
+  issues,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   technicians: TechnicianLite[];
   onCreated: (id: string) => void;
+  issues: WizardValidationIssue[];
 }) {
   const queryClient = useQueryClient();
   const createTec = useServerFn(createTechnician);
@@ -787,56 +945,87 @@ function TechnicianStep({
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
     },
   });
+  const requesterError = issues.find((issue) => issue.field === "requesterName")?.message;
+  const technicianError = issues.find((issue) => issue.field === "technician")?.message;
 
   return (
-    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
+    <section className="lemarc-os-wizard-surface space-y-5 p-4 sm:p-6 lg:p-7">
       <StepHeader
         eyebrow="Etapa 3 · Solicitante e técnico"
         title="Quem pediu e quem vai executar?"
-        description="Informe quem solicitou esta OS e, se quiser, já atribua o técnico responsável."
+        description="Registre o solicitante e defina como a execução será atribuída."
       />
 
-      <div className="lemarc-form-panel space-y-2 rounded-2xl p-4">
-        <FieldLabel required>Solicitante da OS</FieldLabel>
+      <div className="lemarc-wizard-subsection space-y-2">
+        <div>
+          <p className="text-sm font-semibold text-white">Contexto do cliente</p>
+          <p className="mt-0.5 text-xs text-slate-300">Quem solicitou a abertura desta OS.</p>
+        </div>
+        <FieldLabel htmlFor="order-requester" required>
+          Solicitante da OS
+        </FieldLabel>
         <Input
+          id="order-requester"
           value={draft.requesterName}
           onChange={(e) => set("requesterName", e.target.value.slice(0, 120))}
           placeholder="Nome de quem solicitou o serviço"
           className={inputCls}
           maxLength={120}
           autoComplete="off"
+          aria-invalid={Boolean(requesterError)}
+          aria-describedby={requesterError ? "order-requester-error" : "order-requester-hint"}
+          data-invalid={requesterError ? "true" : undefined}
         />
-        <FieldHint>Pessoa responsável pela abertura desta OS no cliente.</FieldHint>
+        <div id="order-requester-hint">
+          <FieldHint>Pessoa responsável pela abertura desta OS no cliente.</FieldHint>
+        </div>
+        <FieldError id="order-requester-error">{requesterError}</FieldError>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          set("noTech", !draft.noTech);
-          if (!draft.noTech) set("techIds", []);
-        }}
-        className={cn(
-          "flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-          draft.noTech
-            ? "lemarc-choice-card-active"
-            : "lemarc-form-panel border-dashed hover:border-white/30 hover:bg-white/[0.06]",
-        )}
+      <div
+        className="lemarc-wizard-subsection space-y-3 border-t border-white/10 pt-5"
+        aria-describedby={technicianError ? "order-technician-error" : undefined}
       >
         <div>
-          <div className="text-sm font-black text-white">Sem técnico definido</div>
-          <div className="text-[11px] font-semibold text-slate-300">
-            Atribuir depois, pelo painel da OS.
-          </div>
+          <p className="text-sm font-semibold text-white">Execução da OS</p>
+          <p className="mt-0.5 text-xs text-slate-300">
+            Se a equipe ainda não estiver definida, registre essa decisão explicitamente.
+          </p>
         </div>
-        <span
+        <button
+          type="button"
+          aria-pressed={draft.noTech}
+          onClick={() => {
+            set("noTech", !draft.noTech);
+            if (!draft.noTech) set("techIds", []);
+          }}
           className={cn(
-            "grid h-6 w-6 place-items-center rounded-full",
-            draft.noTech ? "bg-primary text-primary-foreground" : "bg-white/[0.08] text-slate-300",
+            "lemarc-selection-row flex min-h-14 w-full items-center justify-between rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+            draft.noTech
+              ? "lemarc-choice-card-active"
+              : "lemarc-choice-card border-dashed hover:border-white/30 hover:bg-white/[0.06]",
           )}
+          data-invalid={technicianError ? "true" : undefined}
         >
-          {draft.noTech && <Check size={14} />}
-        </span>
-      </button>
+          <div>
+            <div className="text-sm font-semibold text-white">Sem técnico definido</div>
+            <div className="text-xs text-slate-300">
+              A equipe será atribuída depois, no painel da OS.
+            </div>
+          </div>
+          <span
+            className={cn(
+              "grid h-7 w-7 shrink-0 place-items-center rounded-full border",
+              draft.noTech
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-white/20 bg-white/[0.06] text-slate-300",
+            )}
+          >
+            {draft.noTech && <Check aria-hidden="true" size={14} />}
+          </span>
+        </button>
+        <FieldError id="order-technician-error">{technicianError}</FieldError>
+      </div>
 
       <Segmented
         value={mode}
@@ -848,11 +1037,9 @@ function TechnicianStep({
       />
 
       {!draft.noTech && draft.techIds.length > 0 && (
-        <div className="lemarc-review-card rounded-2xl p-3">
+        <div className="lemarc-selected-summary rounded-xl p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-              Técnicos selecionados
-            </p>
+            <p className="text-xs font-semibold text-primary">Técnicos selecionados</p>
             <span className="rounded-full border border-primary/50 bg-primary/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
               {draft.techIds.length} {draft.techIds.length === 1 ? "técnico" : "técnicos"}
             </span>
@@ -864,7 +1051,7 @@ function TechnicianStep({
               return (
                 <span
                   key={id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-primary/20 px-2.5 py-1 text-[11px] font-black text-white shadow-[0_8px_18px_-14px_hsl(var(--primary)/0.8)]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-white"
                 >
                   {t.full_name}
                   <button
@@ -896,9 +1083,15 @@ function TechnicianStep({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar técnico ou função…"
               className={cn(inputCls, "pl-10")}
+              aria-label="Buscar técnico por nome ou função"
             />
           </div>
-          <div className="lemarc-form-panel max-h-[min(22rem,52vh)] space-y-1.5 overflow-y-auto rounded-2xl p-1.5 pr-2">
+          <p className="text-xs text-slate-300">
+            {filtered.length === 1
+              ? "1 técnico encontrado"
+              : `${filtered.length} técnicos encontrados`}
+          </p>
+          <div className="lemarc-selection-list space-y-1.5">
             {technicians.length > activeTechnicians.length && (
               <p className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-bold text-amber-100">
                 Colaboradores inativos ficam ocultos na criação de novas OS.
@@ -915,6 +1108,7 @@ function TechnicianStep({
                 <button
                   key={t.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => {
                     set("noTech", false);
                     if (active) {
@@ -927,14 +1121,16 @@ function TechnicianStep({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                    "lemarc-selection-row flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     active
                       ? "lemarc-choice-card-active"
-                      : "lemarc-choice-card hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07]",
+                      : "lemarc-choice-card hover:border-white/25 hover:bg-white/[0.07]",
                   )}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-white">{t.full_name}</div>
+                    <div className="break-words text-sm font-semibold text-white">
+                      {t.full_name}
+                    </div>
                     {t.role && (
                       <div className="truncate text-[11px] font-semibold text-slate-300">
                         {t.role}
@@ -952,7 +1148,7 @@ function TechnicianStep({
           </div>
         </div>
       ) : (
-        <div className="lemarc-form-panel space-y-4 rounded-2xl p-4">
+        <div className="space-y-4 border-t border-white/10 pt-5">
           <div className="space-y-2">
             <FieldLabel required>Nome do técnico</FieldLabel>
             <Input
@@ -975,14 +1171,14 @@ function TechnicianStep({
             type="button"
             onClick={() => techMutation.mutate()}
             disabled={!newName.trim() || techMutation.isPending}
-            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-black uppercase tracking-wider"
+            className="lemarc-primary-action h-12 w-full gap-2 rounded-xl font-semibold"
           >
             <Plus size={16} />
             {techMutation.isPending ? "Salvando..." : "Salvar e selecionar"}
           </Button>
         </div>
       )}
-    </GlassCard>
+    </section>
   );
 }
 
@@ -991,98 +1187,109 @@ function TechnicianStep({
 function ServiceTypeStep({
   draft,
   set,
+  issues,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
+  issues: WizardValidationIssue[];
 }) {
+  const typeOtherError = issues.find((issue) => issue.field === "typeOther")?.message;
   return (
-    <GlassCard className="lemarc-wizard-card space-y-6 p-5 sm:p-6">
+    <section className="lemarc-os-wizard-surface space-y-6 p-4 sm:p-6 lg:p-7">
       <StepHeader
         eyebrow="Etapa 4 · Serviço"
         title="Que tipo de serviço é este?"
         description="A categoria e a prioridade orientam o roteiro da execução."
       />
-      <div className="space-y-2">
-        <FieldLabel required>Tipo de serviço</FieldLabel>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {serviceTypes.map(([key, label]) => {
-            const Icon = typeIcon[key];
-            const active = draft.type === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => set("type", key)}
-                className={cn(
-                  "group relative flex min-h-[92px] flex-col items-start gap-2 rounded-xl border px-3 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-                  active
-                    ? "lemarc-choice-card-active text-white"
-                    : "lemarc-choice-card text-slate-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07] hover:text-white",
-                )}
-              >
-                {active && (
-                  <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
-                    <Check size={12} />
-                  </span>
-                )}
-                <span
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+        <div className="space-y-2">
+          <FieldLabel required>Tipo de serviço</FieldLabel>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {serviceTypes.map(([key, label]) => {
+              const Icon = typeIcon[key];
+              const active = draft.type === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => set("type", key)}
                   className={cn(
-                    "grid h-9 w-9 place-items-center rounded-lg",
+                    "lemarc-selection-row group relative flex min-h-[88px] flex-col items-start gap-2 rounded-lg border px-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                     active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-white/[0.08] text-slate-100",
+                      ? "lemarc-choice-card-active text-white"
+                      : "lemarc-choice-card text-slate-300 hover:border-white/25 hover:bg-white/[0.07] hover:text-white",
                   )}
                 >
-                  <Icon size={16} />
-                </span>
-                <span className="text-[11px] font-black uppercase tracking-[0.08em] leading-tight">
-                  {label}
-                </span>
-              </button>
-            );
-          })}
+                  {active && (
+                    <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
+                      <Check size={12} />
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-lg",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-white/[0.08] text-slate-100",
+                    )}
+                  >
+                    <Icon size={16} />
+                  </span>
+                  <span className="text-xs font-semibold leading-tight">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {draft.type === "outro" && (
+            <div className="lemarc-option-reveal mt-3 space-y-2 border-l-2 border-primary/55 pl-3">
+              <FieldLabel htmlFor="order-type-other" required>
+                Descreva o tipo de serviço
+              </FieldLabel>
+              <Input
+                id="order-type-other"
+                value={draft.typeOther}
+                onChange={(e) => set("typeOther", e.target.value)}
+                placeholder="Ex.: Calibração de sensores de vazão"
+                className={inputCls}
+                autoFocus
+                aria-invalid={Boolean(typeOtherError)}
+                aria-describedby={typeOtherError ? "order-type-other-error" : undefined}
+                data-invalid={typeOtherError ? "true" : undefined}
+              />
+              <FieldHint>Mínimo 3 caracteres. Este texto aparecerá na OS.</FieldHint>
+              <FieldError id="order-type-other-error">{typeOtherError}</FieldError>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2 lg:border-l lg:border-white/10 lg:pl-6">
+          <FieldLabel required>Prioridade</FieldLabel>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+            {priorities.map(([key, label]) => {
+              const active = draft.priority === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => set("priority", key)}
+                  className={cn(
+                    "lemarc-selection-row min-h-12 rounded-lg border px-3 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                    active ? priorityActive[key] : priorityTone[key],
+                  )}
+                >
+                  <span className="inline-flex items-center justify-center gap-2">
+                    {active && <Check size={13} />}
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
-
-      {draft.type === "outro" && (
-        <div className="lemarc-form-panel space-y-2 rounded-2xl p-4">
-          <FieldLabel required>Descreva o tipo de serviço</FieldLabel>
-          <Input
-            value={draft.typeOther}
-            onChange={(e) => set("typeOther", e.target.value)}
-            placeholder="Ex.: Calibração de sensores de vazão"
-            className={inputCls}
-            autoFocus
-          />
-          <FieldHint>Mínimo 3 caracteres. Este texto aparecerá na OS.</FieldHint>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <FieldLabel required>Prioridade</FieldLabel>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {priorities.map(([key, label]) => {
-            const active = draft.priority === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => set("priority", key)}
-                className={cn(
-                  "min-h-12 rounded-xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-                  active ? priorityActive[key] : priorityTone[key],
-                )}
-              >
-                <span className="inline-flex items-center justify-center gap-2">
-                  {active && <Check size={13} />}
-                  {label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </GlassCard>
+    </section>
   );
 }
 
@@ -1093,6 +1300,7 @@ function ReviewStep({
   clients,
   units,
   technicians,
+  onEdit,
 }: {
   draft: Draft;
   clients: { id: string; name: string; unit: string | null; cnpj: string | null }[];
@@ -1106,6 +1314,7 @@ function ReviewStep({
     state?: string | null;
   }[];
   technicians: TechnicianLite[];
+  onEdit: (step: number) => void;
 }) {
   const client = clients.find((c) => c.id === draft.clientId);
   const unit = units.find((u) => u.id === draft.unitId);
@@ -1113,7 +1322,10 @@ function ReviewStep({
     .map((id) => technicians.find((t) => t.id === id))
     .filter((t): t is TechnicianLite => Boolean(t));
   const scheduledLabel = draft.scheduled
-    ? new Date(draft.scheduled).toLocaleString("pt-BR")
+    ? new Date(draft.scheduled).toLocaleString("pt-BR", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
     : "Sem previsão definida";
   const unitLabel = unit
     ? [
@@ -1133,52 +1345,54 @@ function ReviewStep({
     alta: "border-amber-300/70 bg-amber-400/22 text-amber-100",
     urgente: "border-rose-300/70 bg-rose-500/22 text-rose-100",
   };
+  const optionalMissing = [
+    !draft.description.trim() ? "Descrição inicial" : null,
+    !draft.location.trim() ? "Local / setor" : null,
+    !draft.scheduled ? "Previsão de início" : null,
+    !draft.unitId ? "Unidade específica" : null,
+  ].filter((item): item is string => Boolean(item));
   return (
-    <div className="space-y-4">
-      <GlassCard className="lemarc-wizard-card space-y-4 p-5 sm:p-6">
-        <StepHeader
-          eyebrow="Etapa 5 · Revisão"
-          title="Confira antes de criar"
-          description="Você ainda pode voltar e ajustar qualquer dado."
-        />
-        <div className="lemarc-summary-panel rounded-2xl p-4 sm:p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-            Título do serviço
-          </p>
-          <h3 className="mt-1.5 font-display text-xl font-black leading-tight text-white sm:text-2xl">
-            {draft.title || "Não informado"}
-          </h3>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100">
-              {typeLabel}
-            </span>
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]",
-                priorityChip[draft.priority],
-              )}
-            >
-              Prioridade {priorityLabel[draft.priority]}
-            </span>
-          </div>
+    <section className="lemarc-os-wizard-surface space-y-5 p-4 sm:p-6 lg:p-7">
+      <StepHeader
+        eyebrow="Etapa 5 · Revisão"
+        title="Confira antes de criar"
+        description="Você ainda pode voltar e ajustar qualquer dado."
+      />
+      <div className="lemarc-review-identity border-l-2 border-primary pl-3 sm:pl-4">
+        <p className="text-xs font-semibold text-primary">Ordem de serviço</p>
+        <h3 className="mt-1 font-display text-xl font-bold leading-tight text-white sm:text-2xl">
+          {draft.title || "Não informado"}
+        </h3>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-100">
+            {typeLabel}
+          </span>
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-xs font-semibold",
+              priorityChip[draft.priority],
+            )}
+          >
+            Prioridade {priorityLabel[draft.priority]}
+          </span>
         </div>
-      </GlassCard>
+      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ReviewSection title="Dados iniciais" icon={FileText}>
+      <div className="lemarc-review-grid grid gap-0 md:grid-cols-2">
+        <ReviewSection title="Dados iniciais" icon={FileText} onEdit={() => onEdit(0)}>
           <ReviewField label="Descrição">
             {draft.description?.trim() || "Não informado"}
           </ReviewField>
         </ReviewSection>
 
-        <ReviewSection title="Local e previsão" icon={MapPin}>
+        <ReviewSection title="Local e previsão" icon={MapPin} onEdit={() => onEdit(0)}>
           <ReviewField label="Local / setor">{draft.location || "Não informado"}</ReviewField>
           <ReviewField label="Previsão de início" icon={CalendarClock}>
             {scheduledLabel}
           </ReviewField>
         </ReviewSection>
 
-        <ReviewSection title="Cliente e técnico" icon={Building2}>
+        <ReviewSection title="Cliente e equipe" icon={Building2} onEdit={() => onEdit(1)}>
           <ReviewField label="Cliente">{client?.name ?? "Não informado"}</ReviewField>
           <ReviewField label="Unidade">{unitLabel}</ReviewField>
           <ReviewField label="Solicitante" icon={UserRound}>
@@ -1209,7 +1423,7 @@ function ReviewStep({
           </ReviewField>
         </ReviewSection>
 
-        <ReviewSection title="Serviço e prioridade" icon={Sparkles}>
+        <ReviewSection title="Serviço e prioridade" icon={Sparkles} onEdit={() => onEdit(3)}>
           <ReviewField label="Tipo de serviço">{typeLabel}</ReviewField>
           <ReviewField label="Prioridade">
             <span
@@ -1223,7 +1437,17 @@ function ReviewStep({
           </ReviewField>
         </ReviewSection>
       </div>
-    </div>
+
+      {optionalMissing.length > 0 && (
+        <div className="lemarc-optional-note flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-xs text-amber-50">
+          <TriangleAlert aria-hidden="true" size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <p>
+            <span className="font-semibold">Informações opcionais não preenchidas:</span>{" "}
+            {optionalMissing.join(", ")}. A OS pode ser criada normalmente.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1231,21 +1455,30 @@ function ReviewSection({
   title,
   icon: Icon,
   children,
+  onEdit,
 }: {
   title: string;
   icon: typeof Cog;
   children: React.ReactNode;
+  onEdit: () => void;
 }) {
   return (
-    <div className="lemarc-review-card rounded-2xl p-4">
+    <section className="lemarc-review-section py-4 md:px-4">
       <div className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg border border-primary/30 bg-primary/18 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+        <span className="grid h-8 w-8 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <Icon size={14} />
         </span>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{title}</p>
+        <h3 className="flex-1 text-sm font-semibold text-white">{title}</h3>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+        >
+          Editar
+        </button>
       </div>
-      <div className="mt-3 space-y-3">{children}</div>
-    </div>
+      <dl className="mt-3 space-y-3">{children}</dl>
+    </section>
   );
 }
 
@@ -1260,11 +1493,11 @@ function ReviewField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
         {Icon && <Icon size={11} />}
         {label}
-      </span>
-      <span className="text-sm font-bold leading-relaxed text-white">{children}</span>
+      </dt>
+      <dd className="break-words text-sm font-semibold leading-relaxed text-white">{children}</dd>
     </div>
   );
 }
@@ -1309,6 +1542,7 @@ function Segmented<T extends string>({
             key={it.value}
             type="button"
             onClick={() => onChange(it.value)}
+            aria-pressed={active}
             className={cn(
               "rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               active

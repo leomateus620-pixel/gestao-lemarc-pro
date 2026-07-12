@@ -35,7 +35,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const { user } = useAuth();
   const { isTecnico } = useUserRole();
   const myTechId = useMemo(
-    () => (user ? technicians.find((t) => t.user_id === user.id)?.id ?? null : null),
+    () => (user ? (technicians.find((t) => t.user_id === user.id)?.id ?? null) : null),
     [technicians, user],
   );
   const queryClient = useQueryClient();
@@ -60,8 +60,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
       return;
     }
     if (!selectedTech) {
-      const preferred =
-        myTechId ?? technicians.find((t) => t.is_primary)?.id ?? technicians[0].id;
+      const preferred = myTechId ?? technicians.find((t) => t.is_primary)?.id ?? technicians[0].id;
       setSelectedTech(preferred);
     }
   }, [selectedTech, technicians, isTecnico, myTechId]);
@@ -82,8 +81,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   };
 
   const startMut = useMutation({
-    mutationFn: (technicianId: string) =>
-      startFn({ data: { orderId: order.id, technicianId } }),
+    mutationFn: (technicianId: string) => startFn({ data: { orderId: order.id, technicianId } }),
     onSuccess: () => {
       toast.success("Serviço iniciado");
       invalidate();
@@ -107,9 +105,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
     },
     onSuccess: ({ started }) => {
       toast.success(
-        started > 1
-          ? `Serviço iniciado para ${started} técnicos.`
-          : "Serviço iniciado.",
+        started > 1 ? `Serviço iniciado para ${started} técnicos.` : "Serviço iniciado.",
       );
       invalidate();
     },
@@ -137,8 +133,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   });
 
   const resumeMut = useMutation({
-    mutationFn: (technicianId: string) =>
-      resumeFn({ data: { orderId: order.id, technicianId } }),
+    mutationFn: (technicianId: string) => resumeFn({ data: { orderId: order.id, technicianId } }),
     onSuccess: () => {
       toast.success("Serviço retomado");
       invalidate();
@@ -158,7 +153,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
 
   if (technicians.length === 0) {
     return (
-      <GlassCard className="mt-4 p-4">
+      <GlassCard className="lemarc-os-time-control mt-4 p-4">
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">
           Controle de tempo
         </p>
@@ -179,15 +174,19 @@ export function ServiceOrderTimeControl({ order }: Props) {
     liveState === "running"
       ? { label: "Em execução", cls: "border-status-done/40 bg-status-done/12 text-status-done" }
       : liveState === "partially_paused"
-        ? { label: "Parcialmente pausada", cls: "border-amber-400/40 bg-amber-500/10 text-amber-200" }
+        ? {
+            label: "Parcialmente pausada",
+            cls: "border-amber-400/40 bg-amber-500/10 text-amber-200",
+          }
         : liveState === "fully_paused"
           ? { label: "Pausada", cls: "border-amber-400/50 bg-amber-500/15 text-amber-200" }
           : liveState === "finished"
             ? { label: "Sessões encerradas", cls: "border-primary/40 bg-primary/10 text-primary" }
             : { label: "Não iniciada", cls: "border-border bg-secondary/40 text-muted-foreground" };
 
-  const pauseTechName =
-    pauseTech ? technicians.find((t) => t.id === pauseTech)?.full_name ?? null : null;
+  const pauseTechName = pauseTech
+    ? (technicians.find((t) => t.id === pauseTech)?.full_name ?? null)
+    : null;
 
   const lockToSelf = isTecnico && !!myTechId;
 
@@ -197,13 +196,11 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const showBulkStart = technicians.length >= 1 && technicians.length <= 2 && allIdle;
 
   return (
-    <GlassCard className="mt-4 p-4">
+    <GlassCard className="lemarc-os-time-control mt-4 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary">
-            Controle de tempo da OS
-          </p>
-          <h2 className="mt-0.5 font-display text-base font-black text-foreground">
+          <p className="text-xs font-semibold text-primary">Controle de tempo da OS</p>
+          <h2 className="mt-1 font-display text-lg font-bold text-foreground tabular-nums">
             Total trabalhado: {formatHHmm(totalWorked)}
           </h2>
         </div>
@@ -282,9 +279,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
                         {" · "}
                         <span className="text-amber-300">
                           Pausada
-                          {st.lastPauseReason
-                            ? ` (${pauseReasonLabel(st.lastPauseReason)})`
-                            : ""}
+                          {st.lastPauseReason ? ` (${pauseReasonLabel(st.lastPauseReason)})` : ""}
                           {st.lastPauseAt ? ` às ${formatHm(st.lastPauseAt)}` : ""}
                         </span>
                       </>
