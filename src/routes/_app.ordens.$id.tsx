@@ -150,9 +150,7 @@ function OrdemDetalhe() {
   const missing = missingFields(order);
   const technicians = getOrderTechnicians(order);
   const isStartFlow =
-    order.status === "pending" ||
-    order.status === "dispatched" ||
-    order.status === "transit";
+    order.status === "pending" || order.status === "dispatched" || order.status === "transit";
 
   const startServiceMutation = useMutation({
     mutationFn: async () => {
@@ -160,9 +158,7 @@ function OrdemDetalhe() {
         throw new Error("Vincule ao menos um técnico para iniciar o serviço.");
       }
       const results = await Promise.allSettled(
-        technicians.map((t) =>
-          startWorkFn({ data: { orderId: order.id, technicianId: t.id } }),
-        ),
+        technicians.map((t) => startWorkFn({ data: { orderId: order.id, technicianId: t.id } })),
       );
       let started = 0;
       let alreadyActive = 0;
@@ -254,144 +250,156 @@ function OrdemDetalhe() {
     order.status === "running"
       ? "Apure horas, deslocamento e feche a OS."
       : "Confira valores, adicione deslocamento e feche a OS.";
+  const serviceType =
+    order.service_type === "outro" && order.service_type_other
+      ? order.service_type_other
+      : order.service_type
+        ? serviceTypeLabel[order.service_type]
+        : "Sem tipo definido";
+  const statusTone: Record<ServiceOrderStatus, string> = {
+    pending: "lemarc-status-chip--neutral",
+    dispatched: "lemarc-status-chip--info",
+    transit: "lemarc-status-chip--info",
+    running: "lemarc-status-chip--running",
+    finished: "lemarc-status-chip--success",
+    review: "lemarc-status-chip--warning",
+    approved: "lemarc-status-chip--success",
+    cancelled: "lemarc-status-chip--danger",
+  };
 
   return (
-    <>
-      <GlassCard className="lemarc-hero-gradient mt-2 overflow-hidden p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              {order.service_type === "outro" && order.service_type_other
-                ? order.service_type_other
-                : order.service_type
-                  ? serviceTypeLabel[order.service_type]
-                  : "Sem tipo"}
-            </p>
-            <h1 className="mt-1 font-display text-xl font-black leading-tight text-foreground">
-              OS #{order.number} · {order.title}
-            </h1>
-          </div>
-          <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-            {statusLabel[order.status]}
-          </span>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-          {order.priority && (
-            <span className="rounded-full border border-border bg-secondary/50 px-2 py-0.5">
-              Prioridade {priorityLabel[order.priority]}
+    <div className="lemarc-os-detail mx-auto w-full max-w-7xl">
+      <div
+        className={cn(
+          "lemarc-os-detail-primary mt-1",
+          showActionCard && "lg:grid-cols-[1fr_20rem]",
+        )}
+      >
+        <section className="lemarc-os-detail-summary">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-primary">{serviceType}</p>
+              <h1 className="mt-1 break-words font-display text-xl font-bold leading-tight text-foreground sm:text-2xl">
+                <span className="tabular-nums">OS #{order.number}</span>
+                <span className="mx-1.5 text-muted-foreground" aria-hidden="true">
+                  ·
+                </span>
+                {order.title}
+              </h1>
+            </div>
+            <span className={cn("lemarc-status-chip", statusTone[order.status])}>
+              {statusLabel[order.status]}
             </span>
-          )}
-          <span className="rounded-full border border-border bg-secondary/50 px-2 py-0.5">
-            Aberta {formatServiceOrderDateTime(getOpenedAt(order)) ?? "—"}
-          </span>
-          {(() => {
-            const closed = getClosedAt(order);
-            const closedLabel = formatServiceOrderDateTime(closed);
-            if (!closedLabel) return null;
-            const verb = order.status === "cancelled" ? "Cancelada" : "Fechada";
-            return (
-              <span className="rounded-full border border-border bg-secondary/50 px-2 py-0.5">
-                {verb} {closedLabel}
-              </span>
-            );
-          })()}
-          {(() => {
-            const dur = formatServiceOrderDuration(getOpenedAt(order), getClosedAt(order));
-            if (!dur) return null;
-            return (
-              <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary">
-                Tempo total {dur}
-              </span>
-            );
-          })()}
-        </div>
-        <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
-          <MetaRow icon={Building2}>
-            <span className="font-bold text-foreground">{order.client?.name ?? "Sem cliente"}</span>
-            {order.client?.cnpj && (
-              <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-                CNPJ {maskCNPJ(order.client.cnpj)}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {order.priority && (
+              <span className="lemarc-detail-chip">
+                Prioridade <strong>{priorityLabel[order.priority]}</strong>
               </span>
             )}
-          </MetaRow>
-          {(order.client_unit || order.client?.unit) && (
-            <MetaRow icon={Building2}>
-              <span className="font-semibold text-foreground/90">
-                Unidade: {order.client_unit?.name ?? order.client?.unit ?? "—"}
-              </span>
-              {order.client_unit?.cnpj && (
-                <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-                  CNPJ {maskCNPJ(order.client_unit.cnpj)}
+            <span className="lemarc-detail-chip tabular-nums">
+              Aberta {formatServiceOrderDateTime(getOpenedAt(order)) ?? "—"}
+            </span>
+            {(() => {
+              const closed = getClosedAt(order);
+              const closedLabel = formatServiceOrderDateTime(closed);
+              if (!closedLabel) return null;
+              const verb = order.status === "cancelled" ? "Cancelada" : "Fechada";
+              return (
+                <span className="lemarc-detail-chip tabular-nums">
+                  {verb} {closedLabel}
                 </span>
-              )}
-              {(order.client_unit?.city || order.client_unit?.state) && (
-                <span className="ml-2 text-[11px] text-muted-foreground">
-                  · {[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}
-                </span>
-              )}
-            </MetaRow>
-          )}
-          {order.location && <MetaRow icon={MapPin}>{order.location}</MetaRow>}
-          <MetaRow icon={HardHat}>
-            {technicians.length === 0
-              ? "Sem técnico"
-              : technicians.map((t) => t.full_name).join(", ")}
-          </MetaRow>
-          {order.requester_name && (
-            <MetaRow icon={UserRound}>Solicitado por {order.requester_name}</MetaRow>
-          )}
-          {order.scheduled_for && (
-            <MetaRow icon={Clock}>
-              Previsão de início: {new Date(order.scheduled_for).toLocaleString("pt-BR")}
-            </MetaRow>
-          )}
-        </div>
-      </GlassCard>
+              );
+            })()}
+            {(() => {
+              const dur = formatServiceOrderDuration(getOpenedAt(order), getClosedAt(order));
+              if (!dur) return null;
+              return <span className="lemarc-detail-chip tabular-nums">Tempo total {dur}</span>;
+            })()}
+          </div>
 
-      {showActionCard && (
-        <GlassCard className="mt-4 p-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary">
-            Próxima ação
-          </p>
-          <h2 className="font-display text-lg font-black text-foreground">
-            {adminReview ? adminReviewLabel : action.label}
-          </h2>
-          {adminReview && <p className="mt-1 text-xs text-muted-foreground">{adminReviewHint}</p>}
-          <div className="mt-3">
-            {tecnicoFinalize ? (
-              <PrimaryCTA
-                onClick={handleTecnicoFinish}
-                icon={Calculator}
-                disabled={mutation.isPending}
-              >
-                {mutation.isPending ? "Finalizando..." : "Finalizar OS"}
-              </PrimaryCTA>
-            ) : adminReview ? (
-              <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
-                {adminReviewLabel}
-              </PrimaryCTA>
-            ) : action.next ? (
-              isStartFlow ? (
+          <dl className="lemarc-os-summary-grid mt-4">
+            <DetailField icon={Building2} label="Cliente">
+              {order.client?.name ?? "Sem cliente"}
+              {order.client?.cnpj ? ` · CNPJ ${maskCNPJ(order.client.cnpj)}` : ""}
+            </DetailField>
+            <DetailField icon={Building2} label="Unidade">
+              {order.client_unit?.name ?? order.client?.unit ?? "Sem unidade específica"}
+              {order.client_unit?.city || order.client_unit?.state
+                ? ` · ${[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}`
+                : ""}
+            </DetailField>
+            <DetailField icon={HardHat} label="Técnico responsável">
+              {technicians.length === 0
+                ? "Sem técnico definido"
+                : technicians.map((t) => t.full_name).join(", ")}
+            </DetailField>
+            <DetailField icon={UserRound} label="Solicitante">
+              {order.requester_name || "Não informado"}
+            </DetailField>
+            <DetailField icon={Clock} label="Previsão de início">
+              {order.scheduled_for
+                ? new Date(order.scheduled_for).toLocaleString("pt-BR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })
+                : "Sem previsão definida"}
+            </DetailField>
+            <DetailField icon={MapPin} label="Local / setor">
+              {order.location || "Não informado"}
+            </DetailField>
+          </dl>
+        </section>
+
+        {showActionCard && (
+          <aside className="lemarc-os-next-action" aria-labelledby="next-action-title">
+            <p className="text-xs font-semibold text-primary">Próxima ação</p>
+            <h2
+              id="next-action-title"
+              className="mt-1 font-display text-lg font-bold text-foreground"
+            >
+              {adminReview ? adminReviewLabel : action.label}
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {adminReview ? adminReviewHint : "Avance a OS para a próxima etapa operacional."}
+            </p>
+            <div className="mt-4">
+              {tecnicoFinalize ? (
                 <PrimaryCTA
-                  onClick={() => startServiceMutation.mutate()}
-                  icon={action.icon}
-                  disabled={startServiceMutation.isPending}
-                >
-                  {startServiceMutation.isPending ? "Iniciando..." : action.label}
-                </PrimaryCTA>
-              ) : (
-                <PrimaryCTA
-                  onClick={() => action.next && mutation.mutate(action.next)}
-                  icon={action.icon}
+                  onClick={handleTecnicoFinish}
+                  icon={Calculator}
                   disabled={mutation.isPending}
                 >
-                  {mutation.isPending ? "Atualizando..." : action.label}
+                  {mutation.isPending ? "Finalizando..." : "Finalizar OS"}
                 </PrimaryCTA>
-              )
-            ) : null}
-          </div>
-        </GlassCard>
-      )}
+              ) : adminReview ? (
+                <PrimaryCTA onClick={() => setFinalizeOpen(true)} icon={Calculator}>
+                  {adminReviewLabel}
+                </PrimaryCTA>
+              ) : action.next ? (
+                isStartFlow ? (
+                  <PrimaryCTA
+                    onClick={() => startServiceMutation.mutate()}
+                    icon={action.icon}
+                    disabled={startServiceMutation.isPending}
+                  >
+                    {startServiceMutation.isPending ? "Iniciando..." : action.label}
+                  </PrimaryCTA>
+                ) : (
+                  <PrimaryCTA
+                    onClick={() => action.next && mutation.mutate(action.next)}
+                    icon={action.icon}
+                    disabled={mutation.isPending}
+                  >
+                    {mutation.isPending ? "Atualizando..." : action.label}
+                  </PrimaryCTA>
+                )
+              ) : null}
+            </div>
+          </aside>
+        )}
+      </div>
 
       {isTecnico &&
         (order.status === "finished" ||
@@ -466,7 +474,7 @@ function OrdemDetalhe() {
       <Section title="Linha do tempo" icon={Clock}>
         <Timeline order={order} isTecnico={isTecnico} />
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -643,11 +651,24 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
   );
 }
 
-function MetaRow({ icon: Icon, children }: { icon: typeof Building2; children: React.ReactNode }) {
+function DetailField({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: typeof Building2;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-2">
-      <Icon size={13} className="shrink-0 text-primary" />
-      <span className="truncate">{children}</span>
+    <div className="lemarc-os-summary-field">
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Icon aria-hidden="true" size={13} className="shrink-0 text-primary" />
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-semibold leading-snug text-foreground">
+        {children}
+      </dd>
     </div>
   );
 }

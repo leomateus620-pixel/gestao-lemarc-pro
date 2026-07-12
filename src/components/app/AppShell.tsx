@@ -38,7 +38,7 @@ export function AppShell({
     <div className="lemarc-app-bg min-h-[100dvh] overflow-x-hidden">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col">
         <header className="lemarc-app-header fixed inset-x-0 top-0 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-7xl">
+          <div className={fullscreenForm ? "mx-auto w-full max-w-5xl" : "mx-auto w-full max-w-7xl"}>
             <div
               className={
                 (fullscreenForm ? "lemarc-form-topbar" : "lemarc-solid-topbar") +
@@ -49,7 +49,7 @@ export function AppShell({
                 {back ? (
                   <button
                     onClick={() => router.history.back()}
-                    className="lemarc-pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    className="lemarc-pressable grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                     aria-label="Voltar"
                   >
                     <ChevronLeft size={21} />
@@ -80,7 +80,7 @@ export function AppShell({
                   (!back && (
                     <Link
                       to="/ordens/nova"
-                      className="lemarc-pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
+                      className="lemarc-pressable grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
                       aria-label="Nova OS"
                     >
                       <Plus size={18} />
@@ -100,7 +100,7 @@ export function AppShell({
                 )}
                 <button
                   onClick={handleSignOut}
-                  className="lemarc-pressable grid size-10 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  className="lemarc-pressable grid size-11 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   aria-label="Sair"
                   title="Sair"
                 >
@@ -112,7 +112,7 @@ export function AppShell({
         </header>
         <main
           className={
-            "lemarc-page-enter lemarc-shell-main flex-1 px-4 sm:px-6 lg:px-8 " +
+            "lemarc-page-enter lemarc-shell-main mx-auto w-full flex-1 px-4 sm:px-6 lg:px-8 " +
             (fullscreenForm ? "lemarc-shell-main--form" : "lemarc-shell-main--nav")
           }
         >
