@@ -167,17 +167,22 @@ export function ServiceOrderIslandRow({
           aria-label={`${expanded ? "Recolher" : "Expandir"} OS ${order.number}`}
         >
           <span className="grid min-w-0 gap-1.5 lg:hidden">
-            <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <OrderIdentity number={order.number} />
-                <span className="min-w-0 break-words font-display text-[14px] font-bold leading-tight text-white">
-                  {clientName}
-                </span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <OrderIdentity number={order.number} />
+              <span
+                className="min-w-0 flex-1 truncate font-display text-[14px] font-bold leading-tight text-white"
+                title={clientName}
+              >
+                {clientName}
               </span>
-              <OrderStatusCluster status={order.status} priority={order.priority} compact />
             </span>
 
-            <span className="block min-w-0 break-words text-[12px] font-semibold leading-snug text-slate-100">
+            <OrderStatusCluster status={order.status} priority={order.priority} compact />
+
+            <span
+              className="block min-w-0 truncate text-[12px] font-semibold leading-snug text-slate-100"
+              title={`${title} · ${serviceType}`}
+            >
               {title} · <span className="text-slate-300">{serviceType}</span>
             </span>
 
