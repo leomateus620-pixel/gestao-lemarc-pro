@@ -289,7 +289,53 @@ function normalizeFinancials(row: any): OrderFinancials | null {
     notes: row.notes ?? null,
     finalized_at: row.finalized_at ?? null,
     finalized_by: row.finalized_by ?? null,
+    labor_entries_adjusted_at: row.labor_entries_adjusted_at ?? null,
+    labor_entries_adjusted_by: row.labor_entries_adjusted_by ?? null,
   };
+}
+
+async function upsertFinancialLaborTotals(
+  sb: any,
+  orderId: string,
+  totals: { totalLaborMinutes: number; totalLaborCents: number },
+  adjustedBy?: string | null,
+): Promise<OrderFinancials | null> {
+  const { data: fin } = await sb
+    .from("service_order_financials")
+    .select("*")
+    .eq("service_order_id", orderId)
+    .maybeSingle();
+
+  const displacementCents = fin?.displacement_total_cents ?? 0;
+  const materialsCents = fin?.materials_total_cents ?? 0;
+  const patch: Record<string, unknown> = {
+    service_order_id: orderId,
+    total_labor_minutes: totals.totalLaborMinutes,
+    total_labor_cents: totals.totalLaborCents,
+    grand_total_cents: totals.totalLaborCents + displacementCents + materialsCents,
+  };
+  if (adjustedBy) {
+    patch.labor_entries_adjusted_at = new Date().toISOString();
+    patch.labor_entries_adjusted_by = adjustedBy;
+  }
+
+  const { data: updated, error } = await sb
+    .from("service_order_financials")
+    .upsert(patch, { onConflict: "service_order_id" })
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  const weightedRate =
+    totals.totalLaborMinutes > 0
+      ? Math.round((totals.totalLaborCents * 60) / totals.totalLaborMinutes) / 100
+      : null;
+  await sb
+    .from("service_orders")
+    .update({ worked_minutes: totals.totalLaborMinutes, hour_rate: weightedRate })
+    .eq("id", orderId);
+
+  return normalizeFinancials(updated);
 }
 
 export const getOrderFinancials = createServerFn({ method: "GET" })
@@ -343,6 +389,20 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
 
     if (closedWorkSessions.length === 0) {
       // No time-tracking data — trust manually entered labor entries.
+      if (storedEntries.length > 0) {
+        const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
+        const totalLaborCents = storedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+        const effectiveFinancials =
+          !financials ||
+          financials.total_labor_minutes !== totalLaborMinutes ||
+          financials.total_labor_cents !== totalLaborCents
+            ? await upsertFinancialLaborTotals(sb, data.orderId, {
+                totalLaborMinutes,
+                totalLaborCents,
+              })
+            : financials;
+        return { entries: storedEntries, financials: effectiveFinancials };
+      }
       return { entries: storedEntries, financials };
     }
 
@@ -382,11 +442,35 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
       techFallback,
     );
 
-    // Self-heal: only when derived diverges from stored and we have a rate for
-    // every entry. Never touch the DB when we'd overwrite with zeroed rates.
-    const allHaveRates = derivedEntries.every((e) => e.hourly_rate_cents > 0);
+    // Once an admin has manually edited/deleted/added labor rows, the persisted
+    // labor table becomes the canonical source. Do not recreate deleted rows
+    // from the immutable time-session audit trail.
+    if (financials?.labor_entries_adjusted_at) {
+      return { entries: storedEntries, financials };
+    }
+
+    // If materialized labor rows already exist, they are the editable working
+    // copy for admin review/PDF/reporting. Do not replace them on every read,
+    // otherwise deleting a row would be undone by the session audit trail.
+    if (storedEntries.length > 0) {
+      const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
+      const totalLaborCents = storedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+      const effectiveFinancials =
+        !financials ||
+        financials.total_labor_minutes !== totalLaborMinutes ||
+        financials.total_labor_cents !== totalLaborCents
+          ? await upsertFinancialLaborTotals(sb, data.orderId, {
+              totalLaborMinutes,
+              totalLaborCents,
+            })
+          : financials;
+      return { entries: storedEntries, financials: effectiveFinancials };
+    }
+
+    // First editable read: materialize derived sessions as the admin working
+    // copy, even if some rates are zero, so the fields can be corrected inline.
     let effectiveFinancials = financials;
-    if (entriesDiverge(storedEntries, derivedEntries) && allHaveRates) {
+    if (entriesDiverge(storedEntries, derivedEntries)) {
       try {
         const totalLaborMinutes = derivedEntries.reduce((a, e) => a + e.duration_minutes, 0);
         const totalLaborCents = derivedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
@@ -413,40 +497,11 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
           const { error: insErr } = await sb
             .from("service_order_labor_entries")
             .insert(inserts);
-          if (!insErr && financials) {
-            const displacementCents = financials.displacement_total_cents ?? 0;
-            const materialsCents = financials.materials_total_cents ?? 0;
-            const grand = totalLaborCents + displacementCents + materialsCents;
-            const { data: updated, error: upErr } = await sb
-              .from("service_order_financials")
-              .update({
-                total_labor_minutes: totalLaborMinutes,
-                total_labor_cents: totalLaborCents,
-                grand_total_cents: grand,
-              })
-              .eq("service_order_id", data.orderId)
-              .select("*")
-              .maybeSingle();
-            if (!upErr && updated) {
-              effectiveFinancials = normalizeFinancials(updated);
-            } else if (financials) {
-              effectiveFinancials = {
-                ...financials,
-                total_labor_minutes: totalLaborMinutes,
-                total_labor_cents: totalLaborCents,
-                grand_total_cents: grand,
-              };
-            }
-
-            // Reflect on the OS legacy fields as well.
-            const weightedRate =
-              totalLaborMinutes > 0
-                ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
-                : null;
-            await sb
-              .from("service_orders")
-              .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
-              .eq("id", data.orderId);
+          if (!insErr) {
+            effectiveFinancials = await upsertFinancialLaborTotals(sb, data.orderId, {
+              totalLaborMinutes,
+              totalLaborCents,
+            });
 
             // Re-fetch canonical entries so IDs are real (not "derived:*").
             const { data: refreshed } = await sb
@@ -591,6 +646,8 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
       notes: data.notes ?? null,
       finalized_at: now,
       finalized_by: context.userId,
+      labor_entries_adjusted_at: now,
+      labor_entries_adjusted_by: context.userId,
     };
     const { error: upErr } = await sb
       .from("service_order_financials")
@@ -646,7 +703,7 @@ function normalizeTime(v: string): string {
 }
 
 /** Recompute financial summary + OS legacy fields from current labor entries. */
-async function recomputeOrderTotals(sb: any, orderId: string) {
+async function recomputeOrderTotals(sb: any, orderId: string, adjustedBy?: string | null) {
   const { data: rows, error } = await sb
     .from("service_order_labor_entries")
     .select("duration_minutes, subtotal_cents")
@@ -661,32 +718,12 @@ async function recomputeOrderTotals(sb: any, orderId: string) {
     0,
   );
 
-  const { data: fin } = await sb
-    .from("service_order_financials")
-    .select("displacement_total_cents, materials_total_cents")
-    .eq("service_order_id", orderId)
-    .maybeSingle();
-  const displacementCents = fin?.displacement_total_cents ?? 0;
-  const materialsCents = fin?.materials_total_cents ?? 0;
-  const grand = totalLaborCents + displacementCents + materialsCents;
-
-  await sb
-    .from("service_order_financials")
-    .update({
-      total_labor_minutes: totalLaborMinutes,
-      total_labor_cents: totalLaborCents,
-      grand_total_cents: grand,
-    })
-    .eq("service_order_id", orderId);
-
-  const weightedRate =
-    totalLaborMinutes > 0
-      ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
-      : null;
-  await sb
-    .from("service_orders")
-    .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
-    .eq("id", orderId);
+  await upsertFinancialLaborTotals(
+    sb,
+    orderId,
+    { totalLaborMinutes, totalLaborCents },
+    adjustedBy,
+  );
 }
 
 /**
@@ -759,7 +796,7 @@ export const updateLaborEntry = createServerFn({ method: "POST" })
     );
     const subtotal = computeSubtotalCents(duration, next.hourly_rate_cents);
 
-    const { error: upErr } = await sb
+    const { data: updatedRows, error: upErr } = await sb
       .from("service_order_labor_entries")
       .update({
         technician_id: next.technician_id,
@@ -772,10 +809,14 @@ export const updateLaborEntry = createServerFn({ method: "POST" })
         subtotal_cents: subtotal,
         description: next.description,
       })
-      .eq("id", data.entryId);
+      .eq("id", data.entryId)
+      .select("id");
     if (upErr) throw new Error(upErr.message);
+    if (!updatedRows || updatedRows.length !== 1) {
+      throw new Error("Não foi possível confirmar a atualização do apontamento.");
+    }
 
-    await recomputeOrderTotals(sb, current.service_order_id);
+    await recomputeOrderTotals(sb, current.service_order_id, context.userId);
     return { ok: true };
   });
 
@@ -796,13 +837,17 @@ export const deleteLaborEntry = createServerFn({ method: "POST" })
     if (curErr) throw new Error(curErr.message);
     if (!current) throw new Error("Apontamento não encontrado.");
 
-    const { error: delErr } = await sb
+    const { data: deletedRows, error: delErr } = await sb
       .from("service_order_labor_entries")
       .delete()
-      .eq("id", data.entryId);
+      .eq("id", data.entryId)
+      .select("id");
     if (delErr) throw new Error(delErr.message);
+    if (!deletedRows || deletedRows.length !== 1) {
+      throw new Error("Não foi possível confirmar a exclusão do apontamento.");
+    }
 
-    await recomputeOrderTotals(sb, current.service_order_id);
+    await recomputeOrderTotals(sb, current.service_order_id, context.userId);
     return { ok: true };
   });
 
@@ -848,7 +893,7 @@ export const createLaborEntry = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    await recomputeOrderTotals(sb, data.orderId);
+    await recomputeOrderTotals(sb, data.orderId, context.userId);
     return { ok: true };
   });
 

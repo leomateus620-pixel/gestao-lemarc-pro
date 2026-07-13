@@ -331,6 +331,8 @@ export type Database = {
           finalized_at: string | null
           finalized_by: string | null
           grand_total_cents: number
+          labor_entries_adjusted_at: string | null
+          labor_entries_adjusted_by: string | null
           materials_total_cents: number
           notes: string | null
           service_order_id: string
@@ -349,6 +351,8 @@ export type Database = {
           finalized_at?: string | null
           finalized_by?: string | null
           grand_total_cents?: number
+          labor_entries_adjusted_at?: string | null
+          labor_entries_adjusted_by?: string | null
           materials_total_cents?: number
           notes?: string | null
           service_order_id: string
@@ -367,6 +371,8 @@ export type Database = {
           finalized_at?: string | null
           finalized_by?: string | null
           grand_total_cents?: number
+          labor_entries_adjusted_at?: string | null
+          labor_entries_adjusted_by?: string | null
           materials_total_cents?: number
           notes?: string | null
           service_order_id?: string
