@@ -657,7 +657,7 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
     { label: "Técnico responsável", value: primary?.full_name ?? EMPTY },
   ]);
 
-  // Resumo executado: intervalos e horas por técnico.
+  // Resumo executado: horas por técnico.
   const executedSummaryMap = new Map<string, LaborEntry[]>();
   for (const e of entries) {
     const key = e.technician_id ?? e.technician?.id ?? "sem-tecnico";
@@ -670,9 +670,8 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
   for (const [, list] of executedSummaryMap) {
     const name = list[0].technician?.full_name ?? "Técnico";
     const totalMin = list.reduce((a, e) => a + (e.duration_minutes ?? 0), 0);
-    const intervalos = list.length;
     executedDescriptions.push(
-      `${summaryIdx}. ${name}: ${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"} · ${formatHHmm(totalMin)} trabalhadas`,
+      `${summaryIdx}. ${name}: ${formatHHmm(totalMin)} horas trabalhadas`,
     );
     summaryIdx += 1;
   }
