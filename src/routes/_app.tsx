@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useMatches, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { BottomNav } from "@/components/app/BottomNav";
 import { RoleProvider } from "@/components/app/RoleContext";
 import { AuthProvider, useAuth } from "@/components/app/AuthContext";
@@ -27,8 +27,24 @@ function BottomNavSlot() {
   const hide = matches.some(
     (m) => (m.staticData as { hideBottomNav?: boolean } | undefined)?.hideBottomNav,
   );
-  if (hide) return null;
+  const fullscreenForm = useFullscreenFormFlag();
+  if (hide || fullscreenForm) return null;
   return <BottomNav />;
+}
+
+function useFullscreenFormFlag() {
+  return useSyncExternalStore(
+    (cb) => {
+      if (typeof document === "undefined") return () => {};
+      const el = document.documentElement;
+      el.addEventListener("lemarc:fullscreen-form-change", cb);
+      return () => el.removeEventListener("lemarc:fullscreen-form-change", cb);
+    },
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.dataset.fullscreenForm === "true",
+    () => false,
+  );
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {

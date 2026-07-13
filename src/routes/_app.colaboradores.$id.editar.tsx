@@ -21,6 +21,7 @@ const editarSearch = z.object({
 export const Route = createFileRoute("/_app/colaboradores/$id/editar")({
   head: () => ({ meta: [{ title: "Editar colaborador — Gestão Lemarc" }] }),
   validateSearch: editarSearch,
+  staticData: { hideBottomNav: true },
   component: EditarColaboradorPage,
 });
 
