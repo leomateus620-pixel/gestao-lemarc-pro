@@ -116,14 +116,10 @@ export function isInPeriod(
   if (!start && !end) return true;
 
   const opened = new Date(o.opened_at).getTime();
-  const updated = new Date(o.updated_at).getTime();
-  const timestamps = [opened, updated].filter(Number.isFinite);
-
-  return timestamps.some((timestamp) => {
-    if (start && timestamp < start.getTime()) return false;
-    if (end && timestamp > end.getTime()) return false;
-    return true;
-  });
+  if (!Number.isFinite(opened)) return false;
+  if (start && opened < start.getTime()) return false;
+  if (end && opened > end.getTime()) return false;
+  return true;
 }
 
 export function filterByPeriod(
