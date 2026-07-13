@@ -401,7 +401,10 @@ function InlineMeta({
   tabular?: boolean;
 }) {
   return (
-    <span className={cn("min-w-0 truncate", tabular && "tabular-nums")} title={title ?? value}>
+    <span
+      className={cn("block max-w-full min-w-0 truncate", tabular && "tabular-nums")}
+      title={title ?? value}
+    >
       <span className="text-slate-500">{label}:</span>{" "}
       <span className="font-bold text-slate-200">{value}</span>
     </span>
