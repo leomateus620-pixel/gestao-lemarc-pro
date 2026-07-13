@@ -631,3 +631,226 @@ export const updateTechnicianHourlyRate = createServerFn({ method: "POST" })
 
 /** Compute totals helper exposed for re-use. */
 export { computeTotals };
+
+/* -------------------------------------------------------------------------- */
+/* Inline editing of labor entries (post-finalization)                        */
+/* -------------------------------------------------------------------------- */
+
+function normalizeTime(v: string): string {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec((v || "").trim());
+  if (!m) throw new Error(`Hora inválida: ${v}`);
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  if (h < 0 || h > 23 || mi < 0 || mi > 59) throw new Error(`Hora inválida: ${v}`);
+  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}:${m[3] ?? "00"}`;
+}
+
+/** Recompute financial summary + OS legacy fields from current labor entries. */
+async function recomputeOrderTotals(sb: any, orderId: string) {
+  const { data: rows, error } = await sb
+    .from("service_order_labor_entries")
+    .select("duration_minutes, subtotal_cents")
+    .eq("service_order_id", orderId);
+  if (error) throw new Error(error.message);
+  const totalLaborMinutes = (rows ?? []).reduce(
+    (a: number, r: any) => a + (r.duration_minutes ?? 0),
+    0,
+  );
+  const totalLaborCents = (rows ?? []).reduce(
+    (a: number, r: any) => a + (r.subtotal_cents ?? 0),
+    0,
+  );
+
+  const { data: fin } = await sb
+    .from("service_order_financials")
+    .select("displacement_total_cents, materials_total_cents")
+    .eq("service_order_id", orderId)
+    .maybeSingle();
+  const displacementCents = fin?.displacement_total_cents ?? 0;
+  const materialsCents = fin?.materials_total_cents ?? 0;
+  const grand = totalLaborCents + displacementCents + materialsCents;
+
+  await sb
+    .from("service_order_financials")
+    .update({
+      total_labor_minutes: totalLaborMinutes,
+      total_labor_cents: totalLaborCents,
+      grand_total_cents: grand,
+    })
+    .eq("service_order_id", orderId);
+
+  const weightedRate =
+    totalLaborMinutes > 0
+      ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
+      : null;
+  await sb
+    .from("service_orders")
+    .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
+    .eq("id", orderId);
+}
+
+/**
+ * If any labor entry for this order is still "derived:*" (i.e. never
+ * materialized), force a self-heal read to persist them before editing.
+ */
+async function ensureEntriesPersisted(sb: any, orderId: string, context: any) {
+  const { data } = await sb
+    .from("service_order_labor_entries")
+    .select("id")
+    .eq("service_order_id", orderId)
+    .limit(1);
+  if (!data || data.length === 0) {
+    // Nothing persisted — trigger self-heal via getOrderFinancials's inner logic.
+    // Simplest reliable approach: return; the caller pre-fetches getOrderFinancials.
+  }
+  void context;
+}
+
+type LaborEntryPatch = Partial<{
+  technician_id: string;
+  role: string | null;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  hourly_rate_cents: number;
+  description: string | null;
+}>;
+
+export const updateLaborEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { entryId: string; patch: LaborEntryPatch }) => data)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (!data.entryId || data.entryId.startsWith("derived:")) {
+      throw new Error(
+        "Este apontamento ainda não foi persistido. Abra o resumo financeiro para consolidar antes de editar.",
+      );
+    }
+    const sb = context.supabase as any;
+
+    const { data: current, error: curErr } = await sb
+      .from("service_order_labor_entries")
+      .select("*")
+      .eq("id", data.entryId)
+      .maybeSingle();
+    if (curErr) throw new Error(curErr.message);
+    if (!current) throw new Error("Apontamento não encontrado.");
+
+    const next = {
+      technician_id: data.patch.technician_id ?? current.technician_id,
+      role: data.patch.role !== undefined ? data.patch.role : current.role,
+      work_date: data.patch.work_date ?? current.work_date,
+      start_time: normalizeTime(data.patch.start_time ?? current.start_time),
+      end_time: normalizeTime(data.patch.end_time ?? current.end_time),
+      hourly_rate_cents:
+        data.patch.hourly_rate_cents != null
+          ? Math.round(data.patch.hourly_rate_cents)
+          : current.hourly_rate_cents,
+      description:
+        data.patch.description !== undefined ? data.patch.description : current.description,
+    };
+
+    if (!next.technician_id) throw new Error("Selecione um técnico válido.");
+    if (!(next.hourly_rate_cents > 0)) throw new Error("Informe um valor de R$/h válido.");
+
+    const duration = computeDurationMinutes(
+      next.start_time.slice(0, 5),
+      next.end_time.slice(0, 5),
+    );
+    const subtotal = computeSubtotalCents(duration, next.hourly_rate_cents);
+
+    const { error: upErr } = await sb
+      .from("service_order_labor_entries")
+      .update({
+        technician_id: next.technician_id,
+        role: next.role,
+        work_date: next.work_date,
+        start_time: next.start_time,
+        end_time: next.end_time,
+        duration_minutes: duration,
+        hourly_rate_cents: next.hourly_rate_cents,
+        subtotal_cents: subtotal,
+        description: next.description,
+      })
+      .eq("id", data.entryId);
+    if (upErr) throw new Error(upErr.message);
+
+    await recomputeOrderTotals(sb, current.service_order_id);
+    return { ok: true };
+  });
+
+export const deleteLaborEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { entryId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (!data.entryId || data.entryId.startsWith("derived:")) {
+      throw new Error("Apontamento ainda não consolidado.");
+    }
+    const sb = context.supabase as any;
+    const { data: current, error: curErr } = await sb
+      .from("service_order_labor_entries")
+      .select("service_order_id")
+      .eq("id", data.entryId)
+      .maybeSingle();
+    if (curErr) throw new Error(curErr.message);
+    if (!current) throw new Error("Apontamento não encontrado.");
+
+    const { error: delErr } = await sb
+      .from("service_order_labor_entries")
+      .delete()
+      .eq("id", data.entryId);
+    if (delErr) throw new Error(delErr.message);
+
+    await recomputeOrderTotals(sb, current.service_order_id);
+    return { ok: true };
+  });
+
+export const createLaborEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: {
+      orderId: string;
+      entry: {
+        technician_id: string;
+        role?: string | null;
+        work_date: string;
+        start_time: string;
+        end_time: string;
+        hourly_rate_cents: number;
+        description?: string | null;
+      };
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const sb = context.supabase as any;
+    const e = data.entry;
+    if (!e.technician_id) throw new Error("Selecione um técnico.");
+    if (!(e.hourly_rate_cents > 0)) throw new Error("Informe um valor de R$/h válido.");
+    const startNorm = normalizeTime(e.start_time);
+    const endNorm = normalizeTime(e.end_time);
+    const duration = computeDurationMinutes(startNorm.slice(0, 5), endNorm.slice(0, 5));
+    const subtotal = computeSubtotalCents(duration, e.hourly_rate_cents);
+
+    const { error } = await sb.from("service_order_labor_entries").insert({
+      service_order_id: data.orderId,
+      technician_id: e.technician_id,
+      role: e.role ?? null,
+      work_date: e.work_date,
+      start_time: startNorm,
+      end_time: endNorm,
+      duration_minutes: duration,
+      hourly_rate_cents: Math.round(e.hourly_rate_cents),
+      subtotal_cents: subtotal,
+      description: e.description ?? "Ajuste manual",
+      created_by: context.userId,
+    });
+    if (error) throw new Error(error.message);
+
+    await recomputeOrderTotals(sb, data.orderId);
+    return { ok: true };
+  });
+
+// Silence unused warning for the placeholder helper.
+void ensureEntriesPersisted;

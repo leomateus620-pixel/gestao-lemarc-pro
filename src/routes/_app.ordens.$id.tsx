@@ -43,6 +43,7 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
+import { LaborEntriesEditor } from "@/components/ordens/LaborEntriesEditor";
 import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeControl";
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
@@ -708,36 +709,7 @@ function FinancialBlock({ order, onEdit }: { order: ServiceOrder; onEdit: () => 
         </div>
       </Section>
       <Section title="Apuração de horas" icon={Calculator}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="text-[10px] uppercase text-muted-foreground">
-              <tr>
-                <th className="py-1 text-left">Técnico</th>
-                <th className="py-1 text-left">Função</th>
-                <th className="py-1 text-left">Data</th>
-                <th className="py-1 text-left">Entrada</th>
-                <th className="py-1 text-left">Saída</th>
-                <th className="py-1 text-right">Horas</th>
-                <th className="py-1 text-right">R$/h</th>
-                <th className="py-1 text-right">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e: (typeof entries)[number]) => (
-                <tr key={e.id} className="border-t border-white/5">
-                  <td className="py-1.5">{e.technician?.full_name ?? "—"}</td>
-                  <td>{e.role ?? "—"}</td>
-                  <td>{e.work_date}</td>
-                  <td>{e.start_time.slice(0, 5)}</td>
-                  <td>{e.end_time.slice(0, 5)}</td>
-                  <td className="text-right tabular-nums">{formatHHmm(e.duration_minutes)}</td>
-                  <td className="text-right tabular-nums">{formatBRL(e.hourly_rate_cents)}</td>
-                  <td className="text-right tabular-nums">{formatBRL(e.subtotal_cents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <LaborEntriesEditor order={order} entries={entries} />
       </Section>
     </>
   );
