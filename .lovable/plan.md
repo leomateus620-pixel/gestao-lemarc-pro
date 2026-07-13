@@ -1,59 +1,82 @@
-## Diagnóstico
+## Objetivo
 
-Na OS #1061 (Leonardo · 18:43→18:50 pausa · 19:39→20:11 fim = 39 min), o PDF mostra **1 linha** com início 18:43 e fim **19:23** (= 18:43 + 40 min). A causa: essa OS foi finalizada **antes** do fix anterior, então o banco (`service_order_labor_entries`) guarda **uma única linha por técnico** com `end_time = start_time + duração total`. O PDF apenas renderiza o que está salvo — por isso divergência de horário e ausência das pausas.
+Tornar a seção **"Apuração de Horas"** (na tela da OS) totalmente editável de forma inline e intuitiva, permitindo:
 
-O fix anterior corrigiu apenas o *fluxo de finalização futuro*, mas OSes já finalizadas continuam com dados colapsados. Precisa também:
-1. tornar o PDF fiel ao histórico real (`service_order_time_sessions`), mesmo quando os `labor_entries` estão colapsados;
-2. reconciliar linhas antigas silenciosamente, sem exigir reabrir a OS.
+1. **Editar horário** de entrada/saída/data de cada linha.
+2. **Excluir** uma linha de apontamento.
+3. **Vincular/transferir** um horário para outro técnico (trocar o técnico dono da linha).
+4. **Ajustar R$/h** por linha quando necessário.
+5. **Adicionar** um novo apontamento manual.
 
-## Solução
+Todas as alterações persistem no banco e refletem imediatamente no PDF, no resumo financeiro (Mão de obra, Total geral), no `worked_minutes`/`hour_rate` da OS e nos relatórios (gerenciais e por cliente/técnico).
 
-Fonte da verdade sempre = `service_order_time_sessions` (sessões work fechadas). `labor_entries` passa a ser cache derivado.
+---
 
-### 1. `getOrderFinancials` — derivação robusta (`src/lib/api/financials.functions.ts`)
+## UX proposta
 
-No handler, após buscar labor_entries e financials, também buscar `service_order_time_sessions` da OS. Se houver ≥1 sessão `kind='work'` com `ended_at`:
+Na `Section "Apuração de horas"` de `src/routes/_app.ordens.$id.tsx` (admin apenas, mesma regra do resumo financeiro):
 
-- Reconstruir a lista de entries a partir das sessões: **uma linha por sessão fechada**, com `work_date`/`start_time`/`end_time` em America/Sao_Paulo derivados de `started_at`/`ended_at`, `duration_minutes = session.duration_minutes`, `hourly_rate_cents` reaproveitado do labor_entry existente do mesmo técnico (ou do cadastro do técnico como fallback), `description = "Intervalo N de M"` ou `"Trabalho executado"`.
-- Recalcular `subtotal_cents` por linha e `total_labor_minutes` / `total_labor_cents` / `grand_total_cents` na resposta.
-- Se os valores derivados divergirem dos armazenados, disparar um **self-heal** no mesmo handler (apenas para admins): `delete` + `insert` em `labor_entries` e `update` em `service_order_financials` (mantendo tipo de deslocamento, materiais, notas). Falhas de self-heal são engolidas — resposta ao cliente sempre usa os valores derivados.
+- Cada linha ganha um botão **"Editar"** (ícone lápis) e **"Excluir"** (ícone lixeira) no final.
+- Botão **"+ Novo apontamento"** acima da tabela.
+- Ao clicar em Editar, a linha vira modo edição com inputs inline: técnico (Select dos técnicos vinculados à OS), data, entrada, saída, R$/h. Ações: **Salvar** / **Cancelar**.
+- Antes de excluir, `AlertDialog` de confirmação exibindo técnico + horário.
+- Feedback via toast + recálculo automático dos KPIs.
+- Estado de salvando: spinner no botão, linha desabilitada, sem duplicar cliques.
+- Validações em tempo real: saída > entrada, R$/h > 0, técnico obrigatório; erros exibidos na própria linha.
 
-Isso corrige de imediato a exibição no PDF/tela e, na primeira leitura pós-deploy, normaliza os dados na nuvem sem migration manual.
+Para não-admins a tabela continua somente-leitura (idêntica ao atual).
 
-### 2. Preservar entries manuais
+---
 
-Só reconstruir quando existirem sessões `work` fechadas. OSes finalizadas manualmente (sem controle de tempo) continuam com o que foi digitado. Se o total de minutos das sessões == soma atual de entries e o número de linhas bate, pular self-heal (evita escrita desnecessária).
+## Backend (server functions)
 
-### 3. PDF — sem mudança estrutural
+Novo arquivo/adições em `src/lib/api/financials.functions.ts`:
 
-`ServiceOrderReportDocument.tsx` e `serviceOrderDownload.ts` já agrupam por técnico e mostram intervalos + subtotal. Verificar apenas que:
-- os horários exibidos usam `America/Sao_Paulo` (já usam).
-- o texto "Serviço executado" reflete N intervalos e horas líquidas (já implementado).
-- inclui a nota "Horas trabalhadas não incluem intervalos de pausa" (já incluída).
+- `updateLaborEntry({ entryId, patch })` — patch com `technician_id?`, `role?`, `work_date?`, `start_time?`, `end_time?`, `hourly_rate_cents?`, `description?`. Recalcula `duration_minutes` e `subtotal_cents` via `computeDurationMinutes` / `computeSubtotalCents`. Valida `end > start`, `rate > 0`, técnico existente na tabela `technicians`. Rejeita IDs "derived:*" (força um self-heal antes: chama `getOrderFinancials` para persistir os derivados).
+- `deleteLaborEntry({ entryId })` — remove a linha, exige ao menos uma linha remanescente ou permite zerar (bloqueia se OS `finished`/`closed` e sem substituição? — permitir; recalcula tudo).
+- `createLaborEntry({ orderId, entry })` — insere manualmente. Usa a hora do técnico como fallback.
+- Todas as três, ao final, **recalculam** `service_order_financials` (total_labor_minutes, total_labor_cents, grand_total_cents mantendo displacement + materials) e `service_orders` (`worked_minutes`, `hour_rate` ponderado). Reutiliza o helper interno de recomputação já existente na finalização — extrair para função `recomputeOrderTotals(sb, orderId)` para reuso.
+- Middleware `requireSupabaseAuth` + `assertAdmin` (padrão do arquivo).
+- Invalida caches no cliente: `["order-financials", orderId]`, `["service-orders"]`, `["reports"]`, `["technician-labor-history"]`.
 
-Nenhuma edição de layout necessária depois do fix na origem.
+Nenhuma migração de banco é necessária — a tabela `service_order_labor_entries` já tem todas as colunas.
 
-### 4. Diálogo Finalizar
+---
 
-Sem mudanças — `buildEntriesFromSessions` já gera uma linha por sessão fechada. Se admin reabrir a OS pós-deploy, os entries já virão corretos do backend.
+## Componente
 
-## Fora do escopo
+Novo componente `src/components/ordens/LaborEntriesEditor.tsx` que renderiza a tabela editável. `_app.ordens.$id.tsx` passa a usá-lo dentro da `Section "Apuração de horas"` quando `isAdmin`. Recebe `order`, `entries`, `techs` (via `getOrderTechnicians(order)` para o select de vínculo).
 
-- Migração SQL manual dos dados antigos: substituída pelo self-heal do handler.
-- Alterações em RLS, rotas, `time_sessions` schema, ou fluxo de execução da OS na tela ao vivo.
-- Ajustes visuais no PDF.
+- Estado local por linha: `editingId`, `draft`, `saving`.
+- `useMutation` para update/delete/create; `onSuccess` invalida `["order-financials", order.id]` para o `FinancialsSection` re-renderizar automaticamente.
+- Reutiliza `computeDurationMinutes`, `computeSubtotalCents`, `formatBRL`, `formatHHmm`, `parseBRLToCents` de `serviceOrders/finance`.
 
-## Detalhes técnicos
+---
 
-Arquivos alterados:
-- `src/lib/api/financials.functions.ts`
-  - Adicionar consulta a `service_order_time_sessions` (kind=work, ended_at not null) no `getOrderFinancials`.
-  - Nova função `deriveEntriesFromSessions(sessions, existingEntries, technicians)` que retorna `LaborEntry[]` derivadas.
-  - Comparar contagem de intervalos e soma de `duration_minutes` — se divergir do stored, executar `delete`+`insert` em `labor_entries` e recomputar/`update` em `service_order_financials` (mantendo `displacement_*`, `materials_total_cents`, `notes`).
-  - Retornar sempre os entries derivados quando houver sessões; senão, os entries do banco.
+## Reflexo no PDF e relatórios
 
-Validação:
-- OS #1061: PDF deve passar a mostrar 2 linhas (18:43→18:50 · 00:07 e 19:39→20:11 · 00:32), subtotal Leonardo = 00:39, totais coerentes com o card "Total trabalhado" na tela ao vivo.
-- OS finalizadas sem sessões (manuais): PDF permanece igual ao que já mostra.
-- Reabrir a OS #1061 no diálogo Finalizar: entries já hidratam com 2 linhas.
-- Typecheck limpo.
+- O PDF (`ServiceOrderReportDocument`) e o resumo financeiro já leem via `getOrderFinancials`, então basta invalidar o cache — nenhuma alteração de PDF necessária.
+- Relatórios gerenciais (`listServiceOrderFinancialSummaries`, `listTechnicianLaborHistory`) leem direto da tabela — refletem automaticamente após update/delete/insert.
+- `worked_minutes` e `hour_rate` da OS são atualizados por `recomputeOrderTotals`, mantendo dashboards e cards de OS consistentes.
+
+---
+
+## Cuidados / não-quebrar
+
+- **Não** alterar a lógica de derivação de sessões existente (self-heal continua funcionando para OSes antigas). O editor só age sobre linhas já persistidas — se a OS ainda tem `id` "derived:*", forçamos um `getOrderFinancials` primeiro para materializar os registros reais.
+- **Não** alterar rotas nem o dialog de finalização (continua funcionando em paralelo).
+- **Não** tocar em `service_order_time_sessions` — o histórico bruto de pausas/retomadas permanece intacto como auditoria.
+- Concorrência: usar `.eq("service_order_id", orderId).eq("id", entryId)` para garantir escopo.
+- Permissão: `assertAdmin` em todas as mutations; UI só mostra controles se `isAdmin`.
+
+---
+
+## Passos de implementação
+
+1. Adicionar `recomputeOrderTotals`, `updateLaborEntry`, `deleteLaborEntry`, `createLaborEntry` em `src/lib/api/financials.functions.ts`.
+2. Criar `src/components/ordens/LaborEntriesEditor.tsx` com tabela + edição inline + AlertDialog de exclusão.
+3. Ligar em `_app.ordens.$id.tsx` dentro da `Section "Apuração de horas"` (admin only).
+4. Invalidar `["order-financials", order.id]` em cada mutation.
+5. Teste manual: editar horário → conferir KPIs, PDF e Relatório do cliente.
+
+Sem alterações em rotas, schema ou fluxo de finalização.
