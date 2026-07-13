@@ -167,19 +167,14 @@ export function ServiceOrderReportDocument({
     grouped.set(key, list);
   }
 
-  // Resumo executado: N intervalos e horas por técnico (não repete "Calculado automaticamente").
+  // Resumo executado: horas por técnico (não repete "Calculado automaticamente").
   const executedSummaryLines: string[] = [];
   let summaryIndex = 1;
   for (const [, list] of grouped) {
     const name = list[0].technician?.full_name ?? "Técnico";
     const totalMin = list.reduce((acc, e) => acc + (e.duration_minutes ?? 0), 0);
-    const intervalos = Math.max(0, list.length - 1);
-    const intervalosLabel =
-      intervalos === 0
-        ? "sem intervalos"
-        : `${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"}`;
     executedSummaryLines.push(
-      `${summaryIndex}. ${name}: ${intervalosLabel} · ${formatHHmm(totalMin)} horas trabalhadas`,
+      `${summaryIndex}. ${name}: ${formatHHmm(totalMin)} horas trabalhadas`,
     );
     summaryIndex += 1;
   }
