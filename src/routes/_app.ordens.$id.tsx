@@ -236,6 +236,8 @@ function OrdemDetalhe() {
     isAdmin &&
     !alreadyFinalized &&
     (order.status === "running" || order.status === "finished" || order.status === "review");
+  const adminCanReviewFromLabor =
+    isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review");
   const tecnicoDone =
     isTecnico &&
     (order.status === "finished" ||
@@ -442,7 +444,13 @@ function OrdemDetalhe() {
 
       <ServiceOrderAttachmentsSection orderId={order.id} />
 
-      {isAdmin && <FinancialBlock order={order} onEdit={() => setFinalizeOpen(true)} />}
+      {isAdmin && (
+        <FinancialBlock
+          order={order}
+          onEdit={() => setFinalizeOpen(true)}
+          canReview={adminCanReviewFromLabor}
+        />
+      )}
 
       {missing.length > 0 && (
         <Section title="Pendências de cadastro" icon={FileText}>
@@ -674,7 +682,15 @@ function DetailField({
   );
 }
 
-function FinancialBlock({ order, onEdit }: { order: ServiceOrder; onEdit: () => void }) {
+function FinancialBlock({
+  order,
+  onEdit,
+  canReview,
+}: {
+  order: ServiceOrder;
+  onEdit: () => void;
+  canReview: boolean;
+}) {
   const fetcher = useServerFn(getOrderFinancials);
   const { data } = useQuery({
     queryKey: ["order-financials", order.id],
@@ -710,6 +726,13 @@ function FinancialBlock({ order, onEdit }: { order: ServiceOrder; onEdit: () => 
       </Section>
       <Section title="Apuração de horas" icon={Calculator}>
         <LaborEntriesEditor order={order} entries={entries} />
+        {canReview && (
+          <div className="mt-4 flex justify-end border-t border-white/10 pt-4">
+            <Button className="gap-2" onClick={onEdit}>
+              <Calculator size={14} /> Revisar e finalizar OS
+            </Button>
+          </div>
+        )}
       </Section>
     </>
   );

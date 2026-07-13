@@ -36,6 +36,8 @@ export type OrderFinancials = {
   notes: string | null;
   finalized_at: string | null;
   finalized_by: string | null;
+  labor_entries_adjusted_at: string | null;
+  labor_entries_adjusted_by: string | null;
 };
 
 export type LaborEntryInput = {

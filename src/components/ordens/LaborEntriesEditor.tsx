@@ -77,8 +77,10 @@ export function LaborEntriesEditor({ order, entries }: Props) {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["order-financials", order.id] });
+    qc.invalidateQueries({ queryKey: ["service-order", order.id] });
     qc.invalidateQueries({ queryKey: ["service-orders"] });
-    qc.invalidateQueries({ queryKey: ["reports"] });
+    qc.invalidateQueries({ queryKey: ["report-orders"] });
+    qc.invalidateQueries({ queryKey: ["client-report"] });
     qc.invalidateQueries({ queryKey: ["technician-labor-history"] });
   };
 
@@ -183,7 +185,7 @@ export function LaborEntriesEditor({ order, entries }: Props) {
     }
   }
 
-  const canEdit = entries.length === 0 || !entries[0].id.startsWith("derived:");
+  const canEdit = entries.every((entry) => !entry.id.startsWith("derived:"));
 
   return (
     <div className="space-y-3">
@@ -207,8 +209,8 @@ export function LaborEntriesEditor({ order, entries }: Props) {
 
       {!canEdit && (
         <div className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-100">
-          Estes apontamentos ainda não foram consolidados. Abra o resumo financeiro uma vez
-          para habilitar a edição.
+          Estes apontamentos estão sendo preparados para edição. Atualize a tela em alguns
+          instantes se os controles não aparecerem automaticamente.
         </div>
       )}
 
