@@ -264,6 +264,7 @@ function OrdensList() {
           range={periodRange}
           onChange={setPeriodWithRange}
           label="Período"
+          variant="inline"
           className="lemarc-period-filter"
         />
         <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>

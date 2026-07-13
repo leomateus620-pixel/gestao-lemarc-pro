@@ -17,12 +17,14 @@ export function MetricPeriodFilter({
   onChange,
   className,
   label = "Período operacional",
+  variant = "card",
 }: {
   value: Period;
   range?: PeriodRange;
   onChange: (p: Period, range?: PeriodRange) => void;
   className?: string;
   label?: string;
+  variant?: "card" | "inline";
 }) {
   const today = useMemo(() => dateInputValue(), []);
   const [draft, setDraft] = useState<Required<PeriodRange>>({
@@ -67,21 +69,36 @@ export function MetricPeriodFilter({
     onChange("day");
   };
 
+  const inline = variant === "inline";
   return (
     <div
       className={cn(
-        "w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 backdrop-blur-md sm:w-auto",
+        inline
+          ? "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] sm:w-auto"
+          : "w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 backdrop-blur-md sm:w-auto",
         className,
       )}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 items-center gap-2 px-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:pr-2">
+      <div
+        className={cn(
+          "flex flex-col gap-2 sm:flex-row sm:items-center",
+          inline && "h-11 gap-1 px-2",
+        )}
+      >
+        <div
+          className={cn(
+            "flex min-w-0 items-center gap-2 px-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:pr-2",
+            inline && "sm:pr-1",
+          )}
+        >
           <CalendarDays size={14} className="shrink-0 text-primary" />
           <span className="truncate">{label}</span>
         </div>
 
         <div
-          className="lemarc-smart-scroll flex max-w-full gap-1 overflow-x-auto rounded-xl bg-black/10 p-1"
+          className={cn(
+            "lemarc-smart-scroll flex max-w-full gap-1 overflow-x-auto rounded-xl bg-black/10 p-1",
+          )}
           aria-label="Selecionar período"
         >
           {items.map((it) => {
@@ -93,7 +110,8 @@ export function MetricPeriodFilter({
                 aria-pressed={active}
                 onClick={() => selectPreset(it.key)}
                 className={cn(
-                  "min-h-9 shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
+                  "shrink-0 rounded-lg px-3 text-[10px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
+                  inline ? "h-8 py-0" : "min-h-9 py-1.5",
                   active
                     ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
                     : "text-muted-foreground hover:bg-white/[0.07] hover:text-foreground",
@@ -107,7 +125,12 @@ export function MetricPeriodFilter({
       </div>
 
       {value === "custom" && (
-        <div className="mt-2 grid gap-2 border-t border-white/[0.08] pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-end">
+        <div
+          className={cn(
+            "grid gap-2 border-t border-white/[0.08] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-end",
+            inline ? "px-2 pb-2 pt-2" : "mt-2 pt-2",
+          )}
+        >
           <label className="min-w-0">
             <span className="block px-1 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Inicial
