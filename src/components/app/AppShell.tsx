@@ -2,7 +2,7 @@ import { ChevronLeft, LogOut, Plus } from "lucide-react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 const HEADER_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
@@ -34,6 +34,24 @@ export function AppShell({
     await signOut();
     navigate({ to: "/login", replace: true });
   }
+
+  // Marca o documento enquanto uma tela de formulário fullscreen está montada.
+  // O BottomNavSlot em src/routes/_app.tsx observa esse marcador para nunca
+  // sobrepor a barra de ações do formulário, mesmo que a rota esqueça de
+  // declarar staticData.hideBottomNav.
+  useEffect(() => {
+    if (!fullscreenForm || typeof document === "undefined") return;
+    const el = document.documentElement;
+    const prev = el.dataset.fullscreenForm;
+    el.dataset.fullscreenForm = "true";
+    el.dispatchEvent(new Event("lemarc:fullscreen-form-change"));
+    return () => {
+      if (prev) el.dataset.fullscreenForm = prev;
+      else delete el.dataset.fullscreenForm;
+      el.dispatchEvent(new Event("lemarc:fullscreen-form-change"));
+    };
+  }, [fullscreenForm]);
+
   return (
     <div className="lemarc-app-bg min-h-[100dvh] overflow-x-hidden">
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col">
