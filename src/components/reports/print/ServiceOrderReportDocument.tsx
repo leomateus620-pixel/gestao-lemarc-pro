@@ -173,9 +173,13 @@ export function ServiceOrderReportDocument({
   for (const [, list] of grouped) {
     const name = list[0].technician?.full_name ?? "Técnico";
     const totalMin = list.reduce((acc, e) => acc + (e.duration_minutes ?? 0), 0);
-    const intervalos = list.length;
+    const intervalos = Math.max(0, list.length - 1);
+    const intervalosLabel =
+      intervalos === 0
+        ? "sem intervalos"
+        : `${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"}`;
     executedSummaryLines.push(
-      `${summaryIndex}. ${name}: ${intervalos} ${intervalos === 1 ? "intervalo" : "intervalos"} · ${formatHHmm(totalMin)} trabalhadas`,
+      `${summaryIndex}. ${name}: ${intervalosLabel} · ${formatHHmm(totalMin)} horas trabalhadas`,
     );
     summaryIndex += 1;
   }
