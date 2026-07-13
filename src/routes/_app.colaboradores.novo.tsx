@@ -9,6 +9,7 @@ import type { TechnicianLite } from "@/types/serviceOrder";
 
 export const Route = createFileRoute("/_app/colaboradores/novo")({
   head: () => ({ meta: [{ title: "Novo colaborador — Gestão Lemarc" }] }),
+  staticData: { hideBottomNav: true },
   component: NovoColaboradorPage,
 });
 
