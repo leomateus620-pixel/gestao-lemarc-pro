@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getServiceOrder } from "@/lib/api/serviceOrders.functions";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
+import { listServiceOrderMaterialAttachments } from "@/lib/api/serviceOrderMaterialAttachments.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
@@ -47,6 +48,7 @@ function PrintActions() {
   const { displayName } = useAuth();
   const orderFn = useServerFn(getServiceOrder);
   const finFn = useServerFn(getOrderFinancials);
+  const matFn = useServerFn(listServiceOrderMaterialAttachments);
   const { data: order } = useSuspenseQuery(
     queryOptions({
       queryKey: ["service-order", id],
@@ -57,6 +59,12 @@ function PrintActions() {
     queryOptions({
       queryKey: ["order-financials", id],
       queryFn: () => finFn({ data: { orderId: id } }),
+    }),
+  );
+  const { data: materials = [] } = useSuspenseQuery(
+    queryOptions({
+      queryKey: ["service-order-materials", id],
+      queryFn: () => matFn({ data: { orderId: id } }),
     }),
   );
   const [downloading, setDownloading] = useState(false);
@@ -70,6 +78,9 @@ function PrintActions() {
         financials: fin.financials,
         generatedAt: new Date(),
         authorName: displayName ?? null,
+        materials: materials
+          .map((m) => m.signed_url)
+          .filter((u): u is string => Boolean(u)),
       });
       toast.success(`PDF da OS #${order.number} baixado`);
     } catch (error) {
