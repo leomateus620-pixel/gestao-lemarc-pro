@@ -445,6 +445,8 @@ function OrdemDetalhe() {
 
       <ServiceOrderAttachmentsSection orderId={order.id} />
 
+      {isAdmin && <ServiceOrderMaterialsSection orderId={order.id} />}
+
       {isAdmin && (
         <FinancialBlock
           order={order}
