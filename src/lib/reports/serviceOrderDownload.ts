@@ -18,6 +18,8 @@ type Input = {
   financials: OrderFinancials | null;
   generatedAt: Date;
   authorName: string | null;
+  /** Signed URLs of extra PDFs (material attachments) to append after page 1. */
+  materials?: string[];
 };
 
 type TextOptions = {
