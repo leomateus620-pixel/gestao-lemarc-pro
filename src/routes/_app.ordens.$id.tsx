@@ -48,6 +48,7 @@ import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeCon
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
+import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/ServiceOrderMaterialsSection";
 import { finishWork, startWork } from "@/lib/api/timeSessions.functions";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
