@@ -785,6 +785,40 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
 
 export async function downloadServiceOrderReportPdf(input: Input) {
   const { doc, filename, pages } = await buildServiceOrderReportPdfDocument(input);
-  doc.save(filename);
-  return { filename, pages };
+  const materials = input.materials ?? [];
+  if (materials.length === 0) {
+    doc.save(filename);
+    return { filename, pages };
+  }
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const base = await PDFDocument.load(doc.output("arraybuffer"));
+    for (const url of materials) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        const attached = await PDFDocument.load(buf, { ignoreEncryption: true });
+        const copied = await base.copyPages(attached, attached.getPageIndices());
+        copied.forEach((p) => base.addPage(p));
+      } catch (err) {
+        console.warn("Falha ao mesclar PDF de material:", err);
+      }
+    }
+    const merged = await base.save();
+    const blob = new Blob([new Uint8Array(merged)], { type: "application/pdf" });
+    const link = document.createElement("a");
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+    return { filename, pages: base.getPageCount() };
+  } catch (err) {
+    console.warn("pdf-lib falhou, salvando apenas relatório:", err);
+    doc.save(filename);
+    return { filename, pages };
+  }
 }
