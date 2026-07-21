@@ -552,6 +552,7 @@ function ClientStep({
     cnpj?: string | null;
     city?: string | null;
     state?: string | null;
+    address?: string | null;
     distance_km_from_base?: number | null;
     default_displacement_rate_cents?: number | null;
   }[];
@@ -562,6 +563,7 @@ function ClientStep({
   const createCli = useServerFn(createCompany);
   const [mode, setMode] = useState<"select" | "new">("select");
   const [query, setQuery] = useState("");
+  const [unitQuery, setUnitQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
   const [newCnpj, setNewCnpj] = useState("");
@@ -586,6 +588,29 @@ function ClientStep({
     () => units.filter((u) => u.client_id === draft.clientId),
     [units, draft.clientId],
   );
+  const showUnitSearch = selectedUnits.length > 6;
+  const filteredUnits = useMemo(() => {
+    const q = unitQuery.trim().toLowerCase();
+    if (!q) return selectedUnits;
+    const qDigits = onlyDigits(q);
+    return selectedUnits.filter((u) => {
+      if (u.name.toLowerCase().includes(q)) return true;
+      if ((u.address ?? "").toLowerCase().includes(q)) return true;
+      if ((u.city ?? "").toLowerCase().includes(q)) return true;
+      if ((u.state ?? "").toLowerCase().includes(q)) return true;
+      if ((u.sector ?? "").toLowerCase().includes(q)) return true;
+      if (u.cnpj) {
+        if (qDigits && u.cnpj.includes(qDigits)) return true;
+        if (maskCNPJ(u.cnpj).toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [selectedUnits, unitQuery]);
+  const selectedUnitPinned = useMemo(() => {
+    if (!draft.unitId) return null;
+    if (filteredUnits.some((u) => u.id === draft.unitId)) return null;
+    return selectedUnits.find((u) => u.id === draft.unitId) ?? null;
+  }, [draft.unitId, filteredUnits, selectedUnits]);
   const selectedClient = clients.find((client) => client.id === draft.clientId);
   const clientError = issues.find((issue) => issue.field === "clientId")?.message;
 
@@ -750,6 +775,36 @@ function ClientStep({
                   Vinculada ao cliente selecionado acima.
                 </p>
               </div>
+              {showUnitSearch && (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <Search size={15} className={searchIconCls} />
+                    <Input
+                      value={unitQuery}
+                      onChange={(e) => setUnitQuery(e.target.value)}
+                      placeholder="Buscar filial por nome, endereço ou cidade…"
+                      className={cn(inputCls, "pl-10")}
+                      aria-label="Buscar filial por nome, endereço, cidade ou CNPJ"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                    <span>
+                      {filteredUnits.length === selectedUnits.length
+                        ? `${selectedUnits.length} unidades`
+                        : `${filteredUnits.length} de ${selectedUnits.length} unidades`}
+                    </span>
+                    {unitQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setUnitQuery("")}
+                        className="font-semibold text-primary hover:underline"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <button
                   type="button"
@@ -767,7 +822,7 @@ function ClientStep({
                     {draft.unitId === "" && <Check aria-hidden="true" size={14} />}
                   </span>
                 </button>
-                {selectedUnits.map((u) => {
+                {(selectedUnitPinned ? [selectedUnitPinned, ...filteredUnits] : filteredUnits).map((u) => {
                   const active = draft.unitId === u.id;
                   return (
                     <button
@@ -802,6 +857,11 @@ function ClientStep({
                   );
                 })}
               </div>
+              {showUnitSearch && filteredUnits.length === 0 && (
+                <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center text-xs text-slate-400">
+                  Nenhuma filial encontrada para “{unitQuery}”.
+                </p>
+              )}
               {draft.unitId &&
                 (() => {
                   const selected = selectedUnits.find((u) => u.id === draft.unitId);
