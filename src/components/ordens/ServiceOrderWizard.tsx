@@ -552,6 +552,7 @@ function ClientStep({
     cnpj?: string | null;
     city?: string | null;
     state?: string | null;
+    address?: string | null;
     distance_km_from_base?: number | null;
     default_displacement_rate_cents?: number | null;
   }[];
