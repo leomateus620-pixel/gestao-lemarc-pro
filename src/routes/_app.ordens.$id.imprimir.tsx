@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { FileDown, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { listServiceOrderMaterialAttachments } from "@/lib/api/serviceOrderMaterialAttachments.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
+import { extractTotalLiquidoFromPdf } from "@/lib/reports/materialsTotalExtractor";
 import { useAuth } from "@/components/app/AuthContext";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 
@@ -67,6 +68,27 @@ function PrintActions() {
       queryFn: () => matFn({ data: { orderId: id } }),
     }),
   );
+  const firstMaterial = materials.find((m) => m.signed_url) ?? null;
+  const { data: materialsExtraction } = useQuery({
+    queryKey: [
+      "service-order-materials-net",
+      id,
+      firstMaterial?.file_path ?? null,
+    ],
+    enabled: Boolean(firstMaterial?.signed_url),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const res = await fetch(firstMaterial!.signed_url!);
+      if (!res.ok) return { cents: null as number | null };
+      const buf = await res.arrayBuffer();
+      const head = new Uint8Array(buf.slice(0, 5));
+      const isPdf =
+        head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+      if (!isPdf) return { cents: null as number | null };
+      const r = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
+      return { cents: r.cents };
+    },
+  });
   const [downloading, setDownloading] = useState(false);
   if (!order) return null;
   const handleDownload = async () => {
@@ -81,6 +103,10 @@ function PrintActions() {
         materials: materials
           .map((m) => m.signed_url)
           .filter((u): u is string => Boolean(u)),
+        materialsNetCents: firstMaterial
+          ? (materialsExtraction?.cents ?? null)
+          : undefined,
+        materialsFileName: firstMaterial?.file_name ?? undefined,
       });
       toast.success(`PDF da OS #${order.number} baixado`);
     } catch (error) {
@@ -108,6 +134,7 @@ function Body() {
   const { displayName } = useAuth();
   const orderFn = useServerFn(getServiceOrder);
   const finFn = useServerFn(getOrderFinancials);
+  const matFn = useServerFn(listServiceOrderMaterialAttachments);
   const { data: order } = useSuspenseQuery(
     queryOptions({
       queryKey: ["service-order", id],
@@ -120,6 +147,33 @@ function Body() {
       queryFn: () => finFn({ data: { orderId: id } }),
     }),
   );
+  const { data: materials = [] } = useSuspenseQuery(
+    queryOptions({
+      queryKey: ["service-order-materials", id],
+      queryFn: () => matFn({ data: { orderId: id } }),
+    }),
+  );
+  const firstMaterial = materials.find((m) => m.signed_url) ?? null;
+  const { data: materialsExtraction } = useQuery({
+    queryKey: [
+      "service-order-materials-net",
+      id,
+      firstMaterial?.file_path ?? null,
+    ],
+    enabled: Boolean(firstMaterial?.signed_url),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const res = await fetch(firstMaterial!.signed_url!);
+      if (!res.ok) return { cents: null as number | null };
+      const buf = await res.arrayBuffer();
+      const head = new Uint8Array(buf.slice(0, 5));
+      const isPdf =
+        head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+      if (!isPdf) return { cents: null as number | null };
+      const r = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
+      return { cents: r.cents };
+    },
+  });
   if (!order) throw notFound();
   const generatedAt = useMemo(() => new Date(), []);
   useEffect(() => {
@@ -132,6 +186,10 @@ function Body() {
       financials={fin.financials}
       generatedAt={generatedAt}
       authorName={displayName ?? null}
+      materialsNetCents={
+        firstMaterial ? (materialsExtraction?.cents ?? null) : undefined
+      }
+      materialsFileName={firstMaterial?.file_name ?? undefined}
     />
   );
 }

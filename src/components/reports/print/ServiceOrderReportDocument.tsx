@@ -16,6 +16,15 @@ type Props = {
   financials: OrderFinancials | null;
   generatedAt: Date;
   authorName: string | null;
+  /**
+   * Total Líquido extraído do primeiro PDF anexado em "Materiais" (em centavos).
+   * `null` = extração falhou; `undefined` = sem anexo.
+   */
+  materialsNetCents?: number | null;
+  /** Motivo da falha, se houver. */
+  materialsExtractionReason?: "not_found" | "parse_error" | null;
+  /** Nome do primeiro anexo de materiais, exibido no card. */
+  materialsFileName?: string | null;
 };
 
 const EMPTY = "—";
@@ -149,6 +158,9 @@ export function ServiceOrderReportDocument({
   financials,
   generatedAt,
   authorName,
+  materialsNetCents,
+  materialsExtractionReason,
+  materialsFileName,
 }: Props) {
   const techs = getOrderTechnicians(order);
   const primary = techs.find((t) => t.is_primary) ?? techs[0];
@@ -183,6 +195,13 @@ export function ServiceOrderReportDocument({
   const workNotes = financials?.notes?.trim();
   const unitName = order.client_unit?.name ?? order.client?.unit ?? EMPTY;
   const localSetor = joinParts([order.location, order.client_unit?.sector], " / ");
+
+  const hasMaterialAttachment =
+    materialsNetCents !== undefined || Boolean(materialsFileName);
+  const materialsExtractionFailed =
+    hasMaterialAttachment && materialsNetCents == null;
+  const grandTotalWithMaterialsCents =
+    (financials?.grand_total_cents ?? 0) + (materialsNetCents ?? 0);
 
   return (
     <div className="os-pdf">
@@ -350,6 +369,43 @@ export function ServiceOrderReportDocument({
           ) : (
             <div className="warn">
               Apuração financeira pendente — finalize a OS para gerar os totais.
+            </div>
+          )}
+
+          {hasMaterialAttachment && financials && (
+            <div className="totalsBox">
+              <div className="boxTitle">Total geral com materiais</div>
+              <div className="totalRow">
+                <span>Total da OS</span>
+                <span>{formatBRL(financials.grand_total_cents)}</span>
+              </div>
+              <div className="totalRow">
+                <span>
+                  Total dos materiais (anexo)
+                  {materialsFileName ? ` · ${materialsFileName}` : ""}
+                </span>
+                <span>
+                  {materialsExtractionFailed ? "—" : formatBRL(materialsNetCents ?? 0)}
+                </span>
+              </div>
+              <div className="totalRow grand">
+                <span>Total final</span>
+                <span>
+                  {materialsExtractionFailed
+                    ? formatBRL(financials.grand_total_cents)
+                    : formatBRL(grandTotalWithMaterialsCents)}
+                </span>
+              </div>
+              {materialsExtractionFailed ? (
+                <div className="mutedNote">
+                  Não foi possível extrair o Total Líquido do PDF de materiais — total final
+                  exibido considera apenas a OS.
+                </div>
+              ) : (
+                <div className="mutedNote">
+                  Total Líquido extraído automaticamente do PDF de materiais anexado.
+                </div>
+              )}
             </div>
           )}
 
