@@ -775,6 +775,36 @@ function ClientStep({
                   Vinculada ao cliente selecionado acima.
                 </p>
               </div>
+              {showUnitSearch && (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <Search size={15} className={searchIconCls} />
+                    <Input
+                      value={unitQuery}
+                      onChange={(e) => setUnitQuery(e.target.value)}
+                      placeholder="Buscar filial por nome, endereço ou cidade…"
+                      className={cn(inputCls, "pl-10")}
+                      aria-label="Buscar filial por nome, endereço, cidade ou CNPJ"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                    <span>
+                      {filteredUnits.length === selectedUnits.length
+                        ? `${selectedUnits.length} unidades`
+                        : `${filteredUnits.length} de ${selectedUnits.length} unidades`}
+                    </span>
+                    {unitQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setUnitQuery("")}
+                        className="font-semibold text-primary hover:underline"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <button
                   type="button"
@@ -792,7 +822,7 @@ function ClientStep({
                     {draft.unitId === "" && <Check aria-hidden="true" size={14} />}
                   </span>
                 </button>
-                {selectedUnits.map((u) => {
+                {(selectedUnitPinned ? [selectedUnitPinned, ...filteredUnits] : filteredUnits).map((u) => {
                   const active = draft.unitId === u.id;
                   return (
                     <button
@@ -827,6 +857,11 @@ function ClientStep({
                   );
                 })}
               </div>
+              {showUnitSearch && filteredUnits.length === 0 && (
+                <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center text-xs text-slate-400">
+                  Nenhuma filial encontrada para “{unitQuery}”.
+                </p>
+              )}
               {draft.unitId &&
                 (() => {
                   const selected = selectedUnits.find((u) => u.id === draft.unitId);
