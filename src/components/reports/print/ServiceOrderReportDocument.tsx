@@ -372,6 +372,43 @@ export function ServiceOrderReportDocument({
             </div>
           )}
 
+          {hasMaterialAttachment && financials && (
+            <div className="totalsBox">
+              <div className="boxTitle">Total geral com materiais</div>
+              <div className="totalRow">
+                <span>Total da OS</span>
+                <span>{formatBRL(financials.grand_total_cents)}</span>
+              </div>
+              <div className="totalRow">
+                <span>
+                  Total dos materiais (anexo)
+                  {materialsFileName ? ` · ${materialsFileName}` : ""}
+                </span>
+                <span>
+                  {materialsExtractionFailed ? "—" : formatBRL(materialsNetCents ?? 0)}
+                </span>
+              </div>
+              <div className="totalRow grand">
+                <span>Total final</span>
+                <span>
+                  {materialsExtractionFailed
+                    ? formatBRL(financials.grand_total_cents)
+                    : formatBRL(grandTotalWithMaterialsCents)}
+                </span>
+              </div>
+              {materialsExtractionFailed ? (
+                <div className="mutedNote">
+                  Não foi possível extrair o Total Líquido do PDF de materiais — total final
+                  exibido considera apenas a OS.
+                </div>
+              ) : (
+                <div className="mutedNote">
+                  Total Líquido extraído automaticamente do PDF de materiais anexado.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="signatureBox">
             <div className="boxTitle">Assinatura do responsável</div>
             {order.signature ? (
