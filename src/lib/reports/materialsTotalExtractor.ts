@@ -47,11 +47,7 @@ export async function extractTotalLiquidoFromPdf(
     // Clone into a fresh buffer — pdfjs takes ownership and detaches the input.
     const buf = new Uint8Array(data.byteLength);
     buf.set(data);
-    const loadingTask = pdfjs.getDocument({
-      data: buf,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
+    const loadingTask = pdfjs.getDocument({ data: buf, useSystemFonts: true });
     const doc = await loadingTask.promise;
     const parts: string[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
