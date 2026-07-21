@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { FileDown, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { listServiceOrderMaterialAttachments } from "@/lib/api/serviceOrderMaterialAttachments.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
+import { extractTotalLiquidoFromPdf } from "@/lib/reports/materialsTotalExtractor";
 import { useAuth } from "@/components/app/AuthContext";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 
