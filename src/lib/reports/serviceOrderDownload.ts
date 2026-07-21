@@ -22,6 +22,10 @@ type Input = {
   materials?: string[];
   /** When provided and `materials` isn't, the downloader loads material PDFs itself (admin-gated). */
   orderId?: string;
+  /** Total Líquido extracted from the first attached PDF (cents). Null = extraction failed. */
+  materialsNetCents?: number | null;
+  /** File name of the first material attachment, shown in the totalization card. */
+  materialsFileName?: string | null;
 };
 
 type TextOptions = {
