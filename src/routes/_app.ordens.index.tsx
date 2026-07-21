@@ -126,7 +126,7 @@ function OrdensPage() {
 function OrdensList() {
   const { status, priority, client, technician, sort, period, from, to, filtro, q } =
     Route.useSearch();
-  const navigate = useNavigate({ from: "/ordens" });
+  const navigate = useNavigate({ from: "/ordens/" });
   const { data: orders } = useServiceOrdersQuery();
   const { data: financials } = useServiceOrderFinancialSummariesQuery();
   const periodRange = useMemo<PeriodRange>(

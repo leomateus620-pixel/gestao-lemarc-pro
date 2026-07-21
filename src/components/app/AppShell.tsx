@@ -1,8 +1,9 @@
-import { ChevronLeft, LogOut, Plus } from "lucide-react";
+import { Boxes, ChevronLeft, LogOut, Plus } from "lucide-react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
 import { useEffect, type ReactNode } from "react";
+import { useModuleAccessQuery } from "@/hooks/useModuleAccess";
 
 const HEADER_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
@@ -27,6 +28,7 @@ export function AppShell({
   const router = useRouter();
   const navigate = useNavigate();
   const { displayName, avatarUrl, signOut } = useAuth();
+  const moduleAccess = useModuleAccessQuery();
   const isHome = !title && !back;
   const firstName = (displayName || name).split(" ")[0];
 
@@ -116,6 +118,16 @@ export function AppShell({
                     {firstName.slice(0, 2)}
                   </span>
                 )}
+                {moduleAccess.data?.wireTrays ? (
+                  <Link
+                    to="/leitos"
+                    className="lemarc-pressable grid size-11 shrink-0 place-items-center rounded-xl border border-orange-300/25 bg-orange-400/10 text-orange-200 transition hover:bg-orange-400/18 hover:text-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    aria-label="Abrir Leitos Aramados"
+                    title="Leitos Aramados"
+                  >
+                    <Boxes size={17} />
+                  </Link>
+                ) : null}
                 <button
                   onClick={handleSignOut}
                   className="lemarc-pressable grid size-11 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
