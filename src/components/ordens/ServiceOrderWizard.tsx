@@ -563,6 +563,7 @@ function ClientStep({
   const createCli = useServerFn(createCompany);
   const [mode, setMode] = useState<"select" | "new">("select");
   const [query, setQuery] = useState("");
+  const [unitQuery, setUnitQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
   const [newCnpj, setNewCnpj] = useState("");
