@@ -49,7 +49,6 @@ export async function extractTotalLiquidoFromPdf(
     buf.set(data);
     const loadingTask = pdfjs.getDocument({
       data: buf,
-      disableWorker: false,
       isEvalSupported: false,
       useSystemFonts: true,
     });
@@ -64,7 +63,12 @@ export async function extractTotalLiquidoFromPdf(
         .join(" ");
       parts.push(pageText);
     }
-    await doc.destroy();
+    // Best-effort cleanup; not present on every pdfjs version.
+    try {
+      await loadingTask.destroy();
+    } catch {
+      /* noop */
+    }
     const fullText = parts.join("\n").replace(/\s+/g, " ");
     const matches = [...fullText.matchAll(LABEL_RE)];
     if (matches.length === 0) return { cents: null, reason: "not_found" };
