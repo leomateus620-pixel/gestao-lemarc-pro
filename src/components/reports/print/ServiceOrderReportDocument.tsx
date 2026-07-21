@@ -16,6 +16,15 @@ type Props = {
   financials: OrderFinancials | null;
   generatedAt: Date;
   authorName: string | null;
+  /**
+   * Total Líquido extraído do primeiro PDF anexado em "Materiais" (em centavos).
+   * `null` = extração falhou; `undefined` = sem anexo.
+   */
+  materialsNetCents?: number | null;
+  /** Motivo da falha, se houver. */
+  materialsExtractionReason?: "not_found" | "parse_error" | null;
+  /** Nome do primeiro anexo de materiais, exibido no card. */
+  materialsFileName?: string | null;
 };
 
 const EMPTY = "—";
@@ -149,6 +158,9 @@ export function ServiceOrderReportDocument({
   financials,
   generatedAt,
   authorName,
+  materialsNetCents,
+  materialsExtractionReason,
+  materialsFileName,
 }: Props) {
   const techs = getOrderTechnicians(order);
   const primary = techs.find((t) => t.is_primary) ?? techs[0];
@@ -183,6 +195,13 @@ export function ServiceOrderReportDocument({
   const workNotes = financials?.notes?.trim();
   const unitName = order.client_unit?.name ?? order.client?.unit ?? EMPTY;
   const localSetor = joinParts([order.location, order.client_unit?.sector], " / ");
+
+  const hasMaterialAttachment =
+    materialsNetCents !== undefined || Boolean(materialsFileName);
+  const materialsExtractionFailed =
+    hasMaterialAttachment && materialsNetCents == null;
+  const grandTotalWithMaterialsCents =
+    (financials?.grand_total_cents ?? 0) + (materialsNetCents ?? 0);
 
   return (
     <div className="os-pdf">
