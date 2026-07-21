@@ -867,9 +867,12 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
 }
 
 export async function downloadServiceOrderReportPdf(input: Input) {
-  const { doc, filename, pages } = await buildServiceOrderReportPdfDocument(input);
-  let materials = input.materials ?? [];
-  if (materials.length === 0 && input.orderId) {
+  // Resolve material attachments (URLs + filename) BEFORE building the doc,
+  // so the "Total geral com materiais" card can render on page 1.
+  type MatEntry = { url: string; fileName: string | null };
+  let matEntries: MatEntry[] =
+    (input.materials ?? []).map((url) => ({ url, fileName: null }));
+  if (matEntries.length === 0 && input.orderId) {
     try {
       const { listServiceOrderMaterialAttachments } = await import(
         "@/lib/api/serviceOrderMaterialAttachments.functions"
@@ -877,14 +880,56 @@ export async function downloadServiceOrderReportPdf(input: Input) {
       const rows = await listServiceOrderMaterialAttachments({
         data: { orderId: input.orderId },
       });
-      materials = rows
-        .map((r) => r.signed_url)
-        .filter((u): u is string => Boolean(u));
+      matEntries = rows
+        .filter((r) => Boolean(r.signed_url))
+        .map((r) => ({ url: r.signed_url as string, fileName: r.file_name ?? null }));
     } catch (err) {
       // Non-admins hit "Acesso restrito" — that's expected; keep the download flowing.
       console.warn("Materiais da OS indisponíveis para este usuário:", err);
     }
   }
+
+  // Fetch first material once (bytes are reused for extraction + merge).
+  let firstMatBytes: ArrayBuffer | null = null;
+  let materialsNetCents: number | null | undefined = input.materialsNetCents;
+  let materialsFileName: string | null | undefined = input.materialsFileName;
+  if (matEntries.length > 0) {
+    const first = matEntries[0];
+    if (materialsFileName === undefined) materialsFileName = first.fileName;
+    if (materialsNetCents === undefined) {
+      try {
+        const res = await fetch(first.url);
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          const head = new Uint8Array(buf.slice(0, 5));
+          const isPdf =
+            head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+          if (isPdf) {
+            firstMatBytes = buf;
+            const { extractTotalLiquidoFromPdf } = await import(
+              "./materialsTotalExtractor"
+            );
+            const result = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
+            materialsNetCents = result.cents;
+          } else {
+            materialsNetCents = null;
+          }
+        } else {
+          materialsNetCents = null;
+        }
+      } catch (err) {
+        console.warn("Falha ao carregar PDF do primeiro material:", err);
+        materialsNetCents = null;
+      }
+    }
+  }
+
+  const { doc, filename, pages } = await buildServiceOrderReportPdfDocument({
+    ...input,
+    materialsNetCents,
+    materialsFileName,
+  });
+  const materials = matEntries.map((m) => m.url);
   if (materials.length === 0) {
     doc.save(filename);
     return { filename, pages };
@@ -893,11 +938,17 @@ export async function downloadServiceOrderReportPdf(input: Input) {
     const { PDFDocument } = await import("pdf-lib");
     const base = await PDFDocument.load(doc.output("arraybuffer"));
     let mergedCount = 0;
-    for (const url of materials) {
+    for (let idx = 0; idx < materials.length; idx++) {
+      const url = materials[idx];
       try {
-        const res = await fetch(url);
-        if (!res.ok) continue;
-        const buf = await res.arrayBuffer();
+        let buf: ArrayBuffer;
+        if (idx === 0 && firstMatBytes) {
+          buf = firstMatBytes;
+        } else {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          buf = await res.arrayBuffer();
+        }
         // Guard: signed URLs sometimes return HTML errors with 200; validate magic bytes.
         const head = new Uint8Array(buf.slice(0, 5));
         const isPdf =
