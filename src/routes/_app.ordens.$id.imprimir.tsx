@@ -68,6 +68,27 @@ function PrintActions() {
       queryFn: () => matFn({ data: { orderId: id } }),
     }),
   );
+  const firstMaterial = materials.find((m) => m.signed_url) ?? null;
+  const { data: materialsExtraction } = useQuery({
+    queryKey: [
+      "service-order-materials-net",
+      id,
+      firstMaterial?.file_path ?? null,
+    ],
+    enabled: Boolean(firstMaterial?.signed_url),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const res = await fetch(firstMaterial!.signed_url!);
+      if (!res.ok) return { cents: null as number | null };
+      const buf = await res.arrayBuffer();
+      const head = new Uint8Array(buf.slice(0, 5));
+      const isPdf =
+        head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+      if (!isPdf) return { cents: null as number | null };
+      const r = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
+      return { cents: r.cents };
+    },
+  });
   const [downloading, setDownloading] = useState(false);
   if (!order) return null;
   const handleDownload = async () => {
@@ -82,6 +103,10 @@ function PrintActions() {
         materials: materials
           .map((m) => m.signed_url)
           .filter((u): u is string => Boolean(u)),
+        materialsNetCents: firstMaterial
+          ? (materialsExtraction?.cents ?? null)
+          : undefined,
+        materialsFileName: firstMaterial?.file_name ?? undefined,
       });
       toast.success(`PDF da OS #${order.number} baixado`);
     } catch (error) {
