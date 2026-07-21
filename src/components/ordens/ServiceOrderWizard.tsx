@@ -588,6 +588,29 @@ function ClientStep({
     () => units.filter((u) => u.client_id === draft.clientId),
     [units, draft.clientId],
   );
+  const showUnitSearch = selectedUnits.length > 6;
+  const filteredUnits = useMemo(() => {
+    const q = unitQuery.trim().toLowerCase();
+    if (!q) return selectedUnits;
+    const qDigits = onlyDigits(q);
+    return selectedUnits.filter((u) => {
+      if (u.name.toLowerCase().includes(q)) return true;
+      if ((u.address ?? "").toLowerCase().includes(q)) return true;
+      if ((u.city ?? "").toLowerCase().includes(q)) return true;
+      if ((u.state ?? "").toLowerCase().includes(q)) return true;
+      if ((u.sector ?? "").toLowerCase().includes(q)) return true;
+      if (u.cnpj) {
+        if (qDigits && u.cnpj.includes(qDigits)) return true;
+        if (maskCNPJ(u.cnpj).toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [selectedUnits, unitQuery]);
+  const selectedUnitPinned = useMemo(() => {
+    if (!draft.unitId) return null;
+    if (filteredUnits.some((u) => u.id === draft.unitId)) return null;
+    return selectedUnits.find((u) => u.id === draft.unitId) ?? null;
+  }, [draft.unitId, filteredUnits, selectedUnits]);
   const selectedClient = clients.find((client) => client.id === draft.clientId);
   const clientError = issues.find((issue) => issue.field === "clientId")?.message;
 
