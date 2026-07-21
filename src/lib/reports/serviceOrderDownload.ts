@@ -20,6 +20,8 @@ type Input = {
   authorName: string | null;
   /** Signed URLs of extra PDFs (material attachments) to append after page 1. */
   materials?: string[];
+  /** When provided and `materials` isn't, the downloader loads material PDFs itself (admin-gated). */
+  orderId?: string;
 };
 
 type TextOptions = {
