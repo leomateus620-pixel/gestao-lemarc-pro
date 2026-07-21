@@ -1,8 +1,15 @@
-import { createFileRoute, Outlet, useMatches, useNavigate } from "@tanstack/react-router";
-import { useEffect, useSyncExternalStore } from "react";
+import {
+  createFileRoute,
+  Outlet,
+  useLocation,
+  useMatches,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { BottomNav } from "@/components/app/BottomNav";
 import { RoleProvider } from "@/components/app/RoleContext";
 import { AuthProvider, useAuth } from "@/components/app/AuthContext";
+import { safeInternalDestination } from "@/lib/modules";
 
 export const Route = createFileRoute("/_app")({
   ssr: false,
@@ -41,8 +48,7 @@ function useFullscreenFormFlag() {
       return () => el.removeEventListener("lemarc:fullscreen-form-change", cb);
     },
     () =>
-      typeof document !== "undefined" &&
-      document.documentElement.dataset.fullscreenForm === "true",
+      typeof document !== "undefined" && document.documentElement.dataset.fullscreenForm === "true",
     () => false,
   );
 }
@@ -50,10 +56,18 @@ function useFullscreenFormFlag() {
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectRef = useRef(safeInternalDestination(location.href, "os"));
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate({ to: "/login", replace: true });
+    if (!loading && !user && !redirectedRef.current) {
+      redirectedRef.current = true;
+      navigate({
+        to: "/login",
+        search: { module: "os", redirect: redirectRef.current },
+        replace: true,
+      });
     }
   }, [loading, user, navigate]);
 

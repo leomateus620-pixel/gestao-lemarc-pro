@@ -10,25 +10,51 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeitosRouteImport } from './routes/leitos'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LeitosIndexRouteImport } from './routes/leitos.index'
+import { Route as LeitosSeparacaoRouteImport } from './routes/leitos.separacao'
+import { Route as LeitosRelatoriosRouteImport } from './routes/leitos.relatorios'
+import { Route as LeitosProdutosRouteImport } from './routes/leitos.produtos'
+import { Route as LeitosProducaoRouteImport } from './routes/leitos.producao'
+import { Route as LeitosPedidosRouteImport } from './routes/leitos.pedidos'
+import { Route as LeitosMovimentacoesRouteImport } from './routes/leitos.movimentacoes'
+import { Route as LeitosMaisRouteImport } from './routes/leitos.mais'
+import { Route as LeitosFaturamentoRouteImport } from './routes/leitos.faturamento'
+import { Route as LeitosEstoqueRouteImport } from './routes/leitos.estoque'
+import { Route as LeitosConfiguracoesRouteImport } from './routes/leitos.configuracoes'
 import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
 import { Route as AppMaisRouteImport } from './routes/_app.mais'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradores'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
+import { Route as LeitosProdutosIndexRouteImport } from './routes/leitos.produtos.index'
+import { Route as LeitosProducaoIndexRouteImport } from './routes/leitos.producao.index'
+import { Route as LeitosPedidosIndexRouteImport } from './routes/leitos.pedidos.index'
+import { Route as LeitosEstoqueIndexRouteImport } from './routes/leitos.estoque.index'
+import { Route as LeitosConfiguracoesIndexRouteImport } from './routes/leitos.configuracoes.index'
 import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
 import { Route as AppColaboradoresIndexRouteImport } from './routes/_app.colaboradores.index'
 import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
+import { Route as LeitosProdutosNovoRouteImport } from './routes/leitos.produtos.novo'
+import { Route as LeitosProducaoNovaRouteImport } from './routes/leitos.producao.nova'
+import { Route as LeitosProducaoProductionIdRouteImport } from './routes/leitos.producao.$productionId'
+import { Route as LeitosPedidosNovoRouteImport } from './routes/leitos.pedidos.novo'
+import { Route as LeitosPedidosOrderIdRouteImport } from './routes/leitos.pedidos.$orderId'
+import { Route as LeitosEstoqueProductIdRouteImport } from './routes/leitos.estoque.$productId'
+import { Route as LeitosConfiguracoesAcessosRouteImport } from './routes/leitos.configuracoes.acessos'
 import { Route as AppRelatoriosImprimirRouteImport } from './routes/_app.relatorios_.imprimir'
 import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
 import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
 import { Route as AppColaboradoresNovoRouteImport } from './routes/_app.colaboradores.novo'
 import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
+import { Route as LeitosProdutosProductIdIndexRouteImport } from './routes/leitos.produtos.$productId.index'
 import { Route as AppColaboradoresIdIndexRouteImport } from './routes/_app.colaboradores.$id.index'
 import { Route as AppClientesIdIndexRouteImport } from './routes/_app.clientes.$id.index'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as LeitosProdutosProductIdEditarRouteImport } from './routes/leitos.produtos.$productId.editar'
 import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
 import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
 import { Route as AppColaboradoresIdPrecificacaoRouteImport } from './routes/_app.colaboradores.$id.precificacao'
@@ -42,6 +68,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeitosRoute = LeitosRouteImport.update({
+  id: '/leitos',
+  path: '/leitos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -50,6 +81,61 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LeitosIndexRoute = LeitosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosSeparacaoRoute = LeitosSeparacaoRouteImport.update({
+  id: '/separacao',
+  path: '/separacao',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosRelatoriosRoute = LeitosRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosProdutosRoute = LeitosProdutosRouteImport.update({
+  id: '/produtos',
+  path: '/produtos',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosProducaoRoute = LeitosProducaoRouteImport.update({
+  id: '/producao',
+  path: '/producao',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosPedidosRoute = LeitosPedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosMovimentacoesRoute = LeitosMovimentacoesRouteImport.update({
+  id: '/movimentacoes',
+  path: '/movimentacoes',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosMaisRoute = LeitosMaisRouteImport.update({
+  id: '/mais',
+  path: '/mais',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosFaturamentoRoute = LeitosFaturamentoRouteImport.update({
+  id: '/faturamento',
+  path: '/faturamento',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosEstoqueRoute = LeitosEstoqueRouteImport.update({
+  id: '/estoque',
+  path: '/estoque',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosConfiguracoesRoute = LeitosConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => LeitosRoute,
 } as any)
 const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
   id: '/relatorios',
@@ -81,6 +167,32 @@ const AppClientesRoute = AppClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => AppRoute,
 } as any)
+const LeitosProdutosIndexRoute = LeitosProdutosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosProdutosRoute,
+} as any)
+const LeitosProducaoIndexRoute = LeitosProducaoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosProducaoRoute,
+} as any)
+const LeitosPedidosIndexRoute = LeitosPedidosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosPedidosRoute,
+} as any)
+const LeitosEstoqueIndexRoute = LeitosEstoqueIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosEstoqueRoute,
+} as any)
+const LeitosConfiguracoesIndexRoute =
+  LeitosConfiguracoesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LeitosConfiguracoesRoute,
+  } as any)
 const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
   id: '/ordens/',
   path: '/ordens/',
@@ -96,6 +208,43 @@ const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppClientesRoute,
 } as any)
+const LeitosProdutosNovoRoute = LeitosProdutosNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => LeitosProdutosRoute,
+} as any)
+const LeitosProducaoNovaRoute = LeitosProducaoNovaRouteImport.update({
+  id: '/nova',
+  path: '/nova',
+  getParentRoute: () => LeitosProducaoRoute,
+} as any)
+const LeitosProducaoProductionIdRoute =
+  LeitosProducaoProductionIdRouteImport.update({
+    id: '/$productionId',
+    path: '/$productionId',
+    getParentRoute: () => LeitosProducaoRoute,
+  } as any)
+const LeitosPedidosNovoRoute = LeitosPedidosNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => LeitosPedidosRoute,
+} as any)
+const LeitosPedidosOrderIdRoute = LeitosPedidosOrderIdRouteImport.update({
+  id: '/$orderId',
+  path: '/$orderId',
+  getParentRoute: () => LeitosPedidosRoute,
+} as any)
+const LeitosEstoqueProductIdRoute = LeitosEstoqueProductIdRouteImport.update({
+  id: '/$productId',
+  path: '/$productId',
+  getParentRoute: () => LeitosEstoqueRoute,
+} as any)
+const LeitosConfiguracoesAcessosRoute =
+  LeitosConfiguracoesAcessosRouteImport.update({
+    id: '/acessos',
+    path: '/acessos',
+    getParentRoute: () => LeitosConfiguracoesRoute,
+  } as any)
 const AppRelatoriosImprimirRoute = AppRelatoriosImprimirRouteImport.update({
   id: '/relatorios_/imprimir',
   path: '/relatorios/imprimir',
@@ -121,6 +270,12 @@ const AppClientesNovoRoute = AppClientesNovoRouteImport.update({
   path: '/novo',
   getParentRoute: () => AppClientesRoute,
 } as any)
+const LeitosProdutosProductIdIndexRoute =
+  LeitosProdutosProductIdIndexRouteImport.update({
+    id: '/$productId/',
+    path: '/$productId/',
+    getParentRoute: () => LeitosProdutosRoute,
+  } as any)
 const AppColaboradoresIdIndexRoute = AppColaboradoresIdIndexRouteImport.update({
   id: '/$id/',
   path: '/$id/',
@@ -136,6 +291,12 @@ const LovableEmailQueueProcessRoute =
     id: '/lovable/email/queue/process',
     path: '/lovable/email/queue/process',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const LeitosProdutosProductIdEditarRoute =
+  LeitosProdutosProductIdEditarRouteImport.update({
+    id: '/$productId/editar',
+    path: '/$productId/editar',
+    getParentRoute: () => LeitosProdutosRoute,
   } as any)
 const AppRelatoriosClienteClientIdRoute =
   AppRelatoriosClienteClientIdRouteImport.update({
@@ -179,6 +340,7 @@ const AppClientesIdEditarRoute = AppClientesIdEditarRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/leitos': typeof LeitosRouteWithChildren
   '/login': typeof LoginRoute
   '/clientes': typeof AppClientesRouteWithChildren
   '/colaboradores': typeof AppColaboradoresRouteWithChildren
@@ -186,14 +348,37 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
   '/relatorios': typeof AppRelatoriosRoute
+  '/leitos/configuracoes': typeof LeitosConfiguracoesRouteWithChildren
+  '/leitos/estoque': typeof LeitosEstoqueRouteWithChildren
+  '/leitos/faturamento': typeof LeitosFaturamentoRoute
+  '/leitos/mais': typeof LeitosMaisRoute
+  '/leitos/movimentacoes': typeof LeitosMovimentacoesRoute
+  '/leitos/pedidos': typeof LeitosPedidosRouteWithChildren
+  '/leitos/producao': typeof LeitosProducaoRouteWithChildren
+  '/leitos/produtos': typeof LeitosProdutosRouteWithChildren
+  '/leitos/relatorios': typeof LeitosRelatoriosRoute
+  '/leitos/separacao': typeof LeitosSeparacaoRoute
+  '/leitos/': typeof LeitosIndexRoute
   '/clientes/novo': typeof AppClientesNovoRoute
   '/colaboradores/novo': typeof AppColaboradoresNovoRoute
   '/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/ordens/nova': typeof AppOrdensNovaRoute
   '/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
+  '/leitos/configuracoes/acessos': typeof LeitosConfiguracoesAcessosRoute
+  '/leitos/estoque/$productId': typeof LeitosEstoqueProductIdRoute
+  '/leitos/pedidos/$orderId': typeof LeitosPedidosOrderIdRoute
+  '/leitos/pedidos/novo': typeof LeitosPedidosNovoRoute
+  '/leitos/producao/$productionId': typeof LeitosProducaoProductionIdRoute
+  '/leitos/producao/nova': typeof LeitosProducaoNovaRoute
+  '/leitos/produtos/novo': typeof LeitosProdutosNovoRoute
   '/clientes/': typeof AppClientesIndexRoute
   '/colaboradores/': typeof AppColaboradoresIndexRoute
   '/ordens/': typeof AppOrdensIndexRoute
+  '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
+  '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
+  '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
+  '/leitos/producao/': typeof LeitosProducaoIndexRoute
+  '/leitos/produtos/': typeof LeitosProdutosIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
@@ -201,9 +386,11 @@ export interface FileRoutesByFullPath {
   '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/clientes/$id/': typeof AppClientesIdIndexRoute
   '/colaboradores/$id/': typeof AppColaboradoresIdIndexRoute
+  '/leitos/produtos/$productId/': typeof LeitosProdutosProductIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -212,14 +399,32 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
   '/relatorios': typeof AppRelatoriosRoute
+  '/leitos/faturamento': typeof LeitosFaturamentoRoute
+  '/leitos/mais': typeof LeitosMaisRoute
+  '/leitos/movimentacoes': typeof LeitosMovimentacoesRoute
+  '/leitos/relatorios': typeof LeitosRelatoriosRoute
+  '/leitos/separacao': typeof LeitosSeparacaoRoute
+  '/leitos': typeof LeitosIndexRoute
   '/clientes/novo': typeof AppClientesNovoRoute
   '/colaboradores/novo': typeof AppColaboradoresNovoRoute
   '/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/ordens/nova': typeof AppOrdensNovaRoute
   '/relatorios/imprimir': typeof AppRelatoriosImprimirRoute
+  '/leitos/configuracoes/acessos': typeof LeitosConfiguracoesAcessosRoute
+  '/leitos/estoque/$productId': typeof LeitosEstoqueProductIdRoute
+  '/leitos/pedidos/$orderId': typeof LeitosPedidosOrderIdRoute
+  '/leitos/pedidos/novo': typeof LeitosPedidosNovoRoute
+  '/leitos/producao/$productionId': typeof LeitosProducaoProductionIdRoute
+  '/leitos/producao/nova': typeof LeitosProducaoNovaRoute
+  '/leitos/produtos/novo': typeof LeitosProdutosNovoRoute
   '/clientes': typeof AppClientesIndexRoute
   '/colaboradores': typeof AppColaboradoresIndexRoute
   '/ordens': typeof AppOrdensIndexRoute
+  '/leitos/configuracoes': typeof LeitosConfiguracoesIndexRoute
+  '/leitos/estoque': typeof LeitosEstoqueIndexRoute
+  '/leitos/pedidos': typeof LeitosPedidosIndexRoute
+  '/leitos/producao': typeof LeitosProducaoIndexRoute
+  '/leitos/produtos': typeof LeitosProdutosIndexRoute
   '/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
@@ -227,14 +432,17 @@ export interface FileRoutesByTo {
   '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/clientes/$id': typeof AppClientesIdIndexRoute
   '/colaboradores/$id': typeof AppColaboradoresIdIndexRoute
+  '/leitos/produtos/$productId': typeof LeitosProdutosProductIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/leitos': typeof LeitosRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/clientes': typeof AppClientesRouteWithChildren
   '/_app/colaboradores': typeof AppColaboradoresRouteWithChildren
@@ -242,14 +450,37 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/mais': typeof AppMaisRoute
   '/_app/relatorios': typeof AppRelatoriosRoute
+  '/leitos/configuracoes': typeof LeitosConfiguracoesRouteWithChildren
+  '/leitos/estoque': typeof LeitosEstoqueRouteWithChildren
+  '/leitos/faturamento': typeof LeitosFaturamentoRoute
+  '/leitos/mais': typeof LeitosMaisRoute
+  '/leitos/movimentacoes': typeof LeitosMovimentacoesRoute
+  '/leitos/pedidos': typeof LeitosPedidosRouteWithChildren
+  '/leitos/producao': typeof LeitosProducaoRouteWithChildren
+  '/leitos/produtos': typeof LeitosProdutosRouteWithChildren
+  '/leitos/relatorios': typeof LeitosRelatoriosRoute
+  '/leitos/separacao': typeof LeitosSeparacaoRoute
+  '/leitos/': typeof LeitosIndexRoute
   '/_app/clientes/novo': typeof AppClientesNovoRoute
   '/_app/colaboradores/novo': typeof AppColaboradoresNovoRoute
   '/_app/ordens/$id': typeof AppOrdensIdRouteWithChildren
   '/_app/ordens/nova': typeof AppOrdensNovaRoute
   '/_app/relatorios_/imprimir': typeof AppRelatoriosImprimirRoute
+  '/leitos/configuracoes/acessos': typeof LeitosConfiguracoesAcessosRoute
+  '/leitos/estoque/$productId': typeof LeitosEstoqueProductIdRoute
+  '/leitos/pedidos/$orderId': typeof LeitosPedidosOrderIdRoute
+  '/leitos/pedidos/novo': typeof LeitosPedidosNovoRoute
+  '/leitos/producao/$productionId': typeof LeitosProducaoProductionIdRoute
+  '/leitos/producao/nova': typeof LeitosProducaoNovaRoute
+  '/leitos/produtos/novo': typeof LeitosProdutosNovoRoute
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/colaboradores/': typeof AppColaboradoresIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
+  '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
+  '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
+  '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
+  '/leitos/producao/': typeof LeitosProducaoIndexRoute
+  '/leitos/produtos/': typeof LeitosProdutosIndexRoute
   '/_app/clientes/$id/editar': typeof AppClientesIdEditarRoute
   '/_app/colaboradores/$id/editar': typeof AppColaboradoresIdEditarRoute
   '/_app/colaboradores/$id/horas': typeof AppColaboradoresIdHorasRoute
@@ -257,14 +488,17 @@ export interface FileRoutesById {
   '/_app/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
   '/_app/relatorios_/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
+  '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/_app/clientes/$id/': typeof AppClientesIdIndexRoute
   '/_app/colaboradores/$id/': typeof AppColaboradoresIdIndexRoute
+  '/leitos/produtos/$productId/': typeof LeitosProdutosProductIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/leitos'
     | '/login'
     | '/clientes'
     | '/colaboradores'
@@ -272,14 +506,37 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mais'
     | '/relatorios'
+    | '/leitos/configuracoes'
+    | '/leitos/estoque'
+    | '/leitos/faturamento'
+    | '/leitos/mais'
+    | '/leitos/movimentacoes'
+    | '/leitos/pedidos'
+    | '/leitos/producao'
+    | '/leitos/produtos'
+    | '/leitos/relatorios'
+    | '/leitos/separacao'
+    | '/leitos/'
     | '/clientes/novo'
     | '/colaboradores/novo'
     | '/ordens/$id'
     | '/ordens/nova'
     | '/relatorios/imprimir'
+    | '/leitos/configuracoes/acessos'
+    | '/leitos/estoque/$productId'
+    | '/leitos/pedidos/$orderId'
+    | '/leitos/pedidos/novo'
+    | '/leitos/producao/$productionId'
+    | '/leitos/producao/nova'
+    | '/leitos/produtos/novo'
     | '/clientes/'
     | '/colaboradores/'
     | '/ordens/'
+    | '/leitos/configuracoes/'
+    | '/leitos/estoque/'
+    | '/leitos/pedidos/'
+    | '/leitos/producao/'
+    | '/leitos/produtos/'
     | '/clientes/$id/editar'
     | '/colaboradores/$id/editar'
     | '/colaboradores/$id/horas'
@@ -287,9 +544,11 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
+    | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
     | '/clientes/$id/'
     | '/colaboradores/$id/'
+    | '/leitos/produtos/$productId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -298,14 +557,32 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mais'
     | '/relatorios'
+    | '/leitos/faturamento'
+    | '/leitos/mais'
+    | '/leitos/movimentacoes'
+    | '/leitos/relatorios'
+    | '/leitos/separacao'
+    | '/leitos'
     | '/clientes/novo'
     | '/colaboradores/novo'
     | '/ordens/$id'
     | '/ordens/nova'
     | '/relatorios/imprimir'
+    | '/leitos/configuracoes/acessos'
+    | '/leitos/estoque/$productId'
+    | '/leitos/pedidos/$orderId'
+    | '/leitos/pedidos/novo'
+    | '/leitos/producao/$productionId'
+    | '/leitos/producao/nova'
+    | '/leitos/produtos/novo'
     | '/clientes'
     | '/colaboradores'
     | '/ordens'
+    | '/leitos/configuracoes'
+    | '/leitos/estoque'
+    | '/leitos/pedidos'
+    | '/leitos/producao'
+    | '/leitos/produtos'
     | '/clientes/$id/editar'
     | '/colaboradores/$id/editar'
     | '/colaboradores/$id/horas'
@@ -313,13 +590,16 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
     | '/relatorios/cliente/$clientId'
+    | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
     | '/clientes/$id'
     | '/colaboradores/$id'
+    | '/leitos/produtos/$productId'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/leitos'
     | '/login'
     | '/_app/clientes'
     | '/_app/colaboradores'
@@ -327,14 +607,37 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/mais'
     | '/_app/relatorios'
+    | '/leitos/configuracoes'
+    | '/leitos/estoque'
+    | '/leitos/faturamento'
+    | '/leitos/mais'
+    | '/leitos/movimentacoes'
+    | '/leitos/pedidos'
+    | '/leitos/producao'
+    | '/leitos/produtos'
+    | '/leitos/relatorios'
+    | '/leitos/separacao'
+    | '/leitos/'
     | '/_app/clientes/novo'
     | '/_app/colaboradores/novo'
     | '/_app/ordens/$id'
     | '/_app/ordens/nova'
     | '/_app/relatorios_/imprimir'
+    | '/leitos/configuracoes/acessos'
+    | '/leitos/estoque/$productId'
+    | '/leitos/pedidos/$orderId'
+    | '/leitos/pedidos/novo'
+    | '/leitos/producao/$productionId'
+    | '/leitos/producao/nova'
+    | '/leitos/produtos/novo'
     | '/_app/clientes/'
     | '/_app/colaboradores/'
     | '/_app/ordens/'
+    | '/leitos/configuracoes/'
+    | '/leitos/estoque/'
+    | '/leitos/pedidos/'
+    | '/leitos/producao/'
+    | '/leitos/produtos/'
     | '/_app/clientes/$id/editar'
     | '/_app/colaboradores/$id/editar'
     | '/_app/colaboradores/$id/horas'
@@ -342,14 +645,17 @@ export interface FileRouteTypes {
     | '/_app/colaboradores/$id/precificacao'
     | '/_app/ordens/$id/imprimir'
     | '/_app/relatorios_/cliente/$clientId'
+    | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
     | '/_app/clientes/$id/'
     | '/_app/colaboradores/$id/'
+    | '/leitos/produtos/$productId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  LeitosRoute: typeof LeitosRouteWithChildren
   LoginRoute: typeof LoginRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
@@ -361,6 +667,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leitos': {
+      id: '/leitos'
+      path: '/leitos'
+      fullPath: '/leitos'
+      preLoaderRoute: typeof LeitosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -376,6 +689,83 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/leitos/': {
+      id: '/leitos/'
+      path: '/'
+      fullPath: '/leitos/'
+      preLoaderRoute: typeof LeitosIndexRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/separacao': {
+      id: '/leitos/separacao'
+      path: '/separacao'
+      fullPath: '/leitos/separacao'
+      preLoaderRoute: typeof LeitosSeparacaoRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/relatorios': {
+      id: '/leitos/relatorios'
+      path: '/relatorios'
+      fullPath: '/leitos/relatorios'
+      preLoaderRoute: typeof LeitosRelatoriosRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/produtos': {
+      id: '/leitos/produtos'
+      path: '/produtos'
+      fullPath: '/leitos/produtos'
+      preLoaderRoute: typeof LeitosProdutosRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/producao': {
+      id: '/leitos/producao'
+      path: '/producao'
+      fullPath: '/leitos/producao'
+      preLoaderRoute: typeof LeitosProducaoRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/pedidos': {
+      id: '/leitos/pedidos'
+      path: '/pedidos'
+      fullPath: '/leitos/pedidos'
+      preLoaderRoute: typeof LeitosPedidosRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/movimentacoes': {
+      id: '/leitos/movimentacoes'
+      path: '/movimentacoes'
+      fullPath: '/leitos/movimentacoes'
+      preLoaderRoute: typeof LeitosMovimentacoesRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/mais': {
+      id: '/leitos/mais'
+      path: '/mais'
+      fullPath: '/leitos/mais'
+      preLoaderRoute: typeof LeitosMaisRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/faturamento': {
+      id: '/leitos/faturamento'
+      path: '/faturamento'
+      fullPath: '/leitos/faturamento'
+      preLoaderRoute: typeof LeitosFaturamentoRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/estoque': {
+      id: '/leitos/estoque'
+      path: '/estoque'
+      fullPath: '/leitos/estoque'
+      preLoaderRoute: typeof LeitosEstoqueRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/configuracoes': {
+      id: '/leitos/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/leitos/configuracoes'
+      preLoaderRoute: typeof LeitosConfiguracoesRouteImport
+      parentRoute: typeof LeitosRoute
     }
     '/_app/relatorios': {
       id: '/_app/relatorios'
@@ -419,6 +809,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/leitos/produtos/': {
+      id: '/leitos/produtos/'
+      path: '/'
+      fullPath: '/leitos/produtos/'
+      preLoaderRoute: typeof LeitosProdutosIndexRouteImport
+      parentRoute: typeof LeitosProdutosRoute
+    }
+    '/leitos/producao/': {
+      id: '/leitos/producao/'
+      path: '/'
+      fullPath: '/leitos/producao/'
+      preLoaderRoute: typeof LeitosProducaoIndexRouteImport
+      parentRoute: typeof LeitosProducaoRoute
+    }
+    '/leitos/pedidos/': {
+      id: '/leitos/pedidos/'
+      path: '/'
+      fullPath: '/leitos/pedidos/'
+      preLoaderRoute: typeof LeitosPedidosIndexRouteImport
+      parentRoute: typeof LeitosPedidosRoute
+    }
+    '/leitos/estoque/': {
+      id: '/leitos/estoque/'
+      path: '/'
+      fullPath: '/leitos/estoque/'
+      preLoaderRoute: typeof LeitosEstoqueIndexRouteImport
+      parentRoute: typeof LeitosEstoqueRoute
+    }
+    '/leitos/configuracoes/': {
+      id: '/leitos/configuracoes/'
+      path: '/'
+      fullPath: '/leitos/configuracoes/'
+      preLoaderRoute: typeof LeitosConfiguracoesIndexRouteImport
+      parentRoute: typeof LeitosConfiguracoesRoute
+    }
     '/_app/ordens/': {
       id: '/_app/ordens/'
       path: '/ordens'
@@ -439,6 +864,55 @@ declare module '@tanstack/react-router' {
       fullPath: '/clientes/'
       preLoaderRoute: typeof AppClientesIndexRouteImport
       parentRoute: typeof AppClientesRoute
+    }
+    '/leitos/produtos/novo': {
+      id: '/leitos/produtos/novo'
+      path: '/novo'
+      fullPath: '/leitos/produtos/novo'
+      preLoaderRoute: typeof LeitosProdutosNovoRouteImport
+      parentRoute: typeof LeitosProdutosRoute
+    }
+    '/leitos/producao/nova': {
+      id: '/leitos/producao/nova'
+      path: '/nova'
+      fullPath: '/leitos/producao/nova'
+      preLoaderRoute: typeof LeitosProducaoNovaRouteImport
+      parentRoute: typeof LeitosProducaoRoute
+    }
+    '/leitos/producao/$productionId': {
+      id: '/leitos/producao/$productionId'
+      path: '/$productionId'
+      fullPath: '/leitos/producao/$productionId'
+      preLoaderRoute: typeof LeitosProducaoProductionIdRouteImport
+      parentRoute: typeof LeitosProducaoRoute
+    }
+    '/leitos/pedidos/novo': {
+      id: '/leitos/pedidos/novo'
+      path: '/novo'
+      fullPath: '/leitos/pedidos/novo'
+      preLoaderRoute: typeof LeitosPedidosNovoRouteImport
+      parentRoute: typeof LeitosPedidosRoute
+    }
+    '/leitos/pedidos/$orderId': {
+      id: '/leitos/pedidos/$orderId'
+      path: '/$orderId'
+      fullPath: '/leitos/pedidos/$orderId'
+      preLoaderRoute: typeof LeitosPedidosOrderIdRouteImport
+      parentRoute: typeof LeitosPedidosRoute
+    }
+    '/leitos/estoque/$productId': {
+      id: '/leitos/estoque/$productId'
+      path: '/$productId'
+      fullPath: '/leitos/estoque/$productId'
+      preLoaderRoute: typeof LeitosEstoqueProductIdRouteImport
+      parentRoute: typeof LeitosEstoqueRoute
+    }
+    '/leitos/configuracoes/acessos': {
+      id: '/leitos/configuracoes/acessos'
+      path: '/acessos'
+      fullPath: '/leitos/configuracoes/acessos'
+      preLoaderRoute: typeof LeitosConfiguracoesAcessosRouteImport
+      parentRoute: typeof LeitosConfiguracoesRoute
     }
     '/_app/relatorios_/imprimir': {
       id: '/_app/relatorios_/imprimir'
@@ -475,6 +949,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesNovoRouteImport
       parentRoute: typeof AppClientesRoute
     }
+    '/leitos/produtos/$productId/': {
+      id: '/leitos/produtos/$productId/'
+      path: '/$productId'
+      fullPath: '/leitos/produtos/$productId/'
+      preLoaderRoute: typeof LeitosProdutosProductIdIndexRouteImport
+      parentRoute: typeof LeitosProdutosRoute
+    }
     '/_app/colaboradores/$id/': {
       id: '/_app/colaboradores/$id/'
       path: '/$id'
@@ -495,6 +976,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/lovable/email/queue/process'
       preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/leitos/produtos/$productId/editar': {
+      id: '/leitos/produtos/$productId/editar'
+      path: '/$productId/editar'
+      fullPath: '/leitos/produtos/$productId/editar'
+      preLoaderRoute: typeof LeitosProdutosProductIdEditarRouteImport
+      parentRoute: typeof LeitosProdutosRoute
     }
     '/_app/relatorios_/cliente/$clientId': {
       id: '/_app/relatorios_/cliente/$clientId'
@@ -631,12 +1119,131 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface LeitosConfiguracoesRouteChildren {
+  LeitosConfiguracoesAcessosRoute: typeof LeitosConfiguracoesAcessosRoute
+  LeitosConfiguracoesIndexRoute: typeof LeitosConfiguracoesIndexRoute
+}
+
+const LeitosConfiguracoesRouteChildren: LeitosConfiguracoesRouteChildren = {
+  LeitosConfiguracoesAcessosRoute: LeitosConfiguracoesAcessosRoute,
+  LeitosConfiguracoesIndexRoute: LeitosConfiguracoesIndexRoute,
+}
+
+const LeitosConfiguracoesRouteWithChildren =
+  LeitosConfiguracoesRoute._addFileChildren(LeitosConfiguracoesRouteChildren)
+
+interface LeitosEstoqueRouteChildren {
+  LeitosEstoqueProductIdRoute: typeof LeitosEstoqueProductIdRoute
+  LeitosEstoqueIndexRoute: typeof LeitosEstoqueIndexRoute
+}
+
+const LeitosEstoqueRouteChildren: LeitosEstoqueRouteChildren = {
+  LeitosEstoqueProductIdRoute: LeitosEstoqueProductIdRoute,
+  LeitosEstoqueIndexRoute: LeitosEstoqueIndexRoute,
+}
+
+const LeitosEstoqueRouteWithChildren = LeitosEstoqueRoute._addFileChildren(
+  LeitosEstoqueRouteChildren,
+)
+
+interface LeitosPedidosRouteChildren {
+  LeitosPedidosOrderIdRoute: typeof LeitosPedidosOrderIdRoute
+  LeitosPedidosNovoRoute: typeof LeitosPedidosNovoRoute
+  LeitosPedidosIndexRoute: typeof LeitosPedidosIndexRoute
+}
+
+const LeitosPedidosRouteChildren: LeitosPedidosRouteChildren = {
+  LeitosPedidosOrderIdRoute: LeitosPedidosOrderIdRoute,
+  LeitosPedidosNovoRoute: LeitosPedidosNovoRoute,
+  LeitosPedidosIndexRoute: LeitosPedidosIndexRoute,
+}
+
+const LeitosPedidosRouteWithChildren = LeitosPedidosRoute._addFileChildren(
+  LeitosPedidosRouteChildren,
+)
+
+interface LeitosProducaoRouteChildren {
+  LeitosProducaoProductionIdRoute: typeof LeitosProducaoProductionIdRoute
+  LeitosProducaoNovaRoute: typeof LeitosProducaoNovaRoute
+  LeitosProducaoIndexRoute: typeof LeitosProducaoIndexRoute
+}
+
+const LeitosProducaoRouteChildren: LeitosProducaoRouteChildren = {
+  LeitosProducaoProductionIdRoute: LeitosProducaoProductionIdRoute,
+  LeitosProducaoNovaRoute: LeitosProducaoNovaRoute,
+  LeitosProducaoIndexRoute: LeitosProducaoIndexRoute,
+}
+
+const LeitosProducaoRouteWithChildren = LeitosProducaoRoute._addFileChildren(
+  LeitosProducaoRouteChildren,
+)
+
+interface LeitosProdutosRouteChildren {
+  LeitosProdutosNovoRoute: typeof LeitosProdutosNovoRoute
+  LeitosProdutosIndexRoute: typeof LeitosProdutosIndexRoute
+  LeitosProdutosProductIdEditarRoute: typeof LeitosProdutosProductIdEditarRoute
+  LeitosProdutosProductIdIndexRoute: typeof LeitosProdutosProductIdIndexRoute
+}
+
+const LeitosProdutosRouteChildren: LeitosProdutosRouteChildren = {
+  LeitosProdutosNovoRoute: LeitosProdutosNovoRoute,
+  LeitosProdutosIndexRoute: LeitosProdutosIndexRoute,
+  LeitosProdutosProductIdEditarRoute: LeitosProdutosProductIdEditarRoute,
+  LeitosProdutosProductIdIndexRoute: LeitosProdutosProductIdIndexRoute,
+}
+
+const LeitosProdutosRouteWithChildren = LeitosProdutosRoute._addFileChildren(
+  LeitosProdutosRouteChildren,
+)
+
+interface LeitosRouteChildren {
+  LeitosConfiguracoesRoute: typeof LeitosConfiguracoesRouteWithChildren
+  LeitosEstoqueRoute: typeof LeitosEstoqueRouteWithChildren
+  LeitosFaturamentoRoute: typeof LeitosFaturamentoRoute
+  LeitosMaisRoute: typeof LeitosMaisRoute
+  LeitosMovimentacoesRoute: typeof LeitosMovimentacoesRoute
+  LeitosPedidosRoute: typeof LeitosPedidosRouteWithChildren
+  LeitosProducaoRoute: typeof LeitosProducaoRouteWithChildren
+  LeitosProdutosRoute: typeof LeitosProdutosRouteWithChildren
+  LeitosRelatoriosRoute: typeof LeitosRelatoriosRoute
+  LeitosSeparacaoRoute: typeof LeitosSeparacaoRoute
+  LeitosIndexRoute: typeof LeitosIndexRoute
+}
+
+const LeitosRouteChildren: LeitosRouteChildren = {
+  LeitosConfiguracoesRoute: LeitosConfiguracoesRouteWithChildren,
+  LeitosEstoqueRoute: LeitosEstoqueRouteWithChildren,
+  LeitosFaturamentoRoute: LeitosFaturamentoRoute,
+  LeitosMaisRoute: LeitosMaisRoute,
+  LeitosMovimentacoesRoute: LeitosMovimentacoesRoute,
+  LeitosPedidosRoute: LeitosPedidosRouteWithChildren,
+  LeitosProducaoRoute: LeitosProducaoRouteWithChildren,
+  LeitosProdutosRoute: LeitosProdutosRouteWithChildren,
+  LeitosRelatoriosRoute: LeitosRelatoriosRoute,
+  LeitosSeparacaoRoute: LeitosSeparacaoRoute,
+  LeitosIndexRoute: LeitosIndexRoute,
+}
+
+const LeitosRouteWithChildren =
+  LeitosRoute._addFileChildren(LeitosRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  LeitosRoute: LeitosRouteWithChildren,
   LoginRoute: LoginRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

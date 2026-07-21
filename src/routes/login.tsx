@@ -1,6 +1,18 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { zodValidator } from "@tanstack/zod-adapter";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  AlertCircle,
+  Boxes,
+  Eye,
+  EyeOff,
+  Loader2,
+  LogOut,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { z } from "zod";
 
 import { ServiceOrderProgressCard } from "@/components/login/ServiceOrderProgressCard";
 import { Button } from "@/components/ui/button";
@@ -9,6 +21,14 @@ import { Label } from "@/components/ui/label";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { getMyModuleAccess } from "@/lib/api/moduleAccess.functions";
+import {
+  moduleFromPath,
+  readPreferredModule,
+  safeInternalDestination,
+  storePreferredModule,
+  type LemarcModule,
+} from "@/lib/modules";
 
 const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
@@ -40,6 +60,16 @@ async function ensureGoogleAdminOrSignOut(user: {
 
 export const Route = createFileRoute("/login")({
   ssr: false,
+  validateSearch: zodValidator(
+    z.object({
+      module: z.enum(["os", "wire_trays"]).optional(),
+      redirect: z
+        .string()
+        .max(600)
+        .refine((value) => value.startsWith("/") && !value.startsWith("//"), "Destino inválido.")
+        .optional(),
+    }),
+  ),
   head: () => ({
     meta: [
       { title: "Entrar - Gestao Lemarc" },
@@ -53,7 +83,12 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const nav = useNavigate();
+  const search = Route.useSearch();
+  const fetchAccess = useServerFn(getMyModuleAccess);
+  const initialModule = search.module ?? moduleFromPath(search.redirect) ?? readPreferredModule();
+  const [selectedModule, setSelectedModule] = useState<LemarcModule | null>(initialModule);
+  const selectedModuleRef = useRef<LemarcModule | null>(initialModule);
+  const [sessionActive, setSessionActive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
@@ -63,30 +98,61 @@ function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    selectedModuleRef.current = selectedModule;
+  }, [selectedModule]);
+
+  const finishAuthentication = useCallback(
+    async (user: Parameters<typeof ensureGoogleAdminOrSignOut>[0]) => {
+      const ok = await ensureGoogleAdminOrSignOut(user);
+      if (!ok) {
+        setError(GOOGLE_RESTRICTED_MESSAGE);
+        setSessionActive(false);
+        setIsSubmitting(false);
+        setGoogleLoading(false);
+        setEmailLoading(false);
+        return;
+      }
+      setSessionActive(true);
+      const module = selectedModuleRef.current;
+      if (!module) {
+        setError("Selecione o módulo que deseja acessar.");
+        setIsSubmitting(false);
+        setGoogleLoading(false);
+        setEmailLoading(false);
+        return;
+      }
+      try {
+        const access = await fetchAccess();
+        if (module === "wire_trays" && !access.wireTrays) {
+          setError("Sua sessão está ativa, mas ainda não possui acesso ao módulo Leitos Aramados.");
+          setIsSubmitting(false);
+          setGoogleLoading(false);
+          setEmailLoading(false);
+          return;
+        }
+        storePreferredModule(module);
+        window.location.assign(safeInternalDestination(search.redirect, module));
+      } catch (cause) {
+        console.error(cause);
+        setError("Não foi possível validar os módulos autorizados. Tente novamente.");
+        setIsSubmitting(false);
+        setGoogleLoading(false);
+        setEmailLoading(false);
+      }
+    },
+    [fetchAccess, search.redirect],
+  );
+
+  useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled || !data.session) return;
-      const ok = await ensureGoogleAdminOrSignOut(data.session.user);
-      if (!cancelled && ok) nav({ to: "/dashboard", replace: true });
-      else if (!cancelled && !ok) {
-        setError(
-          "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
-        );
-      }
+      if (!cancelled) await finishAuthentication(data.session.user);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
         void (async () => {
-          const ok = await ensureGoogleAdminOrSignOut(session.user);
-          if (cancelled) return;
-          if (ok) nav({ to: "/dashboard", replace: true });
-          else {
-            setError(
-              "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.",
-            );
-            setIsSubmitting(false);
-            setGoogleLoading(false);
-          }
+          if (!cancelled) await finishAuthentication(session.user);
         })();
       }
     });
@@ -94,16 +160,20 @@ function LoginPage() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [nav]);
+  }, [finishAuthentication]);
 
   async function handleGoogle() {
     if (isSubmitting) return;
     setError("");
+    if (!selectedModule) {
+      setError("Selecione o módulo antes de continuar.");
+      return;
+    }
     setIsSubmitting(true);
     setGoogleLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: window.location.href,
       });
       if (result.error) {
         setError("Não foi possível iniciar o login com Google. Tente novamente.");
@@ -126,6 +196,11 @@ function LoginPage() {
     e.preventDefault();
     if (isSubmitting) return;
     setError("");
+
+    if (!selectedModule) {
+      setError("Selecione o módulo antes de informar suas credenciais.");
+      return;
+    }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
@@ -157,13 +232,35 @@ function LoginPage() {
         setEmailLoading(false);
         return;
       }
-      // onAuthStateChange redireciona para /dashboard
+      // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
       console.error(err);
       setError("Erro inesperado ao acessar o sistema.");
       setIsSubmitting(false);
       setEmailLoading(false);
     }
+  }
+
+  async function handleContinueSession() {
+    setError("");
+    if (!selectedModule) {
+      setError("Selecione o módulo que deseja acessar.");
+      return;
+    }
+    setIsSubmitting(true);
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      setSessionActive(false);
+      setIsSubmitting(false);
+      return;
+    }
+    await finishAuthentication(data.session.user);
+  }
+
+  async function handleSwitchAccount() {
+    await supabase.auth.signOut();
+    setSessionActive(false);
+    setError("");
   }
 
   return (
@@ -177,7 +274,7 @@ function LoginPage() {
 
             <div className="mt-3 hidden max-w-[560px] items-center gap-3 text-sm font-medium leading-6 text-white/58 lg:flex">
               <span className="h-px w-10 shrink-0 bg-gradient-to-r from-orange-glow to-orange-glow/20" />
-              <span>Ordens de serviço conectadas do chamado à entrega técnica.</span>
+              <span>Operação industrial conectada, do chamado à expedição.</span>
             </div>
 
             <ServiceOrderProgressCard className="mt-4 w-full max-w-[660px] sm:mt-5 lg:mt-7" />
@@ -188,100 +285,175 @@ function LoginPage() {
 
             <GlassLoginCard>
               <div className="space-y-5">
-                <p className="text-sm leading-6 text-white/72">
-                  Técnicos acessam com e-mail e senha. Contas corporativas Google também são
-                  aceitas.
-                </p>
-
-                <form className="space-y-3" onSubmit={handleEmailPassword} noValidate>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
-                      E-mail
-                    </Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      inputMode="email"
-                      autoComplete="username"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isSubmitting}
-                      placeholder="tecnico@lemarc.com.br"
-                      className="h-11 rounded-xl border-white/10 bg-white/[0.045] text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/58">
+                    Escolha a operação
+                  </p>
+                  <div
+                    className="mt-2 grid grid-cols-2 gap-2"
+                    role="radiogroup"
+                    aria-label="Módulo de acesso"
+                  >
+                    <ModuleCard
+                      selected={selectedModule === "os"}
+                      icon={<Wrench size={18} />}
+                      title="Ordens de Serviço"
+                      description="Campo e assistência"
+                      onClick={() => {
+                        setSelectedModule("os");
+                        setError("");
+                      }}
+                    />
+                    <ModuleCard
+                      selected={selectedModule === "wire_trays"}
+                      icon={<Boxes size={18} />}
+                      title="Leitos Aramados"
+                      description="Pedidos e fábrica"
+                      onClick={() => {
+                        setSelectedModule("wire_trays");
+                        setError("");
+                      }}
                     />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
-                      Senha
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isSubmitting}
-                        placeholder="Sua senha"
-                        className="h-11 rounded-xl border-white/10 bg-white/[0.045] pr-11 text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((s) => !s)}
-                        disabled={isSubmitting}
-                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-white/58 transition hover:bg-white/8 hover:text-white disabled:opacity-50"
-                      >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="h-[3rem] w-full rounded-xl bg-orange-glow text-[15px] font-bold text-navy-deep transition hover:brightness-110 disabled:opacity-70"
-                  >
-                    {emailLoading ? (
-                      <>
-                        <Loader2 aria-hidden="true" className="animate-spin" />
-                        Entrando...
-                      </>
-                    ) : (
-                      "Entrar"
-                    )}
-                  </Button>
-                </form>
-
-                <div className="flex items-center gap-3">
-                  <span className="h-px flex-1 bg-white/10" />
-                  <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/40">
-                    ou
-                  </span>
-                  <span className="h-px flex-1 bg-white/10" />
                 </div>
 
-                <Button
-                  className="lemarc-login-google h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep disabled:opacity-70"
-                  disabled={isSubmitting}
-                  onClick={handleGoogle}
-                  type="button"
-                >
-                  {googleLoading ? (
-                    <>
-                      <Loader2 aria-hidden="true" className="animate-spin" />
-                      Conectando...
-                    </>
-                  ) : (
-                    <>
-                      <GoogleIcon />
-                      Entrar com Google
-                    </>
-                  )}
-                </Button>
+                {sessionActive ? (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-emerald-300/18 bg-emerald-400/[0.08] px-3 py-3 text-sm leading-6 text-emerald-50">
+                      Sua sessão está ativa. Confirme o módulo para continuar com as permissões
+                      atuais.
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={isSubmitting || !selectedModule}
+                      onClick={handleContinueSession}
+                      className="h-12 w-full rounded-xl bg-orange-glow text-[15px] font-bold text-navy-deep hover:brightness-110"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="animate-spin" /> Validando acesso...
+                        </>
+                      ) : (
+                        "Continuar"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleSwitchAccount}
+                      className="h-10 w-full gap-2 text-white/70 hover:bg-white/8 hover:text-white"
+                    >
+                      <LogOut size={15} /> Entrar com outra conta
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm leading-6 text-white/72">
+                      Técnicos acessam com e-mail e senha. Contas corporativas Google também são
+                      aceitas.
+                    </p>
+
+                    <form className="space-y-3" onSubmit={handleEmailPassword} noValidate>
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="login-email"
+                          className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62"
+                        >
+                          E-mail
+                        </Label>
+                        <Input
+                          id="login-email"
+                          type="email"
+                          inputMode="email"
+                          autoComplete="username"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={isSubmitting}
+                          placeholder="tecnico@lemarc.com.br"
+                          className="h-11 rounded-xl border-white/10 bg-white/[0.045] text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="login-password"
+                          className="text-xs font-semibold uppercase tracking-[0.14em] text-white/62"
+                        >
+                          Senha
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="login-password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={isSubmitting}
+                            placeholder="Sua senha"
+                            className="h-11 rounded-xl border-white/10 bg-white/[0.045] pr-11 text-white placeholder:text-white/32 focus-visible:border-orange-glow/60 focus-visible:ring-orange-glow/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((s) => !s)}
+                            disabled={isSubmitting}
+                            aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-white/58 transition hover:bg-white/8 hover:text-white disabled:opacity-50"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="size-4" />
+                            ) : (
+                              <Eye className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !selectedModule}
+                        className="h-[3rem] w-full rounded-xl bg-orange-glow text-[15px] font-bold text-navy-deep transition hover:brightness-110 disabled:opacity-70"
+                      >
+                        {emailLoading ? (
+                          <>
+                            <Loader2 aria-hidden="true" className="animate-spin" />
+                            Entrando...
+                          </>
+                        ) : (
+                          "Entrar"
+                        )}
+                      </Button>
+                    </form>
+
+                    <div className="flex items-center gap-3">
+                      <span className="h-px flex-1 bg-white/10" />
+                      <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/40">
+                        ou
+                      </span>
+                      <span className="h-px flex-1 bg-white/10" />
+                    </div>
+
+                    <Button
+                      className="lemarc-login-google h-[3.25rem] w-full rounded-xl bg-white text-[15px] font-bold text-navy-deep disabled:opacity-70"
+                      disabled={isSubmitting || !selectedModule}
+                      onClick={handleGoogle}
+                      type="button"
+                    >
+                      {googleLoading ? (
+                        <>
+                          <Loader2 aria-hidden="true" className="animate-spin" />
+                          Conectando...
+                        </>
+                      ) : (
+                        <>
+                          <GoogleIcon />
+                          Entrar com Google
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
 
                 {error ? (
                   <div
@@ -309,6 +481,42 @@ function LoginPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function ModuleCard({
+  selected,
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  selected: boolean;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      className={`min-w-0 rounded-xl border p-3 text-left transition ${
+        selected
+          ? "border-orange-glow/70 bg-orange-glow/12 shadow-[inset_0_0_0_1px_oklch(0.78_0.18_55/0.18)]"
+          : "border-white/10 bg-white/[0.035] hover:border-white/20 hover:bg-white/[0.06]"
+      }`}
+    >
+      <span
+        className={`grid size-8 place-items-center rounded-lg ${selected ? "bg-orange-glow text-navy-deep" : "bg-white/8 text-white/70"}`}
+      >
+        {icon}
+      </span>
+      <span className="mt-2 block truncate text-xs font-bold text-white">{title}</span>
+      <span className="mt-0.5 block truncate text-[10px] text-white/50">{description}</span>
+    </button>
   );
 }
 
