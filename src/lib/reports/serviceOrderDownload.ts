@@ -488,12 +488,18 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
         displacementNoteLines.length * 3
       : 10;
 
+    const hasMaterialAttachment =
+      input.materialsNetCents !== undefined || Boolean(input.materialsFileName);
+    const materialsFailed =
+      hasMaterialAttachment && (input.materialsNetCents == null);
+    const materialsCardH = hasMaterialAttachment && financials ? 32 : 0;
+
     const signatureH = order.signature
       ? 32
       : order.signature_waiver_reason
         ? Math.max(14, split(order.signature_waiver_reason, contentWidth - 8).length * 3.2 + 8)
         : 10;
-    const groupH = totalsH + 2.5 + signatureH;
+    const groupH = totalsH + 2.5 + materialsCardH + (materialsCardH ? 2.5 : 0) + signatureH;
     ensurePage(groupH);
 
     if (financials) {
@@ -549,6 +555,75 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
     } else {
       noticeBox("Apuração financeira pendente — finalize a OS para gerar os totais.");
       y += 2.5;
+    }
+
+    if (hasMaterialAttachment && financials) {
+      const cardH = materialsCardH;
+      doc.setDrawColor(...LEMARC_COLORS.navy);
+      doc.setLineWidth(0.35);
+      doc.setFillColor(...LEMARC_COLORS.bgSoft);
+      doc.roundedRect(marginX, y, contentWidth, cardH, 1.5, 1.5, "FD");
+      txt("TOTAL GERAL COM MATERIAIS", marginX + 4, y + 4.8, {
+        size: 7.4,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      let ry = y + 9;
+      txt("Total da OS", marginX + 4, ry, { size: 7.5, color: LEMARC_COLORS.slate });
+      txt(formatBRL(financials.grand_total_cents), pageWidth - marginX - 4, ry, {
+        size: 7.5,
+        style: "bold",
+        color: LEMARC_COLORS.ink,
+        align: "right",
+      });
+      ry += 4.25;
+      const matLabel = input.materialsFileName
+        ? `Total dos materiais · ${input.materialsFileName}`
+        : "Total dos materiais (anexo)";
+      txt(matLabel, marginX + 4, ry, {
+        size: 7.5,
+        color: LEMARC_COLORS.slate,
+        maxWidth: contentWidth - 40,
+      });
+      txt(
+        materialsFailed ? "—" : formatBRL(input.materialsNetCents ?? 0),
+        pageWidth - marginX - 4,
+        ry,
+        {
+          size: 7.5,
+          style: "bold",
+          color: LEMARC_COLORS.ink,
+          align: "right",
+        },
+      );
+      ry += 4.25;
+      doc.setDrawColor(...LEMARC_COLORS.navy);
+      doc.setLineWidth(0.35);
+      doc.line(marginX + 3, ry - 1.6, pageWidth - marginX - 3, ry - 1.6);
+      txt("Total final", marginX + 4, ry + 3, {
+        size: 8.6,
+        style: "bold",
+        color: LEMARC_COLORS.navy,
+      });
+      const finalCents = materialsFailed
+        ? financials.grand_total_cents
+        : financials.grand_total_cents + (input.materialsNetCents ?? 0);
+      txt(formatBRL(finalCents), pageWidth - marginX - 4, ry + 3, {
+        size: 10.5,
+        style: "bold",
+        color: LEMARC_COLORS.orange,
+        align: "right",
+      });
+      ry += 7.2;
+      txt(
+        materialsFailed
+          ? "Não foi possível extrair o Total Líquido do PDF de materiais — total final exibido considera apenas a OS."
+          : "Total Líquido extraído automaticamente do PDF de materiais anexado.",
+        marginX + 4,
+        ry,
+        { size: 6.5, color: LEMARC_COLORS.slateSoft, maxWidth: contentWidth - 8 },
+      );
+      y += cardH + 2.5;
     }
 
     doc.setDrawColor(...LEMARC_COLORS.border);
