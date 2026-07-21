@@ -830,6 +830,7 @@ function useOrderPdfDownload(order: ServiceOrder) {
         financials,
         generatedAt: new Date(),
         authorName: displayName ?? null,
+        orderId: order.id,
       });
       toast.success(`PDF da OS #${order.number} baixado`);
     } catch (error) {

@@ -20,6 +20,8 @@ type Input = {
   authorName: string | null;
   /** Signed URLs of extra PDFs (material attachments) to append after page 1. */
   materials?: string[];
+  /** When provided and `materials` isn't, the downloader loads material PDFs itself (admin-gated). */
+  orderId?: string;
 };
 
 type TextOptions = {
@@ -787,7 +789,23 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
 
 export async function downloadServiceOrderReportPdf(input: Input) {
   const { doc, filename, pages } = await buildServiceOrderReportPdfDocument(input);
-  const materials = input.materials ?? [];
+  let materials = input.materials ?? [];
+  if (materials.length === 0 && input.orderId) {
+    try {
+      const { listServiceOrderMaterialAttachments } = await import(
+        "@/lib/api/serviceOrderMaterialAttachments.functions"
+      );
+      const rows = await listServiceOrderMaterialAttachments({
+        data: { orderId: input.orderId },
+      });
+      materials = rows
+        .map((r) => r.signed_url)
+        .filter((u): u is string => Boolean(u));
+    } catch (err) {
+      // Non-admins hit "Acesso restrito" — that's expected; keep the download flowing.
+      console.warn("Materiais da OS indisponíveis para este usuário:", err);
+    }
+  }
   if (materials.length === 0) {
     doc.save(filename);
     return { filename, pages };
@@ -795,17 +813,34 @@ export async function downloadServiceOrderReportPdf(input: Input) {
   try {
     const { PDFDocument } = await import("pdf-lib");
     const base = await PDFDocument.load(doc.output("arraybuffer"));
+    let mergedCount = 0;
     for (const url of materials) {
       try {
         const res = await fetch(url);
         if (!res.ok) continue;
         const buf = await res.arrayBuffer();
+        // Guard: signed URLs sometimes return HTML errors with 200; validate magic bytes.
+        const head = new Uint8Array(buf.slice(0, 5));
+        const isPdf =
+          head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+        if (!isPdf) {
+          console.warn(
+            "Anexo ignorado (não é PDF válido):",
+            url.slice(0, 80),
+          );
+          continue;
+        }
         const attached = await PDFDocument.load(buf, { ignoreEncryption: true });
         const copied = await base.copyPages(attached, attached.getPageIndices());
         copied.forEach((p) => base.addPage(p));
+        mergedCount += 1;
       } catch (err) {
-        console.warn("Falha ao mesclar PDF de material:", err);
+        console.warn("Falha ao mesclar PDF de material:", url.slice(0, 80), err);
       }
+    }
+    if (mergedCount === 0) {
+      doc.save(filename);
+      return { filename, pages };
     }
     const merged = await base.save();
     const blob = new Blob([new Uint8Array(merged)], { type: "application/pdf" });
