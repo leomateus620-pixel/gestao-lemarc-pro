@@ -1,79 +1,36 @@
-# Total geral (OS + Materiais) no PDF final
+## Causa raiz
 
-## Objetivo
-Ao final do PDF baixado da OS, adicionar um **card de totalização** que soma:
-- **Total da OS** (valor atual calculado — mão de obra + deslocamento)
-- **Total Líquido dos Materiais** (extraído automaticamente do primeiro PDF anexado no campo "Materiais")
-- **Total final** = OS + Materiais
+O login falha em ambos os módulos ("Ordens de Serviço" e "Leitos Aramados") com "Não foi possível validar os módulos autorizados". A tela chama `getMyModuleAccess`, que consulta `public.user_module_access` — e essa tabela **não existe no banco**.
 
-Sem alterar o fluxo atual da OS, apenas somando essa nova apresentação.
+Confirmado via banco: `supabase_migrations.schema_migrations` mostra a última migração aplicada como `20260716131602`. As quatro migrações de Leitos Aramados (`20260721133000_wire_tray_foundation`, `133100_wire_tray_security`, `133200_wire_tray_commands`, `133300_wire_tray_fulfillment`) **nunca rodaram na nuvem**, então nenhuma das tabelas `wire_tray_*` nem `user_module_access` existe. Como `getMyModuleAccess` faz `.from("user_module_access")` sempre (mesmo para o módulo OS, apenas para validar), o `.maybeSingle()` retorna erro de relation missing e o handler lança a mensagem genérica que o usuário vê.
 
-## Regras acordadas
-- **Múltiplos PDFs anexados:** usar apenas o **Total Líquido do primeiro** PDF (ordem de criação — igual ao já usado hoje).
-- **Falha na extração** (PDF escaneado, formato diferente, sem o rótulo): renderizar o card mesmo assim, com aviso `"Não foi possível extrair o Total Líquido do PDF de materiais"` e mostrar apenas o total da OS como total geral.
+Nada no fluxo de auth em si está quebrado — Google e e-mail/senha autenticam com sucesso (as logs de auth mostram login `200`). O bloqueio é 100% no passo pós-login que valida acesso a módulos contra uma tabela ausente.
 
-## Como o valor é extraído
-Parse do texto do PDF anexado, procurando o rótulo **"Total Líquido"** (case-insensitive, com/sem acento) seguido do primeiro número no formato pt-BR (`12.445,02`, `1.234.567,89`, `85,00`). Reaproveita `parseBRLToCents` de `src/lib/serviceOrders/finance.ts` para converter em centavos com precisão inteira.
+## Correção
 
-Biblioteca: `pdfjs-dist` (leve, roda no browser, sem worker nativo — usar build `legacy/build/pdf.mjs` com `disableWorker`/fake worker). Já compatível com o bundle atual (`pdf-lib` fica só para merge/desenho).
+Aplicar as quatro migrações pendentes exatamente como já estão versionadas no repositório, sem alterar o fluxo de login e sem tocar em código de UI:
 
-## Onde entra no fluxo
+1. `supabase/migrations/20260721133000_wire_tray_foundation.sql`
+2. `supabase/migrations/20260721133100_wire_tray_security.sql`
+3. `supabase/migrations/20260721133200_wire_tray_commands.sql`
+4. `supabase/migrations/20260721133300_wire_tray_fulfillment.sql`
 
-### 1. Extração (novo módulo)
-`src/lib/reports/materialsTotalExtractor.ts`
-- `extractTotalLiquidoFromPdf(bytes: Uint8Array): Promise<{ cents: number | null; reason?: "not_found" | "parse_error" }>`.
-- Faz o parse página a página, concatena texto, aplica regex tolerante a múltiplos espaços / quebras de linha entre "Total Líquido" e o número.
+Elas criam `public.user_module_access` (com `GRANT SELECT ... TO authenticated` e RLS), o enum `app_module`, as demais tabelas de Leitos Aramados e a RPC `wire_tray_list_access_users` / `wire_tray_set_module_access` que outros pontos do app já esperam.
 
-### 2. Renderização do card
-`src/components/reports/print/ServiceOrderReportDocument.tsx`
-- Nova `<section>` após "TOTAIS DA OS" (última coisa antes de assinaturas), com layout consistente ao design atual:
-  - Linha 1: `Total da OS` … `R$ ...`
-  - Linha 2: `Total dos materiais (anexo)` … `R$ ...` **ou** o aviso quando indisponível.
-  - Linha 3 (destaque): `Total geral` … `R$ ...` (mesmo estilo do "Total geral" atual).
-- Recebe via props opcional `materialsNetCents: number | null` e `materialsExtractionWarning?: string | null`.
+Efeito no login:
+- Módulo **Ordens de Serviço**: `getMyModuleAccess` retorna `{ os: true, wireTrays: null }` → `finishAuthentication` prossegue e redireciona para `/ordens/...`.
+- Módulo **Leitos Aramados**: para usuários ainda sem linha em `user_module_access`, retorna `wireTrays: null` e a UI mostra a mensagem já existente "Sua sessão está ativa, mas ainda não possui acesso ao módulo Leitos Aramados" — comportamento correto e previsto pelo código atual. Admins podem então liberar acesso pela tela de configurações de Leitos.
 
-### 3. Renderização no PDF baixado (pdf-lib)
-`src/lib/reports/serviceOrderDownload.ts`
-- Antes de anexar as páginas dos materiais, calcular:
-  - Baixar o **primeiro** PDF da lista `materials` (signed URL).
-  - Validar magic bytes `%PDF-` (já existe).
-  - Chamar `extractTotalLiquidoFromPdf` sobre os bytes.
-- Desenhar o card de totalização no **final da página 1** (mesma página do relatório da OS) — ou, se não couber, uma página nova antes dos anexos. Consistente com o layout HTML.
-- Depois, seguir com o append normal das páginas dos anexos (fluxo atual).
+## Passos técnicos
 
-### 4. Preview (rota `_app.ordens.$id.imprimir.tsx`)
-- Buscar bytes do primeiro material via `fetch(signed_url)` no client (Suspense query já existente para materials), extrair o Total Líquido e passar ao `ServiceOrderReportDocument`.
-- Cache-key por `file_path` do primeiro anexo → evita re-parse.
-
-## Detalhes técnicos
-
-### Regex de extração
-```
-/total\s*l[ií]quido[^\d\-]{0,40}(-?\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|-?\d+(?:,\d{1,2})?)/i
-```
-- Reutiliza `parseBRLToCents` — não reimplementa parsing numérico.
-- Se houver múltiplos matches, usa o **último** (rodapé é mais confiável em orçamentos).
-
-### Consistência entre HTML e PDF
-Ambos os renderizadores (`ServiceOrderReportDocument` para preview/print e `serviceOrderDownload` para pdf-lib) recebem o mesmo `materialsNetCents` já computado — a extração acontece **uma vez** por download/preview.
-
-### Sem migração / sem mudança de schema
-Não persiste o valor no banco. É sempre derivado do anexo atual — se o admin trocar o PDF, o novo valor é refletido no próximo download. Isso garante que "sempre respeita os valores corretos".
-
-### Testes
-- Novo `src/lib/reports/materialsTotalExtractor.test.ts` com casos: formato pt-BR padrão, com espaços/tabs, valor sem casas decimais, PDF sem o rótulo (retorna `null`), múltiplas ocorrências (pega a última).
-- Update em `ServiceOrderReportDocument.test.tsx` cobrindo os 3 estados do card: com valor, sem anexo, extração falhou.
-
-## Arquivos alterados
-- **novo** `src/lib/reports/materialsTotalExtractor.ts`
-- **novo** `src/lib/reports/materialsTotalExtractor.test.ts`
-- `src/components/reports/print/ServiceOrderReportDocument.tsx` — nova seção
-- `src/lib/reports/serviceOrderDownload.ts` — buscar/extrair antes de anexar, desenhar card
-- `src/routes/_app.ordens.$id.imprimir.tsx` — buscar bytes + extrair para o preview
-- `package.json` / lockfile — adicionar `pdfjs-dist`
-- `src/components/reports/print/ServiceOrderReportDocument.test.tsx` — cobertura dos 3 estados
+1. Executar as quatro migrações via ferramenta `supabase--migration`, na ordem cronológica dos nomes, cada uma no seu próprio call para preservar o versionamento.
+2. Após rodar, verificar com `supabase--read_query`:
+   - `user_module_access` existe e tem `GRANT SELECT ... TO authenticated`.
+   - RPCs `wire_tray_list_access_users` e `wire_tray_set_module_access` presentes.
+3. Testar o login no preview em ambos os módulos com a conta atual do usuário — deve entrar em Ordens de Serviço e, ao tentar Leitos, receber a mensagem de "sem acesso ao módulo" (esperado até liberação).
 
 ## Fora de escopo
-- Alterar o total registrado em `service_order_financials` (`grand_total_cents` continua sendo só o da OS — o total geral é apresentação).
-- Relatório gerencial / exports (`.xlsx`, agregados) — permanecem sem materiais, como hoje.
-- Extração de PDFs escaneados via OCR.
+
+- Nenhuma mudança em `src/routes/login.tsx`, `AuthContext`, `getMyModuleAccess` ou fluxo OAuth Google.
+- Nenhuma alteração em RLS / policies existentes de outras tabelas.
+- Nenhum seed operacional de Leitos Aramados (as migrações são intencionalmente aditivas e não semeiam dados).

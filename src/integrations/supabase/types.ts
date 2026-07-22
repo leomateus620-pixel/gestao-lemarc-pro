@@ -1030,6 +1030,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_module_access: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          financial_access: boolean
+          id: string
+          module_key: Database["public"]["Enums"]["app_module"]
+          module_role:
+            | Database["public"]["Enums"]["wire_tray_module_role"]
+            | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          financial_access?: boolean
+          id?: string
+          module_key: Database["public"]["Enums"]["app_module"]
+          module_role?:
+            | Database["public"]["Enums"]["wire_tray_module_role"]
+            | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          financial_access?: boolean
+          id?: string
+          module_key?: Database["public"]["Enums"]["app_module"]
+          module_role?:
+            | Database["public"]["Enums"]["wire_tray_module_role"]
+            | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1097,6 +1139,7 @@ export type Database = {
       user_owns_order: { Args: { _order_id: string }; Returns: boolean }
     }
     Enums: {
+      app_module: "os" | "wire_trays"
       app_role: "admin" | "operador" | "tecnico"
       billing_status: "pending" | "ready" | "billed" | "cancelled"
       displacement_type: "none" | "per_km" | "fixed"
@@ -1119,6 +1162,14 @@ export type Database = {
         | "visita"
         | "emergencia"
         | "outro"
+      wire_tray_module_role:
+        | "admin"
+        | "gestor"
+        | "comercial"
+        | "producao"
+        | "estoque"
+        | "faturamento"
+        | "consulta"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1246,6 +1297,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_module: ["os", "wire_trays"],
       app_role: ["admin", "operador", "tecnico"],
       billing_status: ["pending", "ready", "billed", "cancelled"],
       displacement_type: ["none", "per_km", "fixed"],
@@ -1269,6 +1321,15 @@ export const Constants = {
         "visita",
         "emergencia",
         "outro",
+      ],
+      wire_tray_module_role: [
+        "admin",
+        "gestor",
+        "comercial",
+        "producao",
+        "estoque",
+        "faturamento",
+        "consulta",
       ],
     },
   },
