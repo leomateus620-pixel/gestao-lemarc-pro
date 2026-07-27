@@ -1,3 +1,5 @@
+import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import {
   buildTimeline,
@@ -10,9 +12,21 @@ import type { AssignedTechnician } from "@/types/serviceOrder";
 type Props = {
   sessions: TimeSession[];
   technicians: AssignedTechnician[];
+  /** When set, an edit button appears next to sessions this user owns. */
+  editableTechnicianId?: string | null;
+  /** When true, the edit button is offered for every eligible session (admin). */
+  allowAllEdits?: boolean;
+  /** Called with the session to edit. */
+  onEditSession?: (session: TimeSession) => void;
 };
 
-export function ServiceOrderTimeHistory({ sessions, technicians }: Props) {
+export function ServiceOrderTimeHistory({
+  sessions,
+  technicians,
+  editableTechnicianId = null,
+  allowAllEdits = false,
+  onEditSession,
+}: Props) {
   const items = buildTimeline(sessions);
   if (items.length === 0) {
     return (
@@ -21,6 +35,7 @@ export function ServiceOrderTimeHistory({ sessions, technicians }: Props) {
   }
   const nameFor = (id: string | null) =>
     (id && technicians.find((t) => t.id === id)?.full_name) || "Técnico";
+  const sessionById = new Map(sessions.map((s) => [s.id, s]));
   return (
     <ol className="space-y-1.5">
       {items.map((item, idx) => {
@@ -36,6 +51,15 @@ export function ServiceOrderTimeHistory({ sessions, technicians }: Props) {
           item.kind === "pause" && item.durationMinutes
             ? ` · trabalhou ${formatHHmm(item.durationMinutes)}`
             : "";
+        const backing = item.sessionId ? sessionById.get(item.sessionId) : undefined;
+        const isMine = !!(editableTechnicianId && item.technicianId === editableTechnicianId);
+        const canEdit =
+          !!onEditSession &&
+          !!backing &&
+          backing.kind === "work" &&
+          // Show one edit affordance per session (on the start/resume row).
+          (item.kind === "start" || item.kind === "resume") &&
+          (allowAllEdits || isMine);
         return (
           <li
             key={idx}
@@ -50,10 +74,30 @@ export function ServiceOrderTimeHistory({ sessions, technicians }: Props) {
                 <span className="ml-2 text-muted-foreground">· {item.notes}</span>
               )}
               <span className="ml-2 text-muted-foreground">{dur}</span>
+              {item.wasAdjusted && (
+                <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                  Horário ajustado
+                </span>
+              )}
             </div>
-            <span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-primary">
-              {nameFor(item.technicianId)}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-primary">
+                {nameFor(item.technicianId)}
+              </span>
+              {canEdit && backing && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 gap-1 px-1.5 text-[10px]"
+                  onClick={() => onEditSession?.(backing)}
+                  aria-label={`Editar horário de ${nameFor(item.technicianId)}`}
+                >
+                  <Pencil size={11} />
+                  Editar
+                </Button>
+              )}
+            </div>
           </li>
         );
       })}
