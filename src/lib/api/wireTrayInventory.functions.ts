@@ -2,7 +2,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizePage, requireWireTrayAccess, unwrapRpc } from "./wireTrayShared";
+import {
+  normalizePage,
+  requireWireTrayAccess,
+  throwWireTrayDataError,
+  unwrapRpc,
+} from "./wireTrayShared";
 import {
   mapInventoryRow,
   mapMovement,
@@ -17,13 +22,20 @@ const inventoryListSchema = z.object({
   pageSize: z.number().int().min(10).max(100).default(25),
 });
 
-const movementListSchema = z.object({
-  search: z.string().trim().max(100).default(""),
-  type: z.string().trim().max(60).optional(),
-  productId: z.string().uuid().optional(),
-  page: z.number().int().positive().default(1),
-  pageSize: z.number().int().min(10).max(100).default(25),
-});
+const movementListSchema = z
+  .object({
+    search: z.string().trim().max(100).default(""),
+    type: z.string().trim().max(60).optional(),
+    productId: z.string().uuid().optional(),
+    dateFrom: z.string().date().optional(),
+    dateTo: z.string().date().optional(),
+    page: z.number().int().positive().default(1),
+    pageSize: z.number().int().min(10).max(100).default(25),
+  })
+  .refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
+    path: ["dateTo"],
+    message: "A data final não pode ser anterior à data inicial.",
+  });
 
 const movementSchema = z.object({
   productId: z.string().uuid(),
@@ -51,7 +63,7 @@ export const listWireTrayInventory = createServerFn({ method: "GET" })
     if (safe) query = query.or(`name.ilike.%${safe}%,sku.ilike.%${safe}%,material.ilike.%${safe}%`);
     if (data.health !== "all") query = query.eq("stock_health", data.health);
     const { data: rows, count, error } = await query.order("name").range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar o estoque.");
     return {
       rows: (rows ?? []).map((row: any) =>
         mapInventoryRow({
@@ -93,6 +105,9 @@ export const listWireTrayMovements = createServerFn({ method: "GET" })
       );
     if (data.type) query = query.eq("movement_type", data.type);
     if (data.productId) query = query.eq("product_id", data.productId);
+    if (data.dateFrom) query = query.gte("created_at", `${data.dateFrom}T00:00:00-03:00`);
+    if (data.dateTo)
+      query = query.lt("created_at", `${nextCalendarDate(data.dateTo)}T00:00:00-03:00`);
     if (data.search) {
       const safe = data.search.replace(/[,()%]/g, " ").trim();
       if (safe) query = query.ilike("reason", `%${safe}%`);
@@ -102,9 +117,15 @@ export const listWireTrayMovements = createServerFn({ method: "GET" })
       count,
       error,
     } = await query.order("created_at", { ascending: false }).range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar as movimentações.");
     return { rows: (rows ?? []).map(mapMovement), count: count ?? 0, page, pageSize };
   });
+
+function nextCalendarDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return next.toISOString().slice(0, 10);
+}
 
 export const recordWireTrayMovement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -124,7 +145,7 @@ export const recordWireTrayMovement = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível registrar o movimento de estoque.");
     return unwrapRpc<{
       movement_id: string;
       physical_quantity: number;
@@ -141,6 +162,6 @@ export const triggerWireTrayReplenishment = createServerFn({ method: "POST" })
       "wire_tray_trigger_replenishment",
       { _product_id: data.productId },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível programar a reposição.");
     return { productionId: productionId ?? null };
   });

@@ -33,7 +33,8 @@ import {
 
 export function WireTrayDashboardPage() {
   const query = useWireTrayDashboardQuery();
-  if (query.isLoading) return <WireLoadingState label="Carregando a visão operacional..." />;
+  if (query.isLoading)
+    return <WireLoadingState label="Carregando a visão operacional..." variant="dashboard" />;
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
   const data = query.data!;
 
@@ -94,14 +95,28 @@ export function WireTrayDashboardPage() {
         />
       </div>
 
+      {!data.hasProducts && data.metrics.activeOrders === 0 ? (
+        <WirePanel>
+          <WireEmptyState
+            title="Módulo pronto para o primeiro cadastro"
+            description="Cadastre um produto e um local de estoque reais para iniciar pedidos, saldos e produção."
+            action={
+              <Link to="/leitos/produtos/novo" className="wire-button-primary">
+                Cadastrar primeiro produto <ArrowRight size={16} />
+              </Link>
+            }
+          />
+        </WirePanel>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
         <WirePanel title="Fila de atenção" description="Exceções que exigem decisão operacional.">
           {data.attention.length ? (
             <div className="divide-y divide-slate-100">
               {data.attention.map((item) => (
-                <a
+                <Link
                   key={`${item.kind}-${item.id}`}
-                  href={item.route}
+                  to={item.route as never}
                   className="group flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50"
                 >
                   <span
@@ -119,9 +134,19 @@ export function WireTrayDashboardPage() {
                     className="mt-2 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5"
                     size={16}
                   />
-                </a>
+                </Link>
               ))}
             </div>
+          ) : !data.hasProducts ? (
+            <WireEmptyState
+              title="Nenhum produto cadastrado"
+              description="A saúde do estoque será calculada após o primeiro produto persistido."
+              action={
+                <Link to="/leitos/produtos/novo" className="wire-button-secondary">
+                  Cadastrar produto
+                </Link>
+              }
+            />
           ) : (
             <WireEmptyState
               title="Operação sem alertas"
@@ -142,9 +167,9 @@ export function WireTrayDashboardPage() {
           {data.criticalInventory.length ? (
             <div className="divide-y divide-slate-100">
               {data.criticalInventory.slice(0, 6).map((row) => (
-                <a
+                <Link
                   key={row.product.id}
-                  href={`/leitos/estoque/${row.product.id}`}
+                  to={`/leitos/estoque/${row.product.id}` as never}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
                 >
                   <div className="min-w-0 flex-1">
@@ -160,9 +185,14 @@ export function WireTrayDashboardPage() {
                   <WireStatus tone={inventoryTone(row.available, row.product.minimumStock)}>
                     {formatWireQuantity(row.available, wireTrayUnitLabel[row.product.unit])}
                   </WireStatus>
-                </a>
+                </Link>
               ))}
             </div>
+          ) : !data.hasProducts ? (
+            <WireEmptyState
+              title="Estoque ainda não configurado"
+              description="Cadastre produtos e locais reais para iniciar o controle de saldos."
+            />
           ) : (
             <WireEmptyState
               title="Estoque em equilíbrio"
@@ -200,9 +230,12 @@ export function WireTrayDashboardPage() {
                   return (
                     <tr key={row.id}>
                       <td>
-                        <a className="wire-table-link" href={`/leitos/producao/${row.id}`}>
+                        <Link
+                          className="wire-table-link"
+                          to={`/leitos/producao/${row.id}` as never}
+                        >
                           #{row.number}
-                        </a>
+                        </Link>
                       </td>
                       <td>
                         <p className="font-semibold text-slate-900">{row.productName}</p>

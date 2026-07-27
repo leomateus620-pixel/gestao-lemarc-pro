@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { wireTrayOrderDraftSchema, wireTrayProductInputSchema } from "./schemas";
+import {
+  wireTrayMovementSearchSchema,
+  wireTrayOrderDraftSchema,
+  wireTrayProductInputSchema,
+} from "./schemas";
 
 describe("wire tray form schemas", () => {
   it("rejects a target below minimum stock", () => {
@@ -39,5 +43,16 @@ describe("wire tray form schemas", () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("normalizes invalid movement URL filters without blocking the route", () => {
+    expect(
+      wireTrayMovementSearchSchema.parse({
+        type: "invalid",
+        product: "not-a-uuid",
+        from: "yesterday",
+        page: "invalid",
+      }),
+    ).toEqual({ q: "", type: "all", product: "all", from: "", to: "", page: 1 });
   });
 });

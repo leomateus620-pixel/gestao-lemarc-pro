@@ -2,7 +2,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizePage, requireWireTrayAccess, unwrapRpc } from "./wireTrayShared";
+import {
+  normalizePage,
+  requireWireTrayAccess,
+  throwWireTrayDataError,
+  unwrapRpc,
+} from "./wireTrayShared";
 import { mapAudit, mapDocument, mapProduction, mapProductionEntry } from "@/lib/wireTrays/mappers";
 
 const listSchema = z.object({
@@ -64,7 +69,7 @@ export const listWireTrayProduction = createServerFn({ method: "GET" })
       .order("planned_completion_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false })
       .range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar a produção.");
     return { rows: (rows ?? []).map(mapProduction), count: count ?? 0, page, pageSize };
   });
 
@@ -79,7 +84,7 @@ export const getWireTrayProductionDetail = createServerFn({ method: "GET" })
       .select(PRODUCTION_SELECT)
       .eq("id", data.id)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar a ordem de produção.");
     if (!production) return null;
     const [entriesResult, documentsResult, auditResult] = await Promise.all([
       sb
@@ -102,7 +107,8 @@ export const getWireTrayProductionDetail = createServerFn({ method: "GET" })
         .limit(100),
     ]);
     for (const result of [entriesResult, documentsResult, auditResult]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível consolidar a ordem de produção.");
     }
     return {
       production: mapProduction(production),
@@ -131,7 +137,7 @@ export const createWireTrayProduction = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar as opções de produção.");
     return unwrapRpc<{ id: string; number: number; status: string }>(result);
   });
 
@@ -151,7 +157,7 @@ export const recordWireTrayProductionEntry = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível criar a ordem de produção.");
     return unwrapRpc<{
       entry_id: string;
       id: string;
@@ -198,7 +204,8 @@ export const listWireTrayProductionFormOptions = createServerFn({ method: "GET" 
         .limit(200),
     ]);
     for (const result of [productsResult, locationsResult, shortageResult]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível atualizar a ordem de produção.");
     }
     return {
       products: (productsResult.data ?? []).map((row: any) => ({

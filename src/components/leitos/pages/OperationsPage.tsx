@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Queue payloads are normalized at the server boundary. */
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -43,6 +44,7 @@ import {
   releaseWireTrayOrderForDispatch,
 } from "@/lib/api/wireTrayOperations.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import {
   wireTrayOrderStatusLabel,
   wireTrayUnitLabel,
@@ -93,9 +95,16 @@ export function WireTraySeparationPage() {
       setAction(null);
       setReason("");
       setDifference(0);
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.separation });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.billing });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.order(result.order_id) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Registro recusado."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Registro recusado.")),
   });
   if (!canSeparate)
     return (
@@ -135,9 +144,12 @@ export function WireTraySeparationPage() {
                 title={`Pedido #${row.order.number} · ${row.order.clientName}`}
                 description={`${row.order.clientUnitName ?? "Sem unidade"} · entrega ${formatWireDate(row.order.expectedDeliveryDate)}`}
                 action={
-                  <a href={`/leitos/pedidos/${row.order.id}`} className="wire-button-ghost">
+                  <Link
+                    to={`/leitos/pedidos/${row.order.id}` as never}
+                    className="wire-button-ghost"
+                  >
                     Abrir pedido <ArrowRight size={15} />
-                  </a>
+                  </Link>
                 }
               >
                 {unresolved.length ? (
@@ -440,6 +452,7 @@ export function WireTrayBillingPage() {
       });
     },
     onSuccess: () => {
+      const orderId = action?.orderId;
       toast.success(
         action?.type === "bill"
           ? "Faturamento registrado."
@@ -450,9 +463,15 @@ export function WireTrayBillingPage() {
       setAction(null);
       setReference("");
       setNotes("");
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.billing });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
+      if (orderId) queryClient.invalidateQueries({ queryKey: wireTrayKeys.order(orderId) });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Operação recusada."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Operação recusada.")),
   });
   if (!canBill || !access.canViewFinancials)
     return (
@@ -480,12 +499,12 @@ export function WireTrayBillingPage() {
               <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={`/leitos/pedidos/${row.order.id}`}
+                    <Link
+                      to={`/leitos/pedidos/${row.order.id}` as never}
                       className="text-base font-extrabold text-slate-950 hover:text-orange-700"
                     >
                       Pedido #{row.order.number} · {row.order.clientName}
-                    </a>
+                    </Link>
                     <WireStatus tone={orderStatusTone(row.order.status)}>
                       {wireTrayOrderStatusLabel[row.order.status as WireTrayOrderStatus]}
                     </WireStatus>

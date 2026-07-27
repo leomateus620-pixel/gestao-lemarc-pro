@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/wireTrayDocuments.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { wireTrayKeys } from "@/hooks/useWireTray";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import type {
   WireTrayDocument,
   WireTrayDocumentType,
@@ -81,16 +82,22 @@ export function WireTrayDocuments({
     onSuccess: () => {
       toast.success("Documento enviado e protegido pelas regras do módulo.");
       if (inputRef.current) inputRef.current.value = "";
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      if (entityType === "product")
+        queryClient.invalidateQueries({ queryKey: wireTrayKeys.product(entityId) });
+      if (entityType === "order" || entityType === "dispatch")
+        queryClient.invalidateQueries({ queryKey: wireTrayKeys.order(entityId) });
+      if (entityType === "production_order")
+        queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionDetail(entityId) });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível enviar o documento."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível enviar o documento.")),
   });
   const open = useMutation({
     mutationFn: (documentId: string) => getUrl({ data: { documentId } }),
     onSuccess: ({ url }) => window.open(url, "_blank", "noopener,noreferrer"),
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível abrir o documento."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível abrir o documento.")),
   });
 
   function changeType(next: WireTrayDocumentType) {

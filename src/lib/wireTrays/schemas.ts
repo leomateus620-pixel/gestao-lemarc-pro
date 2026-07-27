@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fallback } from "@tanstack/zod-adapter";
 
 export const wireTrayCategorySchema = z.enum([
   "straight_tray",
@@ -12,6 +13,34 @@ export const wireTrayCategorySchema = z.enum([
   "other",
 ]);
 export const wireTrayUnitSchema = z.enum(["piece", "meter", "kilogram", "set"]);
+
+export const wireTrayMovementSearchSchema = z.object({
+  q: fallback(z.string().trim().max(100), "").default(""),
+  type: fallback(
+    z.enum([
+      "all",
+      "stock_entry",
+      "stock_exit",
+      "transfer_out",
+      "transfer_in",
+      "return",
+      "loss",
+      "adjustment",
+      "reservation",
+      "reservation_release",
+      "reservation_consumption",
+      "production_entry",
+      "dispatch",
+    ]),
+    "all",
+  ).default("all"),
+  product: fallback(z.union([z.literal("all"), z.string().uuid()]), "all").default("all"),
+  from: fallback(z.union([z.literal(""), z.string().date()]), "").default(""),
+  to: fallback(z.union([z.literal(""), z.string().date()]), "").default(""),
+  page: fallback(z.coerce.number().int().positive(), 1).default(1),
+});
+
+export type WireTrayMovementSearch = z.infer<typeof wireTrayMovementSearchSchema>;
 
 const optionalNumber = z
   .union([z.number(), z.nan(), z.null(), z.undefined()])

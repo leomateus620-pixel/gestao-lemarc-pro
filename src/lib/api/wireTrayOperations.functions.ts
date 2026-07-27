@@ -2,7 +2,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireWireTrayAccess, unwrapRpc } from "./wireTrayShared";
+import {
+  domainError,
+  requireWireTrayAccess,
+  throwWireTrayDataError,
+  unwrapRpc,
+} from "./wireTrayShared";
 import { mapOrderSummary } from "@/lib/wireTrays/mappers";
 import type { WireTrayNotification } from "@/types/wireTray";
 
@@ -37,7 +42,7 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
       .in("status", ["stock_reserved", "separating", "awaiting_check"])
       .order("expected_delivery_date", { ascending: true, nullsFirst: false })
       .limit(100);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar a fila de separação.");
     const orderIds = (orders ?? []).map((order: any) => order.id);
     const [reservationsResult, entriesResult] = orderIds.length
       ? await Promise.all([
@@ -58,8 +63,10 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
           { data: [], error: null },
           { data: [], error: null },
         ];
-    if (reservationsResult.error) throw new Error(reservationsResult.error.message);
-    if (entriesResult.error) throw new Error(entriesResult.error.message);
+    if (reservationsResult.error)
+      throwWireTrayDataError(reservationsResult.error, "Não foi possível carregar as reservas.");
+    if (entriesResult.error)
+      throwWireTrayDataError(entriesResult.error, "Não foi possível carregar as conferências.");
     return (orders ?? []).map((order: any) => ({
       order: mapOrderSummary(order),
       items: order.items ?? [],
@@ -87,7 +94,7 @@ export const recordWireTraySeparation = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível registrar a separação.");
     return unwrapRpc<{
       entry_id: string;
       order_id: string;
@@ -100,7 +107,8 @@ export const listWireTrayBillingQueue = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const access = await requireWireTrayAccess(context, ["admin", "gestor", "faturamento"]);
-    if (!access.canViewFinancials) throw new Error("Seu perfil não possui acesso financeiro.");
+    if (!access.canViewFinancials)
+      throw domainError("FORBIDDEN", "Seu perfil não possui acesso financeiro.");
     const sb = context.supabase as any;
     const { data: orders, error } = await sb
       .from("wire_tray_orders")
@@ -108,7 +116,7 @@ export const listWireTrayBillingQueue = createServerFn({ method: "GET" })
       .in("status", ["ready_for_billing", "billed", "ready_for_dispatch"])
       .order("ready_for_billing_at", { ascending: true })
       .limit(100);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar a fila de faturamento.");
     const orderIds = (orders ?? []).map((row: any) => row.id);
     const [financialResult, documentResult] = orderIds.length
       ? await Promise.all([
@@ -124,8 +132,10 @@ export const listWireTrayBillingQueue = createServerFn({ method: "GET" })
           { data: [], error: null },
           { data: [], error: null },
         ];
-    if (financialResult.error) throw new Error(financialResult.error.message);
-    if (documentResult.error) throw new Error(documentResult.error.message);
+    if (financialResult.error)
+      throwWireTrayDataError(financialResult.error, "Não foi possível carregar os valores.");
+    if (documentResult.error)
+      throwWireTrayDataError(documentResult.error, "Não foi possível carregar os documentos.");
     const financialMap = new Map<
       string,
       { total_cents: number; invoice_reference: string | null; billing_notes: string | null }
@@ -151,13 +161,14 @@ export const markWireTrayOrderBilled = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const access = await requireWireTrayAccess(context, ["admin", "gestor", "faturamento"]);
-    if (!access.canViewFinancials) throw new Error("Seu perfil não possui acesso financeiro.");
+    if (!access.canViewFinancials)
+      throw domainError("FORBIDDEN", "Seu perfil não possui acesso financeiro.");
     const { data: result, error } = await (context.supabase as any).rpc("wire_tray_mark_billed", {
       _order_id: data.orderId,
       _invoice_reference: data.invoiceReference,
       _billing_notes: data.billingNotes ?? null,
     });
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível confirmar o faturamento.");
     return result;
   });
 
@@ -166,12 +177,13 @@ export const releaseWireTrayOrderForDispatch = createServerFn({ method: "POST" }
   .inputValidator((input) => z.object({ orderId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const access = await requireWireTrayAccess(context, ["admin", "gestor", "faturamento"]);
-    if (!access.canViewFinancials) throw new Error("Seu perfil não possui acesso financeiro.");
+    if (!access.canViewFinancials)
+      throw domainError("FORBIDDEN", "Seu perfil não possui acesso financeiro.");
     const { data: result, error } = await (context.supabase as any).rpc(
       "wire_tray_release_for_dispatch",
       { _order_id: data.orderId },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível liberar a expedição.");
     return result;
   });
 
@@ -198,7 +210,7 @@ export const dispatchWireTrayOrder = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível concluir a expedição.");
     return result;
   });
 
@@ -214,7 +226,7 @@ export const listWireTrayNotifications = createServerFn({ method: "GET" })
       .is("dismissed_at", null)
       .order("created_at", { ascending: false })
       .limit(10);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar as notificações.");
     return ((data ?? []) as any[]).map(
       (row): WireTrayNotification => ({
         id: row.id,
@@ -239,6 +251,6 @@ export const markWireTrayNotification = createServerFn({ method: "POST" })
       "wire_tray_mark_notification_read",
       { _notification_id: data.id, _dismiss: data.dismiss },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível atualizar a notificação.");
     return { updated: Boolean(updated) };
   });

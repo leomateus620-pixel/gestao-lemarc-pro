@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireWireTrayAccess } from "./wireTrayShared";
+import { requireWireTrayAccess, throwWireTrayDataError } from "./wireTrayShared";
 
 const BUCKET = "wire-tray-documents";
 const allowedMimes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -50,7 +50,7 @@ async function ensureEntityExists(sb: any, entityType: string, entityId: string)
     .select("id")
     .eq("id", entityId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) throwWireTrayDataError(error, "Não foi possível validar o vínculo do documento.");
   if (!data) throw new Error("O registro vinculado ao documento não foi encontrado.");
 }
 
@@ -115,13 +115,17 @@ export const prepareWireTrayDocumentUpload = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (documentError) throw new Error(documentError.message);
+    if (documentError)
+      throwWireTrayDataError(documentError, "Não foi possível registrar o documento.");
     const { data: signed, error: signedError } = await sb.storage
       .from(BUCKET)
       .createSignedUploadUrl(path);
     if (signedError || !signed?.token) {
       await sb.from("wire_tray_documents").update({ status: "rejected" }).eq("id", document.id);
-      throw new Error(signedError?.message ?? "Não foi possível preparar o envio do arquivo.");
+      throwWireTrayDataError(
+        signedError ?? new Error("Falha ao preparar upload"),
+        "Não foi possível preparar o envio do arquivo.",
+      );
     }
     return { documentId: document.id as string, path, token: signed.token as string };
   });
@@ -146,7 +150,7 @@ export const finalizeWireTrayDocumentUpload = createServerFn({ method: "POST" })
       .eq("status", "pending")
       .select("id, file_name, document_type, visibility, entity_type, entity_id, created_at")
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível confirmar o documento.");
     if (!document) throw new Error("Documento pendente não encontrado.");
     return document;
   });
@@ -163,13 +167,16 @@ export const getWireTrayDocumentUrl = createServerFn({ method: "POST" })
       .eq("id", data.documentId)
       .eq("status", "ready")
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar o documento.");
     if (!document) throw new Error("Documento não encontrado ou acesso restrito.");
     const { data: signed, error: signedError } = await sb.storage
       .from(BUCKET)
       .createSignedUrl(document.storage_path, 300, { download: false });
     if (signedError || !signed?.signedUrl)
-      throw new Error(signedError?.message ?? "Não foi possível abrir o documento.");
+      throwWireTrayDataError(
+        signedError ?? new Error("Falha ao assinar download"),
+        "Não foi possível abrir o documento.",
+      );
     return {
       url: signed.signedUrl as string,
       fileName: document.file_name as string,

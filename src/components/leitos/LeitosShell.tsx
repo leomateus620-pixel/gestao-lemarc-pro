@@ -16,6 +16,7 @@ import {
   PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCw,
   Settings,
   ShoppingCart,
   Warehouse,
@@ -30,6 +31,7 @@ import { markWireTrayNotification } from "@/lib/api/wireTrayOperations.functions
 import { useWireTrayNotificationsQuery, wireTrayKeys } from "@/hooks/useWireTray";
 import { wireTrayRoleLabel } from "@/types/wireTray";
 import { cn } from "@/lib/utils";
+import { normalizeWireTrayError } from "@/lib/wireTrays/errors";
 
 const LOGO = "/branding/lemarc-login-logo.png";
 
@@ -91,6 +93,9 @@ export function LeitosShell({ children }: { children: ReactNode }) {
     mutationFn: (id: string) => markNotification({ data: { id, dismiss: false } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications }),
   });
+  const notificationError = notifications.isError
+    ? normalizeWireTrayError(notifications.error)
+    : null;
   const visibleNavigation = useMemo(
     () =>
       navigation.filter(
@@ -259,11 +264,29 @@ export function LeitosShell({ children }: { children: ReactNode }) {
                       <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
                       <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
                     </div>
+                  ) : notificationError ? (
+                    <div className="p-4 text-center" role="alert">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {notificationError.title}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">
+                        {notificationError.description}
+                      </p>
+                      {notificationError.retryable ? (
+                        <button
+                          type="button"
+                          className="wire-button-secondary mt-3"
+                          onClick={() => notifications.refetch()}
+                        >
+                          <RefreshCw size={15} /> Tentar novamente
+                        </button>
+                      ) : null}
+                    </div>
                   ) : notifications.data?.length ? (
                     notifications.data.map((notification) => (
-                      <a
+                      <Link
                         key={notification.id}
-                        href={notification.route ?? "/leitos"}
+                        to={(notification.route ?? "/leitos") as never}
                         onClick={() => markMutation.mutate(notification.id)}
                         className="block rounded-xl px-3 py-3 hover:bg-slate-50"
                       >
@@ -273,7 +296,7 @@ export function LeitosShell({ children }: { children: ReactNode }) {
                             {notification.message}
                           </p>
                         )}
-                      </a>
+                      </Link>
                     ))
                   ) : (
                     <p className="px-4 py-8 text-center text-sm text-slate-500">

@@ -6,12 +6,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
-  Loader2,
   LockKeyhole,
   RefreshCw,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { normalizeWireTrayError } from "@/lib/wireTrays/errors";
 
 export function WirePage({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("wire-page", className)}>{children}</div>;
@@ -80,18 +80,56 @@ export function WirePanel({
 
 export function WireLoadingState({
   label = "Carregando dados persistidos...",
+  variant = "table",
 }: {
   label?: string;
+  variant?: "dashboard" | "table" | "form" | "detail";
 }) {
   return (
-    <div className="wire-state" role="status" aria-live="polite">
-      <span className="wire-state-icon bg-orange-50 text-orange-700">
-        <Loader2 className="animate-spin" size={23} />
-      </span>
-      <p className="font-semibold text-slate-900">{label}</p>
-      <p className="mt-1 text-sm text-slate-500">
-        A operação será exibida assim que a consulta terminar.
-      </p>
+    <div
+      className={cn("wire-loading-state", `wire-loading-${variant}`)}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label={label}
+    >
+      <span className="sr-only">{label}</span>
+      {variant === "dashboard" ? (
+        <>
+          <div className="wire-loading-heading">
+            <span className="wire-skeleton h-3 w-36" />
+            <span className="wire-skeleton h-8 w-56 max-w-full" />
+            <span className="wire-skeleton h-4 w-[28rem] max-w-full" />
+          </div>
+          <div className="wire-loading-metrics">
+            {Array.from({ length: 6 }, (_, index) => (
+              <span className="wire-skeleton h-28" key={index} />
+            ))}
+          </div>
+          <div className="wire-loading-panels">
+            <span className="wire-skeleton h-72" />
+            <span className="wire-skeleton h-72" />
+          </div>
+        </>
+      ) : variant === "form" ? (
+        <>
+          <span className="wire-skeleton h-14" />
+          <div className="wire-loading-form-grid">
+            {Array.from({ length: 6 }, (_, index) => (
+              <span className="wire-skeleton h-20" key={index} />
+            ))}
+          </div>
+          <span className="wire-skeleton ml-auto h-11 w-40 max-w-full" />
+        </>
+      ) : (
+        <>
+          <span className="wire-skeleton h-14" />
+          <span className="wire-skeleton h-16" />
+          {Array.from({ length: variant === "detail" ? 4 : 5 }, (_, index) => (
+            <span className="wire-skeleton h-14" key={index} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -99,21 +137,21 @@ export function WireLoadingState({
 export function WireErrorState({
   error,
   onRetry,
-  title = "Não foi possível carregar esta operação",
+  title,
 }: {
   error: unknown;
   onRetry?: () => void;
   title?: string;
 }) {
-  const message = error instanceof Error ? error.message : "Ocorreu uma falha inesperada.";
+  const feedback = normalizeWireTrayError(error);
   return (
     <div className="wire-state border-red-200 bg-red-50/55" role="alert">
       <span className="wire-state-icon bg-red-100 text-red-700">
         <AlertTriangle size={22} />
       </span>
-      <p className="font-semibold text-slate-950">{title}</p>
-      <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">{message}</p>
-      {onRetry ? (
+      <p className="font-semibold text-slate-950">{title ?? feedback.title}</p>
+      <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">{feedback.description}</p>
+      {onRetry && feedback.retryable ? (
         <button type="button" className="wire-button-secondary mt-4" onClick={onRetry}>
           <RefreshCw size={16} /> Tentar novamente
         </button>

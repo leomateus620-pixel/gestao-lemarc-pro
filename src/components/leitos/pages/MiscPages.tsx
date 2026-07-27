@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -41,11 +41,14 @@ import {
   useWireTrayLocationsQuery,
   useWireTrayMovementsQuery,
   useWireTrayOrdersQuery,
+  useWireTrayProductsQuery,
   wireTrayKeys,
 } from "@/hooks/useWireTray";
 import { saveWireTrayLocation } from "@/lib/api/wireTrayProducts.functions";
 import { setWireTrayAccess } from "@/lib/api/moduleAccess.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
+import type { WireTrayMovementSearch } from "@/lib/wireTrays/schemas";
 import {
   wireTrayMovementLabel,
   wireTrayOrderStatusLabel,
@@ -60,12 +63,26 @@ const movementTypes = Object.entries(wireTrayMovementLabel) as Array<
   [WireTrayMovementType, string]
 >;
 
-export function WireTrayMovementsPage() {
-  const [search, setSearch] = useState("");
-  const [type, setType] = useState("");
-  const [page, setPage] = useState(1);
-  const query = useWireTrayMovementsQuery({ search, type: type || undefined, page, pageSize: 25 });
-  useEffect(() => setPage(1), [search, type]);
+export function WireTrayMovementsPage({ search }: { search: WireTrayMovementSearch }) {
+  const navigate = useNavigate({ from: "/leitos/movimentacoes" });
+  const products = useWireTrayProductsQuery({ search: "", active: true, page: 1, pageSize: 100 });
+  const query = useWireTrayMovementsQuery({
+    search: search.q,
+    type: search.type === "all" ? undefined : search.type,
+    productId: search.product === "all" ? undefined : search.product,
+    dateFrom: search.from || undefined,
+    dateTo: search.to || undefined,
+    page: search.page,
+    pageSize: 25,
+  });
+
+  function updateSearch(patch: Partial<WireTrayMovementSearch>, resetPage = true) {
+    navigate({
+      replace: true,
+      search: (current) => ({ ...current, ...patch, page: resetPage ? 1 : (patch.page ?? 1) }),
+    });
+  }
+
   return (
     <WirePage>
       <WirePageHeader
@@ -74,7 +91,7 @@ export function WireTrayMovementsPage() {
         description="Entradas, saídas, reservas, transferências, produção e expedição com saldo anterior e posterior."
       />
       <WirePanel>
-        <div className="wire-filterbar">
+        <div className="wire-filterbar wire-filterbar-movements">
           <label className="wire-field">
             <span className="wire-label">Buscar motivo</span>
             <span className="relative">
@@ -84,16 +101,22 @@ export function WireTrayMovementsPage() {
               />
               <input
                 className="wire-input pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={search.q}
+                onChange={(e) => updateSearch({ q: e.target.value })}
                 placeholder="Documento, ocorrência ou justificativa"
               />
             </span>
           </label>
           <label className="wire-field">
             <span className="wire-label">Tipo</span>
-            <select className="wire-select" value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="">Todos</option>
+            <select
+              className="wire-select"
+              value={search.type}
+              onChange={(e) =>
+                updateSearch({ type: e.target.value as WireTrayMovementSearch["type"] })
+              }
+            >
+              <option value="all">Todos</option>
               {movementTypes.map(([value, label]) => (
                 <option value={value} key={value}>
                   {label}
@@ -101,12 +124,45 @@ export function WireTrayMovementsPage() {
               ))}
             </select>
           </label>
-          <div className="wire-field">
-            <span className="wire-label">Estoque</span>
-            <Link to="/leitos/estoque" className="wire-button-secondary">
-              Abrir posição atual <ArrowRight size={15} />
-            </Link>
-          </div>
+          <label className="wire-field">
+            <span className="wire-label">Produto</span>
+            <select
+              className="wire-select"
+              value={search.product}
+              onChange={(e) => updateSearch({ product: e.target.value })}
+              disabled={products.isLoading}
+            >
+              <option value="all">
+                {products.isError ? "Produtos indisponíveis" : "Todos os produtos"}
+              </option>
+              {products.data?.rows.map((product) => (
+                <option value={product.id} key={product.id}>
+                  {product.sku ? `${product.sku} · ` : ""}
+                  {product.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="wire-field">
+            <span className="wire-label">De</span>
+            <input
+              type="date"
+              className="wire-input"
+              value={search.from}
+              max={search.to || undefined}
+              onChange={(e) => updateSearch({ from: e.target.value })}
+            />
+          </label>
+          <label className="wire-field">
+            <span className="wire-label">Até</span>
+            <input
+              type="date"
+              className="wire-input"
+              value={search.to}
+              min={search.from || undefined}
+              onChange={(e) => updateSearch({ to: e.target.value })}
+            />
+          </label>
         </div>
         {query.isLoading ? (
           <WireLoadingState label="Consultando livro de estoque..." />
@@ -114,7 +170,7 @@ export function WireTrayMovementsPage() {
           <WireErrorState error={query.error} onRetry={() => query.refetch()} />
         ) : query.data!.rows.length ? (
           <>
-            <div className="wire-table-wrap">
+            <div className="wire-table-wrap hidden md:block">
               <table className="wire-table">
                 <thead>
                   <tr>
@@ -125,6 +181,7 @@ export function WireTrayMovementsPage() {
                     <th>Quantidade</th>
                     <th>Físico</th>
                     <th>Reservado</th>
+                    <th>Vínculo</th>
                     <th>Motivo</th>
                   </tr>
                 </thead>
@@ -144,12 +201,12 @@ export function WireTrayMovementsPage() {
                         </WireStatus>
                       </td>
                       <td>
-                        <a
-                          href={`/leitos/estoque/${movement.productId}`}
+                        <Link
+                          to={`/leitos/estoque/${movement.productId}` as never}
                           className="wire-table-link"
                         >
                           {movement.productName}
-                        </a>
+                        </Link>
                         <p className="mt-1 text-xs text-slate-500">
                           {movement.productSku ?? "Sem SKU"}
                         </p>
@@ -166,6 +223,25 @@ export function WireTrayMovementsPage() {
                         {formatWireQuantity(movement.previousReserved)} →{" "}
                         <strong>{formatWireQuantity(movement.newReserved)}</strong>
                       </td>
+                      <td>
+                        {movement.orderId ? (
+                          <Link
+                            to={`/leitos/pedidos/${movement.orderId}` as never}
+                            className="wire-table-link"
+                          >
+                            Pedido
+                          </Link>
+                        ) : movement.productionOrderId ? (
+                          <Link
+                            to={`/leitos/producao/${movement.productionOrderId}` as never}
+                            className="wire-table-link"
+                          >
+                            Produção
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="max-w-xs">
                         <p className="line-clamp-2">{movement.reason}</p>
                       </td>
@@ -174,7 +250,69 @@ export function WireTrayMovementsPage() {
                 </tbody>
               </table>
             </div>
-            <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
+            <div className="wire-mobile-list md:hidden">
+              {query.data!.rows.map((movement) => (
+                <article className="wire-mobile-card" key={movement.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        to={`/leitos/estoque/${movement.productId}` as never}
+                        className="wire-table-link block truncate"
+                      >
+                        {movement.productName}
+                      </Link>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatWireDate(movement.createdAt, true)} · {movement.locationName}
+                      </p>
+                    </div>
+                    <WireStatus
+                      tone={
+                        movement.physicalDelta < 0 || movement.reservedDelta < 0
+                          ? "warning"
+                          : "info"
+                      }
+                    >
+                      {wireTrayMovementLabel[movement.type]}
+                    </WireStatus>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
+                    <div>
+                      <p className="wire-summary-label">Saldo físico</p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {formatWireQuantity(movement.previousPhysical)} →{" "}
+                        {formatWireQuantity(movement.newPhysical)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="wire-summary-label">Saldo reservado</p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {formatWireQuantity(movement.previousReserved)} →{" "}
+                        {formatWireQuantity(movement.newReserved)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs leading-5 text-slate-600">{movement.reason}</p>
+                  {movement.orderId || movement.productionOrderId ? (
+                    <Link
+                      to={
+                        (movement.orderId
+                          ? `/leitos/pedidos/${movement.orderId}`
+                          : `/leitos/producao/${movement.productionOrderId}`) as never
+                      }
+                      className="wire-button-ghost justify-self-start"
+                    >
+                      Abrir operação relacionada <ArrowRight size={15} />
+                    </Link>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <WirePager
+              page={search.page}
+              pageSize={25}
+              count={query.data!.count}
+              onPage={(page) => updateSearch({ page }, false)}
+            />
           </>
         ) : (
           <WireEmptyState
@@ -212,6 +350,10 @@ export function WireTrayReportsPage() {
     );
   const data = dashboard.data!;
   const inventoryRows = inventory.data!.rows;
+  const orderGroups = groupCount(orders.data!.rows.map((row) => row.status));
+  const prioritizedInventory = [...inventoryRows]
+    .sort((a, b) => a.available - a.product.minimumStock - (b.available - b.product.minimumStock))
+    .slice(0, 10);
   const totalPhysical = inventoryRows.reduce((sum, row) => sum + row.physical, 0);
   const totalReserved = inventoryRows.reduce((sum, row) => sum + row.reserved, 0);
   function exportInventory() {
@@ -246,7 +388,12 @@ export function WireTrayReportsPage() {
         title="Relatórios"
         description="Indicadores e exportações derivados exclusivamente dos pedidos, saldos e eventos persistidos."
         action={
-          <button type="button" className="wire-button-secondary" onClick={exportInventory}>
+          <button
+            type="button"
+            className="wire-button-secondary"
+            onClick={exportInventory}
+            disabled={inventoryRows.length === 0}
+          >
             <Download size={16} /> Exportar estoque CSV
           </button>
         }
@@ -289,32 +436,34 @@ export function WireTrayReportsPage() {
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <WirePanel title="Pedidos por etapa" description="Amostra dos 100 pedidos mais recentes.">
-          <div className="divide-y divide-slate-100">
-            {groupCount(orders.data!.rows.map((row) => row.status)).map(([status, count]) => (
-              <div className="flex items-center justify-between gap-3 px-4 py-3" key={status}>
-                <WireStatus>
-                  {wireTrayOrderStatusLabel[status as keyof typeof wireTrayOrderStatusLabel] ??
-                    status}
-                </WireStatus>
-                <strong className="text-slate-900">{count}</strong>
-              </div>
-            ))}
-          </div>
+          {orderGroups.length ? (
+            <div className="divide-y divide-slate-100">
+              {orderGroups.map(([status, count]) => (
+                <div className="flex items-center justify-between gap-3 px-4 py-3" key={status}>
+                  <WireStatus>
+                    {wireTrayOrderStatusLabel[status as keyof typeof wireTrayOrderStatusLabel] ??
+                      status}
+                  </WireStatus>
+                  <strong className="text-slate-900">{count}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <WireEmptyState
+              title="Sem pedidos para consolidar"
+              description="Os totais por etapa aparecerão após o primeiro pedido persistido."
+            />
+          )}
         </WirePanel>
         <WirePanel
           title="Itens com menor disponibilidade"
           description="Prioridade de reposição conforme estoque mínimo."
         >
-          <div className="divide-y divide-slate-100">
-            {[...inventoryRows]
-              .sort(
-                (a, b) =>
-                  a.available - a.product.minimumStock - (b.available - b.product.minimumStock),
-              )
-              .slice(0, 10)
-              .map((row) => (
-                <a
-                  href={`/leitos/estoque/${row.product.id}`}
+          {prioritizedInventory.length ? (
+            <div className="divide-y divide-slate-100">
+              {prioritizedInventory.map((row) => (
+                <Link
+                  to={`/leitos/estoque/${row.product.id}` as never}
                   key={row.product.id}
                   className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                 >
@@ -331,9 +480,15 @@ export function WireTrayReportsPage() {
                   <strong className="text-sm text-slate-900">
                     {formatWireQuantity(row.available, wireTrayUnitLabel[row.product.unit])}
                   </strong>
-                </a>
+                </Link>
               ))}
-          </div>
+            </div>
+          ) : (
+            <WireEmptyState
+              title="Sem estoque para analisar"
+              description="Cadastre um produto e um saldo real para habilitar a priorização."
+            />
+          )}
         </WirePanel>
       </div>
       <WirePanel title="Nota de escopo">
@@ -369,9 +524,12 @@ export function WireTraySettingsPage() {
       setForm({ code: "", name: "", description: null, active: true });
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: wireTrayKeys.locations });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderOptions });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionOptions });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o local."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível salvar o local.")),
   });
   if (locations.isLoading) return <WireLoadingState label="Carregando parâmetros do módulo..." />;
   if (locations.isError)
@@ -580,7 +738,7 @@ function AccessRow({ user }: { user: WireTrayAccessUser }) {
       queryClient.invalidateQueries({ queryKey: ["module-access"] });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar o acesso."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível alterar o acesso.")),
   });
   return (
     <div className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_180px_150px_auto] lg:items-end">
@@ -702,8 +860,8 @@ export function WireTrayMorePage() {
           {links.map((item) => {
             const Icon = item.icon;
             return (
-              <a
-                href={item.to}
+              <Link
+                to={item.to as never}
                 key={item.to}
                 className="flex items-center gap-3 px-4 py-4 hover:bg-slate-50"
               >
@@ -715,7 +873,7 @@ export function WireTrayMorePage() {
                   <span className="mt-1 block text-xs text-slate-500">{item.description}</span>
                 </span>
                 <ArrowRight size={17} className="text-slate-400" />
-              </a>
+              </Link>
             );
           })}
         </div>
