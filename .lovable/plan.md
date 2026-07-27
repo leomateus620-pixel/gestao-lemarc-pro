@@ -1,55 +1,28 @@
-# Reconciliação do schema Leitos Aramados
+## Aplicar migração Fulfillment do Leitos Aramados
 
-## Objetivo
-Restaurar a cadeia operacional completa do módulo Leitos Aramados no backend `lvsljgctwwovxcswtfwu`, sem quebrar o fluxo de login já corrigido nem afetar dados existentes.
+Aplicar `supabase/migrations/20260721133300_wire_tray_fulfillment.sql` (1066 linhas) via `supabase--migration` para completar a cadeia operacional do módulo.
 
-## Estado verificado
-- Projeto Supabase ativo: `lvsljgctwwovxcswtfwu` ✅
-- `public.user_module_access` já existe (com admins mapeados)
-- 0 tabelas `wire_tray_*` presentes — schema está limpo, seguro para aplicação sequencial
-- 4 arquivos-fonte originais presentes em `supabase/migrations/`
+### O que a migração entrega
 
-## Passos
+Funções RPC de fulfillment (todas com `SECURITY DEFINER`, `search_path = ''`, checagem de papel via `wire_tray_assert_role` e idempotência via `wire_tray_operation_requests`):
 
-### 1. Aplicar 4 migrations sequenciais via `supabase--migration`
-Cada chamada é uma migration separada, atômica, aditiva. Como o banco está limpo de objetos `wire_tray_*`, não há conflito.
+- `wire_tray_create_production_order` — cria OP manual (para estoque ou vinculada a item de pedido), valida saldo de falta, atualiza status do pedido para `production_pending` e grava auditoria.
+- `wire_tray_record_production_entry` — máquina de estados da produção (`start`, `progress`, `pause`, `resume`, `scrap`, `cancel`, `complete`). No `complete`, gera reserva (quando `customer_order`), atualiza saldos, insere movimento `production_entry` e reavalia status do pedido.
+- Demais RPCs contidas no arquivo (separação, faturamento, expedição, notificações) seguem o mesmo padrão de asserção de papel + idempotência + auditoria + movimentos.
 
-1. **Foundation** (`20260721133000`): enums (`app_module`, `wire_tray_module_role`, categorias, status, etc.), 16 tabelas operacionais (`wire_tray_stock_locations`, `wire_tray_products`, `wire_tray_orders`, `wire_tray_order_items`, `wire_tray_reservations`, `wire_tray_production_orders`, `wire_tray_documents`, `wire_tray_stock_movements`, `wire_tray_audit_events`, financials, etc.), índices e constraints
-2. **Security** (`20260721133100`): `ENABLE ROW LEVEL SECURITY` + policies por role em cada tabela, GRANTs para `authenticated`/`service_role`, funções `has_wire_tray_role`/`wire_tray_can_view_financials`
-3. **Commands** (`20260721133200`): RPCs de comando (criar pedido, reservar estoque, iniciar produção, registrar separação, etc.) — tudo `SECURITY DEFINER` com validação de role
-4. **Fulfillment** (`20260721133300`): views (`wire_tray_inventory_catalog`, etc.), RPCs de listagem, storage buckets `wire-tray-documents` com policies
+### Pré-condições já satisfeitas
 
-### 2. Recarga do PostgREST
-Cada migration já contém `NOTIFY pgrst, 'reload schema'` no final. Após a última, confirmar via `supabase--read_query` que nenhuma tabela retorna `PGRST205`.
+- Foundation, Security e Commands já aplicadas (tabelas, enums, RLS, imutabilidade do ledger, bucket `wire-tray-documents` criado).
+- Funções auxiliares usadas pela Fulfillment (`wire_tray_assert_role`, `wire_tray_write_audit`, `wire_tray_insert_movement`, `wire_tray_assert_evidence_document`, `wire_tray_trigger_replenishment_internal`) já existem no schema.
 
-### 3. Validação automatizada
-```
-node scripts/validate-wire-tray-reconciliation.mjs
-```
-Confirma que todas as 16 tabelas, views, RPCs e buckets estão presentes.
+### Passos
 
-### 4. Regeneração de tipos TypeScript
-```
-node scripts/sync-wire-tray-supabase-types.mjs
-```
-Atualiza `src/integrations/supabase/types.ts` para refletir o schema real.
+1. Enviar o SQL completo do arquivo via `supabase--migration` com descrição em português.
+2. Após aprovação e execução, rodar `supabase--linter` para capturar eventuais avisos de segurança/performance introduzidos pelas novas funções.
+3. Se o linter apontar issues nas funções desta migração, aplicar migração corretiva pontual.
+4. Confirmar ao usuário que a cadeia (Foundation → Security → Commands → Fulfillment) está completa e que o módulo Leitos Aramados pode ser exercitado no preview.
 
-### 5. Verificação funcional
-- Rodar `bunx tsgo` para confirmar que tipos batem com o código
-- Rodar `bunx vitest run` (suíte `useWireTray`, `schema-contract`, `errors`)
-- Verificar via `supabase--read_query` que:
-  - `user_module_access` mantém os admins existentes
-  - `getMyModuleAccess` retorna dados esperados para um admin
-- Instruir o usuário a fazer login real e validar acesso a `/leitos` e ao módulo OS
+### Fora de escopo
 
-## Garantias
-- **Transacional**: cada migration é uma transação Supabase; falha reverte tudo
-- **Aditiva**: apenas `CREATE`, sem `DROP TABLE`, sem `TRUNCATE`, sem `DELETE`
-- **Sem impacto em OS**: nenhuma tabela do módulo Ordens de Serviço é tocada
-- **Sem impacto em auth**: `user_module_access` e admins existentes preservados
-- **Idempotência**: se qualquer migration falhar, as anteriores permanecem aplicadas e podem ser retomadas
-
-## Fora do escopo (não será feito)
-- Não aplicar o arquivo `20260727123000_wire_tray_schema_reconciliation.sql` como bloco único (limitação prática da interface de tool; conteúdo é idêntico ao das 4 originais)
-- Não modificar `.env`, `client.ts`, `types.ts` manualmente (tipos serão regenerados)
-- Não tocar em `auth.*`, `storage.*` além dos buckets do módulo
+- Nenhuma alteração em código do frontend nesta etapa — a migração é puramente SQL aditiva.
+- Nenhum `DROP`/`TRUNCATE`; tudo é `CREATE OR REPLACE FUNCTION` idempotente.
