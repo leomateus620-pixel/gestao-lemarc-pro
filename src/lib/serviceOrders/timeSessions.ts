@@ -181,6 +181,10 @@ export type TimelineItem = {
   reason?: string | null;
   notes?: string | null;
   durationMinutes?: number | null;
+  /** Session backing this event (start/resume => same session that started; pause/finish => session that closed). */
+  sessionId?: string;
+  /** True when the underlying session has been adjusted after creation. */
+  wasAdjusted?: boolean;
 };
 
 /** Build a chronological event log from sessions for display. */
@@ -199,6 +203,8 @@ export function buildTimeline(sessions: TimeSession[]): TimelineItem[] {
       at: s.started_at,
       kind: prevForTech.length === 0 ? "start" : "resume",
       technicianId: s.technician_id,
+      sessionId: s.id,
+      wasAdjusted: !!s.adjusted_at,
     });
     if (s.ended_at) {
       items.push({
@@ -208,6 +214,8 @@ export function buildTimeline(sessions: TimeSession[]): TimelineItem[] {
         reason: s.pause_reason,
         notes: s.pause_notes,
         durationMinutes: s.duration_minutes,
+        sessionId: s.id,
+        wasAdjusted: !!s.adjusted_at,
       });
     }
   }
