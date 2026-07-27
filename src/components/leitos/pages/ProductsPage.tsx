@@ -746,9 +746,9 @@ function emptyProduct(id?: string): WireTrayProductInput {
     finish: null,
     technicalNotes: null,
     defaultLocationId: null,
-    minimumStock: 0,
+    minimumStock: null as unknown as number,
     targetStock: null,
-    minimumProductionBatch: 1,
+    minimumProductionBatch: null as unknown as number,
     automaticReplenishment: false,
     replenishmentNotes: null,
   };
@@ -763,16 +763,21 @@ function Field({
   label,
   error,
   span,
+  required,
   children,
 }: {
   label: string;
   error?: string;
   span?: boolean;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className={`wire-field ${span ? "wire-form-span-2" : ""}`}>
-      <span className="wire-label">{label}</span>
+      <span className="wire-label">
+        {label}
+        {required ? <span className="ml-1 text-orange-600">*</span> : null}
+      </span>
       {children}
       {error ? <span className="wire-field-error">{error}</span> : null}
     </label>
@@ -784,23 +789,53 @@ function NumberField({
   onChange,
   error,
   required,
+  fieldKey,
 }: {
   label: string;
   value: number | null | undefined;
   onChange: (value: number | null) => void;
   error?: string;
   required?: boolean;
+  fieldKey?: string;
 }) {
+  const [draft, setDraft] = useState<string>(value == null ? "" : String(value));
+  const externalRef = useRef(value);
+  useEffect(() => {
+    if (value !== externalRef.current) {
+      externalRef.current = value;
+      setDraft(value == null ? "" : String(value));
+    }
+  }, [value]);
   return (
-    <Field label={label} error={error}>
+    <Field label={label} error={error} required={required}>
       <input
+        data-field={fieldKey}
         className="wire-input"
-        type="number"
-        min="0"
-        step="0.001"
-        required={required}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={draft}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw !== "" && !/^\d*[.,]?\d*$/.test(raw)) return;
+          setDraft(raw);
+          if (raw === "" || raw === "." || raw === ",") {
+            onChange(null);
+            return;
+          }
+          const parsed = Number(raw.replace(",", "."));
+          if (!Number.isNaN(parsed)) onChange(parsed);
+        }}
+        onBlur={() => {
+          if (draft === "" || draft === "." || draft === ",") return;
+          const parsed = Number(draft.replace(",", "."));
+          if (Number.isNaN(parsed)) {
+            setDraft("");
+            onChange(null);
+          } else {
+            setDraft(String(parsed));
+          }
+        }}
       />
     </Field>
   );
