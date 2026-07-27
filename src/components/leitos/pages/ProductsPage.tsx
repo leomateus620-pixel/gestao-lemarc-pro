@@ -230,12 +230,11 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
   const access = useWireTrayAccess();
   const canManage = hasWireTrayPermission(access.role, "manage_products", access.financialAccess);
   const productQuery = useWireTrayProductQuery(productId ?? "");
-  const locations = useWireTrayLocationsQuery();
   const queryClient = useQueryClient();
   const save = useServerFn(saveWireTrayProduct);
-  const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<WireTrayProductInput>(() => emptyProduct(productId));
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (!productQuery.data?.product) return;
@@ -261,7 +260,18 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
       automaticReplenishment: product.automaticReplenishment,
       replenishmentNotes: product.replenishmentNotes,
     });
+    setDirty(false);
   }, [productQuery.data]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   const mutation = useMutation({
     mutationFn: () => save({ data: wireTrayProductInputSchema.parse(form) }),
@@ -275,6 +285,7 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
       toast.success(
         productId ? "Produto atualizado com segurança." : "Produto cadastrado com segurança.",
       );
+      setDirty(false);
       navigate({ to: "/leitos/produtos/$productId", params: { productId: saved.id } });
     },
     onError: (error) =>
@@ -299,93 +310,81 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
 
   function set<K extends keyof WireTrayProductInput>(key: K, value: WireTrayProductInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setDirty(true);
     setErrors((current) => {
       const next = { ...current };
       delete next[String(key)];
       return next;
     });
   }
-  function advance() {
+
+  function submit() {
     const result = wireTrayProductInputSchema.safeParse(form);
     if (!result.success) {
-      const next = Object.fromEntries(
-        result.error.issues.map((issue) => [String(issue.path[0]), issue.message]),
-      );
+      const next: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0]);
+        if (!next[key]) next[key] = issue.message;
+      }
       setErrors(next);
-      const stepFields = [
-        ["name", "category", "unit"],
-        ["widthMm", "heightMm", "lengthMm"],
-        ["minimumStock", "targetStock", "minimumProductionBatch"],
-      ];
-      if (step < 3 && Object.keys(next).some((field) => stepFields[step]?.includes(field))) return;
+      const firstKey = Object.keys(next)[0];
+      if (firstKey) {
+        const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
+        el?.focus();
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      toast.error("Revise os campos destacados antes de salvar.");
+      return;
     }
-    setStep((current) => Math.min(3, current + 1));
+    mutation.mutate();
   }
 
   return (
     <WirePage>
       <WirePageHeader
-        eyebrow="Cadastro técnico"
+        eyebrow="Cadastro industrial"
         title={productId ? "Editar produto" : "Novo produto"}
         description="Atributos técnicos e parâmetros que alimentam pedidos, estoque e produção."
         backTo={productId ? `/leitos/produtos/${productId}` : "/leitos/produtos"}
+        action={
+          productId ? (
+            <WireStatus tone={form.active ? "success" : "neutral"}>
+              {form.active ? "Ativo" : "Inativo"}
+            </WireStatus>
+          ) : undefined
+        }
       />
-      <WirePanel>
-        <div className="wire-stepper">
-          {["Identificação", "Especificação", "Estoque", "Revisão"].map((label, index) => (
-            <button
-              key={label}
-              type="button"
-              className="wire-step"
-              data-active={index === step}
-              onClick={() => index < step && setStep(index)}
-            >
-              <span className="wire-step-index">
-                {index < step ? <Check size={12} /> : index + 1}
-              </span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
-        {step === 0 ? (
+      <form
+        className="mx-auto grid w-full max-w-4xl gap-5 pb-28 sm:pb-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <FormSection
+          title="Identificação"
+          description="Como o produto aparece no catálogo e nos pedidos."
+        >
           <div className="wire-form-grid">
-            <Field label="Nome do produto" error={errors.name} span>
+            <Field label="Nome do produto" error={errors.name} span required>
               <input
+                data-field="name"
                 className="wire-input"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="Ex.: Leito aramado 100 x 50 mm"
+                placeholder="Ex.: Leito aramado 100 × 50 mm"
                 autoFocus
+                maxLength={180}
               />
             </Field>
-            <Field label="SKU">
-              <input
-                className="wire-input"
-                value={form.sku ?? ""}
-                onChange={(e) => set("sku", e.target.value || null)}
-                placeholder="Gerencial ou comercial"
-              />
-            </Field>
-            <Field label="Categoria" error={errors.category}>
+            <Field label="Categoria" error={errors.category} required>
               <select
+                data-field="category"
                 className="wire-select"
                 value={form.category}
                 onChange={(e) => set("category", e.target.value as WireTrayCategory)}
               >
                 {categories.map(([value, label]) => (
-                  <option value={value} key={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Unidade" error={errors.unit}>
-              <select
-                className="wire-select"
-                value={form.unit}
-                onChange={(e) => set("unit", e.target.value as WireTrayUnit)}
-              >
-                {units.map(([value, label]) => (
                   <option value={value} key={value}>
                     {label}
                   </option>
@@ -408,29 +407,38 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
                 value={form.shortDescription ?? ""}
                 onChange={(e) => set("shortDescription", e.target.value || null)}
                 placeholder="Descrição objetiva para consulta operacional."
+                maxLength={500}
+                rows={3}
               />
             </Field>
           </div>
-        ) : null}
-        {step === 1 ? (
+        </FormSection>
+
+        <FormSection
+          title="Especificações físicas"
+          description="Dimensões e acabamento usados em fabricação."
+        >
           <div className="wire-form-grid">
             <NumberField
               label="Largura (mm)"
               value={form.widthMm}
               onChange={(v) => set("widthMm", v)}
               error={errors.widthMm}
+              fieldKey="widthMm"
             />
             <NumberField
               label="Altura (mm)"
               value={form.heightMm}
               onChange={(v) => set("heightMm", v)}
               error={errors.heightMm}
+              fieldKey="heightMm"
             />
             <NumberField
               label="Comprimento (mm)"
               value={form.lengthMm}
               onChange={(v) => set("lengthMm", v)}
               error={errors.lengthMm}
+              fieldKey="lengthMm"
             />
             <Field label="Material">
               <input
@@ -438,164 +446,81 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
                 value={form.material ?? ""}
                 onChange={(e) => set("material", e.target.value || null)}
                 placeholder="Aço carbono, inox..."
+                maxLength={120}
               />
             </Field>
-            <Field label="Acabamento">
+            <Field label="Acabamento" span>
               <input
                 className="wire-input"
                 value={form.finish ?? ""}
                 onChange={(e) => set("finish", e.target.value || null)}
                 placeholder="Galvanizado, pintura..."
-              />
-            </Field>
-            <Field label="Notas técnicas" span>
-              <textarea
-                className="wire-textarea"
-                value={form.technicalNotes ?? ""}
-                onChange={(e) => set("technicalNotes", e.target.value || null)}
-                placeholder="Restrições, normas e orientações de fabricação."
+                maxLength={120}
               />
             </Field>
           </div>
-        ) : null}
-        {step === 2 ? (
+        </FormSection>
+
+        <FormSection
+          title="Estoque e produção"
+          description="Parâmetros que orientam reposição e ordens de produção."
+        >
           <div className="wire-form-grid">
-            <Field label="Local padrão">
-              <select
-                className="wire-select"
-                value={form.defaultLocationId ?? ""}
-                onChange={(e) => set("defaultLocationId", e.target.value || null)}
-              >
-                <option value="">Não definido</option>
-                {locations.data
-                  ?.filter((item) => item.active)
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.code} · {item.name}
-                    </option>
-                  ))}
-              </select>
-            </Field>
             <NumberField
               label="Estoque mínimo"
               value={form.minimumStock}
-              onChange={(v) => set("minimumStock", v ?? 0)}
+              onChange={(v) => set("minimumStock", (v ?? null) as unknown as number)}
               error={errors.minimumStock}
               required
-            />
-            <NumberField
-              label="Estoque-alvo"
-              value={form.targetStock}
-              onChange={(v) => set("targetStock", v)}
-              error={errors.targetStock}
+              fieldKey="minimumStock"
             />
             <NumberField
               label="Lote mínimo de produção"
               value={form.minimumProductionBatch}
-              onChange={(v) => set("minimumProductionBatch", v ?? 1)}
+              onChange={(v) => set("minimumProductionBatch", (v ?? null) as unknown as number)}
               error={errors.minimumProductionBatch}
               required
+              fieldKey="minimumProductionBatch"
             />
-            <Field label="Reposição automática">
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700">
+            <Field label="Reposição automática" span>
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
                   checked={form.automaticReplenishment}
                   onChange={(e) => set("automaticReplenishment", e.target.checked)}
                   className="size-4 accent-orange-600"
-                />{" "}
-                Criar OP quando o projetado atingir o mínimo
+                />
+                Criar ordem de produção quando o projetado atingir o mínimo
               </label>
             </Field>
-            <Field label="Observações de reposição" span>
-              <textarea
-                className="wire-textarea"
-                value={form.replenishmentNotes ?? ""}
-                onChange={(e) => set("replenishmentNotes", e.target.value || null)}
-              />
-            </Field>
           </div>
-        ) : null}
-        {step === 3 ? (
-          <div className="p-4 sm:p-6">
-            <div className="grid gap-4 lg:grid-cols-[1fr_.7fr]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <p className="wire-eyebrow">Revisão</p>
-                <h3 className="mt-2 font-display text-xl font-extrabold text-slate-950">
-                  {form.name || "Produto sem nome"}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {wireTrayCategoryLabel[form.category]} · {dimensions(form)} · unidade{" "}
-                  {wireTrayUnitLabel[form.unit]}
-                </p>
-                <div className="mt-5 grid grid-cols-2 gap-4">
-                  <Summary
-                    label="Mínimo"
-                    value={formatWireQuantity(form.minimumStock, wireTrayUnitLabel[form.unit])}
-                  />
-                  <Summary
-                    label="Alvo"
-                    value={
-                      form.targetStock === null
-                        ? "Não definido"
-                        : formatWireQuantity(form.targetStock, wireTrayUnitLabel[form.unit])
-                    }
-                  />
-                  <Summary
-                    label="Lote mínimo"
-                    value={formatWireQuantity(
-                      form.minimumProductionBatch,
-                      wireTrayUnitLabel[form.unit],
-                    )}
-                  />
-                  <Summary
-                    label="Reposição"
-                    value={form.automaticReplenishment ? "Automática" : "Manual"}
-                  />
-                </div>
-              </div>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                <ShieldCheck className="text-emerald-700" size={24} />
-                <p className="mt-3 font-bold text-emerald-950">Pronto para persistir</p>
-                <p className="mt-1 text-sm leading-6 text-emerald-900/75">
-                  A gravação respeita as permissões do módulo. Nenhum saldo de estoque é alterado
-                  por este cadastro.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        <div className="wire-form-footer">
+        </FormSection>
+
+        <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:mx-0 sm:flex-row sm:items-center sm:justify-end sm:rounded-2xl sm:border sm:px-6">
           <button
             type="button"
             className="wire-button-secondary"
-            disabled={step === 0 || mutation.isPending}
-            onClick={() => setStep((current) => current - 1)}
+            disabled={mutation.isPending}
+            onClick={() =>
+              navigate({
+                to: productId ? `/leitos/produtos/${productId}` : "/leitos/produtos",
+              } as never)
+            }
           >
-            Voltar
+            Cancelar
           </button>
-          {step < 3 ? (
-            <button type="button" className="wire-button-primary" onClick={advance}>
-              Continuar <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="wire-button-primary"
-              disabled={mutation.isPending}
-              onClick={() => mutation.mutate()}
-            >
-              {mutation.isPending ? (
-                "Salvando..."
-              ) : (
-                <>
-                  <Save size={16} /> Salvar produto
-                </>
-              )}
-            </button>
-          )}
+          <button type="submit" className="wire-button-primary" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              "Salvando..."
+            ) : (
+              <>
+                <Save size={16} />
+                {productId ? "Salvar alterações" : "Cadastrar produto"}
+              </>
+            )}
+          </button>
         </div>
-      </WirePanel>
+      </form>
     </WirePage>
   );
 }
