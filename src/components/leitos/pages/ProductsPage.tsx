@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight,
   Boxes,
-  Check,
   Edit3,
   PackagePlus,
   Plus,
   Save,
   Search,
-  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWireTrayAccess } from "@/components/leitos/WireTrayAccessContext";
@@ -31,7 +29,6 @@ import {
   inventoryTone,
 } from "@/components/leitos/WireTrayUi";
 import {
-  useWireTrayLocationsQuery,
   useWireTrayProductQuery,
   useWireTrayProductsQuery,
   wireTrayKeys,
@@ -49,7 +46,6 @@ import {
 } from "@/types/wireTray";
 
 const categories = Object.entries(wireTrayCategoryLabel) as Array<[WireTrayCategory, string]>;
-const units = Object.entries(wireTrayUnitLabel) as Array<[WireTrayUnit, string]>;
 
 export function WireTrayProductsPage() {
   const access = useWireTrayAccess();
