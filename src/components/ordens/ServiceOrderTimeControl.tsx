@@ -25,6 +25,7 @@ import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { PauseServiceOrderDialog } from "./PauseServiceOrderDialog";
 import { ServiceOrderTimeHistory } from "./ServiceOrderTimeHistory";
+import { EditTimeSessionSheet } from "./EditTimeSessionSheet";
 import { useAuth } from "@/components/app/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -33,7 +34,7 @@ type Props = { order: ServiceOrder };
 export function ServiceOrderTimeControl({ order }: Props) {
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
   const { user } = useAuth();
-  const { isTecnico } = useUserRole();
+  const { isTecnico, isAdmin } = useUserRole();
   const myTechId = useMemo(
     () => (user ? (technicians.find((t) => t.user_id === user.id)?.id ?? null) : null),
     [technicians, user],
@@ -74,6 +75,12 @@ export function ServiceOrderTimeControl({ order }: Props) {
     return () => window.clearInterval(t);
   }, [sessions]);
   void tick;
+
+  const [editingSession, setEditingSession] = useState<TimeSession | null>(null);
+  const editingTechName = useMemo(() => {
+    if (!editingSession?.technician_id) return null;
+    return technicians.find((t) => t.id === editingSession.technician_id)?.full_name ?? null;
+  }, [editingSession, technicians]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["order-time-sessions", order.id] });
@@ -371,7 +378,13 @@ export function ServiceOrderTimeControl({ order }: Props) {
           <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             Histórico
           </p>
-          <ServiceOrderTimeHistory sessions={sessions} technicians={technicians} />
+          <ServiceOrderTimeHistory
+            sessions={sessions}
+            technicians={technicians}
+            editableTechnicianId={myTechId}
+            allowAllEdits={isAdmin}
+            onEditSession={setEditingSession}
+          />
         </div>
       )}
 
@@ -384,6 +397,14 @@ export function ServiceOrderTimeControl({ order }: Props) {
         onConfirm={({ reason, notes }) =>
           pauseTech && pauseMut.mutate({ technicianId: pauseTech, reason, notes })
         }
+      />
+
+      <EditTimeSessionSheet
+        open={!!editingSession}
+        onOpenChange={(o) => !o && setEditingSession(null)}
+        session={editingSession}
+        orderId={order.id}
+        technicianName={editingTechName}
       />
     </GlassCard>
   );
