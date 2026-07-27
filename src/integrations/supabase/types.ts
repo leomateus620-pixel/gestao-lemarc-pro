@@ -2385,6 +2385,20 @@ export type Database = {
         Args: { _idempotency_key: string; _order_id: string }
         Returns: Json
       }
+      wire_tray_create_production_order: {
+        Args: {
+          _destination_location_id: string
+          _idempotency_key: string
+          _order_item_id: string
+          _planned_completion_date: string
+          _planned_quantity: number
+          _priority: Database["public"]["Enums"]["service_priority"]
+          _product_id: string
+          _responsible_user_id: string
+          _technical_instructions: string
+        }
+        Returns: Json
+      }
       wire_tray_current_role: {
         Args: never
         Returns: Database["public"]["Enums"]["wire_tray_module_role"]
@@ -2392,6 +2406,15 @@ export type Database = {
       wire_tray_current_role_in: {
         Args: { _roles: Database["public"]["Enums"]["wire_tray_module_role"][] }
         Returns: boolean
+      }
+      wire_tray_dispatch_order: {
+        Args: {
+          _idempotency_key: string
+          _order_id: string
+          _receipt_document_id: string
+          _transport_note: string
+        }
+        Returns: Json
       }
       wire_tray_document_entity_exists: {
         Args: { _entity_id: string; _entity_type: string }
@@ -2435,6 +2458,43 @@ export type Database = {
           user_id: string
         }[]
       }
+      wire_tray_mark_billed: {
+        Args: {
+          _billing_notes: string
+          _invoice_reference: string
+          _order_id: string
+        }
+        Returns: Json
+      }
+      wire_tray_mark_notification_read: {
+        Args: { _dismiss?: boolean; _notification_id: string }
+        Returns: boolean
+      }
+      wire_tray_record_production_entry: {
+        Args: {
+          _entry_type: Database["public"]["Enums"]["wire_tray_production_entry_type"]
+          _evidence_document_id: string
+          _idempotency_key: string
+          _notes: string
+          _production_order_id: string
+          _quantity: number
+        }
+        Returns: Json
+      }
+      wire_tray_record_separation: {
+        Args: {
+          _difference_quantity: number
+          _entry_type: Database["public"]["Enums"]["wire_tray_separation_entry_type"]
+          _evidence_document_id: string
+          _idempotency_key: string
+          _order_id: string
+          _order_item_id: string
+          _quantity: number
+          _reason: string
+          _resolves_entry_id: string
+        }
+        Returns: Json
+      }
       wire_tray_record_stock_movement: {
         Args: {
           _destination_location_id: string
@@ -2448,9 +2508,17 @@ export type Database = {
         }
         Returns: Json
       }
+      wire_tray_release_for_dispatch: {
+        Args: { _order_id: string }
+        Returns: Json
+      }
       wire_tray_release_order_reservations_internal: {
         Args: { _order_id: string; _reason: string }
         Returns: number
+      }
+      wire_tray_release_reservation: {
+        Args: { _reason: string; _reservation_id: string }
+        Returns: Json
       }
       wire_tray_save_order_draft: {
         Args: { _idempotency_key: string; _order_id: string; _payload: Json }
