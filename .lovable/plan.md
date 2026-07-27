@@ -1,94 +1,134 @@
-
 ## Objetivo
-Substituir o wizard de 4 etapas do cadastro/edição de produtos em "Leitos Aramados → Produtos" por uma única tela responsiva, remover campos não operacionais, fixar unidade como `un`, e corrigir bug de campos numéricos que restauram `1` automaticamente. Preservar rotas, dados existentes, permissões e integração Supabase.
 
-## Escopo (o que muda)
-Apenas arquivos ligados ao cadastro/edição de produtos:
-- `src/components/leitos/pages/ProductsPage.tsx` — reescrever `WireTrayProductFormPage` (wizard) como formulário único.
-- `src/lib/wireTrays/schemas.ts` — ajustar `wireTrayProductInputSchema` (SKU/unit opcionais, unit default `"piece"` internamente, remover exigências).
-- `src/lib/api/wireTrayProducts.functions.ts` — garantir que unit sempre persiste como `"piece"` (rótulo interno de `un`), aceitar payload sem campos removidos.
-- Testes: `src/lib/wireTrays/schemas.test.ts` + novo teste de UI focado no comportamento numérico.
+Permitir que técnicos editem, direto no bloco "Histórico" do "Controle de tempo da OS", **os próprios apontamentos de tempo** (início / fim / pausa / retomada), reutilizando o mesmo fluxo de recálculo já usado pela "Apuração de horas". Origem única da verdade: `service_order_time_sessions` → materializa `service_order_labor_entries` → recomputa `service_order_financials` e `service_orders.worked_minutes`.
 
-Não muda: autenticação, OS, outras telas do módulo (dashboard, pedidos, produção, estoque), listagem de produtos (continua exibindo SKU quando existir, "Sem SKU" quando null — já suportado), detalhes de produto, políticas RLS, migrações estruturais.
+## Fonte da verdade confirmada
 
-## Mapeamento "unidade"
-O enum atual de unidades no banco é `piece | meter | kilogram | set` e `wireTrayUnitLabel.piece = "un"`. Portanto "un" já corresponde a `piece`. Solução: fixar internamente `unit: "piece"` em todo produto criado/editado pelo novo formulário; não expor seletor. Produtos legados com outra unidade preservam o valor no banco (edição não sobrescreve unless o form envia — enviaremos `"piece"` apenas em NOVOS; em edição, preservar unit atual sem exibir seletor).
+- `service_order_time_sessions` (append-only, com `duration_minutes` GERADO pelo banco): registra `work`/`displacement`, `started_at`, `ended_at`, `end_reason` (`pause`|`finish`), `pause_reason/notes`.
+- `service_order_labor_entries`: materializado a partir das sessões em `getOrderFinancials` quando `labor_entries_adjusted_at` é nulo; após primeiro ajuste, torna-se a cópia canônica editável.
+- `service_order_financials` + `service_orders.worked_minutes/hour_rate`: recomputados por `recomputeOrderTotals()`.
+- Já existe RLS na tabela de sessões: `UPDATE` permitido para `created_by = auth.uid()` OU admin. **Precisa ser fortalecido** para exigir também que o técnico seja o dono da sessão (ver §5).
 
-Decisão: em edição, manter `unit` original do produto carregado (não alterar). Em criação, forçar `"piece"`. Isso preserva histórico e satisfaz "unit fixa `un` para novos".
+## Escopo
 
-## Campos removidos da UI
-Do formulário (não do banco):
-- SKU
-- Seletor de unidade
-- Notas técnicas
-- Local padrão
-- Estoque-alvo
-- Observações de reposição
+**Alterar:** `service_order_time_sessions` (política RLS + coluna de auditoria), `timeSessions.functions.ts` (nova server fn), `financials.functions.ts` (helper reutilizável de recompute), `ServiceOrderTimeHistory.tsx`, `ServiceOrderTimeControl.tsx`, novo diálogo/bottom-sheet, testes.
 
-Colunas do banco permanecem; server function envia `null`/valor atual conforme apropriado:
-- Em criação: SKU=null, technicalNotes=null, defaultLocationId=null, targetStock=null, replenishmentNotes=null.
-- Em edição: preservar valores existentes desses campos (não sobrescrever com null) — carregar do produto atual e reenviar inalterados no payload.
+**NÃO alterar:** autenticação, rotas, "Apuração de horas" (`LaborEntriesEditor`), fluxo start/pause/resume/finish, módulo Leitos Aramados, cadastros.
 
-## Schema (Zod)
-`wireTrayProductInputSchema`:
-- `sku`, `technicalNotes`, `defaultLocationId`, `targetStock`, `replenishmentNotes` continuam opcionais/nullable (já são).
-- `unit` continua obrigatório no schema, mas o form controla o valor internamente.
-- Remover `superRefine` do targetStock≥minimum quando targetStock=null (já ok — refine já ignora null).
-- Numéricos (`widthMm`, `heightMm`, `lengthMm`, `minimumStock`, `minimumProductionBatch`): manter validação (não-negativos; batch > 0).
+## 1. Backend — server function `updateOwnTimeSession`
 
-## Correção do bug numérico
-Causa: `NumberField` provavelmente usa `Number(value) || 1` ou converte string vazia direto para número em cada keystroke. Correção:
-- Estado local do campo como `string` (`""` permitido durante edição).
-- `onChange`: aceitar string bruta, apenas filtrar caracteres inválidos (regex `^-?\d*[.,]?\d*$`).
-- `onBlur`: parse para número; se vazio → `null` (ou `0` para minimumStock que é obrigatório ≥0); se batch vazio ao submeter e replenishment automático ativo → erro de validação.
-- Não usar `|| 1` nem `|| 0` durante digitação.
-- `inputMode="decimal"`, `type="text"` para evitar comportamento inconsistente entre navegadores (ou `type="number"` sem fallback lógico).
-- Validação exibida no blur/submit, não a cada tecla.
+Novo arquivo/adição em `src/lib/api/timeSessions.functions.ts`:
 
-Aplicar a todos os campos numéricos do form.
-
-## Layout novo (tela única)
-
-```text
-[Header: eyebrow "Cadastro industrial" · título · descrição · badge status (edição)]
-
-┌─ Identificação ────────────────────────────────────┐
-│ Nome do produto*        │ Categoria*               │
-│ Situação (ativo/inativo)│                          │
-│ Descrição curta (full width)                       │
-├─ Especificações físicas ───────────────────────────┤
-│ Largura │ Altura │ Comprimento (mm)               │
-│ Material            │ Acabamento                   │
-├─ Estoque e produção ───────────────────────────────┤
-│ Estoque mínimo      │ Lote mínimo de produção     │
-│ [ ] Reposição automática                           │
-├─ Anexos (se WireTrayDocuments já suporta edição)   │
-│ imagem/desenho técnico                             │
-└─ Ações (sticky no mobile) ─────────────────────────┘
-  [Cancelar]  [Cadastrar produto / Salvar alterações]
+```ts
+updateOwnTimeSession({
+  sessionId, started_at, ended_at?, pause_reason?, pause_notes?, reason: string
+})
 ```
 
-Desktop: grid 2 colunas dentro de cada seção; container `max-w-4xl` centralizado.
-Mobile: coluna única, `pb-24` para não sobrepor bottom nav, ações sticky ou próximas ao final com safe-area.
+Fluxo transacional:
+1. `requireSupabaseAuth` (bearer obrigatório).
+2. Resolver técnico pelo `user_id` autenticado (`technicians.user_id = auth.uid()`).
+3. Carregar sessão; abortar se `technician_id !== meuTechId`.
+4. Confirmar que o técnico está vinculado à OS via `service_order_technicians` OU `service_orders.technician_id`.
+5. Bloquear se OS estiver `finished` / `approved` / `cancelled` ou se `service_order_financials.finalized_at IS NOT NULL` → retorna erro amigável "OS encerrada — solicite ao administrador".
+6. Não permitir "fechar" uma sessão aberta pela edição (`ended_at` só editável se já existia); não permitir mudar `kind`.
+7. Validar: `started_at < ended_at`; sem sobreposição com outra sessão `work` do mesmo técnico na mesma OS (excluindo a própria).
+8. Persistir campos permitidos + `source='admin_adjustment'` (marca como ajuste) + nova coluna `adjusted_by`, `adjusted_at`, `adjustment_reason` (ver §2).
+9. Chamar `syncLaborEntriesFromSessions(orderId)` (extraído da lógica existente em `getOrderFinancials`) — regrava `labor_entries` derivadas, **desde que** `financials.labor_entries_adjusted_at` seja `NULL` (mesma regra atual: se admin já ajustou manualmente, retorna erro pedindo para o admin editar via Apuração de horas).
+10. `recomputeOrderTotals()` (já existente).
+11. Retornar sessão normalizada.
 
-Reusar tokens/utilitários `wire-*` existentes (`wire-input`, `wire-select`, `wire-field`, `wire-label`, `WirePanel`, `WirePageHeader`). Sem stepper, sem "Próximo/Voltar/Revisão".
+Observações:
+- A `duration_minutes` da sessão é **coluna gerada** — nada a persistir manualmente.
+- Concorrência: `UPDATE ... WHERE id = ? AND updated_at = ?` para evitar overwrite silencioso; senão erro "O registro foi alterado por outro usuário. Atualize a tela e tente novamente."
 
-## Mutation e navegação
-Mantém `useMutation` + `saveWireTrayProduct`. Após sucesso: invalidar mesmas queries de hoje e navegar para detalhe (`/leitos/produtos/$productId`). Botão de submit desabilitado enquanto `mutation.isPending` para evitar duplo envio. Guard de "unsaved changes" via `beforeunload` quando `dirty`.
+## 2. Migração (mínima e aditiva)
 
-## Anexos
-`WireTrayDocuments` do produto já existe na página de detalhe; **não vou embutir upload no form** nesta iteração para manter escopo (o usuário mantém upload pela tela de detalhe, como hoje). Deixarei uma seção "Anexos" no form apenas se já houver componente pronto de attach por produto pré-persistência — inspecionarei em build mode; se não houver, mantenho como está e o item é opcional conforme spec ("if already supported").
+```sql
+ALTER TABLE public.service_order_time_sessions
+  ADD COLUMN IF NOT EXISTS adjusted_by uuid REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS adjusted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS adjustment_reason text;
+```
 
-## Testes
-- Atualizar `schemas.test.ts`: adicionar teste de que produto válido sem SKU/targetStock/technicalNotes/defaultLocationId passa.
-- Novo teste unitário do input numérico controlado (estado string, blur parse) — teste focado em util/hook se extraído; caso contrário, teste de componente pequeno.
-- Rodar `bunx vitest run` nos arquivos afetados e typecheck (`tsgo`).
+RLS reforçada (substitui a atual `"Authenticated can update own or admin"` — que autorizava qualquer criador; agora exige dono real da sessão OU admin):
 
-## Critérios de aceitação
-- Tela única, sem stepper.
-- Nenhum dos 6 campos removidos aparece.
-- Produtos novos gravam `unit=piece` (rótulo "un").
-- Campos numéricos podem ser apagados completamente sem restauração de `1`.
-- Lista e detalhes continuam funcionando com SKU/campos null (já suportados).
-- Sem mocks; sem alterações fora do escopo.
-- Typecheck, testes e build passam.
+```sql
+DROP POLICY "Authenticated can update own or admin" ON service_order_time_sessions;
+CREATE POLICY "Own technician or admin can update session"
+ON service_order_time_sessions FOR UPDATE TO authenticated
+USING (
+  has_role(auth.uid(),'admin')
+  OR technician_id IN (SELECT id FROM technicians WHERE user_id = auth.uid())
+)
+WITH CHECK (
+  has_role(auth.uid(),'admin')
+  OR technician_id IN (SELECT id FROM technicians WHERE user_id = auth.uid())
+);
+```
+
+Sem `DROP TABLE` / `TRUNCATE`. Nenhuma outra política/tabela impactada.
+
+## 3. Frontend — UI
+
+### `ServiceOrderTimeHistory.tsx`
+- Cada linha do histórico ganha um botão discreto (ícone lápis) **só** quando:
+  - `item.technicianId === myTechId` (ou usuário é admin), e
+  - a OS não está travada, e
+  - o evento corresponde a uma sessão editável (start/pause/finish — ou seja, tem `sessionId`).
+- Passar `sessions` cruas (não só `timeline`) para o componente ou expandir `TimelineItem` com `sessionId`. Ajustar `buildTimeline()` para incluir `sessionId` sem quebrar consumidores atuais.
+- Indicador visual "Horário ajustado" quando `source === 'admin_adjustment'` + `adjusted_at`.
+- Mobile: linha reflow para 2 linhas, botão editar com alvo ≥44px alinhado à direita.
+
+### Novo `EditTimeSessionSheet.tsx`
+- Desktop: `Dialog` compacto. Mobile: `Sheet side="bottom"` full-height com safe-area.
+- Campos: técnico (readonly), data + hora de início, data + hora de término (se `ended_at`), duração calculada em tempo real, motivo (obrigatório se registro histórico), Cancelar / Salvar ajuste.
+- Estado local em string para permitir apagar (evita bug já visto em outros formulários).
+- Validação client-side espelha a do servidor; foco no primeiro campo inválido; loading no botão salvar; evita duplo submit.
+
+### `ServiceOrderTimeControl.tsx`
+- Ao salvar: `invalidateQueries` em `["order-time-sessions", order.id]`, `["order-financials", order.id]`, `["service-order", order.id]`, `["service-orders"]`, `["report-orders"]`, `["client-report"]`, `["technician-labor-history"]` — mesmo conjunto usado pelo LaborEntriesEditor. Sem reload manual.
+
+## 4. Reuso do pipeline "Apuração de horas"
+
+Extrair de `getOrderFinancials` a função pura `syncLaborEntriesFromSessions(sb, orderId, userId)` que:
+- Se `financials.labor_entries_adjusted_at IS NOT NULL` → **não sincroniza** (admin travou); retorna sem erro para o técnico, mas a server fn `updateOwnTimeSession` rejeita a edição com mensagem clara ("Este apontamento já foi consolidado pelo administrador. Solicite ajuste via Apuração de horas.").
+- Caso contrário: regrava `service_order_labor_entries` a partir das sessões fechadas (mesmo algoritmo `deriveEntriesFromSessions` já existente).
+- Chama `recomputeOrderTotals`.
+
+Assim, PDF, relatórios e KPI/dashboard leem a mesma verdade.
+
+## 5. Segurança em camadas
+
+- Cliente: botão só aparece quando `myTechId === session.technician_id` e OS não travada.
+- Server fn: verifica `technicians.user_id = auth.uid()`, propriedade da sessão, vínculo com OS, status permitido.
+- RLS: política reforçada (§2) impede update mesmo que a server fn seja burlada.
+- IDs de técnico **nunca** vêm do cliente; sempre derivados de `auth.uid()`.
+
+## 6. Auditoria
+
+- Colunas novas `adjusted_by / adjusted_at / adjustment_reason` na própria linha (a sessão original é mutada porque `duration_minutes` é gerada; para preservar histórico de valores, gravamos o antes/depois em `metadata` JSONB — já existente):
+  ```json
+  { "adjustments": [{ "at": "...", "by": "user-id", "reason": "...", "before": {"started_at":"...","ended_at":"..."}, "after": {...} }] }
+  ```
+- Histórico visual mostra "Horário ajustado" + data; detalhe (before/after) apenas para admin (já natural, já que só admin vê `metadata` via Apuração/relatórios).
+
+## 7. Testes
+
+- `timeSessions.functions.test.ts` (novo): dono edita própria sessão OK; outro técnico rejeitado; usuário não vinculado à OS rejeitado; OS finalizada rejeitada; sobreposição rejeitada; `ended_at <= started_at` rejeitado; concorrência (updated_at stale) rejeitada; sincroniza `labor_entries`; travamento por `labor_entries_adjusted_at` respeitado.
+- Atualizar `dashboardTechnicianTime.test.ts` se necessário (não deve mudar).
+- Teste visual manual conforme roteiro do usuário (browser via Playwright pós-implementação).
+
+## 8. Aceite
+
+- Técnico edita só as próprias linhas do histórico direto no card de Controle de Tempo.
+- Duração recalcula automaticamente (coluna gerada) e labor_entries + financials + `worked_minutes` + PDF/relatórios refletem imediatamente.
+- Nenhum mock, nenhuma alteração em autenticação/rotas/Apuração de horas.
+- `bun typecheck`, `bun test` focados, e build passam.
+
+## Detalhes técnicos
+
+- `updateOwnTimeSession` fica em `timeSessions.functions.ts` para manter proximidade dos consumidores; `syncLaborEntriesFromSessions` é movido para `src/lib/serviceOrders/laborSync.server.ts` (importado inside handler para evitar leak SSR).
+- `duration_minutes` da sessão continua vindo do banco; o backend só valida start/end antes do UPDATE.
+- Nova coluna `adjustment_reason` é opcional em sessões abertas (correção em tempo real) e obrigatória em sessões fechadas.
+- Nenhuma migração destrutiva; políticas antigas conflitantes removidas explicitamente (`DROP POLICY IF EXISTS`).
