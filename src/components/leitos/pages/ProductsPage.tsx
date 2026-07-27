@@ -848,6 +848,29 @@ function Summary({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <header className="border-b border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+        <h2 className="font-display text-base font-extrabold uppercase tracking-wide text-slate-950 sm:text-lg">
+          {title}
+        </h2>
+        {description ? (
+          <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+        ) : null}
+      </header>
+      <div className="px-5 py-5 sm:px-6">{children}</div>
+    </section>
+  );
+}
 function WireInventoryMetric({
   label,
   value,
