@@ -10,7 +10,8 @@ import type {
 const SELECT = `
   id, service_order_id, technician_id, kind, started_at, ended_at,
   duration_minutes, pause_reason, pause_notes, end_reason, source,
-  notes, metadata, created_by, created_at, updated_at
+  notes, metadata, created_by, created_at, updated_at,
+  adjusted_by, adjusted_at, adjustment_reason
 `;
 
 const DASHBOARD_LABOR_SELECT = `
@@ -36,6 +37,9 @@ function normalize(row: any): TimeSession {
     created_by: row.created_by ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    adjusted_by: row.adjusted_by ?? null,
+    adjusted_at: row.adjusted_at ?? null,
+    adjustment_reason: row.adjustment_reason ?? null,
   };
 }
 
@@ -268,4 +272,227 @@ export const adjustSession = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return normalize(row);
+  });
+
+/**
+ * Technician self-service edit of ONE of their own time sessions.
+ * Validates ownership, OS assignment, allowed status, times and
+ * overlap, then rematerializes labor entries + recomputes financials
+ * so PDF/relatórios stay in sync with the single source of truth.
+ */
+export const updateOwnTimeSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: {
+      sessionId: string;
+      startedAt?: string;
+      endedAt?: string | null;
+      pauseReason?: string | null;
+      pauseNotes?: string | null;
+      reason: string;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const userId = context.userId;
+
+    if (!data.sessionId) throw new Error("Sessão inválida.");
+    if (!data.reason?.trim() || data.reason.trim().length < 3) {
+      throw new Error("Informe um motivo para o ajuste (mín. 3 caracteres).");
+    }
+
+    const { data: isAdmin } = await sb.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+
+    // Load the session (RLS lets the owner or admin see it).
+    const { data: sessionRaw, error: sessErr } = await sb
+      .from("service_order_time_sessions")
+      .select(SELECT)
+      .eq("id", data.sessionId)
+      .maybeSingle();
+    if (sessErr) throw new Error(sessErr.message);
+    if (!sessionRaw) throw new Error("Sessão não encontrada.");
+    const session = normalize(sessionRaw);
+
+    if (session.kind !== "work") {
+      throw new Error("Apenas sessões de trabalho podem ser editadas por aqui.");
+    }
+
+    // Resolve caller technician id.
+    let callerTechnicianId: string | null = null;
+    if (!isAdmin) {
+      const { data: techRow, error: techErr } = await sb
+        .from("technicians")
+        .select("id, active")
+        .eq("user_id", userId)
+        .eq("active", true)
+        .maybeSingle();
+      if (techErr) throw new Error(techErr.message);
+      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+      callerTechnicianId = techRow.id as string;
+      if (session.technician_id !== callerTechnicianId) {
+        throw new Error("Você só pode editar seus próprios horários.");
+      }
+    }
+
+    // Load the order to gate by status and confirm assignment for non-admins.
+    const { data: order, error: ordErr } = await sb
+      .from("service_orders")
+      .select("id, status, technician_id")
+      .eq("id", session.service_order_id)
+      .maybeSingle();
+    if (ordErr) throw new Error(ordErr.message);
+    if (!order) throw new Error("Ordem de serviço não encontrada.");
+
+    const lockedStatuses = ["approved", "cancelled"];
+    if (lockedStatuses.includes(order.status)) {
+      throw new Error("Esta OS já foi encerrada e não pode ser editada.");
+    }
+
+    if (!isAdmin && callerTechnicianId) {
+      const [{ data: assigned }, isPrimary] = await Promise.all([
+        sb
+          .from("service_order_technicians")
+          .select("id")
+          .eq("service_order_id", order.id)
+          .eq("technician_id", callerTechnicianId)
+          .maybeSingle(),
+        Promise.resolve(order.technician_id === callerTechnicianId),
+      ]);
+      if (!assigned && !isPrimary) {
+        throw new Error("Você não está mais atribuído a esta OS.");
+      }
+    }
+
+    // Validate times.
+    const nextStartedAtIso = data.startedAt ?? session.started_at;
+    if (!nextStartedAtIso) throw new Error("Data/hora de início inválida.");
+    const nextStart = new Date(nextStartedAtIso);
+    if (Number.isNaN(nextStart.getTime())) throw new Error("Data/hora de início inválida.");
+
+    // ended_at handling: preserve open state — a session that was open
+    // cannot be closed via this flow (would falsely conclude the OS).
+    let nextEndedAtIso: string | null = session.ended_at;
+    if (data.endedAt !== undefined) {
+      if (data.endedAt === null) {
+        throw new Error("Não é possível reabrir uma sessão já finalizada.");
+      }
+      if (!session.ended_at) {
+        throw new Error("Sessões em andamento não podem receber horário de fim.");
+      }
+      const parsed = new Date(data.endedAt);
+      if (Number.isNaN(parsed.getTime())) throw new Error("Data/hora de fim inválida.");
+      nextEndedAtIso = parsed.toISOString();
+    }
+
+    if (nextEndedAtIso) {
+      const endMs = new Date(nextEndedAtIso).getTime();
+      if (endMs <= nextStart.getTime()) {
+        throw new Error("O horário de fim precisa ser maior que o de início.");
+      }
+      if (endMs - nextStart.getTime() > 24 * 60 * 60 * 1000) {
+        throw new Error("Uma sessão não pode passar de 24 horas.");
+      }
+    }
+
+    const nowMs = Date.now();
+    if (nextStart.getTime() > nowMs + 60_000) {
+      throw new Error("Data de início no futuro não é permitida.");
+    }
+    if (nextEndedAtIso && new Date(nextEndedAtIso).getTime() > nowMs + 60_000) {
+      throw new Error("Data de fim no futuro não é permitida.");
+    }
+
+    // Overlap with other work sessions of the same technician on this OS.
+    const { data: siblings, error: sibErr } = await sb
+      .from("service_order_time_sessions")
+      .select("id, started_at, ended_at, kind, technician_id")
+      .eq("service_order_id", session.service_order_id)
+      .eq("technician_id", session.technician_id)
+      .eq("kind", "work")
+      .neq("id", session.id);
+    if (sibErr) throw new Error(sibErr.message);
+
+    const startMs = nextStart.getTime();
+    const endMs = nextEndedAtIso ? new Date(nextEndedAtIso).getTime() : Number.POSITIVE_INFINITY;
+    for (const s of siblings ?? []) {
+      const sStart = new Date(s.started_at).getTime();
+      const sEnd = s.ended_at ? new Date(s.ended_at).getTime() : Number.POSITIVE_INFINITY;
+      if (sStart < endMs && sEnd > startMs) {
+        throw new Error("O horário informado se sobrepõe a outra sessão sua nesta OS.");
+      }
+    }
+
+    // Pause fields: only meaningful when this session was closed with "pause".
+    const patch: Record<string, unknown> = {
+      started_at: nextStart.toISOString(),
+      adjusted_by: userId,
+      adjusted_at: new Date().toISOString(),
+      adjustment_reason: data.reason.trim().slice(0, 500),
+    };
+    if (data.endedAt !== undefined && nextEndedAtIso) {
+      patch.ended_at = nextEndedAtIso;
+    }
+    if (session.end_reason === "pause") {
+      if (data.pauseReason !== undefined) patch.pause_reason = data.pauseReason;
+      if (data.pauseNotes !== undefined) patch.pause_notes = data.pauseNotes;
+    }
+
+    // Append before/after snapshot to metadata.adjustments for audit trail.
+    const prevMeta = (session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata))
+      ? (session.metadata as Record<string, unknown>)
+      : {};
+    const prevAdjustments = Array.isArray((prevMeta as any).adjustments)
+      ? ((prevMeta as any).adjustments as unknown[])
+      : [];
+    const nextMeta = {
+      ...prevMeta,
+      adjustments: [
+        ...prevAdjustments,
+        {
+          at: new Date().toISOString(),
+          by_user_id: userId,
+          by_admin: !!isAdmin,
+          reason: data.reason.trim().slice(0, 500),
+          before: {
+            started_at: session.started_at,
+            ended_at: session.ended_at,
+            pause_reason: session.pause_reason,
+            pause_notes: session.pause_notes,
+          },
+          after: {
+            started_at: patch.started_at,
+            ended_at: patch.ended_at ?? session.ended_at,
+            pause_reason:
+              (patch.pause_reason as string | null | undefined) ?? session.pause_reason,
+            pause_notes:
+              (patch.pause_notes as string | null | undefined) ?? session.pause_notes,
+          },
+        },
+      ],
+    };
+    patch.metadata = nextMeta;
+
+    const { data: updated, error: updErr } = await sb
+      .from("service_order_time_sessions")
+      .update(patch)
+      .eq("id", session.id)
+      .select(SELECT)
+      .single();
+    if (updErr) throw new Error(updErr.message);
+
+    // Sync labor entries + recompute financials from sessions.
+    const { syncLaborEntriesFromSessions } = await import(
+      "@/lib/serviceOrders/laborSync.server"
+    );
+    const outcome = await syncLaborEntriesFromSessions(sb, session.service_order_id, userId);
+    if (!outcome.synced) {
+      throw new Error(
+        "Esta OS está com apuração consolidada pelo administrador. Solicite o ajuste ao gestor.",
+      );
+    }
+
+    return normalize(updated);
   });
