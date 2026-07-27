@@ -29,6 +29,10 @@ export type TimeSession = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Audit: last user who adjusted this session (admin or the own tech). */
+  adjusted_by?: string | null;
+  adjusted_at?: string | null;
+  adjustment_reason?: string | null;
 };
 
 export type TechnicianTimeState = {
