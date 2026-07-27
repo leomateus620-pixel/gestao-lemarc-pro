@@ -273,6 +273,7 @@ export interface WireTrayMovement {
   newReserved: number;
   reason: string;
   orderId: string | null;
+  productionOrderId: string | null;
   createdAt: string;
 }
 
@@ -297,6 +298,7 @@ export interface WireTrayAccessUser {
 }
 
 export interface WireTrayDashboardData {
+  hasProducts: boolean;
   metrics: {
     activeOrders: number;
     productionOrders: number;

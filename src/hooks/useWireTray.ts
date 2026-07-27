@@ -41,19 +41,34 @@ import type {
   WireTrayProductionFormOptions,
   WireTrayProductionSummary,
 } from "@/types/wireTray";
+import { shouldRetryWireTrayQuery, wireTrayRetryDelay } from "@/lib/wireTrays/errors";
+
+const wireTrayQueryPolicy = {
+  retry: shouldRetryWireTrayQuery,
+  retryDelay: wireTrayRetryDelay,
+  refetchOnWindowFocus: false,
+} as const;
 
 export const wireTrayKeys = {
   all: ["wire-trays"] as const,
   dashboard: ["wire-trays", "dashboard"] as const,
+  productLists: ["wire-trays", "products"] as const,
   products: (filters: unknown) => ["wire-trays", "products", filters] as const,
+  productDetails: ["wire-trays", "product"] as const,
   product: (id: string) => ["wire-trays", "product", id] as const,
   locations: ["wire-trays", "locations"] as const,
+  inventoryLists: ["wire-trays", "inventory"] as const,
   inventory: (filters: unknown) => ["wire-trays", "inventory", filters] as const,
+  movementLists: ["wire-trays", "movements"] as const,
   movements: (filters: unknown) => ["wire-trays", "movements", filters] as const,
+  orderLists: ["wire-trays", "orders"] as const,
   orders: (filters: unknown) => ["wire-trays", "orders", filters] as const,
+  orderDetails: ["wire-trays", "order"] as const,
   order: (id: string) => ["wire-trays", "order", id] as const,
   orderOptions: ["wire-trays", "order-options"] as const,
+  productionLists: ["wire-trays", "production"] as const,
   production: (filters: unknown) => ["wire-trays", "production", filters] as const,
+  productionDetails: ["wire-trays", "production-detail"] as const,
   productionDetail: (id: string) => ["wire-trays", "production-detail", id] as const,
   productionOptions: ["wire-trays", "production-options"] as const,
   separation: ["wire-trays", "separation"] as const,
@@ -65,7 +80,12 @@ export const wireTrayKeys = {
 export function useWireTrayDashboardQuery() {
   const fetcher = useServerFn(getWireTrayDashboard);
   return useQuery(
-    queryOptions({ queryKey: wireTrayKeys.dashboard, queryFn: () => fetcher(), staleTime: 20_000 }),
+    queryOptions({
+      ...wireTrayQueryPolicy,
+      queryKey: wireTrayKeys.dashboard,
+      queryFn: () => fetcher(),
+      staleTime: 20_000,
+    }),
   );
 }
 
@@ -78,6 +98,7 @@ export function useWireTrayProductsQuery(filters: {
 }) {
   const fetcher = useServerFn(listWireTrayProducts);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.products(filters),
     queryFn: () => fetcher({ data: filters }) as Promise<PaginatedResult<WireTrayProduct>>,
     placeholderData: keepPreviousData,
@@ -88,6 +109,7 @@ export function useWireTrayProductsQuery(filters: {
 export function useWireTrayProductQuery(id: string) {
   const fetcher = useServerFn(getWireTrayProductDetail);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.product(id),
     queryFn: () => fetcher({ data: { id } }) as Promise<WireTrayProductDetailData | null>,
     enabled: Boolean(id),
@@ -97,6 +119,7 @@ export function useWireTrayProductQuery(id: string) {
 export function useWireTrayLocationsQuery() {
   const fetcher = useServerFn(listWireTrayLocations);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.locations,
     queryFn: () => fetcher() as Promise<WireTrayLocation[]>,
     staleTime: 60_000,
@@ -111,6 +134,7 @@ export function useWireTrayInventoryQuery(filters: {
 }) {
   const fetcher = useServerFn(listWireTrayInventory);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.inventory(filters),
     queryFn: () => fetcher({ data: filters }) as Promise<PaginatedResult<WireTrayInventoryRow>>,
     placeholderData: keepPreviousData,
@@ -121,11 +145,14 @@ export function useWireTrayMovementsQuery(filters: {
   search: string;
   type?: string;
   productId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page: number;
   pageSize: number;
 }) {
   const fetcher = useServerFn(listWireTrayMovements);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.movements(filters),
     queryFn: () => fetcher({ data: filters }) as Promise<PaginatedResult<WireTrayMovement>>,
     placeholderData: keepPreviousData,
@@ -136,11 +163,13 @@ export function useWireTrayOrdersQuery(filters: {
   search: string;
   status?: string;
   priority?: string;
+  sort?: "newest" | "oldest" | "delivery";
   page: number;
   pageSize: number;
 }) {
   const fetcher = useServerFn(listWireTrayOrders);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.orders(filters),
     queryFn: () => fetcher({ data: filters }) as Promise<PaginatedResult<WireTrayOrderSummary>>,
     placeholderData: keepPreviousData,
@@ -150,6 +179,7 @@ export function useWireTrayOrdersQuery(filters: {
 export function useWireTrayOrderQuery(id: string) {
   const fetcher = useServerFn(getWireTrayOrderDetail);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.order(id),
     queryFn: () => fetcher({ data: { id } }) as Promise<WireTrayOrderDetail | null>,
     enabled: Boolean(id),
@@ -159,6 +189,7 @@ export function useWireTrayOrderQuery(id: string) {
 export function useWireTrayOrderOptionsQuery() {
   const fetcher = useServerFn(getWireTrayOrderFormOptions);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.orderOptions,
     queryFn: () => fetcher() as Promise<WireTrayOrderFormOptions>,
     staleTime: 30_000,
@@ -175,6 +206,7 @@ export function useWireTrayProductionQuery(filters: {
 }) {
   const fetcher = useServerFn(listWireTrayProduction);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.production(filters),
     queryFn: () =>
       fetcher({ data: filters }) as Promise<PaginatedResult<WireTrayProductionSummary>>,
@@ -185,6 +217,7 @@ export function useWireTrayProductionQuery(filters: {
 export function useWireTrayProductionDetailQuery(id: string) {
   const fetcher = useServerFn(getWireTrayProductionDetail);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.productionDetail(id),
     queryFn: () => fetcher({ data: { id } }) as Promise<WireTrayProductionDetailData | null>,
     enabled: Boolean(id),
@@ -194,6 +227,7 @@ export function useWireTrayProductionDetailQuery(id: string) {
 export function useWireTrayProductionOptionsQuery() {
   const fetcher = useServerFn(listWireTrayProductionFormOptions);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.productionOptions,
     queryFn: () => fetcher() as Promise<WireTrayProductionFormOptions>,
     staleTime: 30_000,
@@ -203,6 +237,7 @@ export function useWireTrayProductionOptionsQuery() {
 export function useWireTraySeparationQuery() {
   const fetcher = useServerFn(listWireTraySeparationQueue);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.separation,
     queryFn: () => fetcher(),
     staleTime: 10_000,
@@ -212,16 +247,17 @@ export function useWireTraySeparationQuery() {
 export function useWireTrayBillingQuery() {
   const fetcher = useServerFn(listWireTrayBillingQueue);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.billing,
     queryFn: () => fetcher(),
     staleTime: 10_000,
-    retry: false,
   });
 }
 
 export function useWireTrayNotificationsQuery() {
   const fetcher = useServerFn(listWireTrayNotifications);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.notifications,
     queryFn: () => fetcher(),
     staleTime: 15_000,
@@ -231,6 +267,7 @@ export function useWireTrayNotificationsQuery() {
 export function useWireTrayAccessUsersQuery(enabled: boolean) {
   const fetcher = useServerFn(listWireTrayAccessUsers);
   return useQuery({
+    ...wireTrayQueryPolicy,
     queryKey: wireTrayKeys.accessUsers,
     queryFn: () => fetcher() as Promise<WireTrayAccessUser[]>,
     enabled,

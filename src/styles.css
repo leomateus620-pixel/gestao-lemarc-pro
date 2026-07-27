@@ -2913,17 +2913,16 @@
   --wire-navy: #101c2e;
   --wire-border: #dce2e9;
   color: #172033;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)),
-    radial-gradient(circle at 80% 0%, rgba(234, 88, 12, 0.11), transparent 34%), #eef1f4;
+  background: #f3f5f7;
 }
 
 .wire-sidebar {
+  display: none;
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 45;
   width: var(--wire-sidebar-width);
-  background: linear-gradient(180deg, #121f33 0%, #0c1626 100%);
+  background: #101c2e;
   box-shadow: 16px 0 45px -28px rgba(15, 23, 42, 0.68);
   transition: width 180ms ease;
 }
@@ -3254,6 +3253,49 @@
   border-radius: 0.9rem;
 }
 
+.wire-loading-state {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  min-height: 290px;
+  align-content: start;
+  border: 1px solid #dce2e9;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem;
+}
+.wire-loading-heading {
+  display: grid;
+  gap: 0.65rem;
+  padding-block: 0.35rem 0.55rem;
+}
+.wire-loading-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.wire-loading-panels,
+.wire-loading-form-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+.wire-skeleton {
+  display: block;
+  max-width: 100%;
+  border-radius: 0.8rem;
+  background: #e8edf2;
+  animation: wire-skeleton-pulse 1.25s ease-in-out infinite alternate;
+}
+
+@keyframes wire-skeleton-pulse {
+  from {
+    opacity: 0.68;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .wire-button-primary,
 .wire-button-secondary,
 .wire-button-danger,
@@ -3340,6 +3382,10 @@
 .wire-textarea:focus {
   border-color: #c95313;
   box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+.wire-root :where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(234, 88, 12, 0.28);
+  outline-offset: 2px;
 }
 .wire-input::placeholder,
 .wire-textarea::placeholder {
@@ -3594,9 +3640,21 @@
   .wire-metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .wire-loading-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .wire-loading-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .wire-filterbar {
     grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(150px, 0.35fr));
     align-items: end;
+  }
+  .wire-filterbar-movements {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wire-filterbar-orders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .wire-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3608,6 +3666,13 @@
 }
 
 @media (min-width: 1024px) {
+  .wire-sidebar {
+    display: flex;
+  }
+  .wire-mobile-nav,
+  .wire-mobile-menu-backdrop {
+    display: none;
+  }
   .wire-content-shell {
     margin-left: var(--wire-sidebar-width);
   }
@@ -3623,11 +3688,26 @@
   .wire-metric-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
+  .wire-loading-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .wire-filterbar-movements {
+    grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(145px, 0.55fr));
+  }
+  .wire-filterbar-orders {
+    grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(150px, 0.4fr));
+  }
   .wire-detail-grid {
     grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.75fr);
   }
   .wire-form-footer {
     bottom: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .wire-loading-panels {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   }
 }
 
@@ -3669,5 +3749,8 @@
   .wire-nav-link,
   .wire-module-switch {
     transition: none;
+  }
+  .wire-skeleton {
+    animation: none;
   }
 }

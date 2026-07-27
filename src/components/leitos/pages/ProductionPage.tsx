@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -28,6 +28,7 @@ import {
   WirePager,
   WirePanel,
   WireProgress,
+  WireRestrictedState,
   WireStatus,
   formatWireDate,
   formatWireQuantity,
@@ -44,6 +45,7 @@ import {
   recordWireTrayProductionEntry,
 } from "@/lib/api/wireTrayProduction.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import {
   wireTrayProductionOriginLabel,
   wireTrayProductionStatusLabel,
@@ -170,9 +172,9 @@ export function WireTrayProductionPage() {
                   {query.data!.rows.map((op) => (
                     <tr key={op.id}>
                       <td>
-                        <a href={`/leitos/producao/${op.id}`} className="wire-table-link">
+                        <Link to={`/leitos/producao/${op.id}` as never} className="wire-table-link">
                           #{op.number}
-                        </a>
+                        </Link>
                         <p className="mt-1 text-xs text-slate-500">{priorities[op.priority]}</p>
                       </td>
                       <td>
@@ -209,7 +211,11 @@ export function WireTrayProductionPage() {
             </div>
             <div className="wire-mobile-list md:hidden">
               {query.data!.rows.map((op) => (
-                <a href={`/leitos/producao/${op.id}`} key={op.id} className="wire-mobile-card">
+                <Link
+                  to={`/leitos/producao/${op.id}` as never}
+                  key={op.id}
+                  className="wire-mobile-card"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-slate-950">
@@ -229,7 +235,7 @@ export function WireTrayProductionPage() {
                     {formatWireQuantity(op.produced)} produzido(s) de{" "}
                     {formatWireQuantity(op.planned)}
                   </p>
-                </a>
+                </Link>
               ))}
             </div>
             <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
@@ -253,6 +259,8 @@ export function WireTrayProductionPage() {
 }
 
 export function WireTrayProductionFormPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const access = useWireTrayAccess();
   const options = useWireTrayProductionOptionsQuery();
   const create = useServerFn(createWireTrayProduction);
@@ -276,10 +284,15 @@ export function WireTrayProductionFormPage() {
       create({ data: { ...form, responsibleUserId: null, idempotencyKey: crypto.randomUUID() } }),
     onSuccess: (result) => {
       toast.success("Ordem de produção criada.");
-      window.location.assign(`/leitos/producao/${result.id}`);
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionDetail(result.id) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+      navigate({ to: "/leitos/producao/$productionId", params: { productionId: result.id } });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível criar a OP."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível criar a OP.")),
   });
   const selectedProduct = options.data?.products.find(
     (product: { id: string }) => product.id === form.productId,
@@ -296,12 +309,10 @@ export function WireTrayProductionFormPage() {
   }, [form.productId, options.data]);
   if (!canOperate)
     return (
-      <WireErrorState
-        title="Acesso restrito"
-        error={new Error("Seu perfil não permite planejar ordens de produção.")}
-      />
+      <WireRestrictedState description="Seu perfil não permite planejar ordens de produção." />
     );
-  if (options.isLoading) return <WireLoadingState label="Carregando opções de produção..." />;
+  if (options.isLoading)
+    return <WireLoadingState label="Carregando opções de produção..." variant="form" />;
   if (options.isError)
     return <WireErrorState error={options.error} onRetry={() => options.refetch()} />;
   function chooseShortage(value: string) {
@@ -528,12 +539,23 @@ export function WireTrayProductionDetailPage({ productionId }: { productionId: s
       setAction(null);
       setQuantity(0);
       setNotes("");
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionDetail(productionId) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.separation });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
+      if (query.data?.production.orderId)
+        queryClient.invalidateQueries({
+          queryKey: wireTrayKeys.order(query.data.production.orderId),
+        });
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Apontamento recusado."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Apontamento recusado.")),
   });
-  if (query.isLoading) return <WireLoadingState label="Consolidando ordem de produção..." />;
+  if (query.isLoading)
+    return <WireLoadingState label="Consolidando ordem de produção..." variant="detail" />;
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
   if (!query.data)
     return (
@@ -692,12 +714,12 @@ export function WireTrayProductionDetailPage({ productionId }: { productionId: s
               <Summary label="Prioridade" value={priorities[production.priority]} />
             </div>
             {production.orderId ? (
-              <a
-                href={`/leitos/pedidos/${production.orderId}`}
+              <Link
+                to={`/leitos/pedidos/${production.orderId}` as never}
                 className="wire-button-ghost mx-4 mb-4"
               >
                 Abrir pedido <ArrowRight size={15} />
-              </a>
+              </Link>
             ) : null}
           </WirePanel>
           <WirePanel title="Auditoria">

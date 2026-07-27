@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -24,6 +24,7 @@ import {
   WirePageHeader,
   WirePager,
   WirePanel,
+  WireRestrictedState,
   WireStatus,
   formatWireDate,
   formatWireQuantity,
@@ -37,6 +38,7 @@ import {
 } from "@/hooks/useWireTray";
 import { saveWireTrayProduct } from "@/lib/api/wireTrayProducts.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import { wireTrayProductInputSchema, type WireTrayProductInput } from "@/lib/wireTrays/schemas";
 import {
   wireTrayCategoryLabel,
@@ -180,9 +182,9 @@ function ProductRow({ product }: { product: WireTrayProduct }) {
   return (
     <tr>
       <td>
-        <a href={`/leitos/produtos/${product.id}`} className="wire-table-link">
+        <Link to={`/leitos/produtos/${product.id}` as never} className="wire-table-link">
           {product.name}
-        </a>
+        </Link>
         <p className="mt-1 text-xs text-slate-500">{product.sku ?? "Sem SKU"}</p>
       </td>
       <td>{wireTrayCategoryLabel[product.category]}</td>
@@ -205,7 +207,7 @@ function ProductRow({ product }: { product: WireTrayProduct }) {
 
 function ProductCard({ product }: { product: WireTrayProduct }) {
   return (
-    <a href={`/leitos/produtos/${product.id}`} className="wire-mobile-card">
+    <Link to={`/leitos/produtos/${product.id}` as never} className="wire-mobile-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-bold text-slate-950">{product.name}</p>
@@ -223,11 +225,12 @@ function ProductCard({ product }: { product: WireTrayProduct }) {
           Mín. {formatWireQuantity(product.minimumStock, wireTrayUnitLabel[product.unit])}
         </span>
       </div>
-    </a>
+    </Link>
   );
 }
 
 export function WireTrayProductFormPage({ productId }: { productId?: string }) {
+  const navigate = useNavigate();
   const access = useWireTrayAccess();
   const canManage = hasWireTrayPermission(access.role, "manage_products", access.financialAccess);
   const productQuery = useWireTrayProductQuery(productId ?? "");
@@ -267,25 +270,27 @@ export function WireTrayProductFormPage({ productId }: { productId?: string }) {
   const mutation = useMutation({
     mutationFn: () => save({ data: wireTrayProductInputSchema.parse(form) }),
     onSuccess: (saved) => {
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.product(saved.id) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderOptions });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionOptions });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
       toast.success(
         productId ? "Produto atualizado com segurança." : "Produto cadastrado com segurança.",
       );
-      window.location.assign(`/leitos/produtos/${saved.id}`);
+      navigate({ to: "/leitos/produtos/$productId", params: { productId: saved.id } });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o produto."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível salvar o produto.")),
   });
 
   if (!canManage)
     return (
-      <WireErrorState
-        title="Acesso restrito"
-        error={new Error("Seu perfil pode consultar produtos, mas não alterar o cadastro técnico.")}
-      />
+      <WireRestrictedState description="Seu perfil pode consultar produtos, mas não alterar o cadastro técnico." />
     );
   if (productId && productQuery.isLoading)
-    return <WireLoadingState label="Carregando produto..." />;
+    return <WireLoadingState label="Carregando produto..." variant="form" />;
   if (productId && productQuery.isError)
     return <WireErrorState error={productQuery.error} onRetry={() => productQuery.refetch()} />;
   if (productId && productQuery.data === null)
@@ -603,7 +608,8 @@ export function WireTrayProductDetailPage({ productId }: { productId: string }) 
   const query = useWireTrayProductQuery(productId);
   const access = useWireTrayAccess();
   const canManage = hasWireTrayPermission(access.role, "manage_products", access.financialAccess);
-  if (query.isLoading) return <WireLoadingState label="Consolidando produto e estoque..." />;
+  if (query.isLoading)
+    return <WireLoadingState label="Consolidando produto e estoque..." variant="detail" />;
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
   if (!query.data)
     return (
@@ -691,8 +697,8 @@ export function WireTrayProductDetailPage({ productId }: { productId: string }) 
             {openOrders.length || production.length ? (
               <div className="divide-y divide-slate-100">
                 {openOrders.map((order) => (
-                  <a
-                    href={`/leitos/pedidos/${order.id}`}
+                  <Link
+                    to={`/leitos/pedidos/${order.id}` as never}
                     className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                     key={order.id}
                   >
@@ -705,11 +711,11 @@ export function WireTrayProductDetailPage({ productId }: { productId: string }) 
                       </p>
                     </div>
                     <ArrowRight size={16} className="text-slate-400" />
-                  </a>
+                  </Link>
                 ))}
                 {production.map((op) => (
-                  <a
-                    href={`/leitos/producao/${op.id}`}
+                  <Link
+                    to={`/leitos/producao/${op.id}` as never}
                     className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                     key={op.id}
                   >
@@ -720,7 +726,7 @@ export function WireTrayProductDetailPage({ productId }: { productId: string }) 
                       </p>
                     </div>
                     <ArrowRight size={16} className="text-slate-400" />
-                  </a>
+                  </Link>
                 ))}
               </div>
             ) : (

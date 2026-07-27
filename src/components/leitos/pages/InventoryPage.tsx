@@ -30,6 +30,7 @@ import {
   triggerWireTrayReplenishment,
 } from "@/lib/api/wireTrayInventory.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import {
   wireTrayUnitLabel,
   type WireTrayInventoryRow,
@@ -217,9 +218,9 @@ function InventoryRow({
   return (
     <tr>
       <td>
-        <a href={`/leitos/estoque/${row.product.id}`} className="wire-table-link">
+        <Link to={`/leitos/estoque/${row.product.id}` as never} className="wire-table-link">
           {row.product.name}
-        </a>
+        </Link>
         <p className="mt-1 text-xs text-slate-500">{row.product.sku ?? "Sem SKU"}</p>
       </td>
       <td>{row.location?.name ?? "Não definido"}</td>
@@ -255,8 +256,8 @@ function InventoryCard({
   const unit = wireTrayUnitLabel[row.product.unit];
   return (
     <article className="wire-mobile-card">
-      <a
-        href={`/leitos/estoque/${row.product.id}`}
+      <Link
+        to={`/leitos/estoque/${row.product.id}` as never}
         className="flex items-start justify-between gap-3"
       >
         <div className="min-w-0">
@@ -268,7 +269,7 @@ function InventoryCard({
         <WireStatus tone={inventoryTone(row.available, row.product.minimumStock)}>
           {healthLabel(row)}
         </WireStatus>
-      </a>
+      </Link>
       <div className="grid grid-cols-3 gap-2 text-xs">
         <StockValue label="Físico" value={formatWireQuantity(row.physical, unit)} />
         <StockValue label="Reservado" value={formatWireQuantity(row.reserved, unit)} />
@@ -293,14 +294,23 @@ export function WireTrayInventoryDetailPage({ productId }: { productId: string }
   const replenishment = useMutation({
     mutationFn: () => trigger({ data: { productId } }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.product(productId) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
+      if (result.productionId)
+        queryClient.invalidateQueries({
+          queryKey: wireTrayKeys.productionDetail(result.productionId),
+        });
       if (result.productionId) toast.success("Ordem de reposição criada.");
       else toast.info("O estoque projetado não exige nova reposição.");
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível avaliar a reposição."),
+      toast.error(wireTrayErrorDescription(error, "Não foi possível avaliar a reposição.")),
   });
-  if (query.isLoading) return <WireLoadingState label="Carregando posição de estoque..." />;
+  if (query.isLoading)
+    return <WireLoadingState label="Carregando posição de estoque..." variant="detail" />;
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
   if (!query.data)
     return (
@@ -441,8 +451,8 @@ export function WireTrayInventoryDetailPage({ productId }: { productId: string }
           {production.length ? (
             <div className="divide-y divide-slate-100">
               {production.map((op) => (
-                <a
-                  href={`/leitos/producao/${op.id}`}
+                <Link
+                  to={`/leitos/producao/${op.id}` as never}
                   key={op.id}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
                 >
@@ -456,7 +466,7 @@ export function WireTrayInventoryDetailPage({ productId }: { productId: string }
                     </p>
                   </div>
                   <ArrowRight size={16} className="text-slate-400" />
-                </a>
+                </Link>
               ))}
             </div>
           ) : (
@@ -504,12 +514,16 @@ function MovementDialog({
     mutationFn: () =>
       record({ data: { ...form, evidenceDocumentId: null, idempotencyKey: crypto.randomUUID() } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.product(form.productId) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
       toast.success("Movimentação registrada no livro de estoque.");
       onClose();
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Movimentação recusada."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Movimentação recusada.")),
   });
   const selectedProduct = products.data?.rows.find((item) => item.id === form.productId);
   const requiresDestination = form.type === "transfer_out";

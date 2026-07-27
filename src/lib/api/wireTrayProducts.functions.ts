@@ -2,7 +2,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizePage, requireWireTrayAccess } from "./wireTrayShared";
+import {
+  domainError,
+  normalizePage,
+  requireWireTrayAccess,
+  throwWireTrayDataError,
+} from "./wireTrayShared";
 import { wireTrayProductInputSchema } from "@/lib/wireTrays/schemas";
 import {
   mapAudit,
@@ -56,7 +61,7 @@ export const listWireTrayProducts = createServerFn({ method: "GET" })
     if (data.category) query = query.eq("category", data.category);
     if (data.active !== undefined) query = query.eq("active", data.active);
     const { data: rows, count, error } = await query.order("name").range(from, to);
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar os produtos.");
     return { rows: (rows ?? []).map(mapWireTrayProduct), count: count ?? 0, page, pageSize };
   });
 
@@ -76,7 +81,7 @@ export const listWireTrayProductOptions = createServerFn({ method: "GET" })
     const safe = data.search.replace(/[,()%]/g, " ").trim();
     if (safe) query = query.or(`name.ilike.%${safe}%,sku.ilike.%${safe}%`);
     const { data: rows, error } = await query;
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar os produtos.");
     return (rows ?? []).map(mapWireTrayProduct);
   });
 
@@ -91,7 +96,7 @@ export const getWireTrayProductDetail = createServerFn({ method: "GET" })
       .select(PRODUCT_SELECT)
       .eq("id", data.id)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar o produto.");
     if (!productRow) return null;
     const [
       locationsResult,
@@ -153,7 +158,8 @@ export const getWireTrayProductDetail = createServerFn({ method: "GET" })
       documentsResult,
       auditResult,
     ]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível consolidar os dados do produto.");
     }
     const product = mapWireTrayProduct(productRow);
     const locations = (locationsResult.data ?? []).map(mapWireTrayLocation);
@@ -244,8 +250,9 @@ export const saveWireTrayProduct = createServerFn({ method: "POST" })
       : sb.from("wire_tray_products").insert({ ...payload, created_by: context.userId });
     const { data: row, error } = await query.select(PRODUCT_SELECT).single();
     if (error) {
-      if (error.code === "23505") throw new Error("Já existe um produto com este SKU.");
-      throw new Error(error.message);
+      if (error.code === "23505")
+        throw domainError("CONFLICT", "Já existe um produto com este SKU.");
+      throwWireTrayDataError(error, "Não foi possível salvar o produto.");
     }
     return mapWireTrayProduct(row);
   });
@@ -259,7 +266,7 @@ export const listWireTrayLocations = createServerFn({ method: "GET" })
       .select("id, code, name, description, active, updated_at")
       .order("active", { ascending: false })
       .order("name");
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar os locais de estoque.");
     return (data ?? []).map(mapWireTrayLocation);
   });
 
@@ -282,8 +289,9 @@ export const saveWireTrayLocation = createServerFn({ method: "POST" })
       .select("id, code, name, description, active, updated_at")
       .single();
     if (error) {
-      if (error.code === "23505") throw new Error("Já existe um local com este código.");
-      throw new Error(error.message);
+      if (error.code === "23505")
+        throw domainError("CONFLICT", "Já existe um local com este código.");
+      throwWireTrayDataError(error, "Não foi possível salvar o local de estoque.");
     }
     return mapWireTrayLocation(row);
   });

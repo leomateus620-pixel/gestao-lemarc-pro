@@ -277,6 +277,7 @@ export function mapMovement(row: any): WireTrayMovement {
     newReserved: asNumber(row.new_reserved),
     reason: row.reason,
     orderId: row.order_id ?? null,
+    productionOrderId: row.production_order_id ?? null,
     createdAt: row.created_at,
   };
 }

@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireWireTrayAccess } from "./wireTrayShared";
+import { requireWireTrayAccess, throwWireTrayDataError } from "./wireTrayShared";
 import type {
   WireTrayAccessUser,
   WireTrayModuleAccess,
@@ -50,7 +50,7 @@ export const listWireTrayAccessUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireWireTrayAccess(context, ["admin"]);
     const { data, error } = await (context.supabase as any).rpc("wire_tray_list_access_users");
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar os acessos do módulo.");
     return ((data ?? []) as any[]).map(
       (row): WireTrayAccessUser => ({
         userId: row.user_id,
@@ -78,6 +78,6 @@ export const setWireTrayAccess = createServerFn({ method: "POST" })
         _financial_access: data.financialAccess,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível atualizar o acesso do módulo.");
     return row;
   });

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Runtime mappers cover the additive schema. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireWireTrayAccess } from "./wireTrayShared";
+import { requireWireTrayAccess, throwWireTrayDataError } from "./wireTrayShared";
 import {
   mapAudit,
   mapInventoryRow,
@@ -20,47 +20,56 @@ export const getWireTrayDashboard = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<WireTrayDashboardData> => {
     await requireWireTrayAccess(context);
     const sb = context.supabase as any;
-    const [ordersResult, productionResult, inventoryResult, auditResult, discrepancyResult] =
-      await Promise.all([
-        sb
-          .from("wire_tray_orders")
-          .select("id, number, client_name_snapshot, status, priority, expected_delivery_date")
-          .not("status", "in", '("completed","cancelled")')
-          .limit(500),
-        sb
-          .from("wire_tray_production_orders")
-          .select(
-            `*, product:wire_tray_products(name, sku), location:wire_tray_stock_locations(name), order:wire_tray_orders(number)`,
-            { count: "exact" },
-          )
-          .in("status", ["planned", "released", "in_progress", "paused", "awaiting_check"])
-          .order("planned_completion_date", { ascending: true, nullsFirst: false })
-          .limit(20),
-        sb
-          .from("wire_tray_inventory_catalog")
-          .select("*", { count: "exact" })
-          .eq("active", true)
-          .in("stock_health", ["empty", "low", "attention"])
-          .order("available_quantity", { ascending: true })
-          .limit(8),
-        sb
-          .from("wire_tray_audit_events")
-          .select("id, event_type, entity_type, entity_id, metadata, created_at")
-          .order("created_at", { ascending: false })
-          .limit(12),
-        sb
-          .from("wire_tray_separation_entries")
-          .select("id, order_id, difference_quantity, resolves_entry_id, entry_type")
-          .limit(200),
-      ]);
+    const [
+      ordersResult,
+      productionResult,
+      inventoryResult,
+      auditResult,
+      discrepancyResult,
+      productCountResult,
+    ] = await Promise.all([
+      sb
+        .from("wire_tray_orders")
+        .select("id, number, client_name_snapshot, status, priority, expected_delivery_date")
+        .not("status", "in", '("completed","cancelled")')
+        .limit(500),
+      sb
+        .from("wire_tray_production_orders")
+        .select(
+          `*, product:wire_tray_products(name, sku), location:wire_tray_stock_locations(name), order:wire_tray_orders(number)`,
+          { count: "exact" },
+        )
+        .in("status", ["planned", "released", "in_progress", "paused", "awaiting_check"])
+        .order("planned_completion_date", { ascending: true, nullsFirst: false })
+        .limit(20),
+      sb
+        .from("wire_tray_inventory_catalog")
+        .select("*", { count: "exact" })
+        .eq("active", true)
+        .in("stock_health", ["empty", "low", "attention"])
+        .order("available_quantity", { ascending: true })
+        .limit(8),
+      sb
+        .from("wire_tray_audit_events")
+        .select("id, event_type, entity_type, entity_id, metadata, created_at")
+        .order("created_at", { ascending: false })
+        .limit(12),
+      sb
+        .from("wire_tray_separation_entries")
+        .select("id, order_id, difference_quantity, resolves_entry_id, entry_type")
+        .limit(200),
+      sb.from("wire_tray_products").select("id", { count: "exact", head: true }).eq("active", true),
+    ]);
     for (const result of [
       ordersResult,
       productionResult,
       inventoryResult,
       auditResult,
       discrepancyResult,
+      productCountResult,
     ]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível consolidar a visão operacional.");
     }
     const orders = ordersResult.data ?? [];
     const production: WireTrayProductionSummary[] = (productionResult.data ?? []).map(
@@ -143,6 +152,7 @@ export const getWireTrayDashboard = createServerFn({ method: "GET" })
       })),
     ].slice(0, 10);
     return {
+      hasProducts: (productCountResult.count ?? 0) > 0,
       metrics: {
         activeOrders: orders.length,
         productionOrders: productionResult.count ?? production.length,

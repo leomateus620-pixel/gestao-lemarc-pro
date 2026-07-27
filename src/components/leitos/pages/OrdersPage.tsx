@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -28,6 +28,7 @@ import {
   WirePager,
   WirePanel,
   WireProgress,
+  WireRestrictedState,
   WireStatus,
   formatWireCurrency,
   formatWireDate,
@@ -47,6 +48,7 @@ import {
   saveWireTrayOrderDraft,
 } from "@/lib/api/wireTrayOrders.functions";
 import { hasWireTrayPermission } from "@/lib/wireTrays/domain";
+import { wireTrayErrorDescription } from "@/lib/wireTrays/errors";
 import { wireTrayOrderDraftSchema, type WireTrayOrderDraftInput } from "@/lib/wireTrays/schemas";
 import {
   wireTrayOrderStatusLabel,
@@ -66,21 +68,35 @@ const priorityLabel: Record<ServicePriority, string> = {
   urgente: "Urgente",
 };
 
+function invalidateOrderFlow(queryClient: ReturnType<typeof useQueryClient>, orderId: string) {
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.order(orderId) });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.separation });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.billing });
+  queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
+}
+
 export function WireTrayOrdersPage() {
   const access = useWireTrayAccess();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+  const [sort, setSort] = useState<"newest" | "oldest" | "delivery">("newest");
   const [page, setPage] = useState(1);
   const query = useWireTrayOrdersQuery({
     search,
     status: status || undefined,
     priority: priority || undefined,
+    sort,
     page,
     pageSize: 25,
   });
   const canCreate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
-  useEffect(() => setPage(1), [priority, search, status]);
+  useEffect(() => setPage(1), [priority, search, sort, status]);
   return (
     <WirePage>
       <WirePageHeader
@@ -96,7 +112,7 @@ export function WireTrayOrdersPage() {
         }
       />
       <WirePanel>
-        <div className="wire-filterbar">
+        <div className="wire-filterbar wire-filterbar-orders">
           <label className="wire-field">
             <span className="wire-label">Buscar</span>
             <span className="relative">
@@ -142,6 +158,18 @@ export function WireTrayOrdersPage() {
               ))}
             </select>
           </label>
+          <label className="wire-field">
+            <span className="wire-label">Ordenação</span>
+            <select
+              className="wire-select"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as "newest" | "oldest" | "delivery")}
+            >
+              <option value="newest">Mais recentes</option>
+              <option value="oldest">Mais antigos</option>
+              <option value="delivery">Prazo mais próximo</option>
+            </select>
+          </label>
         </div>
         {query.isLoading ? (
           <WireLoadingState label="Consultando pedidos..." />
@@ -166,9 +194,12 @@ export function WireTrayOrdersPage() {
                   {query.data!.rows.map((order) => (
                     <tr key={order.id}>
                       <td>
-                        <a href={`/leitos/pedidos/${order.id}`} className="wire-table-link">
+                        <Link
+                          to={`/leitos/pedidos/${order.id}` as never}
+                          className="wire-table-link"
+                        >
                           #{order.number}
-                        </a>
+                        </Link>
                         <p className="mt-1 text-xs text-slate-500">
                           {order.customerOrderReference ??
                             order.quotationReference ??
@@ -218,7 +249,11 @@ export function WireTrayOrdersPage() {
             </div>
             <div className="wire-mobile-list md:hidden">
               {query.data!.rows.map((order) => (
-                <a href={`/leitos/pedidos/${order.id}`} className="wire-mobile-card" key={order.id}>
+                <Link
+                  to={`/leitos/pedidos/${order.id}` as never}
+                  className="wire-mobile-card"
+                  key={order.id}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-slate-950">Pedido #{order.number}</p>
@@ -239,7 +274,7 @@ export function WireTrayOrdersPage() {
                       <span>{priorityLabel[order.priority]}</span>
                     )}
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
             <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
@@ -265,6 +300,7 @@ export function WireTrayOrdersPage() {
 type DraftItem = WireTrayOrderDraftInput["items"][number] & { key: string };
 
 export function WireTrayOrderWizardPage() {
+  const navigate = useNavigate();
   const access = useWireTrayAccess();
   const canCreate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
   const options = useWireTrayOrderOptionsQuery();
@@ -304,16 +340,24 @@ export function WireTrayOrderWizardPage() {
       return result;
     },
     onSuccess: (result, shouldConfirm) => {
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.orderLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.order(result.id) });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.inventoryLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.movementLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.productionLists });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.separation });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.billing });
+      queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
       toast.success(
         shouldConfirm
           ? "Pedido confirmado; reservas e faltas foram processadas."
           : "Rascunho salvo.",
       );
-      window.location.assign(`/leitos/pedidos/${result.id}`);
+      navigate({ to: "/leitos/pedidos/$orderId", params: { orderId: result.id } });
     },
     onError: (cause) => {
-      const message = cause instanceof Error ? cause.message : "Não foi possível salvar o pedido.";
+      const message = wireTrayErrorDescription(cause, "Não foi possível salvar o pedido.");
       setError(message);
       toast.error(message);
     },
@@ -330,20 +374,13 @@ export function WireTrayOrderWizardPage() {
       setStep(3);
     },
     onError: (cause) =>
-      setError(
-        cause instanceof Error ? cause.message : "Não foi possível validar a disponibilidade.",
-      ),
+      setError(wireTrayErrorDescription(cause, "Não foi possível validar a disponibilidade.")),
   });
 
   if (!canCreate)
-    return (
-      <WireErrorState
-        title="Acesso restrito"
-        error={new Error("Seu perfil não permite criar ou confirmar pedidos.")}
-      />
-    );
+    return <WireRestrictedState description="Seu perfil não permite criar ou confirmar pedidos." />;
   if (options.isLoading)
-    return <WireLoadingState label="Carregando clientes, produtos e saldos..." />;
+    return <WireLoadingState label="Carregando clientes, produtos e saldos..." variant="form" />;
   if (options.isError)
     return <WireErrorState error={options.error} onRetry={() => options.refetch()} />;
   function addItem() {
@@ -773,23 +810,23 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
     mutationFn: () => confirm({ data: { id: orderId, idempotencyKey: crypto.randomUUID() } }),
     onSuccess: () => {
       toast.success("Pedido confirmado e disponibilidade processada.");
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      invalidateOrderFlow(queryClient, orderId);
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível confirmar."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Não foi possível confirmar.")),
   });
   const cancelMutation = useMutation({
     mutationFn: () => cancel({ data: { id: orderId, reason: cancelReason } }),
     onSuccess: () => {
       toast.success("Pedido cancelado e reservas liberadas.");
       setCancelReason("");
-      queryClient.invalidateQueries({ queryKey: wireTrayKeys.all });
+      invalidateOrderFlow(queryClient, orderId);
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Cancelamento recusado."),
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Cancelamento recusado.")),
   });
   if (query.isLoading)
-    return <WireLoadingState label="Consolidando pedido, reservas e produção..." />;
+    return (
+      <WireLoadingState label="Consolidando pedido, reservas e produção..." variant="detail" />
+    );
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
   if (!query.data)
     return (
@@ -920,8 +957,8 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
             {order.production.length ? (
               <div className="divide-y divide-slate-100">
                 {order.production.map((op) => (
-                  <a
-                    href={`/leitos/producao/${op.id}`}
+                  <Link
+                    to={`/leitos/producao/${op.id}` as never}
                     key={op.id}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
                   >
@@ -938,7 +975,7 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
                       </p>
                     </div>
                     <ArrowRight size={16} className="text-slate-400" />
-                  </a>
+                  </Link>
                 ))}
               </div>
             ) : (

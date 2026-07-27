@@ -66,3 +66,57 @@ Bloqueia pedido, reservas e saldos, consome somente o saldo reservado do pedido,
 ## Limites de publicação
 
 A PR entrega migrations, aplicação e testes. Ela não executa migrations no projeto Supabase remoto e não cria registros operacionais artificiais. A validação integrada com dados reais depende da aplicação das migrations no ambiente de homologação/produção autorizado.
+
+## Diagnóstico da implantação de 27/07/2026
+
+A inspeção do endpoint PostgREST conectado confirmou `user_module_access`, mas retornou
+`PGRST205` para todas as relações operacionais de Leitos. Os tipos gerados do ambiente também
+continham apenas `app_module`, `wire_tray_module_role` e `user_module_access`. Isso comprova que a
+migration mínima `20260722010529_a314a04d-1425-4fa6-b9fc-25b71f02840d.sql` foi aplicada, enquanto o
+grupo operacional anterior, datado de 21/07, não foi executado. O erro de faturamento não era uma
+falha isolada: dashboard, pedidos, produção, estoque, separação, produtos, movimentos e relatórios
+dependiam da mesma implantação incompleta.
+
+A correção está em `20260727123000_wire_tray_schema_reconciliation.sql`. Ela parte do estado mínimo,
+usa lock transacional, cria somente objetos ausentes, substitui funções e policies de forma
+determinística, mantém RLS, valida o contrato final e solicita a recarga do cache do PostgREST. A
+migration aborta sem alterar registros caso encontre uma quantidade intermediária de tabelas
+operacionais; esse estado exige inspeção manual porque não é seguro inferir constraints de tabelas
+parcialmente criadas.
+
+## Mapa de dependências por tela
+
+| Área           | Relações e views lidas                                                                                                                                                                                                                                                                                     | Comandos persistentes                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Acesso e shell | `user_module_access`, `wire_tray_notifications`                                                                                                                                                                                                                                                            | `wire_tray_mark_notification_read`                                                    |
+| Visão geral    | `wire_tray_orders`, `wire_tray_production_orders`, `wire_tray_inventory_catalog`, `wire_tray_separation_entries`, `wire_tray_audit_events`                                                                                                                                                                 | nenhum                                                                                |
+| Pedidos        | `clients`, `client_units`, `wire_tray_orders`, `wire_tray_order_items`, `wire_tray_order_financials`, `wire_tray_order_item_financials`, `wire_tray_reservations`, `wire_tray_production_orders`, `wire_tray_stock_balances`, `wire_tray_stock_locations`, `wire_tray_documents`, `wire_tray_audit_events` | `wire_tray_save_order_draft`, `wire_tray_confirm_order`, `wire_tray_cancel_order`     |
+| Produção       | `wire_tray_production_orders`, `wire_tray_production_entries`, `wire_tray_products`, `wire_tray_stock_locations`, `wire_tray_orders`, `wire_tray_order_items`, `wire_tray_documents`, `wire_tray_audit_events`                                                                                             | `wire_tray_create_production_order`, `wire_tray_record_production_entry`              |
+| Estoque        | `wire_tray_inventory_catalog`, `wire_tray_projected_inventory`, `wire_tray_stock_balances`, `wire_tray_stock_locations`, `wire_tray_stock_movements`, `wire_tray_production_orders`                                                                                                                        | `wire_tray_record_stock_movement`, `wire_tray_trigger_replenishment`                  |
+| Separação      | `wire_tray_orders`, `wire_tray_order_items`, `wire_tray_reservations`, `wire_tray_separation_entries`, `wire_tray_stock_locations`                                                                                                                                                                         | `wire_tray_record_separation`                                                         |
+| Faturamento    | `wire_tray_orders`, `wire_tray_order_items`, `wire_tray_order_financials`, `wire_tray_documents`                                                                                                                                                                                                           | `wire_tray_mark_billed`, `wire_tray_release_for_dispatch`, `wire_tray_dispatch_order` |
+| Produtos       | `wire_tray_products`, `wire_tray_stock_locations`, `wire_tray_projected_inventory`, `wire_tray_order_items`, `wire_tray_orders`, `wire_tray_production_orders`, `wire_tray_stock_movements`, `wire_tray_documents`, `wire_tray_audit_events`                                                               | gravação protegida por RLS; reposição usa `wire_tray_trigger_replenishment`           |
+| Movimentações  | `wire_tray_stock_movements`, `wire_tray_products`, `wire_tray_stock_locations`, `wire_tray_orders`, `wire_tray_production_orders`                                                                                                                                                                          | nenhum; o livro-razão é imutável                                                      |
+| Relatórios     | mesmas consultas consolidadas de dashboard, estoque e pedidos                                                                                                                                                                                                                                              | nenhum                                                                                |
+| Configurações  | `wire_tray_stock_locations`, usuários retornados por `wire_tray_list_access_users`                                                                                                                                                                                                                         | `wire_tray_set_module_access`; gravação de locais protegida por RLS                   |
+| Documentos     | `wire_tray_documents`, bucket privado `wire-tray-documents`                                                                                                                                                                                                                                                | preparação/finalização autenticada de upload e URL assinada                           |
+
+Todas as server functions passam por `requireSupabaseAuth` e `requireWireTrayAccess`. Os comandos
+críticos também repetem a autorização no PostgreSQL e retornam o registro ou saldo persistido; a UI
+não calcula um novo saldo otimista.
+
+## Ordem segura de implantação
+
+1. Conferir no projeto alvo que o estado corresponde à fundação mínima ou ao contrato operacional completo.
+2. Aplicar apenas as migrations pendentes, incluindo a reconciliação de 27/07; não reproduzir manualmente as quatro migrations originais.
+3. Confirmar o `COMMIT` e a emissão de `NOTIFY pgrst, 'reload schema'` e `NOTIFY pgrst, 'reload config'`.
+4. Gerar novamente os tipos com o CLI conectado ao projeto real e comparar com `src/integrations/supabase/types.ts`.
+5. Executar consultas vazias autenticadas para todas as relações e testar cada papel do módulo antes de liberar escrita operacional.
+
+Se o histórico remoto ainda listar `20260721133000`, `20260721133100`, `20260721133200` e
+`20260721133300` como pendentes, não executar `db push` diretamente: ele tentaria aplicar os arquivos
+antigos antes da reconciliação e colidiria com a fundação mínima. Nesse caso, um administrador deve
+executar a reconciliação em transação, validar o contrato e então reparar o histórico dessas quatro
+versões e de `20260727123000` como aplicadas. Essa decisão depende da inspeção de
+`supabase_migrations.schema_migrations` no projeto alvo e não pode ser inferida apenas pelos arquivos
+locais.

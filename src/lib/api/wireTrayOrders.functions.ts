@@ -2,7 +2,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizePage, requireWireTrayAccess, unwrapRpc } from "./wireTrayShared";
+import {
+  domainError,
+  normalizePage,
+  requireWireTrayAccess,
+  throwWireTrayDataError,
+  unwrapRpc,
+} from "./wireTrayShared";
 import { wireTrayOrderDraftSchema } from "@/lib/wireTrays/schemas";
 import {
   mapOrderDetail,
@@ -16,6 +22,7 @@ const orderListSchema = z.object({
   search: z.string().trim().max(100).default(""),
   status: z.string().trim().max(60).optional(),
   priority: z.string().trim().max(20).optional(),
+  sort: z.enum(["newest", "oldest", "delivery"]).default("newest"),
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().min(10).max(100).default(25),
 });
@@ -58,12 +65,16 @@ export const listWireTrayOrders = createServerFn({ method: "GET" })
         query = query.or(filters.join(","));
       }
     }
-    const {
-      data: rows,
-      count,
-      error,
-    } = await query.order("created_at", { ascending: false }).range(from, to);
-    if (error) throw new Error(error.message);
+    const orderedQuery =
+      data.sort === "oldest"
+        ? query.order("created_at", { ascending: true })
+        : data.sort === "delivery"
+          ? query
+              .order("expected_delivery_date", { ascending: true, nullsFirst: false })
+              .order("created_at", { ascending: false })
+          : query.order("created_at", { ascending: false });
+    const { data: rows, count, error } = await orderedQuery.range(from, to);
+    if (error) throwWireTrayDataError(error, "Não foi possível consultar os pedidos.");
     const orderIds = (rows ?? []).map((row: any) => row.id);
     let financialMap = new Map<string, number>();
     if (access.canViewFinancials && orderIds.length > 0) {
@@ -71,7 +82,11 @@ export const listWireTrayOrders = createServerFn({ method: "GET" })
         .from("wire_tray_order_financials")
         .select("order_id, total_cents")
         .in("order_id", orderIds);
-      if (financialError) throw new Error(financialError.message);
+      if (financialError)
+        throwWireTrayDataError(
+          financialError,
+          "Não foi possível consultar os valores dos pedidos.",
+        );
       financialMap = new Map(
         (financials ?? []).map((row: any) => [row.order_id, Number(row.total_cents)]),
       );
@@ -100,7 +115,7 @@ export const getWireTrayOrderDetail = createServerFn({ method: "GET" })
       .select(ORDER_SELECT)
       .eq("id", data.id)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível carregar o pedido.");
     if (!order) return null;
     const itemIds = (order.items ?? []).map((item: any) => item.id);
     const [reservationResult, productionResult, documentResult, auditResult] = await Promise.all([
@@ -125,7 +140,8 @@ export const getWireTrayOrderDetail = createServerFn({ method: "GET" })
         .limit(100),
     ]);
     for (const result of [reservationResult, productionResult, documentResult, auditResult]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível consolidar os dados do pedido.");
     }
     let itemFinancials: any[] = [];
     let orderFinancial: any | null = null;
@@ -136,8 +152,16 @@ export const getWireTrayOrderDetail = createServerFn({ method: "GET" })
           : Promise.resolve({ data: [], error: null }),
         sb.from("wire_tray_order_financials").select("*").eq("order_id", data.id).maybeSingle(),
       ]);
-      if (itemFinancialResult.error) throw new Error(itemFinancialResult.error.message);
-      if (orderFinancialResult.error) throw new Error(orderFinancialResult.error.message);
+      if (itemFinancialResult.error)
+        throwWireTrayDataError(
+          itemFinancialResult.error,
+          "Não foi possível carregar os valores dos itens.",
+        );
+      if (orderFinancialResult.error)
+        throwWireTrayDataError(
+          orderFinancialResult.error,
+          "Não foi possível carregar o total do pedido.",
+        );
       itemFinancials = itemFinancialResult.data ?? [];
       orderFinancial = orderFinancialResult.data ?? null;
     }
@@ -209,7 +233,8 @@ export const getWireTrayOrderFormOptions = createServerFn({ method: "GET" })
       balancesResult,
       productionResult,
     ]) {
-      if (result.error) throw new Error(result.error.message);
+      if (result.error)
+        throwWireTrayDataError(result.error, "Não foi possível carregar as opções do pedido.");
     }
     const products = (productsResult.data ?? []).map(mapWireTrayProduct);
     return {
@@ -259,7 +284,7 @@ export const saveWireTrayOrderDraft = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const access = await requireWireTrayAccess(context, ["admin", "gestor", "comercial"]);
     if (!access.canViewFinancials && data.draft.items.some((item) => item.unitPriceCents != null)) {
-      throw new Error("Seu perfil não permite registrar valores.");
+      throw domainError("FORBIDDEN", "Seu perfil não permite registrar valores.");
     }
     const payload = {
       client_id: data.draft.clientId,
@@ -285,7 +310,7 @@ export const saveWireTrayOrderDraft = createServerFn({ method: "POST" })
         _idempotency_key: data.idempotencyKey,
       },
     );
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível salvar o pedido.");
     return unwrapRpc<{ id: string; number: number; status: string }>(result);
   });
 
@@ -300,7 +325,7 @@ export const confirmWireTrayOrder = createServerFn({ method: "POST" })
       _order_id: data.id,
       _idempotency_key: data.idempotencyKey,
     });
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível confirmar o pedido.");
     return unwrapRpc<{ id: string; number: number; status: string }>(result);
   });
 
@@ -315,7 +340,7 @@ export const cancelWireTrayOrder = createServerFn({ method: "POST" })
       _order_id: data.id,
       _reason: data.reason,
     });
-    if (error) throw new Error(error.message);
+    if (error) throwWireTrayDataError(error, "Não foi possível cancelar o pedido.");
     return result;
   });
 
@@ -344,8 +369,13 @@ export const previewWireTrayOrderInventory = createServerFn({ method: "POST" })
         .in("product_id", ids)
         .in("status", ["planned", "released", "in_progress", "paused", "awaiting_check"]),
     ]);
-    if (balanceResult.error) throw new Error(balanceResult.error.message);
-    if (productionResult.error) throw new Error(productionResult.error.message);
+    if (balanceResult.error)
+      throwWireTrayDataError(balanceResult.error, "Não foi possível consultar os saldos.");
+    if (productionResult.error)
+      throwWireTrayDataError(
+        productionResult.error,
+        "Não foi possível consultar a produção aberta.",
+      );
     return data.items.map((item) => {
       const balances = (balanceResult.data ?? []).filter(
         (row: any) => row.product_id === item.productId,
