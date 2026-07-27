@@ -79,7 +79,7 @@ export function WireTrayMovementsPage({ search }: { search: WireTrayMovementSear
   function updateSearch(patch: Partial<WireTrayMovementSearch>, resetPage = true) {
     navigate({
       replace: true,
-      search: (current) => ({ ...current, ...patch, page: resetPage ? 1 : (patch.page ?? 1) }),
+      search: (current: WireTrayMovementSearch) => ({ ...current, ...patch, page: resetPage ? 1 : (patch.page ?? 1) }),
     });
   }
 
