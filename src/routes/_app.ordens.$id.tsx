@@ -46,6 +46,7 @@ import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceO
 import { LaborEntriesEditor } from "@/components/ordens/LaborEntriesEditor";
 import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeControl";
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
+import { ExecutionReportSection } from "@/components/ordens/ExecutionReportSection";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
 import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/ServiceOrderMaterialsSection";
@@ -440,6 +441,8 @@ function OrdemDetalhe() {
       )}
 
       {!tecnicoDone && <ServiceOrderTimeControl order={order} />}
+
+      <ExecutionReportSection order={order} />
 
       <SignatureBlock order={order} />
 

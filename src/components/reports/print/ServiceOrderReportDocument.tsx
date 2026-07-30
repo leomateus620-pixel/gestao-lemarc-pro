@@ -269,6 +269,11 @@ export function ServiceOrderReportDocument({
           {executedDescriptions && (
             <WorkItem label="Serviço executado">{executedDescriptions}</WorkItem>
           )}
+          {order.execution_report?.trim() && (
+            <WorkItem label="Serviço executado (relato do técnico)">
+              {order.execution_report.trim()}
+            </WorkItem>
+          )}
           {workNotes && <WorkItem label="Observações da apuração">{workNotes}</WorkItem>}
         </div>
       </section>

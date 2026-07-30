@@ -17,6 +17,7 @@ const ORDER_SELECT = `
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   signature_waiver_reason, signature_waived_by, signature_waived_at,
+  execution_report, execution_report_updated_by, execution_report_updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit, cnpj),
   technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
   client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type),
@@ -461,6 +462,45 @@ export const deleteServiceOrder = createServerFn({ method: "POST" })
     const { error } = await sb.from("service_orders").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true as const, id: data.id };
+  });
+
+export const updateServiceOrderExecutionReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; report: string }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin } = await sb.rpc("is_admin");
+    if (!isAdmin) {
+      const { data: isTech, error: techErr } = await sb.rpc("user_is_order_technician", {
+        _order_id: data.id,
+      });
+      if (techErr) throw new Error(techErr.message);
+      if (!isTech) {
+        throw new Error("Apenas técnicos atribuídos a esta OS podem preencher o relato.");
+      }
+      const { data: cur, error: curErr } = await sb
+        .from("service_orders")
+        .select("status")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (curErr) throw new Error(curErr.message);
+      if (cur?.status === "approved" || cur?.status === "cancelled") {
+        throw new Error("Esta OS já foi encerrada. Peça ao administrador para ajustar o relato.");
+      }
+    }
+    const report = (data.report ?? "").trim();
+    const { data: row, error } = await sb
+      .from("service_orders")
+      .update({
+        execution_report: report.length > 0 ? report : null,
+        execution_report_updated_by: report.length > 0 ? context.userId : null,
+        execution_report_updated_at: report.length > 0 ? new Date().toISOString() : null,
+      })
+      .eq("id", data.id)
+      .select(ORDER_SELECT)
+      .single();
+    if (error) throw new Error(error.message);
+    return normalize(row);
   });
 
 // ---------- Clients ----------
