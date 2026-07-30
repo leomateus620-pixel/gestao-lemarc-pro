@@ -1,28 +1,41 @@
-## Objetivo
+## Situação atual (verificada)
 
-Adicionar, na tela da Ordem de Serviço, um campo onde o técnico descreve **o que foi realizado**, posicionado **logo antes do bloco de assinatura do responsável**. O texto é salvo no banco, fica visível na OS depois de salvo e aparece no PDF.
+- A tabela `user_module_access` hoje só tem 5 linhas, todas `wire_trays / admin / ativo`, todas de usuários com papel global `admin`. Nenhum técnico tem acesso ao módulo.
+- Ou seja: hoje os técnicos estão fora do módulo **por ausência de dado**, não por regra. Se um administrador conceder acesso (tela Configurações → Acessos) ou se uma linha for criada por engano, um técnico passa a entrar normalmente — nada no banco impede isso.
+- As funções que governam o módulo (`wire_tray_has_access`, `wire_tray_current_role`, `wire_tray_current_role_in`, `wire_tray_can_view_financials`, `wire_tray_assert_role`) apenas olham `user_module_access` + papel global `admin`. Nenhuma delas conhece o papel `tecnico`.
+- O módulo de Ordens de Serviço não usa `user_module_access` (o servidor devolve `os: true` fixo), então a mudança não o afeta.
 
-## Como vai funcionar
+## O que será feito
 
-- Novo cartão "Serviço executado — relato do técnico", exibido entre o Controle de tempo e o bloco de Assinatura.
-- Estado vazio: aviso claro de responsabilidade ("Descreva o que foi executado antes de coletar a assinatura") com botão para escrever.
-- Edição: área de texto ampla, contador de caracteres, botões Salvar / Cancelar, salvamento com confirmação (toast) e indicação de quem preencheu e quando.
-- Depois de salvo: texto exibido formatado (quebras de linha preservadas), com botão "Editar" para o técnico atribuído e para o admin.
-- Somente leitura quando a OS estiver aprovada/cancelada (admin continua podendo ajustar).
-- Bloco de assinatura mostra um aviso leve quando o relato ainda estiver vazio, sem bloquear o fluxo atual.
+Regra: **quem tem papel `tecnico` e não tem papel `admin` nunca acessa Leitos Aramados**, mesmo que exista linha de acesso.
 
-## Persistência e exibição
+### 1. Migração no banco (camada de verdade)
 
-- Nova coluna em `service_orders`: `execution_report` (texto), mais `execution_report_updated_by` e `execution_report_updated_at` para rastreabilidade. Migração aditiva, sem afetar dados existentes.
-- Regras de acesso: só quem está atribuído à OS (ou admin) pode gravar; validação feita no servidor.
-- O relato passa a ser a fonte do campo "Serviço executado" do PDF, que hoje é montado a partir das descrições dos apontamentos — no PDF ele aparece como "Serviço executado (relato do técnico)", mantendo os apontamentos por técnico como estão.
-- Aparece também na visualização de impressão e no download do PDF da OS.
+- Nova função `public.wire_tray_role_blocked()` (security definer, stable): retorna verdadeiro quando o usuário atual tem papel `tecnico` em `user_roles` e **não** tem papel `admin`.
+- Aplicar esse bloqueio dentro das funções já existentes, sem mudar assinaturas:
+  - `wire_tray_has_access()` → falso para técnico;
+  - `wire_tray_current_role()` → nulo para técnico;
+  - `wire_tray_current_role_in()` → falso para técnico;
+  - `wire_tray_can_view_financials()` → falso para técnico;
+  - `wire_tray_is_global_admin()` → falso para técnico sem papel admin (na prática já é, fica explícito);
+  - `wire_tray_assert_role()` → erro claro "Seu perfil de técnico não tem acesso ao módulo Leitos Aramados".
+- Como todas as políticas RLS das ~16 tabelas `wire_tray_*` e do bucket de documentos derivam dessas funções, o bloqueio passa a valer em leitura, escrita, RPCs e storage de uma só vez — sem reescrever política por política.
+- Trigger de validação em `user_module_access` (antes de inserir/atualizar): recusa qualquer linha `wire_trays` para usuário com papel `tecnico`, evitando concessão indevida pela tela de acessos.
+- Nada de `DROP TABLE`, `TRUNCATE` ou remoção de dados; migração aditiva e transacional.
+
+### 2. Ajuste mínimo no aplicativo (apresentação)
+
+- `getMyModuleAccess` passa a devolver `wireTrays: null` quando o bloqueio se aplica, para o técnico ver a mensagem de acesso restrito em vez de um erro de permissão cru.
+- Nenhuma mudança no fluxo de login, no seletor de módulo (que já esconde a entrada quando não há acesso), no atalho do cabeçalho nem em qualquer parte do módulo de OS.
+
+### 3. Verificação
+
+- Consultar as políticas e funções após a migração.
+- Simular as funções para um usuário técnico e para um administrador, confirmando: técnico bloqueado, admin inalterado.
+- Conferir que os 5 administradores atuais continuam com acesso ativo ao módulo.
 
 ## Detalhes técnicos
 
-- Migração: `ALTER TABLE public.service_orders ADD COLUMN execution_report text, ...` (sem novas tabelas, políticas RLS existentes já cobrem update da OS; a validação de atribuição fica na server function).
-- Nova server function `updateServiceOrderExecutionReport` em `src/lib/api/serviceOrders.functions.ts` com `requireSupabaseAuth`, checando admin ou vínculo em `service_order_technicians`.
-- `ORDER_SELECT` e `src/types/serviceOrder.ts` passam a incluir os novos campos.
-- Novo componente `src/components/ordens/ExecutionReportSection.tsx`, montado em `src/routes/_app.ordens.$id.tsx` antes de `<SignatureBlock />`.
-- Hook de mutação em `src/hooks/useServiceOrders.ts` com invalidação da query da OS.
-- PDF: `src/components/reports/print/ServiceOrderReportDocument.tsx` e `src/lib/reports/serviceOrderDownload.ts` usam `execution_report` quando existir.
+- Migração via ferramenta de migração (uma transação), usando `CREATE OR REPLACE FUNCTION` nas funções já existentes — nenhuma política é recriada, então não há janela em que o módulo fica sem RLS.
+- O bloqueio consulta `user_roles` (fonte oficial de papéis), nunca `profiles`, e usa `security definer` com `search_path` vazio para evitar recursão em RLS.
+- Arquivo tocado no código: `src/lib/api/moduleAccess.functions.ts`.

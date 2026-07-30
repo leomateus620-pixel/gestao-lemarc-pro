@@ -19,6 +19,8 @@ const setAccessSchema = z.object({
 export const getMyModuleAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { data: blocked } = await (context.supabase as any).rpc("wire_tray_role_blocked");
+    if (blocked === true) return { os: true, wireTrays: null };
     const { data, error } = await (context.supabase as any)
       .from("user_module_access")
       .select("id, user_id, module_role, active, financial_access")
