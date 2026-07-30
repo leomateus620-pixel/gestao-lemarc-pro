@@ -145,4 +145,7 @@ export type ServiceOrder = {
   signature_waiver_reason?: string | null;
   signature_waived_by?: string | null;
   signature_waived_at?: string | null;
+  execution_report?: string | null;
+  execution_report_updated_by?: string | null;
+  execution_report_updated_at?: string | null;
 };
