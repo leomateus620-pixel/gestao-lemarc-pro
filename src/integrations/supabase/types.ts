@@ -2538,6 +2538,7 @@ export type Database = {
         Args: { _reason: string; _reservation_id: string }
         Returns: Json
       }
+      wire_tray_role_blocked: { Args: never; Returns: boolean }
       wire_tray_save_order_draft: {
         Args: { _idempotency_key: string; _order_id: string; _payload: Json }
         Returns: Json
@@ -2576,6 +2577,10 @@ export type Database = {
       wire_tray_trigger_replenishment_internal: {
         Args: { _product_id: string; _reason: string }
         Returns: string
+      }
+      wire_tray_user_role_blocked: {
+        Args: { _user_id: string }
+        Returns: boolean
       }
       wire_tray_write_audit: {
         Args: {
