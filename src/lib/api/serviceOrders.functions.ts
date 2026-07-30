@@ -17,6 +17,7 @@ const ORDER_SELECT = `
   opened_at, started_at, finished_at, approved_at, closed_at,
   hour_rate, worked_minutes, created_by, created_at, updated_at,
   signature_waiver_reason, signature_waived_by, signature_waived_at,
+  execution_report, execution_report_updated_by, execution_report_updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit, cnpj),
   technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
   client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type),
