@@ -464,6 +464,45 @@ export const deleteServiceOrder = createServerFn({ method: "POST" })
     return { ok: true as const, id: data.id };
   });
 
+export const updateServiceOrderExecutionReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; report: string }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin } = await sb.rpc("is_admin");
+    if (!isAdmin) {
+      const { data: isTech, error: techErr } = await sb.rpc("user_is_order_technician", {
+        _order_id: data.id,
+      });
+      if (techErr) throw new Error(techErr.message);
+      if (!isTech) {
+        throw new Error("Apenas técnicos atribuídos a esta OS podem preencher o relato.");
+      }
+      const { data: cur, error: curErr } = await sb
+        .from("service_orders")
+        .select("status")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (curErr) throw new Error(curErr.message);
+      if (cur?.status === "approved" || cur?.status === "cancelled") {
+        throw new Error("Esta OS já foi encerrada. Peça ao administrador para ajustar o relato.");
+      }
+    }
+    const report = (data.report ?? "").trim();
+    const { data: row, error } = await sb
+      .from("service_orders")
+      .update({
+        execution_report: report.length > 0 ? report : null,
+        execution_report_updated_by: report.length > 0 ? context.userId : null,
+        execution_report_updated_at: report.length > 0 ? new Date().toISOString() : null,
+      })
+      .eq("id", data.id)
+      .select(ORDER_SELECT)
+      .single();
+    if (error) throw new Error(error.message);
+    return normalize(row);
+  });
+
 // ---------- Clients ----------
 
 export const listClients = createServerFn({ method: "GET" })
