@@ -772,6 +772,9 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          execution_report: string | null
+          execution_report_updated_at: string | null
+          execution_report_updated_by: string | null
           finished_at: string | null
           hour_rate: number | null
           id: string
@@ -805,6 +808,9 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          execution_report?: string | null
+          execution_report_updated_at?: string | null
+          execution_report_updated_by?: string | null
           finished_at?: string | null
           hour_rate?: number | null
           id?: string
@@ -838,6 +844,9 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          execution_report?: string | null
+          execution_report_updated_at?: string | null
+          execution_report_updated_by?: string | null
           finished_at?: string | null
           hour_rate?: number | null
           id?: string
