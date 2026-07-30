@@ -768,6 +768,10 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
   if (executedDescriptions.length > 0) {
     workItems.push({ label: "Serviço executado", value: executedDescriptions.join("\n") });
   }
+  const executionReport = order.execution_report?.trim();
+  if (executionReport) {
+    workItems.push({ label: "Serviço executado (relato do técnico)", value: executionReport });
+  }
   if (financials?.notes?.trim()) {
     workItems.push({ label: "Observações da apuração", value: financials.notes.trim() });
   }
