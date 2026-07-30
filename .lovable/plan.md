@@ -1,40 +1,22 @@
 ## Objetivo
+Criar o acesso de login para **bebyalves68@gmail.com** e vinculá-lo ao colaborador já existente **OMAR ALVES**, seguindo exatamente o mesmo fluxo usado para os 10 técnicos anteriores.
 
-Criar/completar 10 contas de acesso (e-mail + senha temporária), com perfil, papel `tecnico` e vínculo com o colaborador correto no menu "Colaboradores" — sem alterar a arquitetura de autenticação nem dados de OS.
+## Situação atual (verificada)
+- Colaborador `OMAR ALVES` existe, está ativo, **sem e-mail e sem conta vinculada**.
+- Não existe conta de autenticação com o e-mail `bebyalves68@gmail.com`.
+- Não há colaborador duplicado com esse nome ou e-mail.
 
-## Situação atual verificada
+## Passos
+1. Criar a conta de acesso com o e-mail e a senha temporária informados, já confirmada para login imediato, com o nome "Omar Alves".
+2. Conferir que o perfil e o papel de técnico foram criados automaticamente pelos gatilhos do sistema (mesmo comportamento dos usuários anteriores); completar manualmente caso algo falte.
+3. Atualizar o colaborador OMAR ALVES existente: preencher o e-mail e vincular à nova conta — sem criar colaborador novo e preservando histórico, OS, horas e precificação.
+4. Validar: login real funcionando, perfil ativo, papel de técnico, exatamente um colaborador vinculado, sem duplicados, e presença correta na lista de Colaboradores e na atribuição de OS.
+5. Apagar os scripts temporários; a senha não será gravada em arquivos, logs, commits ou campos do banco.
 
-Contas de autenticação existentes hoje: 8 (nenhum dos 10 e-mails solicitados existe). Colaboradores existentes relevantes (consulta feita na base):
-
-| Usuário solicitado | Colaborador existente | Ação |
-|---|---|---|
-| José Manuel — manuelverajose2021@gmail.com | JOSÉ MANOEL VERA (sem e-mail, sem user_id) | vincular + preencher e-mail |
-| Sebastian — marquxz.s@gmail.com | SEBASTIAN MARQUXS | vincular + preencher e-mail |
-| Uilian — uilian.urb@gmail.com | UILIAN RAMOS BASTOS | vincular + preencher e-mail |
-| Ricardo — rmckoscrevic@gmail.com | Ricardo (sem e-mail, sem user_id) | vincular + preencher e-mail |
-| Juan Grellmann | nenhum (o "Juan Rusch" existente é outra pessoa, já vinculada a outra conta) | criar colaborador |
-| Matheus, Rodimir, Rudinilson, Valdir, Vinicius | nenhum | criar colaborador |
-
-Nenhum colaborador existente será renomeado, excluído ou terá horas/OS/precificação alteradas.
-
-## Execução
-
-1. **Contas de acesso** — criar as 10 contas pela API administrativa oficial do backend, com e-mail já confirmado (login imediato por e-mail/senha). Senhas apenas em memória durante a execução: nunca gravadas em arquivos, migrações, logs ou no perfil.
-2. **Perfis** — garantir um perfil por conta com nome completo e e-mail corretos (criar se o gatilho automático não tiver criado; atualizar o nome caso já exista).
-3. **Papel** — inserir `tecnico` em `user_roles` de forma idempotente (sem duplicar, sem remover papéis existentes).
-4. **Colaboradores** — para cada usuário: buscar por e-mail; se não achar, buscar por nome normalizado (sem acentos, caixa única); se achar, vincular `user_id` e completar o e-mail; se não achar, criar colaborador ativo com nome e e-mail. Cada conta fica com exatamente 1 colaborador, e cada colaborador com no máximo 1 conta.
-5. **Validação** — consulta final conferindo, por usuário: conta existe, perfil correto, papel `tecnico`, exatamente 1 colaborador vinculado, colaborador ativo (portanto visível na lista de Colaboradores e na seleção de técnico da OS). Teste de login real por e-mail/senha para confirmar autenticação.
-
-## Troca de senha no primeiro acesso
-
-A arquitetura atual não possui fluxo de "senha temporária obrigatória". Para não alterar a arquitetura de autenticação (como pedido), as senhas serão definidas como informadas e a orientação será trocar a senha manualmente. Se quiser, posso depois adicionar uma tela de troca obrigatória no primeiro acesso — é uma mudança separada.
+## Observação
+Continua sem troca obrigatória de senha no primeiro acesso (mesma condição dos demais usuários). Posso implementar depois, se desejar.
 
 ## Detalhes técnicos
-
-- Criação das contas via API Admin do Supabase Auth executada no sandbox (chave de serviço já disponível no ambiente), com `email_confirm: true`.
-- Perfis/papéis/colaboradores gravados via operações de dados idempotentes (upsert por e-mail/`user_id`), sem migração de schema — nenhuma tabela, política ou trigger é alterada.
-- Vínculo feito em `technicians.user_id`, o mesmo relacionamento usado pelos fluxos de OS e pelo `useUserRole`.
-
-## Entrega
-
-Relatório final por usuário: nome, e-mail, colaborador (encontrado/criado), status do vínculo, status do papel, resultado do teste de login e eventuais erros.
+- Conta criada via Supabase Auth Admin API com a service role key (o `psql` não acessa o schema `auth`).
+- Vínculo feito por `UPDATE public.technicians SET user_id, email WHERE id = '26337dce-…'`, com guarda `user_id IS NULL` e verificação de ausência de duplicidade.
+- Papel `tecnico` em `public.user_roles` (nunca em `profiles`/`technicians`).
