@@ -43,6 +43,7 @@ import {
 import {
   cancelWireTrayOrder,
   confirmWireTrayOrder,
+  deleteWireTrayOrder,
   previewWireTrayOrderInventory,
   saveWireTrayOrderDraft,
 } from "@/lib/api/wireTrayOrders.functions";
