@@ -954,6 +954,26 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
           </>
         }
       />
+      {order.status === "draft" ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-bold text-amber-950">Ainda não enviado para separação</p>
+          <p className="mt-1 text-xs text-amber-900">
+            Rascunhos não reservam estoque e não aparecem na fila de separação. Confirme o pedido
+            para liberar a operação.
+          </p>
+          {canOperate ? (
+            <button
+              type="button"
+              className="wire-button-primary mt-3"
+              disabled={confirmMutation.isPending}
+              onClick={() => confirmMutation.mutate()}
+            >
+              <Check size={16} />{" "}
+              {confirmMutation.isPending ? "Confirmando..." : "Confirmar e enviar para separação"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <article className="wire-metric">
           <p className="wire-metric-label">Status</p>
