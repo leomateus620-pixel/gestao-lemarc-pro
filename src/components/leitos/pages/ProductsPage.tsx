@@ -91,7 +91,7 @@ export function WireTrayProductsPage() {
                 className="wire-input pl-9"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Nome, SKU ou material"
+                placeholder="Nome ou material"
               />
             </span>
           </label>
