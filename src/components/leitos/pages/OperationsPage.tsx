@@ -61,6 +61,24 @@ type SeparationAction = {
   resolvesEntryId?: string;
 };
 
+function deliveryBadge(date: string | null) {
+  if (!date) return { tone: "neutral" as const, label: "Sem previsão" };
+  const today = new Date();
+  const todayKey = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const [year, month, day] = date.slice(0, 10).split("-").map(Number);
+  const target = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1).getTime();
+  if (target < todayKey) return { tone: "danger" as const, label: "Atrasado" };
+  if (target === todayKey) return { tone: "warning" as const, label: "Entrega hoje" };
+  return { tone: "success" as const, label: "No prazo" };
+}
+
+const separationEntryLabel: Record<string, string> = {
+  separation: "Separação",
+  checking: "Conferência",
+  discrepancy: "Divergência",
+  resolution: "Resolução",
+};
+
 export function WireTraySeparationPage() {
   const access = useWireTrayAccess();
   const query = useWireTraySeparationQuery();
@@ -71,6 +89,7 @@ export function WireTraySeparationPage() {
   const [difference, setDifference] = useState(0);
   const [reason, setReason] = useState("");
   const canSeparate = hasWireTrayPermission(access.role, "separate", access.financialAccess);
+  const canView = canSeparate || access.role === "producao";
   const mutation = useMutation({
     mutationFn: () =>
       record({
@@ -106,13 +125,14 @@ export function WireTraySeparationPage() {
     },
     onError: (error) => toast.error(wireTrayErrorDescription(error, "Registro recusado.")),
   });
-  if (!canSeparate)
+  if (!canView)
     return (
       <WireRestrictedState description="A fila de separação exige perfil de estoque, gestão ou administração." />
     );
   if (query.isLoading) return <WireLoadingState label="Carregando fila de separação..." />;
   if (query.isError) return <WireErrorState error={query.error} onRetry={() => query.refetch()} />;
-  const rows = query.data ?? [];
+  const rows = (query.data?.rows ?? []) as any[];
+  const showValues = Boolean(query.data?.canViewFinancials);
   function open(next: SeparationAction) {
     setAction(next);
     setQuantity(next.max);
@@ -138,6 +158,12 @@ export function WireTraySeparationPage() {
                     candidate.resolves_entry_id === entry.id,
                 ),
             );
+            const deadline = deliveryBadge(row.order.expectedDeliveryDate ?? null);
+            const toProduce = (row.items ?? []).reduce(
+              (sum: number, item: any) => sum + Number(item.production_required_quantity ?? 0),
+              0,
+            );
+            const history = (row.entries ?? []).slice(0, 6);
             return (
               <WirePanel
                 key={row.order.id}
@@ -152,6 +178,22 @@ export function WireTraySeparationPage() {
                   </Link>
                 }
               >
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white px-4 py-3">
+                  <WireStatus tone={deadline.tone}>{deadline.label}</WireStatus>
+                  <WireStatus tone={orderStatusTone(row.order.status)}>
+                    {wireTrayOrderStatusLabel[row.order.status as WireTrayOrderStatus]}
+                  </WireStatus>
+                  {toProduce > 0 ? (
+                    <WireStatus tone="warning">
+                      A produzir {formatWireQuantity(toProduce)}
+                    </WireStatus>
+                  ) : null}
+                  {showValues && row.order.totalCents ? (
+                    <span className="ml-auto text-sm font-bold text-slate-900">
+                      {formatWireCurrency(row.order.totalCents)}
+                    </span>
+                  ) : null}
+                </div>
                 {unresolved.length ? (
                   <div className="border-b border-red-200 bg-red-50 px-4 py-3">
                     <div className="flex items-start gap-3">
@@ -197,9 +239,13 @@ export function WireTraySeparationPage() {
                     <thead>
                       <tr>
                         <th>Produto</th>
+                        <th>Pedido</th>
                         <th>Reservado</th>
+                        <th>A produzir</th>
                         <th>Separado</th>
                         <th>Conferido</th>
+                        {showValues ? <th>Valor unit.</th> : null}
+                        {showValues ? <th>Total</th> : null}
                         <th>Progresso</th>
                         <th>Ação</th>
                       </tr>
@@ -225,19 +271,41 @@ export function WireTraySeparationPage() {
                               <p className="font-semibold text-slate-900">
                                 {item.product_name_snapshot}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {item.product_sku_snapshot ?? "Sem SKU"}
-                              </p>
                             </td>
+                            <td>{formatWireQuantity(Number(item.requested_quantity), unit)}</td>
                             <td>{formatWireQuantity(Number(item.reserved_quantity), unit)}</td>
+                            <td>
+                              {Number(item.production_required_quantity) > 0
+                                ? formatWireQuantity(
+                                    Number(item.production_required_quantity),
+                                    unit,
+                                  )
+                                : "—"}
+                            </td>
                             <td>{formatWireQuantity(Number(item.separated_quantity), unit)}</td>
                             <td>{formatWireQuantity(Number(item.checked_quantity), unit)}</td>
+                            {showValues ? (
+                              <td>
+                                {item.unit_price_cents === null
+                                  ? "—"
+                                  : formatWireCurrency(Number(item.unit_price_cents))}
+                              </td>
+                            ) : null}
+                            {showValues ? (
+                              <td>
+                                {item.total_price_cents === null
+                                  ? "—"
+                                  : formatWireCurrency(Number(item.total_price_cents))}
+                              </td>
+                            ) : null}
                             <td>
                               <WireProgress value={progress} />
                             </td>
                             <td>
                               <div className="flex flex-wrap gap-2">
-                                {separationRemaining > 0 ? (
+                                {!canSeparate ? (
+                                  <span className="text-xs text-slate-500">Somente leitura</span>
+                                ) : separationRemaining > 0 ? (
                                   <button
                                     type="button"
                                     className="wire-button-secondary min-h-9"
@@ -290,6 +358,36 @@ export function WireTraySeparationPage() {
                     {wireTrayOrderStatusLabel[row.order.status as WireTrayOrderStatus]}
                   </WireStatus>
                 </div>
+                {history.length ? (
+                  <div className="border-t border-slate-100 px-4 py-3">
+                    <p className="wire-eyebrow">Histórico de movimentações</p>
+                    <ul className="mt-2 grid gap-1.5">
+                      {history.map((entry: any) => {
+                        const item = row.items.find(
+                          (candidate: any) => candidate.id === entry.order_item_id,
+                        );
+                        return (
+                          <li
+                            key={entry.id}
+                            className="flex flex-wrap items-center gap-2 text-xs text-slate-600"
+                          >
+                            <span className="font-semibold text-slate-900">
+                              {separationEntryLabel[entry.entry_type] ?? entry.entry_type}
+                            </span>
+                            <span>{item?.product_name_snapshot ?? "Item"}</span>
+                            <span>{formatWireQuantity(Number(entry.quantity))}</span>
+                            {Number(entry.difference_quantity) > 0 ? (
+                              <span className="font-semibold text-red-700">
+                                divergência {formatWireQuantity(Number(entry.difference_quantity))}
+                              </span>
+                            ) : null}
+                            <span className="ml-auto">{formatWireDate(entry.created_at, true)}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
               </WirePanel>
             );
           })}
@@ -297,7 +395,7 @@ export function WireTraySeparationPage() {
       ) : (
         <WireEmptyState
           title="Fila de separação vazia"
-          description="Pedidos integralmente reservados aparecerão aqui para separação e dupla conferência."
+          description="Pedidos confirmados aparecem aqui automaticamente — inclusive os que ainda precisam ser produzidos."
         />
       )}
       {action ? (

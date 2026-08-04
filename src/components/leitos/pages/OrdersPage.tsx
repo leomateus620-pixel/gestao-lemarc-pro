@@ -420,8 +420,8 @@ export function WireTrayOrderWizardPage() {
       queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
       toast.success(
         shouldConfirm
-          ? "Pedido confirmado; reservas e faltas foram processadas."
-          : "Rascunho salvo.",
+          ? "Pedido confirmado e enviado para a fila de separação."
+          : "Rascunho salvo. Ele só vai para a separação após a confirmação.",
       );
       navigate({ to: "/leitos/pedidos/$orderId", params: { orderId: result.id } });
     },
@@ -861,7 +861,7 @@ export function WireTrayOrderWizardPage() {
         <div className="wire-form-footer">
           <button
             type="button"
-            className="wire-button-secondary"
+            className="wire-button-ghost"
             disabled={saveMutation.isPending}
             onClick={() => submit(false)}
           >
@@ -873,7 +873,7 @@ export function WireTrayOrderWizardPage() {
             disabled={saveMutation.isPending}
             onClick={() => submit(true)}
           >
-            <Check size={16} /> Confirmar pedido
+            <Check size={16} /> Salvar e enviar para separação
           </button>
         </div>
       </WirePanel>
@@ -892,7 +892,7 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
   const confirmMutation = useMutation({
     mutationFn: () => confirm({ data: { id: orderId, idempotencyKey: crypto.randomUUID() } }),
     onSuccess: () => {
-      toast.success("Pedido confirmado e disponibilidade processada.");
+      toast.success("Pedido confirmado e enviado para a fila de separação.");
       invalidateOrderFlow(queryClient, orderId);
     },
     onError: (error) => toast.error(wireTrayErrorDescription(error, "Não foi possível confirmar.")),
@@ -954,6 +954,26 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
           </>
         }
       />
+      {order.status === "draft" ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-bold text-amber-950">Ainda não enviado para separação</p>
+          <p className="mt-1 text-xs text-amber-900">
+            Rascunhos não reservam estoque e não aparecem na fila de separação. Confirme o pedido
+            para liberar a operação.
+          </p>
+          {canOperate ? (
+            <button
+              type="button"
+              className="wire-button-primary mt-3"
+              disabled={confirmMutation.isPending}
+              onClick={() => confirmMutation.mutate()}
+            >
+              <Check size={16} />{" "}
+              {confirmMutation.isPending ? "Confirmando..." : "Confirmar e enviar para separação"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <article className="wire-metric">
           <p className="wire-metric-label">Status</p>
