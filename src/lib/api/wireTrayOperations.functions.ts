@@ -34,17 +34,31 @@ const SEPARATION_ORDER_SELECT = `
 export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireWireTrayAccess(context, ["admin", "gestor", "estoque"]);
+    const access = await requireWireTrayAccess(context, [
+      "admin",
+      "gestor",
+      "estoque",
+      "producao",
+    ]);
     const sb = context.supabase as any;
     const { data: orders, error } = await sb
       .from("wire_tray_orders")
       .select(SEPARATION_ORDER_SELECT)
-      .in("status", ["stock_reserved", "separating", "awaiting_check"])
+      .in("status", [
+        "stock_reserved",
+        "separating",
+        "awaiting_check",
+        "production_pending",
+        "in_production",
+      ])
       .order("expected_delivery_date", { ascending: true, nullsFirst: false })
       .limit(100);
     if (error) throwWireTrayDataError(error, "Não foi possível carregar a fila de separação.");
     const orderIds = (orders ?? []).map((order: any) => order.id);
-    const [reservationsResult, entriesResult] = orderIds.length
+    const itemIds = (orders ?? []).flatMap((order: any) =>
+      (order.items ?? []).map((item: any) => item.id),
+    );
+    const [reservationsResult, entriesResult, itemFinancialsResult] = orderIds.length
       ? await Promise.all([
           sb
             .from("wire_tray_reservations")
@@ -58,8 +72,15 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
             .select("*")
             .in("order_id", orderIds)
             .order("created_at", { ascending: false }),
+          access.canViewFinancials && itemIds.length
+            ? sb
+                .from("wire_tray_order_item_financials")
+                .select("order_item_id, unit_price_cents, total_cents")
+                .in("order_item_id", itemIds)
+            : Promise.resolve({ data: [], error: null }),
         ])
       : [
+          { data: [], error: null },
           { data: [], error: null },
           { data: [], error: null },
         ];
@@ -67,12 +88,27 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
       throwWireTrayDataError(reservationsResult.error, "Não foi possível carregar as reservas.");
     if (entriesResult.error)
       throwWireTrayDataError(entriesResult.error, "Não foi possível carregar as conferências.");
-    return (orders ?? []).map((order: any) => ({
-      order: mapOrderSummary(order),
-      items: order.items ?? [],
-      reservations: (reservationsResult.data ?? []).filter((row: any) => row.order_id === order.id),
-      entries: (entriesResult.data ?? []).filter((row: any) => row.order_id === order.id),
-    }));
+    const priceMap = new Map<string, { unit_price_cents: number; total_cents: number }>(
+      (itemFinancialsResult.data ?? []).map((row: any) => [row.order_item_id, row]),
+    );
+    return {
+      canViewFinancials: access.canViewFinancials,
+      rows: (orders ?? []).map((order: any) => {
+        const items = (order.items ?? []).map((item: any) => ({
+          ...item,
+          unit_price_cents: priceMap.get(item.id)?.unit_price_cents ?? null,
+          total_price_cents: priceMap.get(item.id)?.total_cents ?? null,
+        }));
+        return {
+          order: mapOrderSummary(order),
+          items,
+          reservations: (reservationsResult.data ?? []).filter(
+            (row: any) => row.order_id === order.id,
+          ),
+          entries: (entriesResult.data ?? []).filter((row: any) => row.order_id === order.id),
+        };
+      }),
+    };
   });
 
 export const recordWireTraySeparation = createServerFn({ method: "POST" })
