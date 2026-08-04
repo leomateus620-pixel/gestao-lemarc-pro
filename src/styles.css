@@ -3489,6 +3489,146 @@
 .wire-mobile-list {
   display: grid;
 }
+
+/* ---- Catálogo de produtos: lista única responsiva ---- */
+.wire-product-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border-bottom: 1px solid #e4e8ee;
+  padding: 0.8rem 1rem;
+}
+.wire-product-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.wire-product-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 0.25rem 0.65rem;
+  color: #47566b;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+.wire-product-chip strong {
+  color: #101a2b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.wire-product-head {
+  display: none;
+}
+.wire-product-list {
+  display: grid;
+}
+.wire-product-row {
+  display: grid;
+  gap: 0.55rem;
+  border-bottom: 1px solid #edf0f4;
+  padding: 0.95rem 1rem;
+  background: #fff;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+.wire-product-row:last-child {
+  border-bottom: 0;
+}
+.wire-product-row:hover {
+  background: #f9fbfd;
+}
+.wire-product-row:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: -2px;
+}
+.wire-product-name {
+  color: #0d1626;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.wire-product-row:hover .wire-product-name {
+  color: #b84508;
+}
+.wire-product-meta {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.wire-product-metric {
+  display: grid;
+  gap: 0.1rem;
+}
+.wire-product-metric dt {
+  color: #8592a6;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wire-product-metric dd {
+  color: #1e293b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wire-product-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.wire-product-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+}
+.wire-product-chevron {
+  display: none;
+  color: #94a3b8;
+}
+@media (min-width: 860px) {
+  .wire-product-head,
+  .wire-product-row {
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.15fr) 1.25rem;
+    align-items: center;
+    gap: 1rem;
+  }
+  .wire-product-head {
+    display: grid;
+    border-bottom: 1px solid #dfe5eb;
+    background: #f8fafc;
+    padding: 0.6rem 1rem;
+    color: #5c687a;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .wire-product-row {
+    padding: 0.85rem 1rem;
+  }
+  .wire-product-facts {
+    display: contents;
+  }
+  .wire-product-metric dt {
+    display: none;
+  }
+  .wire-product-chevron {
+    display: block;
+  }
+}
 .wire-mobile-card {
   display: grid;
   gap: 0.68rem;

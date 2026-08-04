@@ -62,6 +62,7 @@ export function WireTrayProductsPage() {
   };
   const query = useWireTrayProductsQuery(filters);
   const canManage = hasWireTrayPermission(access.role, "manage_products", access.financialAccess);
+  const filtersDirty = search.trim() !== "" || category !== "" || active !== "active";
   useEffect(() => setPage(1), [search, category, active]);
 
   return (
@@ -91,7 +92,7 @@ export function WireTrayProductsPage() {
                 className="wire-input pl-9"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Nome, SKU ou material"
+                placeholder="Nome ou material"
               />
             </span>
           </label>
@@ -129,29 +130,46 @@ export function WireTrayProductsPage() {
           <WireErrorState error={query.error} onRetry={() => query.refetch()} />
         ) : query.data!.rows.length ? (
           <>
-            <div className="wire-table-wrap hidden md:block">
-              <table className="wire-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Categoria</th>
-                    <th>Dimensões</th>
-                    <th>Unidade</th>
-                    <th>Estoque mínimo</th>
-                    <th>Reposição</th>
-                    <th>Situação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data!.rows.map((product) => (
-                    <ProductRow key={product.id} product={product} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="wire-product-toolbar">
+              <div className="wire-product-chips">
+                <span className="wire-product-chip">
+                  <strong>{query.data!.count}</strong> no filtro
+                </span>
+                <span className="wire-product-chip">
+                  <strong>{query.data!.rows.filter((row) => row.active).length}</strong> ativos
+                  listados
+                </span>
+                <span className="wire-product-chip">
+                  <strong>
+                    {query.data!.rows.filter((row) => row.automaticReplenishment).length}
+                  </strong>{" "}
+                  com reposição automática
+                </span>
+              </div>
+              {filtersDirty ? (
+                <button
+                  type="button"
+                  className="wire-button-ghost"
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("");
+                    setActive("active");
+                  }}
+                >
+                  Limpar filtros
+                </button>
+              ) : null}
             </div>
-            <div className="wire-mobile-list md:hidden">
+            <div className="wire-product-head" aria-hidden="true">
+              <span>Produto</span>
+              <span>Dimensões</span>
+              <span>Estoque mínimo</span>
+              <span>Situação</span>
+              <span />
+            </div>
+            <div className="wire-product-list">
               {query.data!.rows.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductListRow key={product.id} product={product} />
               ))}
             </div>
             <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
@@ -174,53 +192,32 @@ export function WireTrayProductsPage() {
   );
 }
 
-function ProductRow({ product }: { product: WireTrayProduct }) {
+function ProductListRow({ product }: { product: WireTrayProduct }) {
   return (
-    <tr>
-      <td>
-        <Link to={`/leitos/produtos/${product.id}` as never} className="wire-table-link">
-          {product.name}
-        </Link>
-        <p className="mt-1 text-xs text-slate-500">{product.sku ?? "Sem SKU"}</p>
-      </td>
-      <td>{wireTrayCategoryLabel[product.category]}</td>
-      <td>{dimensions(product)}</td>
-      <td>{wireTrayUnitLabel[product.unit]}</td>
-      <td>{formatWireQuantity(product.minimumStock, wireTrayUnitLabel[product.unit])}</td>
-      <td>
-        <WireStatus tone={product.automaticReplenishment ? "info" : "neutral"}>
-          {product.automaticReplenishment ? "Automática" : "Manual"}
-        </WireStatus>
-      </td>
-      <td>
-        <WireStatus tone={product.active ? "success" : "neutral"}>
-          {product.active ? "Ativo" : "Inativo"}
-        </WireStatus>
-      </td>
-    </tr>
-  );
-}
-
-function ProductCard({ product }: { product: WireTrayProduct }) {
-  return (
-    <Link to={`/leitos/produtos/${product.id}` as never} className="wire-mobile-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-bold text-slate-950">{product.name}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {product.sku ?? "Sem SKU"} · {wireTrayCategoryLabel[product.category]}
-          </p>
+    <Link to={`/leitos/produtos/${product.id}` as never} className="wire-product-row">
+      <div className="min-w-0">
+        <p className="wire-product-name truncate">{product.name}</p>
+        <p className="wire-product-meta">{wireTrayCategoryLabel[product.category]}</p>
+      </div>
+      <div className="wire-product-facts">
+        <dl className="wire-product-metric">
+          <dt>Dimensões</dt>
+          <dd>{dimensions(product)}</dd>
+        </dl>
+        <dl className="wire-product-metric">
+          <dt>Estoque mínimo</dt>
+          <dd>{formatWireQuantity(product.minimumStock, wireTrayUnitLabel[product.unit])}</dd>
+        </dl>
+        <div className="wire-product-badges">
+          <WireStatus tone={product.active ? "success" : "neutral"}>
+            {product.active ? "Ativo" : "Inativo"}
+          </WireStatus>
+          <WireStatus tone={product.automaticReplenishment ? "info" : "neutral"}>
+            {product.automaticReplenishment ? "Reposição automática" : "Reposição manual"}
+          </WireStatus>
         </div>
-        <WireStatus tone={product.active ? "success" : "neutral"}>
-          {product.active ? "Ativo" : "Inativo"}
-        </WireStatus>
       </div>
-      <div className="flex items-center justify-between text-xs text-slate-600">
-        <span>{dimensions(product)}</span>
-        <span>
-          Mín. {formatWireQuantity(product.minimumStock, wireTrayUnitLabel[product.unit])}
-        </span>
-      </div>
+      <ArrowRight size={16} className="wire-product-chevron" />
     </Link>
   );
 }
