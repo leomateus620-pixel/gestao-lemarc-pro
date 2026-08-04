@@ -531,6 +531,15 @@ export function WireTrayOrderWizardPage() {
             </div>
           ) : null}
 
+          <QuickClientDialog
+            open={clientDialogOpen}
+            onOpenChange={setClientDialogOpen}
+            onCreated={async (clientId) => {
+              await options.refetch();
+              setForm((prev) => ({ ...prev, clientId, clientUnitId: null }));
+            }}
+          />
+
           <OrderSection {...SECTIONS[0]}>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="wire-field sm:col-span-2">
