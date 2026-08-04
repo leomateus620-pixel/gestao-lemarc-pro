@@ -534,7 +534,18 @@ export function WireTrayOrderWizardPage() {
           <OrderSection {...SECTIONS[0]}>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="wire-field sm:col-span-2">
-                <span className="wire-label">Cliente</span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="wire-label">Cliente</span>
+                  {canCreate ? (
+                    <button
+                      type="button"
+                      className="wire-button-ghost"
+                      onClick={() => setClientDialogOpen(true)}
+                    >
+                      <Plus size={15} /> Nova empresa
+                    </button>
+                  ) : null}
+                </span>
                 <select
                   className="wire-select text-base font-semibold"
                   value={form.clientId}
