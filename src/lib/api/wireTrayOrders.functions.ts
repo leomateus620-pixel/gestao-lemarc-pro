@@ -354,6 +354,31 @@ export const previewWireTrayOrderInventory = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    return previewInventory(data, context);
+  });
+
+export const deleteWireTrayOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await requireWireTrayAccess(context, ["admin", "gestor", "comercial"]);
+    const { data: result, error } = await (context.supabase as any).rpc("wire_tray_delete_order", {
+      _order_id: data.id,
+    });
+    if (error) throwWireTrayDataError(error, "Não foi possível excluir o pedido.");
+    return result as { id: string; number: number; deleted: boolean };
+  });
+
+const previewInventoryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().positive() })),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
     await requireWireTrayAccess(context, ["admin", "gestor", "comercial"]);
     const ids = Array.from(new Set(data.items.map((item) => item.productId)));
     if (ids.length === 0) return [];
