@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useWireTrayAccess } from "@/components/leitos/WireTrayAccessContext";
 import { WireTrayDocuments } from "@/components/leitos/WireTrayDocuments";
+import { QuickClientDialog } from "@/components/leitos/QuickClientDialog";
 import {
   WireEmptyState,
   WireErrorState,
