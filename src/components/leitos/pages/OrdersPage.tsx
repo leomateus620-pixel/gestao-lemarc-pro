@@ -1104,6 +1104,15 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
                 <Check size={16} /> Confirmar
               </button>
             ) : null}
+            {order.status === "draft" && canOperate ? (
+              <button
+                type="button"
+                className="wire-button-secondary text-red-700"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 size={16} /> Excluir
+              </button>
+            ) : null}
             {!["cancelled", "completed", "dispatched"].includes(order.status) && canOperate ? (
               <button
                 type="button"
