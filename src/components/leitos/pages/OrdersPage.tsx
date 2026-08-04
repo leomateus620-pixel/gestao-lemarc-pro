@@ -81,6 +81,8 @@ function invalidateOrderFlow(queryClient: ReturnType<typeof useQueryClient>, ord
 
 export function WireTrayOrdersPage() {
   const access = useWireTrayAccess();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
@@ -95,6 +97,32 @@ export function WireTrayOrdersPage() {
     pageSize: 25,
   });
   const canCreate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
+  const confirmFn = useServerFn(confirmWireTrayOrder);
+  const deleteFn = useServerFn(deleteWireTrayOrder);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    number: number;
+    clientName: string;
+  } | null>(null);
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => confirmFn({ data: { id, idempotencyKey: crypto.randomUUID() } }),
+    onSuccess: (_result, id) => {
+      toast.success("Pedido confirmado e enviado para a fila de separação.");
+      invalidateOrderFlow(queryClient, id);
+    },
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Não foi possível confirmar.")),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { id } }),
+    onSuccess: (_result, id) => {
+      toast.success("Pedido excluído definitivamente.");
+      setPendingDelete(null);
+      invalidateOrderFlow(queryClient, id);
+    },
+    onError: (error) =>
+      toast.error(wireTrayErrorDescription(error, "Não foi possível excluir o pedido.")),
+  });
+  const openOrder = (id: string) => navigate({ to: `/leitos/pedidos/${id}` as never });
   useEffect(() => setPage(1), [priority, search, sort, status]);
   return (
     <WirePage>
