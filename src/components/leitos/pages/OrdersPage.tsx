@@ -216,18 +216,27 @@ export function WireTrayOrdersPage() {
                     <th>Progresso</th>
                     {access.canViewFinancials ? <th>Total</th> : null}
                     <th>Status</th>
+                    {canCreate ? <th className="text-right">Ações</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {query.data!.rows.map((order) => (
-                    <tr key={order.id}>
+                    <tr
+                      key={order.id}
+                      className="wire-row-clickable"
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Abrir pedido #${order.number}`}
+                      onClick={() => openOrder(order.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openOrder(order.id);
+                        }
+                      }}
+                    >
                       <td>
-                        <Link
-                          to={`/leitos/pedidos/${order.id}` as never}
-                          className="wire-table-link"
-                        >
-                          #{order.number}
-                        </Link>
+                        <span className="wire-table-link">#{order.number}</span>
                         <p className="mt-1 text-xs text-slate-500">
                           {order.customerOrderReference ??
                             order.quotationReference ??
@@ -270,6 +279,49 @@ export function WireTrayOrdersPage() {
                           {wireTrayOrderStatusLabel[order.status]}
                         </WireStatus>
                       </td>
+                      {canCreate ? (
+                        <td>
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {order.status === "draft" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="wire-button-secondary wire-button-compact"
+                                  disabled={confirmMutation.isPending}
+                                  onClick={() => confirmMutation.mutate(order.id)}
+                                  title="Confirmar e enviar para separação"
+                                >
+                                  <Check size={14} /> Confirmar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="wire-button-secondary wire-button-compact text-red-700"
+                                  onClick={() =>
+                                    setPendingDelete({
+                                      id: order.id,
+                                      number: order.number,
+                                      clientName: order.clientName,
+                                    })
+                                  }
+                                  title="Excluir pedido"
+                                >
+                                  <Trash2 size={14} /> Excluir
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="wire-button-secondary wire-button-compact"
+                              onClick={() => openOrder(order.id)}
+                            >
+                              Abrir <ArrowRight size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -277,11 +329,12 @@ export function WireTrayOrdersPage() {
             </div>
             <div className="wire-mobile-list md:hidden">
               {query.data!.rows.map((order) => (
-                <Link
-                  to={`/leitos/pedidos/${order.id}` as never}
-                  className="wire-mobile-card"
-                  key={order.id}
-                >
+                <div className="wire-mobile-card" key={order.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => openOrder(order.id)}
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-slate-950">Pedido #{order.number}</p>
@@ -302,7 +355,44 @@ export function WireTrayOrdersPage() {
                       <span>{priorityLabel[order.priority]}</span>
                     )}
                   </div>
-                </Link>
+                  </button>
+                  {canCreate ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+                      {order.status === "draft" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="wire-button-secondary wire-button-compact"
+                            disabled={confirmMutation.isPending}
+                            onClick={() => confirmMutation.mutate(order.id)}
+                          >
+                            <Check size={14} /> Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            className="wire-button-secondary wire-button-compact text-red-700"
+                            onClick={() =>
+                              setPendingDelete({
+                                id: order.id,
+                                number: order.number,
+                                clientName: order.clientName,
+                              })
+                            }
+                          >
+                            <Trash2 size={14} /> Excluir
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="wire-button-secondary wire-button-compact ml-auto"
+                        onClick={() => openOrder(order.id)}
+                      >
+                        Abrir <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
             <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
@@ -321,6 +411,39 @@ export function WireTrayOrdersPage() {
           />
         )}
       </WirePanel>
+      {pendingDelete ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <p className="text-lg font-bold text-slate-950">Excluir pedido definitivamente?</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Pedido <strong>#{pendingDelete.number}</strong> — {pendingDelete.clientName}. Esta
+              ação não pode ser desfeita e só é possível porque o pedido está em rascunho.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="wire-button-secondary"
+                onClick={() => setPendingDelete(null)}
+              >
+                Manter pedido
+              </button>
+              <button
+                type="button"
+                className="wire-button-danger"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate(pendingDelete.id)}
+              >
+                <Trash2 size={16} />{" "}
+                {deleteMutation.isPending ? "Excluindo..." : "Excluir pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </WirePage>
   );
 }
