@@ -3508,6 +3508,11 @@
 .wire-mobile-list {
   display: grid;
 }
+@media (min-width: 768px) {
+  .wire-mobile-list {
+    display: none;
+  }
+}
 
 /* ---- Catálogo de produtos: lista única responsiva ---- */
 .wire-product-toolbar {
