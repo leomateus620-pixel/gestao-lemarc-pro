@@ -324,7 +324,10 @@ function OrderSection({
   action?: ReactNode;
 }) {
   return (
-    <section id={`novo-pedido-${id}`} className="scroll-mt-24 border-t border-slate-200 pt-6 first:border-0 first:pt-0">
+    <section
+      id={`novo-pedido-${id}`}
+      className="scroll-mt-24 border-t border-slate-200 pt-6 first:border-0 first:pt-0"
+    >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="font-display text-3xl font-black leading-none tracking-tight text-slate-300">
@@ -391,10 +394,7 @@ export function WireTrayOrderWizardPage() {
   const total = items.reduce((sum, item) => sum + (item.unitPriceCents ?? 0) * item.quantity, 0);
   const itemsValid = items.length > 0 && items.every((item) => item.productId && item.quantity > 0);
   const previewSignature = useMemo(
-    () =>
-      itemsValid
-        ? JSON.stringify(items.map((item) => [item.productId, item.quantity]))
-        : "",
+    () => (itemsValid ? JSON.stringify(items.map((item) => [item.productId, item.quantity])) : ""),
     [items, itemsValid],
   );
 
@@ -475,7 +475,9 @@ export function WireTrayOrderWizardPage() {
     setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
   function focusSection(id: string) {
-    document.getElementById(`novo-pedido-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document
+      .getElementById(`novo-pedido-${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function submit(shouldConfirm: boolean) {
     setError(null);
@@ -577,7 +579,9 @@ export function WireTrayOrderWizardPage() {
                 <select
                   className="wire-select"
                   value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as ServicePriority })}
+                  onChange={(e) =>
+                    setForm({ ...form, priority: e.target.value as ServicePriority })
+                  }
                 >
                   {Object.entries(priorityLabel).map(([value, label]) => (
                     <option value={value} key={value}>
