@@ -385,6 +385,7 @@ export function WireTrayOrderWizardPage() {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [previewRows, setPreviewRows] = useState<Array<Record<string, number | string>>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const draft = {
     ...form,
     items: items.map(({ key: _key, qtyText: _q, priceText: _p, ...item }) => item),
