@@ -892,7 +892,7 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
   const confirmMutation = useMutation({
     mutationFn: () => confirm({ data: { id: orderId, idempotencyKey: crypto.randomUUID() } }),
     onSuccess: () => {
-      toast.success("Pedido confirmado e disponibilidade processada.");
+      toast.success("Pedido confirmado e enviado para a fila de separação.");
       invalidateOrderFlow(queryClient, orderId);
     },
     onError: (error) => toast.error(wireTrayErrorDescription(error, "Não foi possível confirmar.")),
