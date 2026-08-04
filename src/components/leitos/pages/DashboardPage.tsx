@@ -205,11 +205,6 @@ export function WireTrayDashboardPage() {
       <WirePanel
         title="Produção em andamento"
         description="Ordens liberadas e apontamentos consolidados."
-        action={
-          <Link to="/leitos/producao" className="wire-button-ghost">
-            Abrir produção
-          </Link>
-        }
       >
         {data.production.length ? (
           <div className="wire-table-wrap">
@@ -230,12 +225,7 @@ export function WireTrayDashboardPage() {
                   return (
                     <tr key={row.id}>
                       <td>
-                        <Link
-                          className="wire-table-link"
-                          to={`/leitos/producao/${row.id}` as never}
-                        >
-                          #{row.number}
-                        </Link>
+                        <span className="font-semibold text-slate-900">#{row.number}</span>
                       </td>
                       <td>
                         <p className="font-semibold text-slate-900">{row.productName}</p>
@@ -265,11 +255,6 @@ export function WireTrayDashboardPage() {
           <WireEmptyState
             title="Nenhuma produção em execução"
             description="Ordens liberadas aparecerão aqui sem necessidade de atualização manual."
-            action={
-              <Link to="/leitos/producao/nova" className="wire-button-secondary">
-                Planejar produção
-              </Link>
-            }
           />
         )}
       </WirePanel>
