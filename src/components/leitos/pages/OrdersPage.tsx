@@ -1356,6 +1356,38 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
           </div>
         </WirePanel>
       ) : null}
+      {deleteOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <p className="text-lg font-bold text-slate-950">Excluir pedido definitivamente?</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Pedido <strong>#{order.number}</strong> — {order.clientName}. Esta ação não pode ser
+              desfeita e só é possível porque o pedido está em rascunho.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="wire-button-secondary"
+                onClick={() => setDeleteOpen(false)}
+              >
+                Manter pedido
+              </button>
+              <button
+                type="button"
+                className="wire-button-danger"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+              >
+                <Trash2 size={16} /> {deleteMutation.isPending ? "Excluindo..." : "Excluir pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </WirePage>
   );
 }
