@@ -1018,11 +1018,7 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
             {order.production.length ? (
               <div className="divide-y divide-slate-100">
                 {order.production.map((op) => (
-                  <Link
-                    to={`/leitos/producao/${op.id}` as never}
-                    key={op.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
-                  >
+                  <div key={op.id} className="flex items-center gap-3 px-4 py-3">
                     <span className="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-700">
                       <Factory size={16} />
                     </span>
@@ -1035,8 +1031,7 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
                         {wireTrayProductionStatusLabel[op.status]}
                       </p>
                     </div>
-                    <ArrowRight size={16} className="text-slate-400" />
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (

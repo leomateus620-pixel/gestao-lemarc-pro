@@ -45,7 +45,6 @@ type NavItem = {
 const navigation: NavItem[] = [
   { to: "/leitos", label: "Visão geral", icon: Home },
   { to: "/leitos/pedidos", label: "Pedidos", icon: ShoppingCart },
-  { to: "/leitos/producao", label: "Produção", icon: Factory },
   { to: "/leitos/estoque", label: "Estoque", icon: Warehouse },
   { to: "/leitos/separacao", label: "Separação", icon: ClipboardCheck, permission: "separate" },
   { to: "/leitos/faturamento", label: "Faturamento", icon: FileBox, permission: "bill" },
@@ -317,7 +316,6 @@ export function LeitosShell({ children }: { children: ReactNode }) {
       >
         <MobileNavItem to="/leitos" label="Início" icon={Home} exact />
         <MobileNavItem to="/leitos/pedidos" label="Pedidos" icon={ShoppingCart} />
-        <MobileNavItem to="/leitos/producao" label="Produção" icon={Factory} />
         <MobileNavItem to="/leitos/estoque" label="Estoque" icon={Warehouse} />
         <MobileNavItem to="/leitos/mais" label="Mais" icon={MoreHorizontal} />
       </nav>
