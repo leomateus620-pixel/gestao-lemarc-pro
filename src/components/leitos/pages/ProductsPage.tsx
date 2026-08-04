@@ -62,6 +62,7 @@ export function WireTrayProductsPage() {
   };
   const query = useWireTrayProductsQuery(filters);
   const canManage = hasWireTrayPermission(access.role, "manage_products", access.financialAccess);
+  const filtersDirty = search.trim() !== "" || category !== "" || active !== "active";
   useEffect(() => setPage(1), [search, category, active]);
 
   return (
