@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useWireTrayAccess } from "@/components/leitos/WireTrayAccessContext";
 import { WireTrayDocuments } from "@/components/leitos/WireTrayDocuments";
+import { QuickClientDialog } from "@/components/leitos/QuickClientDialog";
 import {
   WireEmptyState,
   WireErrorState,
@@ -384,6 +385,7 @@ export function WireTrayOrderWizardPage() {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [previewRows, setPreviewRows] = useState<Array<Record<string, number | string>>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const draft = {
     ...form,
     items: items.map(({ key: _key, qtyText: _q, priceText: _p, ...item }) => item),
@@ -529,10 +531,30 @@ export function WireTrayOrderWizardPage() {
             </div>
           ) : null}
 
+          <QuickClientDialog
+            open={clientDialogOpen}
+            onOpenChange={setClientDialogOpen}
+            onCreated={async (clientId) => {
+              await options.refetch();
+              setForm((prev) => ({ ...prev, clientId, clientUnitId: null }));
+            }}
+          />
+
           <OrderSection {...SECTIONS[0]}>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="wire-field sm:col-span-2">
-                <span className="wire-label">Cliente</span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="wire-label">Cliente</span>
+                  {canCreate ? (
+                    <button
+                      type="button"
+                      className="wire-button-ghost"
+                      onClick={() => setClientDialogOpen(true)}
+                    >
+                      <Plus size={15} /> Nova empresa
+                    </button>
+                  ) : null}
+                </span>
                 <select
                   className="wire-select text-base font-semibold"
                   value={form.clientId}
