@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,12 +7,10 @@ import {
   ArrowRight,
   Check,
   CircleDollarSign,
-  ClipboardList,
   Factory,
   Plus,
   Save,
   Search,
-  ShieldCheck,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -297,7 +295,72 @@ export function WireTrayOrdersPage() {
   );
 }
 
-type DraftItem = WireTrayOrderDraftInput["items"][number] & { key: string };
+type DraftItem = WireTrayOrderDraftInput["items"][number] & {
+  key: string;
+  qtyText: string;
+  priceText: string;
+};
+
+const SECTIONS = [
+  { id: "cliente", index: "01", title: "Cliente", hint: "Quem recebe o pedido." },
+  { id: "itens", index: "02", title: "Itens", hint: "Produtos, quantidades e valores." },
+  { id: "entrega", index: "03", title: "Entrega", hint: "Prazo e instruções operacionais." },
+  { id: "revisao", index: "04", title: "Revisão", hint: "Confira antes de confirmar." },
+] as const;
+
+function OrderSection({
+  id,
+  index,
+  title,
+  hint,
+  children,
+  action,
+}: {
+  id: string;
+  index: string;
+  title: string;
+  hint: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <section
+      id={`novo-pedido-${id}`}
+      className="scroll-mt-24 border-t border-slate-200 pt-6 first:border-0 first:pt-0"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="font-display text-3xl font-black leading-none tracking-tight text-slate-300">
+            {index}
+          </span>
+          <div>
+            <h3 className="font-display text-xl font-extrabold leading-tight tracking-tight text-slate-950">
+              {title}
+            </h3>
+            <p className="mt-0.5 text-sm text-slate-500">{hint}</p>
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function toDateInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatLongDate(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
 
 export function WireTrayOrderWizardPage() {
   const navigate = useNavigate();
@@ -308,7 +371,6 @@ export function WireTrayOrderWizardPage() {
   const confirm = useServerFn(confirmWireTrayOrder);
   const preview = useServerFn(previewWireTrayOrderInventory);
   const queryClient = useQueryClient();
-  const [step, setStep] = useState(0);
   const [form, setForm] = useState<Omit<WireTrayOrderDraftInput, "items">>({
     id: null,
     clientId: "",
@@ -324,12 +386,17 @@ export function WireTrayOrderWizardPage() {
   const [error, setError] = useState<string | null>(null);
   const draft = {
     ...form,
-    items: items.map(({ key: _key, ...item }) => item),
+    items: items.map(({ key: _key, qtyText: _q, priceText: _p, ...item }) => item),
   } as WireTrayOrderDraftInput;
   const clientUnits =
     options.data?.units.filter((unit: { client_id: string }) => unit.client_id === form.clientId) ??
     [];
   const total = items.reduce((sum, item) => sum + (item.unitPriceCents ?? 0) * item.quantity, 0);
+  const itemsValid = items.length > 0 && items.every((item) => item.productId && item.quantity > 0);
+  const previewSignature = useMemo(
+    () => (itemsValid ? JSON.stringify(items.map((item) => [item.productId, item.quantity])) : ""),
+    [items, itemsValid],
+  );
 
   const saveMutation = useMutation({
     mutationFn: async (shouldConfirm: boolean) => {
@@ -363,19 +430,23 @@ export function WireTrayOrderWizardPage() {
     },
   });
   const previewMutation = useMutation({
-    mutationFn: () =>
-      preview({
-        data: {
-          items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-        },
-      }),
-    onSuccess: (rows) => {
-      setPreviewRows(rows);
-      setStep(3);
-    },
-    onError: (cause) =>
-      setError(wireTrayErrorDescription(cause, "Não foi possível validar a disponibilidade.")),
+    mutationFn: (payload: Array<{ productId: string; quantity: number }>) =>
+      preview({ data: { items: payload } }),
+    onSuccess: (rows) => setPreviewRows(rows),
   });
+  const runPreview = previewMutation.mutate;
+
+  useEffect(() => {
+    if (!previewSignature) {
+      setPreviewRows([]);
+      return;
+    }
+    const payload = (JSON.parse(previewSignature) as Array<[string, number]>).map(
+      ([productId, quantity]) => ({ productId, quantity }),
+    );
+    const timer = setTimeout(() => runPreview(payload), 450);
+    return () => clearTimeout(timer);
+  }, [previewSignature, runPreview]);
 
   if (!canCreate)
     return <WireRestrictedState description="Seu perfil não permite criar ou confirmar pedidos." />;
@@ -392,8 +463,10 @@ export function WireTrayOrderWizardPage() {
         key: crypto.randomUUID(),
         productId: product.id,
         quantity: 1,
+        qtyText: "1",
         notes: null,
         unitPriceCents: access.canViewFinancials ? 0 : null,
+        priceText: "",
         sortOrder: current.length,
       },
     ]);
@@ -401,144 +474,135 @@ export function WireTrayOrderWizardPage() {
   function updateItem(key: string, patch: Partial<DraftItem>) {
     setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
-  function next() {
-    setError(null);
-    if (step === 0 && !form.clientId) return setError("Selecione o cliente do pedido.");
-    if (
-      step === 1 &&
-      (!items.length || items.some((item) => !item.productId || item.quantity <= 0))
-    )
-      return setError("Adicione ao menos um produto com quantidade válida.");
-    if (step === 2) return previewMutation.mutate();
-    setStep((current) => Math.min(3, current + 1));
+  function focusSection(id: string) {
+    document
+      .getElementById(`novo-pedido-${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  function submit(shouldConfirm: boolean) {
+    setError(null);
+    if (!form.clientId) {
+      setError("Selecione o cliente do pedido.");
+      focusSection("cliente");
+      return;
+    }
+    if (!itemsValid) {
+      setError("Adicione ao menos um produto com quantidade válida.");
+      focusSection("itens");
+      return;
+    }
+    saveMutation.mutate(shouldConfirm);
+  }
+
+  const selectedClient = options.data!.clients.find(
+    (client: { id: string }) => client.id === form.clientId,
+  );
+  const selectedUnit = clientUnits.find((unit: { id: string }) => unit.id === form.clientUnitId);
+  const longDate = form.expectedDeliveryDate ? formatLongDate(form.expectedDeliveryDate) : null;
+  const isPastDate = Boolean(
+    form.expectedDeliveryDate && form.expectedDeliveryDate < toDateInput(new Date()),
+  );
+  const dateShortcuts: Array<{ label: string; days: number }> = [
+    { label: "Hoje", days: 0 },
+    { label: "+7 dias", days: 7 },
+    { label: "+15 dias", days: 15 },
+    { label: "+30 dias", days: 30 },
+  ];
 
   return (
     <WirePage>
       <WirePageHeader
         eyebrow="Fluxo comercial seguro"
         title="Novo pedido"
-        description="O rascunho não altera saldos. Somente a confirmação no servidor bloqueia o estoque e cria as OPs necessárias."
+        description="Preencha as seções abaixo. O rascunho não altera saldos; a confirmação reserva estoque e cria as OPs necessárias."
         backTo="/leitos/pedidos"
       />
       <WirePanel>
-        <div className="wire-stepper">
-          {["Cliente", "Itens", "Entrega", "Revisão"].map((label, index) => (
-            <button
-              type="button"
-              key={label}
-              className="wire-step"
-              data-active={step === index}
-              onClick={() => index < step && setStep(index)}
+        <div className="grid gap-8 p-4 sm:p-6">
+          {error ? (
+            <div
+              className="flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800"
+              role="alert"
             >
-              <span className="wire-step-index">
-                {index < step ? <Check size={12} /> : index + 1}
-              </span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
-        {error ? (
-          <div
-            className="mx-4 mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800"
-            role="alert"
-          >
-            <AlertTriangle size={17} className="mt-0.5 shrink-0" />
-            {error}
-          </div>
-        ) : null}
-        {step === 0 ? (
-          <div className="wire-form-grid">
-            <label className="wire-field wire-form-span-2">
-              <span className="wire-label">Cliente</span>
-              <select
-                className="wire-select"
-                value={form.clientId}
-                onChange={(e) => setForm({ ...form, clientId: e.target.value, clientUnitId: null })}
-              >
-                <option value="">Selecione um cliente real</option>
-                {options.data!.clients.map(
-                  (client: { id: string; name: string; cnpj: string | null }) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                      {client.cnpj ? ` · ${client.cnpj}` : ""}
+              <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+              {error}
+            </div>
+          ) : null}
+
+          <OrderSection {...SECTIONS[0]}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="wire-field sm:col-span-2">
+                <span className="wire-label">Cliente</span>
+                <select
+                  className="wire-select text-base font-semibold"
+                  value={form.clientId}
+                  onChange={(e) =>
+                    setForm({ ...form, clientId: e.target.value, clientUnitId: null })
+                  }
+                >
+                  <option value="">Selecione um cliente real</option>
+                  {options.data!.clients.map(
+                    (client: { id: string; name: string; cnpj: string | null }) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                        {client.cnpj ? ` · ${client.cnpj}` : ""}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="wire-field">
+                <span className="wire-label">Unidade do cliente</span>
+                <select
+                  className="wire-select"
+                  value={form.clientUnitId ?? ""}
+                  onChange={(e) => setForm({ ...form, clientUnitId: e.target.value || null })}
+                >
+                  <option value="">Sem unidade específica</option>
+                  {clientUnits.map(
+                    (unit: {
+                      id: string;
+                      name: string;
+                      city: string | null;
+                      state: string | null;
+                    }) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                        {unit.city ? ` · ${unit.city}/${unit.state ?? ""}` : ""}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="wire-field">
+                <span className="wire-label">Prioridade</span>
+                <select
+                  className="wire-select"
+                  value={form.priority}
+                  onChange={(e) =>
+                    setForm({ ...form, priority: e.target.value as ServicePriority })
+                  }
+                >
+                  {Object.entries(priorityLabel).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
                     </option>
-                  ),
-                )}
-              </select>
-            </label>
-            <label className="wire-field">
-              <span className="wire-label">Unidade do cliente</span>
-              <select
-                className="wire-select"
-                value={form.clientUnitId ?? ""}
-                onChange={(e) => setForm({ ...form, clientUnitId: e.target.value || null })}
-              >
-                <option value="">Sem unidade específica</option>
-                {clientUnits.map(
-                  (unit: {
-                    id: string;
-                    name: string;
-                    city: string | null;
-                    state: string | null;
-                  }) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.name}
-                      {unit.city ? ` · ${unit.city}/${unit.state ?? ""}` : ""}
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
-            <label className="wire-field">
-              <span className="wire-label">Prioridade</span>
-              <select
-                className="wire-select"
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as ServicePriority })}
-              >
-                {Object.entries(priorityLabel).map(([value, label]) => (
-                  <option value={value} key={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="wire-field">
-              <span className="wire-label">Referência do pedido do cliente</span>
-              <input
-                className="wire-input"
-                value={form.customerOrderReference ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, customerOrderReference: e.target.value || null })
-                }
-              />
-            </label>
-            <label className="wire-field">
-              <span className="wire-label">Referência da cotação</span>
-              <input
-                className="wire-input"
-                value={form.quotationReference ?? ""}
-                onChange={(e) => setForm({ ...form, quotationReference: e.target.value || null })}
-              />
-            </label>
-          </div>
-        ) : null}
-        {step === 1 ? (
-          <div className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-display font-extrabold text-slate-950">Itens do pedido</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Produtos ativos do catálogo Leitos Aramados.
-                </p>
-              </div>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </OrderSection>
+
+          <OrderSection
+            {...SECTIONS[1]}
+            action={
               <button className="wire-button-secondary" type="button" onClick={addItem}>
                 <Plus size={15} /> Adicionar
               </button>
-            </div>
+            }
+          >
             {items.length ? (
-              <div className="mt-4 grid gap-3">
+              <div className="grid gap-3">
                 {items.map((item, index) => {
                   const option = options.data!.products.find(
                     (entry: { product: { id: string } }) => entry.product.id === item.productId,
@@ -551,7 +615,7 @@ export function WireTrayOrderWizardPage() {
                       <label className="wire-field">
                         <span className="wire-label">Produto</span>
                         <select
-                          className="wire-select"
+                          className="wire-select font-semibold"
                           value={item.productId}
                           onChange={(e) => updateItem(item.key, { productId: e.target.value })}
                         >
@@ -581,11 +645,15 @@ export function WireTrayOrderWizardPage() {
                         <input
                           className="wire-input"
                           type="number"
-                          min="0.001"
+                          min="0"
                           step="0.001"
-                          value={item.quantity}
+                          inputMode="decimal"
+                          value={item.qtyText}
                           onChange={(e) =>
-                            updateItem(item.key, { quantity: Number(e.target.value) })
+                            updateItem(item.key, {
+                              qtyText: e.target.value,
+                              quantity: e.target.value === "" ? 0 : Number(e.target.value),
+                            })
                           }
                         />
                       </label>
@@ -597,10 +665,16 @@ export function WireTrayOrderWizardPage() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={(item.unitPriceCents ?? 0) / 100}
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            value={item.priceText}
                             onChange={(e) =>
                               updateItem(item.key, {
-                                unitPriceCents: Math.round(Number(e.target.value) * 100),
+                                priceText: e.target.value,
+                                unitPriceCents:
+                                  e.target.value === ""
+                                    ? 0
+                                    : Math.round(Number(e.target.value) * 100),
                               })
                             }
                           />
@@ -638,51 +712,78 @@ export function WireTrayOrderWizardPage() {
                 }
               />
             )}
-          </div>
-        ) : null}
-        {step === 2 ? (
-          <div className="wire-form-grid">
-            <label className="wire-field">
-              <span className="wire-label">Data prevista de entrega</span>
-              <input
-                className="wire-input"
-                type="date"
-                value={form.expectedDeliveryDate ?? ""}
-                onChange={(e) => setForm({ ...form, expectedDeliveryDate: e.target.value || null })}
-              />
-            </label>
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
-              <ShieldCheck size={18} className="mb-2" />
-              <strong>Planejamento autoritativo</strong>
-              <p className="text-blue-900/75">
-                A disponibilidade exibida na revisão será recalculada no servidor. A confirmação usa
-                bloqueio de linha para impedir dupla reserva.
-              </p>
+          </OrderSection>
+
+          <OrderSection {...SECTIONS[2]}>
+            <div className="grid gap-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                <span className="wire-label">Data prevista de entrega</span>
+                <p className="mt-2 font-display text-2xl font-extrabold leading-tight tracking-tight text-slate-950 first-letter:uppercase sm:text-3xl">
+                  {longDate ?? "Sem data definida"}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <input
+                    className="wire-input h-12 max-w-56 text-base font-semibold"
+                    type="date"
+                    value={form.expectedDeliveryDate ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, expectedDeliveryDate: e.target.value || null })
+                    }
+                  />
+                  {dateShortcuts.map((shortcut) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + shortcut.days);
+                    const value = toDateInput(date);
+                    return (
+                      <button
+                        type="button"
+                        key={shortcut.label}
+                        className="wire-button-secondary h-10"
+                        data-active={form.expectedDeliveryDate === value}
+                        onClick={() => setForm({ ...form, expectedDeliveryDate: value })}
+                      >
+                        {shortcut.label}
+                      </button>
+                    );
+                  })}
+                  {form.expectedDeliveryDate ? (
+                    <button
+                      type="button"
+                      className="h-10 px-2 text-sm font-semibold text-slate-500 underline-offset-4 hover:underline"
+                      onClick={() => setForm({ ...form, expectedDeliveryDate: null })}
+                    >
+                      Limpar
+                    </button>
+                  ) : null}
+                </div>
+                {isPastDate ? (
+                  <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-amber-700">
+                    <AlertTriangle size={15} /> A data escolhida já passou.
+                  </p>
+                ) : null}
+              </div>
+              <label className="wire-field">
+                <span className="wire-label">Observações operacionais</span>
+                <textarea
+                  className="wire-textarea min-h-32"
+                  value={form.operationalNotes ?? ""}
+                  onChange={(e) => setForm({ ...form, operationalNotes: e.target.value || null })}
+                  placeholder="Instruções de fabricação, separação ou expedição."
+                />
+              </label>
             </div>
-            <label className="wire-field wire-form-span-2">
-              <span className="wire-label">Observações operacionais</span>
-              <textarea
-                className="wire-textarea min-h-36"
-                value={form.operationalNotes ?? ""}
-                onChange={(e) => setForm({ ...form, operationalNotes: e.target.value || null })}
-                placeholder="Instruções de fabricação, separação ou expedição."
-              />
-            </label>
-          </div>
-        ) : null}
-        {step === 3 ? (
-          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_.8fr]">
-            <div className="grid content-start gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="wire-eyebrow">Resumo do pedido</p>
-                <h3 className="mt-2 font-display text-xl font-extrabold text-slate-950">
-                  {
-                    options.data!.clients.find(
-                      (client: { id: string }) => client.id === form.clientId,
-                    )?.name
-                  }
-                </h3>
-                <div className="mt-4 grid grid-cols-2 gap-4">
+          </OrderSection>
+
+          <OrderSection {...SECTIONS[3]}>
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                <h4 className="font-display text-lg font-extrabold tracking-tight text-slate-950">
+                  {selectedClient?.name ?? "Cliente não selecionado"}
+                </h4>
+                {selectedUnit ? (
+                  <p className="mt-1 text-sm text-slate-500">{selectedUnit.name}</p>
+                ) : null}
+                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Summary label="Prioridade" value={priorityLabel[form.priority]} />
                   <Summary label="Entrega" value={formatWireDate(form.expectedDeliveryDate)} />
                   <Summary label="Itens" value={String(items.length)} />
@@ -690,108 +791,68 @@ export function WireTrayOrderWizardPage() {
                     <Summary label="Total" value={formatWireCurrency(total)} />
                   ) : null}
                 </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <h4 className="font-bold text-slate-950">Disponibilidade indicativa</h4>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Uma nova leitura será feita no instante da confirmação.
+                {form.operationalNotes ? (
+                  <p className="mt-4 border-t border-slate-100 pt-3 text-sm leading-6 text-slate-600">
+                    {form.operationalNotes}
                   </p>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {previewRows.map((row) => {
-                    const product = options.data!.products.find(
-                      (entry: { product: { id: string } }) => entry.product.id === row.productId,
-                    )?.product;
-                    return (
-                      <div
-                        className="flex items-center gap-3 px-4 py-3"
-                        key={String(row.productId)}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {product?.name ?? "Produto"}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Solicitado {formatWireQuantity(Number(row.requested))} · disponível{" "}
-                            {formatWireQuantity(Number(row.available))}
-                          </p>
+                ) : null}
+              </div>
+              {items.length ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="divide-y divide-slate-100">
+                    {items.map((item) => {
+                      const product = options.data!.products.find(
+                        (entry: { product: { id: string } }) => entry.product.id === item.productId,
+                      )?.product;
+                      const row = previewRows.find((entry) => entry.productId === item.productId);
+                      return (
+                        <div className="flex items-center gap-3 px-4 py-3" key={item.key}>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {product?.name ?? "Produto"}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {formatWireQuantity(item.quantity)}
+                              {access.canViewFinancials
+                                ? ` · ${formatWireCurrency((item.unitPriceCents ?? 0) * item.quantity)}`
+                                : ""}
+                            </p>
+                          </div>
+                          {row ? (
+                            <WireStatus
+                              tone={Number(row.productionRequired) > 0 ? "warning" : "success"}
+                            >
+                              {Number(row.productionRequired) > 0
+                                ? `Produzir ${formatWireQuantity(Number(row.productionRequired))}`
+                                : "Reservável"}
+                            </WireStatus>
+                          ) : null}
                         </div>
-                        <WireStatus
-                          tone={Number(row.productionRequired) > 0 ? "warning" : "success"}
-                        >
-                          {Number(row.productionRequired) > 0
-                            ? `Produzir ${formatWireQuantity(Number(row.productionRequired))}`
-                            : "Reservável"}
-                        </WireStatus>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
-            <div className="grid content-start gap-3">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                <ClipboardList className="text-emerald-700" size={24} />
-                <p className="mt-3 font-bold text-emerald-950">Salvar rascunho</p>
-                <p className="mt-1 text-sm leading-6 text-emerald-900/75">
-                  Persiste o pedido, mas não movimenta nem reserva saldo.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5">
-                <Factory className="text-orange-700" size={24} />
-                <p className="mt-3 font-bold text-orange-950">Confirmar agora</p>
-                <p className="mt-1 text-sm leading-6 text-orange-900/75">
-                  Reserva o disponível e cria produção somente para a falta real, em uma transação.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
+          </OrderSection>
+        </div>
         <div className="wire-form-footer">
           <button
             type="button"
             className="wire-button-secondary"
-            disabled={step === 0 || saveMutation.isPending || previewMutation.isPending}
-            onClick={() => setStep((current) => current - 1)}
+            disabled={saveMutation.isPending}
+            onClick={() => submit(false)}
           >
-            Voltar
+            <Save size={16} /> Salvar rascunho
           </button>
-          {step < 3 ? (
-            <button
-              type="button"
-              className="wire-button-primary"
-              disabled={previewMutation.isPending}
-              onClick={next}
-            >
-              {previewMutation.isPending ? (
-                "Validando..."
-              ) : (
-                <>
-                  Continuar <ArrowRight size={16} />
-                </>
-              )}
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="wire-button-secondary"
-                disabled={saveMutation.isPending}
-                onClick={() => saveMutation.mutate(false)}
-              >
-                <Save size={16} /> Salvar rascunho
-              </button>
-              <button
-                type="button"
-                className="wire-button-primary"
-                disabled={saveMutation.isPending}
-                onClick={() => saveMutation.mutate(true)}
-              >
-                <Check size={16} /> Confirmar pedido
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="wire-button-primary"
+            disabled={saveMutation.isPending}
+            onClick={() => submit(true)}
+          >
+            <Check size={16} /> Confirmar pedido
+          </button>
         </div>
       </WirePanel>
     </WirePage>
