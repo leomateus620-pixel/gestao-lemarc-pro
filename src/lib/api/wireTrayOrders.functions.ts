@@ -344,19 +344,6 @@ export const cancelWireTrayOrder = createServerFn({ method: "POST" })
     return result;
   });
 
-export const previewWireTrayOrderInventory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z
-      .object({
-        items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().positive() })),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    return previewInventory(data, context);
-  });
-
 export const deleteWireTrayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
@@ -369,7 +356,7 @@ export const deleteWireTrayOrder = createServerFn({ method: "POST" })
     return result as { id: string; number: number; deleted: boolean };
   });
 
-const previewInventoryFn = createServerFn({ method: "POST" })
+export const previewWireTrayOrderInventory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z
