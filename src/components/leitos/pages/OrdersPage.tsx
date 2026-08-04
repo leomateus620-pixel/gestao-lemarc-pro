@@ -43,6 +43,7 @@ import {
 import {
   cancelWireTrayOrder,
   confirmWireTrayOrder,
+  deleteWireTrayOrder,
   previewWireTrayOrderInventory,
   saveWireTrayOrderDraft,
 } from "@/lib/api/wireTrayOrders.functions";
@@ -81,6 +82,8 @@ function invalidateOrderFlow(queryClient: ReturnType<typeof useQueryClient>, ord
 
 export function WireTrayOrdersPage() {
   const access = useWireTrayAccess();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
@@ -95,6 +98,32 @@ export function WireTrayOrdersPage() {
     pageSize: 25,
   });
   const canCreate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
+  const confirmFn = useServerFn(confirmWireTrayOrder);
+  const deleteFn = useServerFn(deleteWireTrayOrder);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    number: number;
+    clientName: string;
+  } | null>(null);
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => confirmFn({ data: { id, idempotencyKey: crypto.randomUUID() } }),
+    onSuccess: (_result, id) => {
+      toast.success("Pedido confirmado e enviado para a fila de separação.");
+      invalidateOrderFlow(queryClient, id);
+    },
+    onError: (error) => toast.error(wireTrayErrorDescription(error, "Não foi possível confirmar.")),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { id } }),
+    onSuccess: (_result, id) => {
+      toast.success("Pedido excluído definitivamente.");
+      setPendingDelete(null);
+      invalidateOrderFlow(queryClient, id);
+    },
+    onError: (error) =>
+      toast.error(wireTrayErrorDescription(error, "Não foi possível excluir o pedido.")),
+  });
+  const openOrder = (id: string) => navigate({ to: `/leitos/pedidos/${id}` as never });
   useEffect(() => setPage(1), [priority, search, sort, status]);
   return (
     <WirePage>
@@ -187,18 +216,27 @@ export function WireTrayOrdersPage() {
                     <th>Progresso</th>
                     {access.canViewFinancials ? <th>Total</th> : null}
                     <th>Status</th>
+                    {canCreate ? <th className="text-right">Ações</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {query.data!.rows.map((order) => (
-                    <tr key={order.id}>
+                    <tr
+                      key={order.id}
+                      className="wire-row-clickable"
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Abrir pedido #${order.number}`}
+                      onClick={() => openOrder(order.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openOrder(order.id);
+                        }
+                      }}
+                    >
                       <td>
-                        <Link
-                          to={`/leitos/pedidos/${order.id}` as never}
-                          className="wire-table-link"
-                        >
-                          #{order.number}
-                        </Link>
+                        <span className="wire-table-link">#{order.number}</span>
                         <p className="mt-1 text-xs text-slate-500">
                           {order.customerOrderReference ??
                             order.quotationReference ??
@@ -241,6 +279,49 @@ export function WireTrayOrdersPage() {
                           {wireTrayOrderStatusLabel[order.status]}
                         </WireStatus>
                       </td>
+                      {canCreate ? (
+                        <td>
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {order.status === "draft" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="wire-button-secondary wire-button-compact"
+                                  disabled={confirmMutation.isPending}
+                                  onClick={() => confirmMutation.mutate(order.id)}
+                                  title="Confirmar e enviar para separação"
+                                >
+                                  <Check size={14} /> Confirmar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="wire-button-secondary wire-button-compact text-red-700"
+                                  onClick={() =>
+                                    setPendingDelete({
+                                      id: order.id,
+                                      number: order.number,
+                                      clientName: order.clientName,
+                                    })
+                                  }
+                                  title="Excluir pedido"
+                                >
+                                  <Trash2 size={14} /> Excluir
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="wire-button-secondary wire-button-compact"
+                              onClick={() => openOrder(order.id)}
+                            >
+                              Abrir <ArrowRight size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -248,11 +329,12 @@ export function WireTrayOrdersPage() {
             </div>
             <div className="wire-mobile-list md:hidden">
               {query.data!.rows.map((order) => (
-                <Link
-                  to={`/leitos/pedidos/${order.id}` as never}
-                  className="wire-mobile-card"
-                  key={order.id}
-                >
+                <div className="wire-mobile-card" key={order.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => openOrder(order.id)}
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-slate-950">Pedido #{order.number}</p>
@@ -273,7 +355,44 @@ export function WireTrayOrdersPage() {
                       <span>{priorityLabel[order.priority]}</span>
                     )}
                   </div>
-                </Link>
+                  </button>
+                  {canCreate ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+                      {order.status === "draft" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="wire-button-secondary wire-button-compact"
+                            disabled={confirmMutation.isPending}
+                            onClick={() => confirmMutation.mutate(order.id)}
+                          >
+                            <Check size={14} /> Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            className="wire-button-secondary wire-button-compact text-red-700"
+                            onClick={() =>
+                              setPendingDelete({
+                                id: order.id,
+                                number: order.number,
+                                clientName: order.clientName,
+                              })
+                            }
+                          >
+                            <Trash2 size={14} /> Excluir
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="wire-button-secondary wire-button-compact ml-auto"
+                        onClick={() => openOrder(order.id)}
+                      >
+                        Abrir <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
             <WirePager page={page} pageSize={25} count={query.data!.count} onPage={setPage} />
@@ -292,6 +411,39 @@ export function WireTrayOrdersPage() {
           />
         )}
       </WirePanel>
+      {pendingDelete ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <p className="text-lg font-bold text-slate-950">Excluir pedido definitivamente?</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Pedido <strong>#{pendingDelete.number}</strong> — {pendingDelete.clientName}. Esta
+              ação não pode ser desfeita e só é possível porque o pedido está em rascunho.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="wire-button-secondary"
+                onClick={() => setPendingDelete(null)}
+              >
+                Manter pedido
+              </button>
+              <button
+                type="button"
+                className="wire-button-danger"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate(pendingDelete.id)}
+              >
+                <Trash2 size={16} />{" "}
+                {deleteMutation.isPending ? "Excluindo..." : "Excluir pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </WirePage>
   );
 }
@@ -885,9 +1037,12 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
   const access = useWireTrayAccess();
   const query = useWireTrayOrderQuery(orderId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const confirm = useServerFn(confirmWireTrayOrder);
   const cancel = useServerFn(cancelWireTrayOrder);
+  const remove = useServerFn(deleteWireTrayOrder);
   const [cancelReason, setCancelReason] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const canOperate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
   const confirmMutation = useMutation({
     mutationFn: () => confirm({ data: { id: orderId, idempotencyKey: crypto.randomUUID() } }),
@@ -905,6 +1060,17 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
       invalidateOrderFlow(queryClient, orderId);
     },
     onError: (error) => toast.error(wireTrayErrorDescription(error, "Cancelamento recusado.")),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => remove({ data: { id: orderId } }),
+    onSuccess: () => {
+      toast.success("Pedido excluído definitivamente.");
+      setDeleteOpen(false);
+      invalidateOrderFlow(queryClient, orderId);
+      navigate({ to: "/leitos/pedidos" });
+    },
+    onError: (error) =>
+      toast.error(wireTrayErrorDescription(error, "Não foi possível excluir o pedido.")),
   });
   if (query.isLoading)
     return (
@@ -936,6 +1102,15 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
                 onClick={() => confirmMutation.mutate()}
               >
                 <Check size={16} /> Confirmar
+              </button>
+            ) : null}
+            {order.status === "draft" && canOperate ? (
+              <button
+                type="button"
+                className="wire-button-secondary text-red-700"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 size={16} /> Excluir
               </button>
             ) : null}
             {!["cancelled", "completed", "dispatched"].includes(order.status) && canOperate ? (
@@ -1180,6 +1355,38 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
             </button>
           </div>
         </WirePanel>
+      ) : null}
+      {deleteOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <p className="text-lg font-bold text-slate-950">Excluir pedido definitivamente?</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Pedido <strong>#{order.number}</strong> — {order.clientName}. Esta ação não pode ser
+              desfeita e só é possível porque o pedido está em rascunho.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="wire-button-secondary"
+                onClick={() => setDeleteOpen(false)}
+              >
+                Manter pedido
+              </button>
+              <button
+                type="button"
+                className="wire-button-danger"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+              >
+                <Trash2 size={16} /> {deleteMutation.isPending ? "Excluindo..." : "Excluir pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </WirePage>
   );

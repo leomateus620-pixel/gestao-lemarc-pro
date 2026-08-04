@@ -344,6 +344,18 @@ export const cancelWireTrayOrder = createServerFn({ method: "POST" })
     return result;
   });
 
+export const deleteWireTrayOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await requireWireTrayAccess(context, ["admin", "gestor", "comercial"]);
+    const { data: result, error } = await (context.supabase as any).rpc("wire_tray_delete_order", {
+      _order_id: data.id,
+    });
+    if (error) throwWireTrayDataError(error, "Não foi possível excluir o pedido.");
+    return result as { id: string; number: number; deleted: boolean };
+  });
+
 export const previewWireTrayOrderInventory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
