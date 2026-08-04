@@ -420,8 +420,8 @@ export function WireTrayOrderWizardPage() {
       queryClient.invalidateQueries({ queryKey: wireTrayKeys.notifications });
       toast.success(
         shouldConfirm
-          ? "Pedido confirmado; reservas e faltas foram processadas."
-          : "Rascunho salvo.",
+          ? "Pedido confirmado e enviado para a fila de separação."
+          : "Rascunho salvo. Ele só vai para a separação após a confirmação.",
       );
       navigate({ to: "/leitos/pedidos/$orderId", params: { orderId: result.id } });
     },
@@ -861,7 +861,7 @@ export function WireTrayOrderWizardPage() {
         <div className="wire-form-footer">
           <button
             type="button"
-            className="wire-button-secondary"
+            className="wire-button-ghost"
             disabled={saveMutation.isPending}
             onClick={() => submit(false)}
           >
@@ -873,7 +873,7 @@ export function WireTrayOrderWizardPage() {
             disabled={saveMutation.isPending}
             onClick={() => submit(true)}
           >
-            <Check size={16} /> Confirmar pedido
+            <Check size={16} /> Salvar e enviar para separação
           </button>
         </div>
       </WirePanel>
