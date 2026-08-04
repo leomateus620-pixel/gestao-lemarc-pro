@@ -2425,6 +2425,7 @@ export type Database = {
         Args: { _roles: Database["public"]["Enums"]["wire_tray_module_role"][] }
         Returns: boolean
       }
+      wire_tray_delete_order: { Args: { _order_id: string }; Returns: Json }
       wire_tray_dispatch_order: {
         Args: {
           _idempotency_key: string
