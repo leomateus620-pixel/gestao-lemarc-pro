@@ -1037,9 +1037,12 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
   const access = useWireTrayAccess();
   const query = useWireTrayOrderQuery(orderId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const confirm = useServerFn(confirmWireTrayOrder);
   const cancel = useServerFn(cancelWireTrayOrder);
+  const remove = useServerFn(deleteWireTrayOrder);
   const [cancelReason, setCancelReason] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const canOperate = hasWireTrayPermission(access.role, "create_orders", access.financialAccess);
   const confirmMutation = useMutation({
     mutationFn: () => confirm({ data: { id: orderId, idempotencyKey: crypto.randomUUID() } }),
@@ -1057,6 +1060,17 @@ export function WireTrayOrderDetailPage({ orderId }: { orderId: string }) {
       invalidateOrderFlow(queryClient, orderId);
     },
     onError: (error) => toast.error(wireTrayErrorDescription(error, "Cancelamento recusado.")),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => remove({ data: { id: orderId } }),
+    onSuccess: () => {
+      toast.success("Pedido excluído definitivamente.");
+      setDeleteOpen(false);
+      invalidateOrderFlow(queryClient, orderId);
+      navigate({ to: "/leitos/pedidos" });
+    },
+    onError: (error) =>
+      toast.error(wireTrayErrorDescription(error, "Não foi possível excluir o pedido.")),
   });
   if (query.isLoading)
     return (
