@@ -3452,6 +3452,25 @@
   text-underline-offset: 3px;
 }
 
+.wire-table tbody tr.wire-row-clickable {
+  cursor: pointer;
+}
+.wire-table tbody tr.wire-row-clickable:hover {
+  background: #fff6ef;
+}
+.wire-table tbody tr.wire-row-clickable:hover .wire-table-link {
+  color: #b84508;
+}
+.wire-table tbody tr.wire-row-clickable:focus-visible {
+  outline: 2px solid #b84508;
+  outline-offset: -2px;
+}
+.wire-button-compact {
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 0.72rem;
+}
+
 .wire-status {
   display: inline-flex;
   min-height: 24px;
