@@ -58,7 +58,8 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
     const itemIds = (orders ?? []).flatMap((order: any) =>
       (order.items ?? []).map((item: any) => item.id),
     );
-    const [reservationsResult, entriesResult, itemFinancialsResult] = orderIds.length
+    const [reservationsResult, entriesResult, itemFinancialsResult, orderFinancialsResult] =
+      orderIds.length
       ? await Promise.all([
           sb
             .from("wire_tray_reservations")
@@ -78,8 +79,15 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
                 .select("order_item_id, unit_price_cents, total_cents")
                 .in("order_item_id", itemIds)
             : Promise.resolve({ data: [], error: null }),
+          access.canViewFinancials
+            ? sb
+                .from("wire_tray_order_financials")
+                .select("order_id, total_cents")
+                .in("order_id", orderIds)
+            : Promise.resolve({ data: [], error: null }),
         ])
       : [
+          { data: [], error: null },
           { data: [], error: null },
           { data: [], error: null },
           { data: [], error: null },
@@ -91,6 +99,9 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
     const priceMap = new Map<string, { unit_price_cents: number; total_cents: number }>(
       (itemFinancialsResult.data ?? []).map((row: any) => [row.order_item_id, row]),
     );
+    const orderTotalMap = new Map<string, number>(
+      (orderFinancialsResult.data ?? []).map((row: any) => [row.order_id, Number(row.total_cents)]),
+    );
     return {
       canViewFinancials: access.canViewFinancials,
       rows: (orders ?? []).map((order: any) => {
@@ -100,7 +111,10 @@ export const listWireTraySeparationQueue = createServerFn({ method: "GET" })
           total_price_cents: priceMap.get(item.id)?.total_cents ?? null,
         }));
         return {
-          order: mapOrderSummary(order),
+          order: mapOrderSummary(
+            order,
+            access.canViewFinancials ? (orderTotalMap.get(order.id) ?? null) : undefined,
+          ),
           items,
           reservations: (reservationsResult.data ?? []).filter(
             (row: any) => row.order_id === order.id,
