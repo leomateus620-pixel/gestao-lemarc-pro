@@ -419,8 +419,20 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
     // recorded AFTER the materialization (typically the next day, after an
     // overnight pause) must be appended, otherwise those hours are lost.
     if (storedEntries.length > 0) {
+      // When the admin already consolidated the hours, only work recorded
+      // AFTER that consolidation may be appended — never re-add history the
+      // admin deliberately reorganized.
+      const adjustedAt = financials?.labor_entries_adjusted_at ?? null;
+      const appendableSessionIds = new Set(
+        closedWorkSessions
+          .filter((s) => !adjustedAt || new Date(s.ended_at) > new Date(adjustedAt))
+          .map((s) => s.id),
+      );
+      const appendable = derivedEntries.filter((e) =>
+        appendableSessionIds.has(String(e.id).split(":")[1] ?? ""),
+      );
       const missing = findMissingSegments(
-        derivedEntries.map((e) => ({
+        appendable.map((e) => ({
           session_id: e.id,
           technician_id: e.technician_id ?? "",
           work_date: e.work_date,
