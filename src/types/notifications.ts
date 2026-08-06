@@ -1,6 +1,15 @@
 import type { ServicePriority, ServiceType } from "@/types/serviceOrder";
 
-export type ServiceOrderNotificationType = "service_order_assigned";
+export type ServiceOrderNotificationType = "service_order_assigned" | "service_order_open_time";
+
+/** Dados do alerta "colega ainda com tempo aberto na OS". */
+export type OpenTimeAlertDetails = {
+  finishedByName: string;
+  finishedByTechnicianId: string | null;
+  openTechnicianId: string;
+  openTechnicianName: string;
+  openSince: string | null;
+};
 
 export type AssignedOrderNotificationSummary = {
   id: string;
@@ -27,4 +36,8 @@ export type ServiceOrderAssignedNotification = {
   message: string | null;
   created_at: string;
   order: AssignedOrderNotificationSummary;
+};
+
+export type ServiceOrderNotification = ServiceOrderAssignedNotification & {
+  openTime?: OpenTimeAlertDetails | null;
 };
