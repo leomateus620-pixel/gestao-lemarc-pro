@@ -414,19 +414,74 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
       techFallback,
     );
 
-    // Once an admin has manually edited/deleted/added labor rows, the persisted
-    // labor table becomes the canonical source. Do not recreate deleted rows
-    // from the immutable time-session audit trail.
-    if (financials?.labor_entries_adjusted_at) {
-      return { entries: storedEntries, financials };
-    }
-
-    // If materialized labor rows already exist, they are the editable working
-    // copy for admin review/PDF/reporting. Do not replace them on every read,
-    // otherwise deleting a row would be undone by the session audit trail.
+    // Already-materialized labor rows are the editable working copy for admin
+    // review / PDF / reporting: never replaced or deleted on read. But work
+    // recorded AFTER the materialization (typically the next day, after an
+    // overnight pause) must be appended, otherwise those hours are lost.
     if (storedEntries.length > 0) {
-      const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
-      const totalLaborCents = storedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+      const missing = findMissingSegments(
+        derivedEntries.map((e) => ({
+          session_id: e.id,
+          technician_id: e.technician_id ?? "",
+          work_date: e.work_date,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          duration_minutes: e.duration_minutes,
+          segment_index: 0,
+          segment_count: 1,
+        })),
+        storedEntries,
+      );
+
+      let entriesNow = storedEntries;
+      if (missing.length > 0) {
+        const byKey = new Map(
+          derivedEntries.map((e) => [
+            `${e.technician_id ?? ""}|${e.work_date}|${e.start_time.slice(0, 5)}|${e.end_time.slice(0, 5)}`,
+            e,
+          ]),
+        );
+        const inserts = missing
+          .map((m) => {
+            const src = byKey.get(
+              `${m.technician_id}|${m.work_date}|${m.start_time.slice(0, 5)}|${m.end_time.slice(0, 5)}`,
+            );
+            if (!src) return null;
+            return {
+              service_order_id: data.orderId,
+              technician_id: src.technician_id,
+              role: src.role,
+              work_date: src.work_date,
+              start_time:
+                src.start_time.length === 5 ? `${src.start_time}:00` : src.start_time,
+              end_time: src.end_time.length === 5 ? `${src.end_time}:00` : src.end_time,
+              duration_minutes: src.duration_minutes,
+              hourly_rate_cents: src.hourly_rate_cents,
+              subtotal_cents: src.subtotal_cents,
+              description: src.description,
+              created_by: context.userId,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        if (inserts.length > 0) {
+          const { error: insErr } = await sb
+            .from("service_order_labor_entries")
+            .insert(inserts);
+          if (!insErr) {
+            const { data: refreshed } = await sb
+              .from("service_order_labor_entries")
+              .select(LABOR_SELECT)
+              .eq("service_order_id", data.orderId)
+              .order("work_date", { ascending: true })
+              .order("start_time", { ascending: true });
+            if (refreshed) entriesNow = refreshed.map(normalizeLabor);
+          }
+        }
+      }
+
+      const totalLaborMinutes = entriesNow.reduce((a, e) => a + e.duration_minutes, 0);
+      const totalLaborCents = entriesNow.reduce((a, e) => a + e.subtotal_cents, 0);
       const effectiveFinancials =
         !financials ||
         financials.total_labor_minutes !== totalLaborMinutes ||
@@ -436,7 +491,13 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               totalLaborCents,
             })
           : financials;
-      return { entries: storedEntries, financials: effectiveFinancials };
+      return { entries: entriesNow, financials: effectiveFinancials };
+    }
+
+    // Nothing materialized yet, but an admin adjustment flag exists (rows were
+    // all deleted on purpose): respect the admin decision.
+    if (financials?.labor_entries_adjusted_at) {
+      return { entries: storedEntries, financials };
     }
 
     // First editable read: materialize derived sessions as the admin working
