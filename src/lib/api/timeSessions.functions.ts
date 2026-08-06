@@ -248,15 +248,6 @@ export const finishWork = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const adjustSession = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (data: { id: string; started_at?: string; ended_at?: string | null; notes?: string }) => data,
-  )
-  .handler(async () => {
-    throw new Error("placeholder");
-  });
-
 export type OrderLaborOverride = {
   adjustedAt: string | null;
   totalMinutes: number;
