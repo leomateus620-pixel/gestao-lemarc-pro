@@ -77,6 +77,8 @@ export function LaborEntriesEditor({ order, entries }: Props) {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["order-financials", order.id] });
+    qc.invalidateQueries({ queryKey: ["order-labor-override", order.id] });
+    qc.invalidateQueries({ queryKey: ["order-time-sessions", order.id] });
     qc.invalidateQueries({ queryKey: ["service-order", order.id] });
     qc.invalidateQueries({ queryKey: ["service-orders"] });
     qc.invalidateQueries({ queryKey: ["report-orders"] });
