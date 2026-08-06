@@ -62,7 +62,7 @@ describe("computeDisplacementCents", () => {
         fixed_total_cents: 0,
       }),
     ).toBe(0));
-  it("per_km: 190 km × R$ 2,50 = R$ 475,00", () => {
+  it("per_km com 1 deslocamento: 190 km × R$ 2,50 = R$ 475,00", () => {
     expect(
       computeDisplacementCents({
         type: "per_km",
@@ -72,6 +72,28 @@ describe("computeDisplacementCents", () => {
         fixed_total_cents: 0,
       }),
     ).toBe(47500);
+  });
+  it("per_km com 2 deslocamentos duplica o km: 2 × 110 km × R$ 2,50 = R$ 550,00", () => {
+    expect(
+      computeDisplacementCents({
+        type: "per_km",
+        count: 2,
+        km_total: 110,
+        rate_cents: 250,
+        fixed_total_cents: 0,
+      }),
+    ).toBe(55000);
+  });
+  it("per_km sem quantidade informada conta como 1", () => {
+    expect(
+      computeDisplacementCents({
+        type: "per_km",
+        count: 0,
+        km_total: 110,
+        rate_cents: 250,
+        fixed_total_cents: 0,
+      }),
+    ).toBe(27500);
   });
   it("fixed mantém o valor informado", () => {
     expect(
@@ -116,7 +138,7 @@ describe("computeTotals", () => {
     );
     expect(totals.totalLaborMinutes).toBe(a.duration_minutes + b.duration_minutes + c.duration_minutes);
     expect(totals.totalLaborCents).toBe(a.subtotal_cents + b.subtotal_cents + c.subtotal_cents);
-    expect(totals.displacementCents).toBe(25000);
+    expect(totals.displacementCents).toBe(50000);
     expect(totals.grandTotalCents).toBe(totals.totalLaborCents + totals.displacementCents);
   });
 });

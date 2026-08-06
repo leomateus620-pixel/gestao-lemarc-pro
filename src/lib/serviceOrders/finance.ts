@@ -39,6 +39,14 @@ export function computeSubtotalCents(minutes: number, rateCents: number): number
   return Math.round((minutes * rateCents) / 60);
 }
 
+/** Km efetivo do deslocamento: km informado × quantidade (mínimo 1). */
+export function effectiveDisplacementKm(d: DisplacementInput): number {
+  const km = Math.max(0, Number(d.km_total) || 0);
+  if (km <= 0) return 0;
+  const count = Math.max(1, Math.round(Number(d.count) || 0));
+  return Math.round(km * count * 10000) / 10000;
+}
+
 export function computeDisplacementCents(d: DisplacementInput): number {
   switch (d.type) {
     case "none":
@@ -46,7 +54,7 @@ export function computeDisplacementCents(d: DisplacementInput): number {
     case "fixed":
       return Math.max(0, Math.round(d.fixed_total_cents || 0));
     case "per_km": {
-      const km = Math.max(0, Number(d.km_total) || 0);
+      const km = effectiveDisplacementKm(d);
       const rate = Math.max(0, Math.round(d.rate_cents || 0));
       return Math.round(km * rate);
     }
@@ -140,7 +148,8 @@ export function describeDisplacement(d: DisplacementInput): string {
   if (d.type === "fixed") return `Valor fixo — ${formatBRL(d.fixed_total_cents)}`;
   const total = computeDisplacementCents(d);
   const count = d.count > 0 ? `${d.count} desloc.` : null;
-  const km = d.km_total > 0 ? `${d.km_total.toLocaleString("pt-BR")} km` : null;
+  const effectiveKm = effectiveDisplacementKm(d);
+  const km = effectiveKm > 0 ? `${effectiveKm.toLocaleString("pt-BR")} km` : null;
   const rate = d.rate_cents > 0 ? `${formatBRL(d.rate_cents)}/km` : null;
   return [count, km, rate, formatBRL(total)].filter(Boolean).join(" · ");
 }
