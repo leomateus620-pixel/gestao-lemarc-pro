@@ -19,6 +19,7 @@ import {
   getTechnicianState,
   pauseReasonLabel,
   formatHm,
+  formatDateHm,
   type TimeSession,
 } from "@/lib/serviceOrders/timeSessions";
 import { formatHHmm } from "@/lib/serviceOrders/finance";
@@ -188,8 +189,11 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const openMinutesFor = (technicianId: string) => {
     const nowIso = new Date().toISOString();
     return sessions
-      .filter((s) => s.kind === "work" && s.technician_id === technicianId && !s.ended_at)
-      .reduce((acc, s) => {
+      .filter(
+        (s: TimeSession) =>
+          s.kind === "work" && s.technician_id === technicianId && !s.ended_at,
+      )
+      .reduce((acc: number, s: TimeSession) => {
         const ms = new Date(nowIso).getTime() - new Date(s.started_at).getTime();
         return acc + (ms > 0 ? Math.round(ms / 60000) : 0);
       }, 0);
