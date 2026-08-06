@@ -54,10 +54,10 @@ const SP_TIME = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 
-function spDate(iso: string): string {
+function spDateLocal(iso: string): string {
   return SP_DATE.format(new Date(iso));
 }
-function spTime(iso: string): string {
+function spTimeLocal(iso: string): string {
   return SP_TIME.format(new Date(iso));
 }
 
@@ -121,30 +121,26 @@ function deriveEntriesFromSessions(
     const rate = rateByTech.get(techId) ?? 0;
     const techObj = techObjByTech.get(techId) ?? null;
     const role = roleByTech.get(techId) ?? null;
-    list.forEach((s, idx) => {
-      const workDate = spDate(s.started_at);
-      const endDate = spDate(s.ended_at);
-      const startTime = spTime(s.started_at);
-      // Edge case: session crosses midnight — clamp end to 23:59:59.
-      const endTime = endDate !== workDate ? "23:59:59" : spTime(s.ended_at);
-      const duration =
-        s.duration_minutes && s.duration_minutes > 0
-          ? s.duration_minutes
-          : minutesBetween(s.started_at, s.ended_at);
-      const subtotal = computeSubtotalCents(duration, rate);
+    // One row per local day: sessions crossing midnight are split so the
+    // hours land on the correct date in the PDF and in the reports.
+    const segments = splitSessionsByDay(list);
+    segments.forEach((seg, idx) => {
+      const subtotal = computeSubtotalCents(seg.duration_minutes, rate);
       out.push({
-        id: `derived:${s.id}`,
+        id: `derived:${seg.session_id}:${seg.segment_index}`,
         service_order_id: orderId,
         technician_id: techId,
         role,
-        work_date: workDate,
-        start_time: startTime,
-        end_time: endTime,
-        duration_minutes: duration,
+        work_date: seg.work_date,
+        start_time: seg.start_time,
+        end_time: seg.end_time,
+        duration_minutes: seg.duration_minutes,
         hourly_rate_cents: rate,
         subtotal_cents: subtotal,
         description:
-          list.length > 1 ? `Intervalo ${idx + 1} de ${list.length}` : "Trabalho executado",
+          segments.length > 1
+            ? `Intervalo ${idx + 1} de ${segments.length}`
+            : "Trabalho executado",
         technician: techObj,
       });
     });
