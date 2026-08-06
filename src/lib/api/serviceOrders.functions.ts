@@ -379,6 +379,56 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
     return normalize(full);
   });
 
+export const updateServiceOrderClientUnit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { id: string; client_id: string | null; client_unit_id: string | null }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin } = await sb.rpc("is_admin");
+    if (!isAdmin) throw new Error("Ação restrita ao administrador.");
+
+    const { data: current, error: curErr } = await sb
+      .from("service_orders")
+      .select("id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (curErr) throw new Error(curErr.message);
+    if (!current) throw new Error("OS não encontrada.");
+    if (current.status === "cancelled") {
+      throw new Error("Não é possível alterar cliente/unidade de uma OS cancelada.");
+    }
+
+    if (data.client_unit_id) {
+      const { data: unit, error: unitErr } = await sb
+        .from("client_units")
+        .select("id, client_id")
+        .eq("id", data.client_unit_id)
+        .maybeSingle();
+      if (unitErr) throw new Error(unitErr.message);
+      if (!unit) throw new Error("Unidade não encontrada.");
+      if (data.client_id && unit.client_id !== data.client_id) {
+        throw new Error("A unidade selecionada não pertence à empresa escolhida.");
+      }
+      if (!data.client_id) data.client_id = unit.client_id;
+    }
+
+    const { error: updErr } = await sb
+      .from("service_orders")
+      .update({ client_id: data.client_id ?? null, client_unit_id: data.client_unit_id ?? null })
+      .eq("id", data.id);
+    if (updErr) throw new Error(updErr.message);
+
+    const { data: full, error: refetchErr } = await context.supabase
+      .from("service_orders")
+      .select(ORDER_SELECT)
+      .eq("id", data.id)
+      .single();
+    if (refetchErr) throw new Error(refetchErr.message);
+    return normalize(full);
+  });
+
 export const updateServiceOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)

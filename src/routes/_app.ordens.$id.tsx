@@ -47,6 +47,7 @@ import { LaborEntriesEditor } from "@/components/ordens/LaborEntriesEditor";
 import { ServiceOrderTimeControl } from "@/components/ordens/ServiceOrderTimeControl";
 import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { ExecutionReportSection } from "@/components/ordens/ExecutionReportSection";
+import { EditClientUnitDialog } from "@/components/ordens/EditClientUnitDialog";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
 import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/ServiceOrderMaterialsSection";
@@ -334,6 +335,7 @@ function OrdemDetalhe() {
               {order.client_unit?.city || order.client_unit?.state
                 ? ` · ${[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}`
                 : ""}
+              {isAdmin && order.status !== "cancelled" && <EditClientUnitDialog order={order} />}
             </DetailField>
             <DetailField icon={HardHat} label="Técnico responsável">
               {technicians.length === 0
