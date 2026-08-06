@@ -137,7 +137,8 @@ export async function syncLaborEntriesFromSessions(
   // Preserve current rates/role/description so the recompute doesn't zero them out.
   const { data: existing, error: exErr } = await sb
     .from("service_order_labor_entries")
-    .select("technician_id, role, hourly_rate_cents");
+    .select("technician_id, role, hourly_rate_cents")
+    .eq("service_order_id", orderId);
   if (exErr) throw new Error(exErr.message);
 
   const rateByTech = new Map<string, number>();
