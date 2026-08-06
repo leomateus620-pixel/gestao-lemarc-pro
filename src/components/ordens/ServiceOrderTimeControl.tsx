@@ -183,10 +183,22 @@ export function ServiceOrderTimeControl({ order }: Props) {
   }
 
   const liveState = getOrderLiveState(sessions, technicians);
-  const totalWorked = technicians.reduce(
-    (acc, t) => acc + computeTechnicianWorkedMinutes(sessions, t.id),
-    0,
-  );
+  // Minutos exibidos: enquanto o admin não apurar, é o cronômetro puro.
+  // Depois de apurado, vale a apuração + eventual sessão ainda aberta.
+  const openMinutesFor = (technicianId: string) => {
+    const nowIso = new Date().toISOString();
+    return sessions
+      .filter((s) => s.kind === "work" && s.technician_id === technicianId && !s.ended_at)
+      .reduce((acc, s) => {
+        const ms = new Date(nowIso).getTime() - new Date(s.started_at).getTime();
+        return acc + (ms > 0 ? Math.round(ms / 60000) : 0);
+      }, 0);
+  };
+  const displayedMinutesFor = (technicianId: string) =>
+    adjustedAt
+      ? (override?.minutesByTechnician[technicianId] ?? 0) + openMinutesFor(technicianId)
+      : computeTechnicianWorkedMinutes(sessions, technicianId);
+  const totalWorked = technicians.reduce((acc, t) => acc + displayedMinutesFor(t.id), 0);
 
   const stateBadge =
     liveState === "running"
@@ -228,6 +240,13 @@ export function ServiceOrderTimeControl({ order }: Props) {
           {stateBadge.label}
         </span>
       </div>
+
+      {adjustedAt && (
+        <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-200">
+          Horas ajustadas pelo admin em {formatDateHm(adjustedAt)} — os valores abaixo seguem a
+          apuração de horas. O histórico mostra os apontamentos originais.
+        </p>
+      )}
 
       {showBulkStart && (
         <div className="mt-3">
@@ -286,7 +305,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
                   <div className="truncate text-sm font-bold text-foreground">{t.full_name}</div>
                   <div className="text-[11px] text-muted-foreground">
                     <Clock size={10} className="mr-1 inline" />
-                    Trabalhadas: {formatHHmm(st.workedMinutes)}
+                    Trabalhadas: {formatHHmm(displayedMinutesFor(t.id))}
                     {st.state === "running" && st.currentStartedAt && (
                       <>
                         {" · "}Iniciada agora às {formatHm(st.currentStartedAt)}
