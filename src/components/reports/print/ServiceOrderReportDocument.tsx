@@ -127,8 +127,10 @@ function displacementDetail(financials: OrderFinancials | null) {
   if (!financials || financials.displacement_type === "none") return "Sem deslocamento";
   const parts = [displacementTypeLabel[financials.displacement_type]];
   if (financials.displacement_type === "per_km") {
-    parts.push(`${financials.displacement_count} desloc.`);
-    parts.push(`${financials.displacement_km_total} km`);
+    const count = Math.max(1, Math.round(financials.displacement_count || 0));
+    const km = Math.round(Number(financials.displacement_km_total || 0) * count * 10000) / 10000;
+    parts.push(`${count} desloc.`);
+    parts.push(`${km.toLocaleString("pt-BR")} km`);
     parts.push(`${formatBRL(financials.displacement_rate_cents)}/km`);
   }
   return parts.join(" · ");
