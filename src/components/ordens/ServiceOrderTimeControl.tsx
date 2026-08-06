@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
 import {
   listTimeSessions,
+  getOrderLaborOverride,
   startWork,
   pauseWork,
   resumeWork,
@@ -41,6 +42,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   );
   const queryClient = useQueryClient();
   const listFn = useServerFn(listTimeSessions);
+  const overrideFn = useServerFn(getOrderLaborOverride);
   const startFn = useServerFn(startWork);
   const pauseFn = useServerFn(pauseWork);
   const resumeFn = useServerFn(resumeWork);
@@ -51,6 +53,14 @@ export function ServiceOrderTimeControl({ order }: Props) {
     queryFn: () => listFn({ data: { orderId: order.id } }),
     refetchOnWindowFocus: true,
   });
+
+  // Horas oficiais apuradas pelo admin (só existem depois que ele salva a apuração).
+  const { data: override } = useQuery({
+    queryKey: ["order-labor-override", order.id],
+    queryFn: () => overrideFn({ data: { orderId: order.id } }),
+    refetchOnWindowFocus: true,
+  });
+  const adjustedAt = override?.adjustedAt ?? null;
 
   const [selectedTech, setSelectedTech] = useState<string>("");
   useEffect(() => {
@@ -84,6 +94,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["order-time-sessions", order.id] });
+    queryClient.invalidateQueries({ queryKey: ["order-labor-override", order.id] });
     queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
   };
 
