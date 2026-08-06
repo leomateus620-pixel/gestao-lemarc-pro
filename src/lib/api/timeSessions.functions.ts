@@ -203,6 +203,17 @@ export const pauseWork = createServerFn({ method: "POST" })
     } catch {
       /* non-blocking */
     }
+    try {
+      const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
+      await syncServiceOrderOpenTimeAlerts({
+        supabase: sb,
+        serviceOrderId: data.orderId,
+        finishedTechnicianId: data.technicianId,
+        actorUserId: context.userId,
+      });
+    } catch {
+      /* non-blocking */
+    }
     return normalize(row);
   });
 
