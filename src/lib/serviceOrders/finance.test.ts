@@ -138,7 +138,7 @@ describe("computeTotals", () => {
     );
     expect(totals.totalLaborMinutes).toBe(a.duration_minutes + b.duration_minutes + c.duration_minutes);
     expect(totals.totalLaborCents).toBe(a.subtotal_cents + b.subtotal_cents + c.subtotal_cents);
-    expect(totals.displacementCents).toBe(25000);
+    expect(totals.displacementCents).toBe(50000);
     expect(totals.grandTotalCents).toBe(totals.totalLaborCents + totals.displacementCents);
   });
 });
