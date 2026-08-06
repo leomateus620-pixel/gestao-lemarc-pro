@@ -381,6 +381,15 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
 
 export const updateServiceOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { id: string; client_id: string | null; client_unit_id: string | null }) => data,
+  )
+  .handler(async () => {
+    throw new Error("placeholder");
+  });
+
+export const updateServiceOrderStatusOriginal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)
   .handler(async ({ data, context }) => {
     const now = new Date().toISOString();
