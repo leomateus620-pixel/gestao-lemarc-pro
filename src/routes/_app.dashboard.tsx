@@ -23,6 +23,7 @@ import { OperationTodayCard } from "@/components/dashboard/OperationTodayCard";
 import { OrderTechnicianTimeCard } from "@/components/dashboard/OrderTechnicianTimeCard";
 import { TechnicianAssignedOrderNotification } from "@/components/dashboard/TechnicianAssignedOrderNotification";
 import { TechnicianOpenTimeNotification } from "@/components/dashboard/TechnicianOpenTimeNotification";
+import { finishColleagueWork } from "@/lib/api/timeSessions.functions";
 import {
   TechnicianHomeHero,
   TechnicianHomeSkeleton,
