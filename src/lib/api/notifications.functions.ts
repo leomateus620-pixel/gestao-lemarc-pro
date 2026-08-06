@@ -357,7 +357,7 @@ export const listTechnicianAssignedOrderNotifications = createServerFn({ method:
       .from("service_order_notifications")
       .select(NOTIFICATION_SELECT)
       .eq("user_id", context.userId)
-      .eq("type", ASSIGNED_NOTIFICATION_TYPE)
+      .in("type", NOTIFICATION_TYPES)
       .is("read_at", null)
       .is("dismissed_at", null)
       .order("created_at", { ascending: false })
@@ -365,8 +365,122 @@ export const listTechnicianAssignedOrderNotifications = createServerFn({ method:
     if (error) throw new Error(error.message);
     return (data ?? [])
       .map(normalizeNotification)
-      .filter(Boolean) as ServiceOrderAssignedNotification[];
+      .filter(Boolean) as ServiceOrderNotification[];
   });
+
+/**
+ * Mantém o alerta "colega ainda com tempo aberto" coerente com o estado real da OS:
+ * cria/reativa para quem ficou com sessão aberta e dispensa quando o tempo é encerrado.
+ * Retorna os dados do técnico ainda em aberto (para o alerta imediato na tela).
+ */
+export async function syncServiceOrderOpenTimeAlerts({
+  supabase,
+  serviceOrderId,
+  finishedTechnicianId = null,
+  actorUserId,
+}: {
+  supabase: SupabaseClient;
+  serviceOrderId: string;
+  finishedTechnicianId?: string | null;
+  actorUserId: string;
+}): Promise<OpenTimeAlertDetails | null> {
+  const { data: openSessions, error: sessionsError } = await supabase
+    .from("service_order_time_sessions")
+    .select("technician_id, started_at")
+    .eq("service_order_id", serviceOrderId)
+    .eq("kind", "work")
+    .is("ended_at", null);
+  if (sessionsError) return null;
+
+  const openMap = new Map<string, string>();
+  for (const row of (openSessions ?? []) as { technician_id: string | null; started_at: string }[]) {
+    if (!row.technician_id) continue;
+    if (row.technician_id === finishedTechnicianId) continue;
+    const current = openMap.get(row.technician_id);
+    if (!current || row.started_at < current) openMap.set(row.technician_id, row.started_at);
+  }
+  const openIds = Array.from(openMap.keys());
+
+  // Dispensa alertas cujo tempo já foi encerrado (evita aviso "fantasma").
+  const stale = supabase
+    .from("service_order_notifications")
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq("service_order_id", serviceOrderId)
+    .eq("type", OPEN_TIME_NOTIFICATION_TYPE)
+    .is("dismissed_at", null);
+  if (openIds.length > 0) stale.not("technician_id", "in", `(${openIds.join(",")})`);
+  await stale;
+
+  if (openIds.length === 0) return null;
+
+  const order = await fetchNotificationOrder(supabase, serviceOrderId);
+  if (!order || order.status === "cancelled") return null;
+
+  const lookupIds = Array.from(
+    new Set([...openIds, ...(finishedTechnicianId ? [finishedTechnicianId] : [])]),
+  );
+  const targets = await fetchTechnicianTargets(supabase, lookupIds);
+  const byId = new Map(targets.map((t) => [t.id, t]));
+  const finishedName = finishedTechnicianId
+    ? (byId.get(finishedTechnicianId)?.full_name ?? "Um colega")
+    : "Um colega";
+  const baseMetadata = buildNotificationMetadata(
+    order,
+    targets.map((t) => t.full_name).filter(Boolean),
+  );
+
+  let firstDetails: OpenTimeAlertDetails | null = null;
+
+  for (const technicianId of openIds) {
+    const target = byId.get(technicianId);
+    if (!target) continue;
+    const details: OpenTimeAlertDetails = {
+      finishedByName: finishedName,
+      finishedByTechnicianId: finishedTechnicianId,
+      openTechnicianId: technicianId,
+      openTechnicianName: target.full_name,
+      openSince: openMap.get(technicianId) ?? null,
+    };
+    if (!firstDetails) firstDetails = details;
+    if (!target.user_id) continue;
+
+    const metadata: Record<string, Json> = {
+      ...baseMetadata,
+      finished_by_name: details.finishedByName,
+      finished_by_technician_id: details.finishedByTechnicianId,
+      open_technician_id: details.openTechnicianId,
+      open_technician_name: details.openTechnicianName,
+      open_since: details.openSince,
+    };
+    const title = `Seu tempo na OS #${order.number ?? "—"} continua aberto`;
+    const message = `${finishedName} encerrou o tempo dele nesta OS, mas o seu tempo segue rodando.`;
+
+    const { error: insertError } = await supabase.from("service_order_notifications").insert({
+      service_order_id: serviceOrderId,
+      technician_id: technicianId,
+      user_id: target.user_id,
+      type: OPEN_TIME_NOTIFICATION_TYPE,
+      title,
+      message,
+      created_by: actorUserId,
+      metadata,
+    } as Database["public"]["Tables"]["service_order_notifications"]["Insert"]);
+
+    if (insertError) {
+      const duplicate =
+        insertError.code === "23505" || /duplicate key/i.test(insertError.message ?? "");
+      if (!duplicate) continue;
+      await supabase
+        .from("service_order_notifications")
+        .update({ read_at: null, dismissed_at: null, title, message, metadata })
+        .eq("service_order_id", serviceOrderId)
+        .eq("technician_id", technicianId)
+        .eq("type", OPEN_TIME_NOTIFICATION_TYPE);
+    }
+  }
+
+  return firstDetails;
+}
 
 export const markServiceOrderNotificationRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
