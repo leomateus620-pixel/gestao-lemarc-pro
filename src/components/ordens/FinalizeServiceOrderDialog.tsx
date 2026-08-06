@@ -41,6 +41,7 @@ import {
   computeDisplacementCents,
   computeTotals,
   describeDisplacement,
+  effectiveDisplacementKm,
   formatBRL,
   formatHHmm,
   parseBRLToCents,
