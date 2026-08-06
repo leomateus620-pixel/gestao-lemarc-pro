@@ -248,6 +248,53 @@ export const finishWork = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export type OrderLaborOverride = {
+  adjustedAt: string | null;
+  totalMinutes: number;
+  minutesByTechnician: Record<string, number>;
+};
+
+/**
+ * Horas oficiais apuradas pelo admin em "Apuração de horas".
+ * `adjustedAt` só vem preenchido quando o admin editou/salvou a apuração;
+ * nesse caso o Controle de tempo da OS passa a exibir esses totais.
+ */
+export const getOrderLaborOverride = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string }) => data)
+  .handler(async ({ data, context }): Promise<OrderLaborOverride> => {
+    const sb = context.supabase as any;
+    const empty: OrderLaborOverride = {
+      adjustedAt: null,
+      totalMinutes: 0,
+      minutesByTechnician: {},
+    };
+    const { data: fin } = await sb
+      .from("service_order_financials")
+      .select("labor_entries_adjusted_at")
+      .eq("service_order_id", data.orderId)
+      .maybeSingle();
+    if (!fin?.labor_entries_adjusted_at) return empty;
+
+    const { data: rows, error } = await sb
+      .from("service_order_labor_entries")
+      .select("technician_id, duration_minutes")
+      .eq("service_order_id", data.orderId);
+    if (error) return empty;
+
+    const minutesByTechnician: Record<string, number> = {};
+    let totalMinutes = 0;
+    for (const r of rows ?? []) {
+      const minutes = Number(r.duration_minutes ?? 0);
+      totalMinutes += minutes;
+      if (r.technician_id) {
+        minutesByTechnician[r.technician_id] =
+          (minutesByTechnician[r.technician_id] ?? 0) + minutes;
+      }
+    }
+    return { adjustedAt: fin.labor_entries_adjusted_at, totalMinutes, minutesByTechnician };
+  });
+
 export const adjustSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
