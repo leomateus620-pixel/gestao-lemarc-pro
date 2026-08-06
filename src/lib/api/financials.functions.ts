@@ -13,6 +13,10 @@ import {
   computeSubtotalCents,
   computeTotals,
 } from "@/lib/serviceOrders/finance";
+import {
+  findMissingSegments,
+  splitSessionsByDay,
+} from "@/lib/serviceOrders/laborDerivation";
 import type {
   DisplacementInput,
   FinalizeOrderInput,
