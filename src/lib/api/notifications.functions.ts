@@ -10,11 +10,15 @@ import {
 } from "@/types/serviceOrder";
 import type {
   AssignedOrderNotificationSummary,
+  OpenTimeAlertDetails,
+  ServiceOrderNotification,
   ServiceOrderAssignedNotification,
   ServiceOrderNotificationType,
 } from "@/types/notifications";
 
 const ASSIGNED_NOTIFICATION_TYPE: ServiceOrderNotificationType = "service_order_assigned";
+const OPEN_TIME_NOTIFICATION_TYPE: ServiceOrderNotificationType = "service_order_open_time";
+const NOTIFICATION_TYPES = [ASSIGNED_NOTIFICATION_TYPE, OPEN_TIME_NOTIFICATION_TYPE];
 
 const ORDER_NOTIFICATION_SELECT = `
   id, number, title, description, service_type, service_type_other, priority,
@@ -121,7 +125,27 @@ function orderSummaryFromRow(
   };
 }
 
-function normalizeNotification(row: any): ServiceOrderAssignedNotification | null {
+function openTimeFromMetadata(metadata: Record<string, unknown>): OpenTimeAlertDetails | null {
+  const openTechnicianId =
+    typeof metadata.open_technician_id === "string" ? metadata.open_technician_id : null;
+  if (!openTechnicianId) return null;
+  return {
+    finishedByName:
+      typeof metadata.finished_by_name === "string" ? metadata.finished_by_name : "Um colega",
+    finishedByTechnicianId:
+      typeof metadata.finished_by_technician_id === "string"
+        ? metadata.finished_by_technician_id
+        : null,
+    openTechnicianId,
+    openTechnicianName:
+      typeof metadata.open_technician_name === "string"
+        ? metadata.open_technician_name
+        : "Técnico",
+    openSince: typeof metadata.open_since === "string" ? metadata.open_since : null,
+  };
+}
+
+function normalizeNotification(row: any): ServiceOrderNotification | null {
   const metadata = asRecord(row.metadata);
   const order = Array.isArray(row.service_order) ? row.service_order[0] : row.service_order;
   const summary = orderSummaryFromRow(order, metadata);
@@ -137,6 +161,7 @@ function normalizeNotification(row: any): ServiceOrderAssignedNotification | nul
     message: row.message ?? null,
     created_at: row.created_at,
     order: summary,
+    openTime: row.type === OPEN_TIME_NOTIFICATION_TYPE ? openTimeFromMetadata(metadata) : null,
   };
 }
 
