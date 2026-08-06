@@ -1032,6 +1032,12 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                             setDisplacement((d) => ({ ...d, km_total: e.target.value }))
                           }
                         />
+                        {displacementInput.count > 1 && displacementInput.km_total > 0 && (
+                          <p className="mt-1 text-[11px] font-semibold tabular-nums text-slate-400">
+                            {displacementInput.count} × {displacementInput.km_total.toLocaleString("pt-BR")} km ={" "}
+                            {effectiveDisplacementKm(displacementInput).toLocaleString("pt-BR")} km
+                          </p>
+                        )}
                       </FieldGroup>
                       <FieldGroup label="Valor por km">
                         <Input
