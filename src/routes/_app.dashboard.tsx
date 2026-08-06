@@ -22,6 +22,8 @@ import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { OperationTodayCard } from "@/components/dashboard/OperationTodayCard";
 import { OrderTechnicianTimeCard } from "@/components/dashboard/OrderTechnicianTimeCard";
 import { TechnicianAssignedOrderNotification } from "@/components/dashboard/TechnicianAssignedOrderNotification";
+import { TechnicianOpenTimeNotification } from "@/components/dashboard/TechnicianOpenTimeNotification";
+import { finishColleagueWork } from "@/lib/api/timeSessions.functions";
 import {
   TechnicianHomeHero,
   TechnicianHomeSkeleton,
@@ -114,7 +116,11 @@ function TechnicianHome() {
     () => technicianOrders.filter(technicianOrderNeedsAction).length,
     [technicianOrders],
   );
-  const currentNotification = notifications[0] ?? null;
+  const currentNotification =
+    notifications.find((n) => n.type === "service_order_assigned") ?? null;
+  const openTimeNotification =
+    notifications.find((n) => n.type === "service_order_open_time") ?? null;
+  const finishColleague = useServerFn(finishColleagueWork);
   const readMutation = useMutation({
     mutationFn: (id: string) => markRead({ data: { id } }),
     onSuccess: () => {
@@ -128,6 +134,29 @@ function TechnicianHome() {
     },
   });
   const notificationBusy = readMutation.isPending || dismissMutation.isPending;
+
+  const finishOpenTimeMutation = useMutation({
+    mutationFn: (input: { orderId: string; technicianId: string }) =>
+      finishColleague({ data: input }),
+    onSuccess: () => {
+      toast.success("Tempo encerrado.");
+      queryClient.invalidateQueries({ queryKey: TECHNICIAN_NOTIFICATIONS_QUERY_KEY });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Não foi possível encerrar o tempo."),
+  });
+  const openTimeBusy = notificationBusy || finishOpenTimeMutation.isPending;
+
+  async function handleDismissOpenTime() {
+    if (!openTimeNotification || openTimeBusy) return;
+    try {
+      await dismissMutation.mutateAsync(openTimeNotification.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível dispensar a notificação.",
+      );
+    }
+  }
 
   async function handleOpenAssignedOrder() {
     if (!currentNotification || notificationBusy) return;
@@ -195,6 +224,32 @@ function TechnicianHome() {
         onOpenChange={handleNotificationOpenChange}
         onOpenOrder={handleOpenAssignedOrder}
         onDismiss={handleDismissNotification}
+      />
+      <TechnicianOpenTimeNotification
+        open={Boolean(openTimeNotification && !currentNotification)}
+        busy={openTimeBusy}
+        orderNumber={openTimeNotification?.order.number ?? null}
+        clientName={openTimeNotification?.order.clientName ?? null}
+        details={openTimeNotification?.openTime ?? null}
+        onOpenChange={(next) => {
+          if (!next) void handleDismissOpenTime();
+        }}
+        onDismiss={handleDismissOpenTime}
+        onOpenOrder={() => {
+          if (!openTimeNotification) return;
+          navigate({
+            to: "/ordens/$id",
+            params: { id: openTimeNotification.service_order_id },
+          });
+        }}
+        onFinishTime={() => {
+          const details = openTimeNotification?.openTime;
+          if (!openTimeNotification || !details) return;
+          finishOpenTimeMutation.mutate({
+            orderId: openTimeNotification.service_order_id,
+            technicianId: details.openTechnicianId,
+          });
+        }}
       />
     </>
   );

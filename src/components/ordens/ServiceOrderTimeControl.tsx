@@ -12,6 +12,7 @@ import {
   pauseWork,
   resumeWork,
   finishWork,
+  finishColleagueWork,
 } from "@/lib/api/timeSessions.functions";
 import {
   computeTechnicianWorkedMinutes,
@@ -30,6 +31,8 @@ import { ServiceOrderTimeHistory } from "./ServiceOrderTimeHistory";
 import { EditTimeSessionSheet } from "./EditTimeSessionSheet";
 import { useAuth } from "@/components/app/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { TechnicianOpenTimeNotification } from "@/components/dashboard/TechnicianOpenTimeNotification";
+import type { OpenTimeAlertDetails } from "@/types/notifications";
 
 type Props = { order: ServiceOrder };
 
@@ -48,6 +51,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const pauseFn = useServerFn(pauseWork);
   const resumeFn = useServerFn(resumeWork);
   const finishFn = useServerFn(finishWork);
+  const finishColleagueFn = useServerFn(finishColleagueWork);
 
   const { data: sessions = [] as TimeSession[] } = useQuery({
     queryKey: ["order-time-sessions", order.id],
@@ -163,11 +167,25 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const finishMut = useMutation({
     mutationFn: (technicianId?: string) =>
       finishFn({ data: { orderId: order.id, technicianId: technicianId ?? null } }),
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       toast.success("Sessão encerrada");
+      const alert = (result?.openTimeAlert ?? null) as OpenTimeAlertDetails | null;
+      if (alert) setOpenTimeAlert(alert);
       invalidate();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar"),
+  });
+
+  const [openTimeAlert, setOpenTimeAlert] = useState<OpenTimeAlertDetails | null>(null);
+  const finishColleagueMut = useMutation({
+    mutationFn: (technicianId: string) =>
+      finishColleagueFn({ data: { orderId: order.id, technicianId } }),
+    onSuccess: () => {
+      toast.success("Tempo do colega encerrado");
+      setOpenTimeAlert(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar o tempo"),
   });
 
   if (technicians.length === 0) {
@@ -439,6 +457,19 @@ export function ServiceOrderTimeControl({ order }: Props) {
         session={editingSession}
         orderId={order.id}
         technicianName={editingTechName}
+      />
+
+      <TechnicianOpenTimeNotification
+        open={!!openTimeAlert}
+        busy={finishColleagueMut.isPending}
+        orderNumber={order.number ?? null}
+        clientName={order.client?.name ?? null}
+        details={openTimeAlert}
+        onOpenChange={(next) => !next && setOpenTimeAlert(null)}
+        onDismiss={() => setOpenTimeAlert(null)}
+        onFinishTime={() =>
+          openTimeAlert && finishColleagueMut.mutate(openTimeAlert.openTechnicianId)
+        }
       />
     </GlassCard>
   );

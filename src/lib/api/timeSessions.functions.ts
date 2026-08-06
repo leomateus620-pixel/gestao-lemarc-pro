@@ -203,6 +203,17 @@ export const pauseWork = createServerFn({ method: "POST" })
     } catch {
       /* non-blocking */
     }
+    try {
+      const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
+      await syncServiceOrderOpenTimeAlerts({
+        supabase: sb,
+        serviceOrderId: data.orderId,
+        finishedTechnicianId: data.technicianId,
+        actorUserId: context.userId,
+      });
+    } catch {
+      /* non-blocking */
+    }
     return normalize(row);
   });
 
@@ -260,6 +271,76 @@ export const finishWork = createServerFn({ method: "POST" })
         "@/lib/serviceOrders/laborSync.server"
       );
       await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    } catch {
+      /* non-blocking */
+    }
+    let openTimeAlert = null as Awaited<
+      ReturnType<typeof import("@/lib/api/notifications.functions").syncServiceOrderOpenTimeAlerts>
+    >;
+    try {
+      const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
+      openTimeAlert = await syncServiceOrderOpenTimeAlerts({
+        supabase: sb,
+        serviceOrderId: data.orderId,
+        finishedTechnicianId: data.technicianId ?? null,
+        actorUserId: context.userId,
+      });
+    } catch {
+      /* non-blocking */
+    }
+    return { ok: true, openTimeAlert };
+  });
+
+/**
+ * Encerra o tempo de um colega ainda em aberto na mesma OS.
+ * Só técnicos vinculados à OS (ou admins) podem executar; a escrita usa
+ * credencial de serviço porque a RLS de sessões restringe cada técnico à própria linha.
+ */
+export const finishColleagueWork = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; technicianId: string }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const [{ data: isAdmin }, { data: isOrderTech }] = await Promise.all([
+      sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      sb.rpc("user_is_order_technician", { _order_id: data.orderId }),
+    ]);
+    if (!isAdmin && !isOrderTech) throw new Error("Sem permissão para encerrar este tempo.");
+
+    const { data: assigned } = await sb
+      .from("service_order_technicians")
+      .select("id")
+      .eq("service_order_id", data.orderId)
+      .eq("technician_id", data.technicianId)
+      .maybeSingle();
+    if (!assigned) throw new Error("Técnico não vinculado a esta OS.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("service_order_time_sessions")
+      .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
+      .eq("service_order_id", data.orderId)
+      .eq("technician_id", data.technicianId)
+      .eq("kind", "work")
+      .is("ended_at", null);
+    if (error) throw new Error(error.message);
+
+    try {
+      const { reconcileLaborFromSessions } = await import(
+        "@/lib/serviceOrders/laborSync.server"
+      );
+      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    } catch {
+      /* non-blocking */
+    }
+    try {
+      const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
+      await syncServiceOrderOpenTimeAlerts({
+        supabase: sb,
+        serviceOrderId: data.orderId,
+        finishedTechnicianId: data.technicianId,
+        actorUserId: context.userId,
+      });
     } catch {
       /* non-blocking */
     }
