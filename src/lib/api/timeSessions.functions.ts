@@ -255,6 +255,14 @@ export const finishWork = createServerFn({ method: "POST" })
     if (data.technicianId) q.eq("technician_id", data.technicianId);
     const { error } = await q;
     if (error) throw new Error(error.message);
+    try {
+      const { reconcileLaborFromSessions } = await import(
+        "@/lib/serviceOrders/laborSync.server"
+      );
+      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    } catch {
+      /* non-blocking */
+    }
     return { ok: true };
   });
 
