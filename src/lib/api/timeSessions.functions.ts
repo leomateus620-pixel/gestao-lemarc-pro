@@ -84,7 +84,6 @@ export const listTimeSessions = createServerFn({ method: "GET" })
   });
 
 export const listDashboardTechnicianTime = createServerFn({ method: "GET" })
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder to keep chain readable
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderIds?: string[] }) => {
     const ids = Array.isArray(data?.orderIds) ? data.orderIds : [];
