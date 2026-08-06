@@ -255,8 +255,17 @@ export async function reconcileLaborFromSessions(
         .eq("service_order_id", orderId),
     ]);
 
+    const { data: finRow } = await sb
+      .from("service_order_financials")
+      .select("labor_entries_adjusted_at")
+      .eq("service_order_id", orderId)
+      .maybeSingle();
+    const adjustedAt = finRow?.labor_entries_adjusted_at ?? null;
+
     const closed = (sessionsRaw ?? [])
       .filter((s: any) => s.technician_id && s.started_at && s.ended_at)
+      // With an admin consolidation in place, only newer work is appended.
+      .filter((s: any) => !adjustedAt || new Date(s.ended_at) > new Date(adjustedAt))
       .map((s: any) => ({
         id: s.id,
         technician_id: s.technician_id as string,
