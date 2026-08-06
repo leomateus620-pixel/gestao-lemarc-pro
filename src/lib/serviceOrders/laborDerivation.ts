@@ -193,5 +193,13 @@ export function findMissingSegments(
   }[],
 ): LaborSegment[] {
   const seen = new Set(existing.map(segmentKey));
-  return segments.filter((s) => !seen.has(segmentKey(s)));
+  const out: LaborSegment[] = [];
+  for (const s of segments) {
+    const key = segmentKey(s);
+    if (seen.has(key)) continue;
+    // Guard against duplicated sessions producing duplicated rows.
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
 }
