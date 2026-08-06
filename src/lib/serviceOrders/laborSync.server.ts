@@ -179,26 +179,23 @@ export async function syncLaborEntriesFromSessions(
     list.sort((a, b) => a.started_at.localeCompare(b.started_at));
     const rate = rateByTech.get(techId) ?? 0;
     const role = roleByTech.get(techId) ?? null;
-    list.forEach((s, idx) => {
-      const workDate = spDate(s.started_at);
-      const endDate = spDate(s.ended_at);
-      const startTime = spTime(s.started_at);
-      const endTime = endDate !== workDate ? "23:59:59" : spTime(s.ended_at);
-      const duration =
-        s.duration_minutes > 0 ? s.duration_minutes : minutesBetween(s.started_at, s.ended_at);
-      if (duration <= 0) return;
+    // Split sessions crossing midnight into one row per local day.
+    const segments = splitSessionsByDay(list);
+    segments.forEach((seg, idx) => {
       inserts.push({
         service_order_id: orderId,
         technician_id: techId,
         role,
-        work_date: workDate,
-        start_time: startTime,
-        end_time: endTime,
-        duration_minutes: duration,
+        work_date: seg.work_date,
+        start_time: seg.start_time,
+        end_time: seg.end_time,
+        duration_minutes: seg.duration_minutes,
         hourly_rate_cents: rate,
-        subtotal_cents: computeSubtotalCents(duration, rate),
+        subtotal_cents: computeSubtotalCents(seg.duration_minutes, rate),
         description:
-          list.length > 1 ? `Intervalo ${idx + 1} de ${list.length}` : "Trabalho executado",
+          segments.length > 1
+            ? `Intervalo ${idx + 1} de ${segments.length}`
+            : "Trabalho executado",
         created_by: syncedByUserId,
       });
     });
