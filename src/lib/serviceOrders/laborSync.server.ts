@@ -8,33 +8,11 @@
  * PDF, reports and dashboards always reflect the same numbers.
  */
 import { computeSubtotalCents } from "@/lib/serviceOrders/finance";
-
-const SP_DATE = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Sao_Paulo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const SP_TIME = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "America/Sao_Paulo",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function spDate(iso: string): string {
-  return SP_DATE.format(new Date(iso));
-}
-function spTime(iso: string): string {
-  return SP_TIME.format(new Date(iso));
-}
-function minutesBetween(a: string, b: string): number {
-  const ta = new Date(a).getTime();
-  const tb = new Date(b).getTime();
-  if (!Number.isFinite(ta) || !Number.isFinite(tb) || tb <= ta) return 0;
-  return Math.max(0, Math.round((tb - ta) / 60000));
-}
+import {
+  findMissingSegments,
+  minutesBetween,
+  splitSessionsByDay,
+} from "@/lib/serviceOrders/laborDerivation";
 
 type ClosedSession = {
   id: string;
