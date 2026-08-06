@@ -193,6 +193,16 @@ export const pauseWork = createServerFn({ method: "POST" })
       .select(SELECT)
       .single();
     if (error) throw new Error(error.message);
+    // Keep the order totals coherent right after the pause (best-effort),
+    // including multi-day work where the labor rows already existed.
+    try {
+      const { reconcileLaborFromSessions } = await import(
+        "@/lib/serviceOrders/laborSync.server"
+      );
+      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    } catch {
+      /* non-blocking */
+    }
     return normalize(row);
   });
 
@@ -245,6 +255,14 @@ export const finishWork = createServerFn({ method: "POST" })
     if (data.technicianId) q.eq("technician_id", data.technicianId);
     const { error } = await q;
     if (error) throw new Error(error.message);
+    try {
+      const { reconcileLaborFromSessions } = await import(
+        "@/lib/serviceOrders/laborSync.server"
+      );
+      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    } catch {
+      /* non-blocking */
+    }
     return { ok: true };
   });
 

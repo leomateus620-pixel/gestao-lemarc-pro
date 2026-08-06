@@ -8,33 +8,11 @@
  * PDF, reports and dashboards always reflect the same numbers.
  */
 import { computeSubtotalCents } from "@/lib/serviceOrders/finance";
-
-const SP_DATE = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Sao_Paulo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const SP_TIME = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "America/Sao_Paulo",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function spDate(iso: string): string {
-  return SP_DATE.format(new Date(iso));
-}
-function spTime(iso: string): string {
-  return SP_TIME.format(new Date(iso));
-}
-function minutesBetween(a: string, b: string): number {
-  const ta = new Date(a).getTime();
-  const tb = new Date(b).getTime();
-  if (!Number.isFinite(ta) || !Number.isFinite(tb) || tb <= ta) return 0;
-  return Math.max(0, Math.round((tb - ta) / 60000));
-}
+import {
+  findMissingSegments,
+  minutesBetween,
+  splitSessionsByDay,
+} from "@/lib/serviceOrders/laborDerivation";
 
 type ClosedSession = {
   id: string;
@@ -159,7 +137,8 @@ export async function syncLaborEntriesFromSessions(
   // Preserve current rates/role/description so the recompute doesn't zero them out.
   const { data: existing, error: exErr } = await sb
     .from("service_order_labor_entries")
-    .select("technician_id, role, hourly_rate_cents");
+    .select("technician_id, role, hourly_rate_cents")
+    .eq("service_order_id", orderId);
   if (exErr) throw new Error(exErr.message);
 
   const rateByTech = new Map<string, number>();
@@ -201,26 +180,23 @@ export async function syncLaborEntriesFromSessions(
     list.sort((a, b) => a.started_at.localeCompare(b.started_at));
     const rate = rateByTech.get(techId) ?? 0;
     const role = roleByTech.get(techId) ?? null;
-    list.forEach((s, idx) => {
-      const workDate = spDate(s.started_at);
-      const endDate = spDate(s.ended_at);
-      const startTime = spTime(s.started_at);
-      const endTime = endDate !== workDate ? "23:59:59" : spTime(s.ended_at);
-      const duration =
-        s.duration_minutes > 0 ? s.duration_minutes : minutesBetween(s.started_at, s.ended_at);
-      if (duration <= 0) return;
+    // Split sessions crossing midnight into one row per local day.
+    const segments = splitSessionsByDay(list);
+    segments.forEach((seg, idx) => {
       inserts.push({
         service_order_id: orderId,
         technician_id: techId,
         role,
-        work_date: workDate,
-        start_time: startTime,
-        end_time: endTime,
-        duration_minutes: duration,
+        work_date: seg.work_date,
+        start_time: seg.start_time,
+        end_time: seg.end_time,
+        duration_minutes: seg.duration_minutes,
         hourly_rate_cents: rate,
-        subtotal_cents: computeSubtotalCents(duration, rate),
+        subtotal_cents: computeSubtotalCents(seg.duration_minutes, rate),
         description:
-          list.length > 1 ? `Intervalo ${idx + 1} de ${list.length}` : "Trabalho executado",
+          segments.length > 1
+            ? `Intervalo ${idx + 1} de ${segments.length}`
+            : "Trabalho executado",
         created_by: syncedByUserId,
       });
     });
@@ -248,4 +224,123 @@ export async function syncLaborEntriesFromSessions(
     0,
   );
   return { synced: true, totalLaborMinutes, totalLaborCents };
+}
+
+/**
+ * Append-only reconciliation: makes sure every closed work session is
+ * represented in `service_order_labor_entries`, then recomputes the order
+ * totals. Existing rows are never modified or deleted, so admin adjustments
+ * stay intact — the hours recorded on the following day (after an overnight
+ * pause) simply get appended for review.
+ *
+ * Best-effort: never throws, so the technician time-tracking flow can't break.
+ */
+export async function reconcileLaborFromSessions(
+  sb: any,
+  orderId: string,
+  userId: string | null,
+): Promise<{ appended: number }> {
+  try {
+    const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
+      sb
+        .from("service_order_time_sessions")
+        .select("id, technician_id, started_at, ended_at, duration_minutes")
+        .eq("service_order_id", orderId)
+        .eq("kind", "work")
+        .not("ended_at", "is", null)
+        .order("started_at", { ascending: true }),
+      sb
+        .from("service_order_labor_entries")
+        .select("technician_id, role, hourly_rate_cents, work_date, start_time, end_time")
+        .eq("service_order_id", orderId),
+    ]);
+
+    const { data: finRow } = await sb
+      .from("service_order_financials")
+      .select("labor_entries_adjusted_at")
+      .eq("service_order_id", orderId)
+      .maybeSingle();
+    const adjustedAt = finRow?.labor_entries_adjusted_at ?? null;
+
+    const closed = (sessionsRaw ?? [])
+      .filter((s: any) => s.technician_id && s.started_at && s.ended_at)
+      // With an admin consolidation in place, only newer work is appended.
+      .filter((s: any) => !adjustedAt || new Date(s.ended_at) > new Date(adjustedAt))
+      .map((s: any) => ({
+        id: s.id,
+        technician_id: s.technician_id as string,
+        started_at: s.started_at as string,
+        ended_at: s.ended_at as string,
+        duration_minutes:
+          (s.duration_minutes ?? 0) > 0
+            ? (s.duration_minutes as number)
+            : minutesBetween(s.started_at, s.ended_at),
+      }));
+    if (closed.length === 0) return { appended: 0 };
+
+    const existingRows = (existing ?? []) as {
+      technician_id: string | null;
+      role: string | null;
+      hourly_rate_cents: number | null;
+      work_date: string;
+      start_time: string;
+      end_time: string;
+    }[];
+
+    const segments = splitSessionsByDay(closed);
+    const missing = findMissingSegments(segments, existingRows);
+
+    if (missing.length > 0) {
+      const rateByTech = new Map<string, number>();
+      const roleByTech = new Map<string, string | null>();
+      for (const e of existingRows) {
+        if (!e.technician_id) continue;
+        if (!rateByTech.has(e.technician_id) && (e.hourly_rate_cents ?? 0) > 0) {
+          rateByTech.set(e.technician_id, e.hourly_rate_cents as number);
+        }
+        if (!roleByTech.has(e.technician_id)) roleByTech.set(e.technician_id, e.role);
+      }
+      const unknown = Array.from(
+        new Set(missing.map((m) => m.technician_id).filter((id) => !rateByTech.has(id))),
+      );
+      if (unknown.length > 0) {
+        const { data: techRows } = await sb
+          .from("technicians")
+          .select("id, role, hourly_rate_cents")
+          .in("id", unknown);
+        for (const t of (techRows ?? []) as any[]) {
+          if (t.hourly_rate_cents != null && !rateByTech.has(t.id)) {
+            rateByTech.set(t.id, t.hourly_rate_cents);
+          }
+          if (!roleByTech.has(t.id)) roleByTech.set(t.id, t.role ?? null);
+        }
+      }
+
+      const inserts = missing.map((m) => {
+        const rate = rateByTech.get(m.technician_id) ?? 0;
+        return {
+          service_order_id: orderId,
+          technician_id: m.technician_id,
+          role: roleByTech.get(m.technician_id) ?? null,
+          work_date: m.work_date,
+          start_time: m.start_time,
+          end_time: m.end_time,
+          duration_minutes: m.duration_minutes,
+          hourly_rate_cents: rate,
+          subtotal_cents: computeSubtotalCents(m.duration_minutes, rate),
+          description: "Trabalho executado",
+          created_by: userId,
+        };
+      });
+      const { error: insErr } = await sb
+        .from("service_order_labor_entries")
+        .insert(inserts);
+      if (insErr) return { appended: 0 };
+    }
+
+    await recomputeOrderFinancials(sb, orderId, null);
+    return { appended: missing.length };
+  } catch {
+    return { appended: 0 };
+  }
 }

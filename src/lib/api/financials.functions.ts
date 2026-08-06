@@ -13,6 +13,10 @@ import {
   computeSubtotalCents,
   computeTotals,
 } from "@/lib/serviceOrders/finance";
+import {
+  findMissingSegments,
+  splitSessionsByDay,
+} from "@/lib/serviceOrders/laborDerivation";
 import type {
   DisplacementInput,
   FinalizeOrderInput,
@@ -39,34 +43,6 @@ type ClosedWorkSession = {
   ended_at: string;
   duration_minutes: number;
 };
-
-const SP_DATE = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Sao_Paulo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const SP_TIME = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "America/Sao_Paulo",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function spDate(iso: string): string {
-  return SP_DATE.format(new Date(iso));
-}
-function spTime(iso: string): string {
-  return SP_TIME.format(new Date(iso));
-}
-
-function minutesBetween(a: string, b: string): number {
-  const ta = new Date(a).getTime();
-  const tb = new Date(b).getTime();
-  if (!Number.isFinite(ta) || !Number.isFinite(tb) || tb <= ta) return 0;
-  return Math.max(0, Math.round((tb - ta) / 60000));
-}
 
 /**
  * Rebuild LaborEntry list from closed work sessions (source of truth).
@@ -121,30 +97,26 @@ function deriveEntriesFromSessions(
     const rate = rateByTech.get(techId) ?? 0;
     const techObj = techObjByTech.get(techId) ?? null;
     const role = roleByTech.get(techId) ?? null;
-    list.forEach((s, idx) => {
-      const workDate = spDate(s.started_at);
-      const endDate = spDate(s.ended_at);
-      const startTime = spTime(s.started_at);
-      // Edge case: session crosses midnight — clamp end to 23:59:59.
-      const endTime = endDate !== workDate ? "23:59:59" : spTime(s.ended_at);
-      const duration =
-        s.duration_minutes && s.duration_minutes > 0
-          ? s.duration_minutes
-          : minutesBetween(s.started_at, s.ended_at);
-      const subtotal = computeSubtotalCents(duration, rate);
+    // One row per local day: sessions crossing midnight are split so the
+    // hours land on the correct date in the PDF and in the reports.
+    const segments = splitSessionsByDay(list);
+    segments.forEach((seg, idx) => {
+      const subtotal = computeSubtotalCents(seg.duration_minutes, rate);
       out.push({
-        id: `derived:${s.id}`,
+        id: `derived:${seg.session_id}:${seg.segment_index}`,
         service_order_id: orderId,
         technician_id: techId,
         role,
-        work_date: workDate,
-        start_time: startTime,
-        end_time: endTime,
-        duration_minutes: duration,
+        work_date: seg.work_date,
+        start_time: seg.start_time,
+        end_time: seg.end_time,
+        duration_minutes: seg.duration_minutes,
         hourly_rate_cents: rate,
         subtotal_cents: subtotal,
         description:
-          list.length > 1 ? `Intervalo ${idx + 1} de ${list.length}` : "Trabalho executado",
+          segments.length > 1
+            ? `Intervalo ${idx + 1} de ${segments.length}`
+            : "Trabalho executado",
         technician: techObj,
       });
     });
@@ -442,19 +414,86 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
       techFallback,
     );
 
-    // Once an admin has manually edited/deleted/added labor rows, the persisted
-    // labor table becomes the canonical source. Do not recreate deleted rows
-    // from the immutable time-session audit trail.
-    if (financials?.labor_entries_adjusted_at) {
-      return { entries: storedEntries, financials };
-    }
-
-    // If materialized labor rows already exist, they are the editable working
-    // copy for admin review/PDF/reporting. Do not replace them on every read,
-    // otherwise deleting a row would be undone by the session audit trail.
+    // Already-materialized labor rows are the editable working copy for admin
+    // review / PDF / reporting: never replaced or deleted on read. But work
+    // recorded AFTER the materialization (typically the next day, after an
+    // overnight pause) must be appended, otherwise those hours are lost.
     if (storedEntries.length > 0) {
-      const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
-      const totalLaborCents = storedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+      // When the admin already consolidated the hours, only work recorded
+      // AFTER that consolidation may be appended — never re-add history the
+      // admin deliberately reorganized.
+      const adjustedAt = financials?.labor_entries_adjusted_at ?? null;
+      const appendableSessionIds = new Set(
+        closedWorkSessions
+          .filter((s) => !adjustedAt || new Date(s.ended_at) > new Date(adjustedAt))
+          .map((s) => s.id),
+      );
+      const appendable = derivedEntries.filter((e) =>
+        appendableSessionIds.has(String(e.id).split(":")[1] ?? ""),
+      );
+      const missing = findMissingSegments(
+        appendable.map((e) => ({
+          session_id: e.id,
+          technician_id: e.technician_id ?? "",
+          work_date: e.work_date,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          duration_minutes: e.duration_minutes,
+          segment_index: 0,
+          segment_count: 1,
+        })),
+        storedEntries,
+      );
+
+      let entriesNow = storedEntries;
+      if (missing.length > 0) {
+        const byKey = new Map(
+          derivedEntries.map((e) => [
+            `${e.technician_id ?? ""}|${e.work_date}|${e.start_time.slice(0, 5)}|${e.end_time.slice(0, 5)}`,
+            e,
+          ]),
+        );
+        const inserts = missing
+          .map((m) => {
+            const src = byKey.get(
+              `${m.technician_id}|${m.work_date}|${m.start_time.slice(0, 5)}|${m.end_time.slice(0, 5)}`,
+            );
+            if (!src) return null;
+            return {
+              service_order_id: data.orderId,
+              technician_id: src.technician_id,
+              role: src.role,
+              work_date: src.work_date,
+              start_time:
+                src.start_time.length === 5 ? `${src.start_time}:00` : src.start_time,
+              end_time: src.end_time.length === 5 ? `${src.end_time}:00` : src.end_time,
+              duration_minutes: src.duration_minutes,
+              hourly_rate_cents: src.hourly_rate_cents,
+              subtotal_cents: src.subtotal_cents,
+              description: src.description,
+              created_by: context.userId,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        if (inserts.length > 0) {
+          const { error: insErr } = await sb
+            .from("service_order_labor_entries")
+            .insert(inserts);
+          if (!insErr) {
+            const { data: refreshed } = await sb
+              .from("service_order_labor_entries")
+              .select(LABOR_SELECT)
+              .eq("service_order_id", data.orderId)
+              .order("work_date", { ascending: true })
+              .order("start_time", { ascending: true });
+            if (refreshed) entriesNow = refreshed.map(normalizeLabor);
+          }
+        }
+      }
+
+      const totalLaborMinutes = entriesNow.reduce((a, e) => a + e.duration_minutes, 0);
+      const totalLaborCents = entriesNow.reduce((a, e) => a + e.subtotal_cents, 0);
       const effectiveFinancials =
         !financials ||
         financials.total_labor_minutes !== totalLaborMinutes ||
@@ -464,7 +503,13 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               totalLaborCents,
             })
           : financials;
-      return { entries: storedEntries, financials: effectiveFinancials };
+      return { entries: entriesNow, financials: effectiveFinancials };
+    }
+
+    // Nothing materialized yet, but an admin adjustment flag exists (rows were
+    // all deleted on purpose): respect the admin decision.
+    if (financials?.labor_entries_adjusted_at) {
+      return { entries: storedEntries, financials };
     }
 
     // First editable read: materialize derived sessions as the admin working
