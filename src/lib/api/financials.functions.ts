@@ -669,6 +669,17 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
     validateInput(data);
     const sb = context.supabase as any;
 
+    // Close any still-open time session so nothing is left dangling after the
+    // order is consolidated (the admin entries below are the source of truth).
+    try {
+      const { closeOpenWorkSessions } = await import(
+        "@/lib/serviceOrders/timeSessionWrite.server"
+      );
+      await closeOpenWorkSessions(data.order_id, new Date().toISOString(), context.userId);
+    } catch {
+      /* non-blocking */
+    }
+
     // 1) Replace labor entries.
     const computed = data.entries.map((e: LaborEntryInput) => {
       const duration = computeDurationMinutes(e.start_time, e.end_time);
