@@ -1,10 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Supabase generated types don't include the new time_sessions table yet. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  assertOrderTimeAccess,
-  getTimeSessionWriter,
-} from "@/lib/serviceOrders/timeSessionWrite.server";
 import type { TimeSession, JsonValue } from "@/lib/serviceOrders/timeSessions";
 import type {
   DashboardLaborEntry,
@@ -147,6 +143,9 @@ export const startWork = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!data.orderId || !data.technicianId) throw new Error("Dados inválidos.");
     const sb = context.supabase as any;
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const open = await findOpenWork(sb, data.orderId, data.technicianId);
     if (open) throw new Error("Já existe uma sessão de trabalho ativa para este técnico.");
@@ -185,6 +184,9 @@ export const pauseWork = createServerFn({ method: "POST" })
       throw new Error("Informe uma observação para o motivo 'Outro'.");
     }
     const sb = context.supabase as any;
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const open = await findOpenWork(sb, data.orderId, data.technicianId);
     if (!open) throw new Error("Nenhuma sessão ativa para pausar.");
@@ -235,6 +237,9 @@ export const resumeWork = createServerFn({ method: "POST" })
   .inputValidator((data: { orderId: string; technicianId: string; notes?: string | null }) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     // Confirm the last session for this tech was a pause.
     const { data: last, error: lastErr } = await sb
@@ -272,6 +277,9 @@ export const finishWork = createServerFn({ method: "POST" })
   .inputValidator((data: { orderId: string; technicianId?: string | null }) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const writer = await getTimeSessionWriter();
     const q = writer
