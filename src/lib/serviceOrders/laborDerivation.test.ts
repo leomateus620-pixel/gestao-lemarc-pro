@@ -121,3 +121,36 @@ describe("findMissingSegments", () => {
     ).toHaveLength(0);
   });
 });
+describe("dois técnicos simultâneos", () => {
+  const sessions = [
+    {
+      id: "s1",
+      technician_id: "juan",
+      started_at: "2026-08-07T10:54:00.000Z",
+      ended_at: "2026-08-07T14:58:00.000Z",
+      duration_minutes: 244,
+    },
+    {
+      id: "s2",
+      technician_id: "joao",
+      started_at: "2026-08-07T10:54:00.000Z",
+      ended_at: "2026-08-07T14:58:00.000Z",
+      duration_minutes: 244,
+    },
+  ];
+
+  it("gera um segmento por técnico mesmo com horários idênticos", () => {
+    const segments = splitSessionsByDay(sessions);
+    expect(segments).toHaveLength(2);
+    expect(new Set(segments.map((s) => s.technician_id))).toEqual(new Set(["juan", "joao"]));
+  });
+
+  it("aponta o técnico ausente na apuração já materializada", () => {
+    const segments = splitSessionsByDay(sessions);
+    const missing = findMissingSegments(segments, [
+      { technician_id: "juan", work_date: "2026-08-07", start_time: "07:54", end_time: "11:58" },
+    ]);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.technician_id).toBe("joao");
+  });
+});

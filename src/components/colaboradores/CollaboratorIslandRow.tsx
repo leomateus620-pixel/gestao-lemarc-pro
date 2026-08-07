@@ -131,6 +131,14 @@ export function CollaboratorIslandRow({ collaborator }: { collaborator: Collabor
                   Sem apontamento individual
                 </li>
               )}
+              {!collaborator.userId && collaborator.active && (
+                <li
+                  className="rounded-full border border-rose-300/40 bg-rose-400/12 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-rose-100"
+                  title="Este cadastro não tem login vinculado. Vincule um acesso para o técnico registrar o próprio tempo."
+                >
+                  Sem login vinculado
+                </li>
+              )}
             </ul>
 
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lemarc-smart-scroll">

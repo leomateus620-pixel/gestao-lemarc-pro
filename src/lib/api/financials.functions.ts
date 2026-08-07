@@ -316,6 +316,34 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const sb = context.supabase as any;
+
+    // No order may be apurada/finalizada with time still open: otherwise those
+    // hours never become labor entries (they are filtered out below) and the
+    // technician's time silently disappears from the totals and the PDF.
+    try {
+      const { data: orderRow } = await sb
+        .from("service_orders")
+        .select("status, finished_at, closed_at, updated_at")
+        .eq("id", data.orderId)
+        .maybeSingle();
+      const status = orderRow?.status as string | undefined;
+      if (status && ["finished", "review", "approved", "cancelled"].includes(status)) {
+        const { closeOpenWorkSessions } = await import(
+          "@/lib/serviceOrders/timeSessionWrite.server"
+        );
+        await closeOpenWorkSessions(
+          data.orderId,
+          orderRow?.finished_at ??
+            orderRow?.closed_at ??
+            orderRow?.updated_at ??
+            new Date().toISOString(),
+          context.userId,
+        );
+      }
+    } catch {
+      /* non-blocking: never prevent the admin from opening the hours screen */
+    }
+
     const [labor, fin, sessionsRes] = await Promise.all([
       sb
         .from("service_order_labor_entries")
@@ -640,6 +668,17 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
     await assertAdmin(context);
     validateInput(data);
     const sb = context.supabase as any;
+
+    // Close any still-open time session so nothing is left dangling after the
+    // order is consolidated (the admin entries below are the source of truth).
+    try {
+      const { closeOpenWorkSessions } = await import(
+        "@/lib/serviceOrders/timeSessionWrite.server"
+      );
+      await closeOpenWorkSessions(data.order_id, new Date().toISOString(), context.userId);
+    } catch {
+      /* non-blocking */
+    }
 
     // 1) Replace labor entries.
     const computed = data.entries.map((e: LaborEntryInput) => {
