@@ -234,7 +234,11 @@ function OrdemDetalhe() {
     !alreadyFinalized &&
     (order.status === "running" || order.status === "finished" || order.status === "review");
   const adminCanReviewFromLabor =
-    isAdmin && (order.status === "running" || order.status === "finished" || order.status === "review");
+    isAdmin &&
+    (order.status === "running" ||
+      order.status === "finished" ||
+      order.status === "review" ||
+      order.status === "approved");
   const tecnicoDone =
     isTecnico &&
     (order.status === "finished" ||
