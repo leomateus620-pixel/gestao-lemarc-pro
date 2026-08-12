@@ -46,6 +46,7 @@ import {
   formatHHmm,
   parseBRLToCents,
 } from "@/lib/serviceOrders/finance";
+import { isDisplacementUnset } from "@/lib/serviceOrders/finance";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import { listTimeSessions } from "@/lib/api/timeSessions.functions";
@@ -470,7 +471,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     }
 
     const f = existing?.financials;
-    if (f) {
+    const displacementUnset = isDisplacementUnset(f);
+    if (f && !displacementUnset) {
       setDisplacement({
         type: f.displacement_type,
         count: f.displacement_count ? String(f.displacement_count) : "",
@@ -488,6 +490,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     } else {
       // Sugestão automática: distância da unidade × valor global por km.
       const distance = order.client_unit?.distance_km_from_base ?? null;
+      setGeneralNotes(f?.notes ?? "");
       if (distance != null && distance > 0 && globalRateCents != null && globalRateCents > 0) {
         setDisplacement({
           type: "per_km",
@@ -495,7 +498,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           km_total: String(distance).replace(".", ","),
           rate_input: (globalRateCents / 100).toFixed(2).replace(".", ","),
           fixed_input: "",
-          notes: "",
+          notes: f?.displacement_notes ?? "",
         });
       }
     }
@@ -531,14 +534,15 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const hasAutoCalculatedEntries = computed.some(isAutoCalculatedEntry);
 
   const unitDistance = order.client_unit?.distance_km_from_base ?? null;
+  const displacementUnset = isDisplacementUnset(existing?.financials);
   const hasAutoDisplacementSuggestion =
-    !existing?.financials &&
+    displacementUnset &&
     unitDistance != null &&
     unitDistance > 0 &&
     globalRateCents != null &&
     globalRateCents > 0;
   const missingGlobalRate =
-    !existing?.financials &&
+    displacementUnset &&
     unitDistance != null &&
     unitDistance > 0 &&
     (globalRateCents == null || globalRateCents <= 0);

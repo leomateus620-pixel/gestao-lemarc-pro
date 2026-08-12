@@ -6,6 +6,7 @@ import {
   computeTotals,
   enrichEntry,
   formatBRL,
+  isDisplacementUnset,
   minutesToDecimalHours,
   parseBRLToCents,
   timeToMinutes,
@@ -145,4 +146,50 @@ describe("computeTotals", () => {
 
 describe("timeToMinutes", () => {
   it("aceita HH:mm:ss", () => expect(timeToMinutes("09:30:00")).toBe(570));
+});
+describe("isDisplacementUnset", () => {
+  it("considera vazio quando não há financeiro", () => {
+    expect(isDisplacementUnset(null)).toBe(true);
+  });
+
+  it("considera vazio o registro auto-criado sem deslocamento", () => {
+    expect(
+      isDisplacementUnset({
+        displacement_type: "none",
+        displacement_km_total: 0,
+        displacement_total_cents: 0,
+        finalized_at: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("respeita apuração finalizada", () => {
+    expect(
+      isDisplacementUnset({
+        displacement_type: "none",
+        displacement_km_total: 0,
+        displacement_total_cents: 0,
+        finalized_at: "2026-08-01T12:00:00Z",
+      }),
+    ).toBe(false);
+  });
+
+  it("respeita deslocamento já definido", () => {
+    expect(
+      isDisplacementUnset({
+        displacement_type: "per_km",
+        displacement_km_total: 110,
+        displacement_total_cents: 27500,
+        finalized_at: null,
+      }),
+    ).toBe(false);
+    expect(
+      isDisplacementUnset({
+        displacement_type: "fixed",
+        displacement_km_total: 0,
+        displacement_total_cents: 5000,
+        finalized_at: null,
+      }),
+    ).toBe(false);
+  });
 });
