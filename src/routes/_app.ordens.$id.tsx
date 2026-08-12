@@ -241,10 +241,10 @@ function OrdemDetalhe() {
       order.status === "review" ||
       order.status === "approved" ||
       order.status === "cancelled");
-  const showActionCard =
-    adminReview ||
-    (action.next !== null &&
-      !(isTecnico && (order.status === "finished" || order.status === "review")));
+  // Somente ações reais aparecem na barra: iniciar serviço, finalizar (técnico)
+  // ou revisar/finalizar (admin). As antigas etapas visuais "Enviar para revisão"
+  // e "Aprovar para cobrança" foram removidas do fluxo.
+  const showActionCard = adminReview || tecnicoFinalize || (isStartFlow && !tecnicoDone);
   const adminReviewLabel = order.status === "running" ? "Finalizar OS" : "Revisar e finalizar OS";
   const adminReviewHint =
     order.status === "running"
