@@ -516,7 +516,7 @@ export const getOrderLaborOverride = createServerFn({ method: "GET" })
       .select("labor_entries_adjusted_at")
       .eq("service_order_id", data.orderId)
       .maybeSingle();
-    if (!fin?.labor_entries_adjusted_at) return empty;
+    const adjustedAt = (fin?.labor_entries_adjusted_at ?? null) as string | null;
 
     const { data: rows, error } = await sb
       .from("service_order_labor_entries")
@@ -534,7 +534,7 @@ export const getOrderLaborOverride = createServerFn({ method: "GET" })
           (minutesByTechnician[r.technician_id] ?? 0) + minutes;
       }
     }
-    return { adjustedAt: fin.labor_entries_adjusted_at, totalMinutes, minutesByTechnician };
+    return { adjustedAt, totalMinutes, minutesByTechnician };
   });
 
 export const adjustSession = createServerFn({ method: "POST" })
