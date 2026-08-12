@@ -46,6 +46,7 @@ import {
   formatHHmm,
   parseBRLToCents,
 } from "@/lib/serviceOrders/finance";
+import { isDisplacementUnset } from "@/lib/serviceOrders/finance";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import { listTimeSessions } from "@/lib/api/timeSessions.functions";
