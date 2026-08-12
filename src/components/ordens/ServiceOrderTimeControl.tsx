@@ -195,10 +195,17 @@ export function ServiceOrderTimeControl({ order }: Props) {
         return acc + (ms > 0 ? Math.round(ms / 60000) : 0);
       }, 0);
   };
-  const displayedMinutesFor = (technicianId: string) =>
-    adjustedAt
-      ? (override?.minutesByTechnician[technicianId] ?? 0) + openMinutesFor(technicianId)
-      : computeTechnicianWorkedMinutes(sessions, technicianId);
+  /** Minutos lançados na apuração de horas (existem mesmo sem cronômetro). */
+  const apuradoMinutesFor = (technicianId: string) =>
+    override?.minutesByTechnician[technicianId] ?? 0;
+  const hasSessionsFor = (technicianId: string) =>
+    sessions.some((s: TimeSession) => s.technician_id === technicianId);
+  const displayedMinutesFor = (technicianId: string) => {
+    if (adjustedAt) return apuradoMinutesFor(technicianId) + openMinutesFor(technicianId);
+    // Técnico sem cronômetro (horas só na apuração) mostra as horas apuradas.
+    if (!hasSessionsFor(technicianId)) return apuradoMinutesFor(technicianId);
+    return computeTechnicianWorkedMinutes(sessions, technicianId);
+  };
   const totalWorked = technicians.reduce((acc, t) => acc + displayedMinutesFor(t.id), 0);
 
   const stateBadge =
