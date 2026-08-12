@@ -215,16 +215,18 @@ export function ServiceOrderTimeControl({ order }: Props) {
             ? { label: "Sessões encerradas", cls: "border-primary/40 bg-primary/10 text-primary" }
             : { label: "Não iniciada", cls: "border-border bg-secondary/40 text-muted-foreground" };
 
-  const pauseTechName = pauseTech
-    ? (technicians.find((t) => t.id === pauseTech)?.full_name ?? null)
-    : null;
-
-  const lockToSelf = isTecnico && !!myTechId;
-
-  // Regra: 1–2 técnicos → botão único inicia para toda a equipe.
-  //        3+ técnicos  → cada técnico inicia individualmente (fluxo atual).
-  const allIdle = technicians.every((t) => getTechnicianState(sessions, t.id).state === "idle");
-  const showBulkStart = technicians.length >= 1 && technicians.length <= 2 && allIdle;
+  // Estado por técnico usado pela barra de ações unificada.
+  const states = technicians.map((t) => ({ tech: t, st: getTechnicianState(sessions, t.id) }));
+  const idsWhere = (fn: (s: (typeof states)[number]) => boolean) =>
+    states.filter(fn).map((s) => s.tech.id);
+  const startableIds = idsWhere(({ st }) => st.state === "idle" || st.state === "finished");
+  const runningIds = idsWhere(({ st }) => st.state === "running");
+  const pausedIds = idsWhere(({ st }) => st.state === "paused");
+  const mine = myTechId ? states.find((s) => s.tech.id === myTechId) : null;
+  const isTeam = technicians.length > 1;
+  const anyPending =
+    startMut.isPending || pauseMut.isPending || resumeMut.isPending || finishMut.isPending;
+  void isTecnico;
 
   return (
     <GlassCard className="lemarc-os-time-control mt-4 p-4 sm:p-5">
@@ -249,57 +251,110 @@ export function ServiceOrderTimeControl({ order }: Props) {
         </p>
       )}
 
-      {showBulkStart && (
-        <div className="mt-3">
+      {/* Barra de ações: equipe inteira ou apenas o próprio tempo. */}
+      <div className="mt-3 space-y-2">
+        {startableIds.length > 0 && (
           <Button
             className="min-h-12 w-full gap-2"
-            onClick={() => bulkStartMut.mutate(technicians.map((t) => t.id))}
-            disabled={bulkStartMut.isPending}
+            onClick={() => startMut.mutate(startableIds)}
+            disabled={anyPending}
           >
             <Play size={16} />
-            {bulkStartMut.isPending
-              ? "Iniciando..."
-              : technicians.length === 1
-                ? "Iniciar serviço"
-                : "Iniciar serviço para toda a equipe"}
+            {isTeam
+              ? `Iniciar serviço para a equipe (${startableIds.length})`
+              : "Iniciar serviço"}
           </Button>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {technicians.length === 1
-              ? "Inicia o cronômetro para o técnico responsável."
-              : "Inicia o cronômetro para os dois técnicos ao mesmo tempo."}
-          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {runningIds.length > 0 && (
+            <Button
+              variant="secondary"
+              className="min-h-11 flex-1 gap-2"
+              onClick={() => setPauseOpen(true)}
+              disabled={anyPending}
+            >
+              <Pause size={16} /> Pausar{isTeam ? ` (${runningIds.length})` : ""}
+            </Button>
+          )}
+          {pausedIds.length > 0 && (
+            <Button
+              className="min-h-11 flex-1 gap-2"
+              onClick={() => resumeMut.mutate(pausedIds)}
+              disabled={anyPending}
+            >
+              <Play size={16} /> Retomar{isTeam ? ` a equipe (${pausedIds.length})` : ""}
+            </Button>
+          )}
+          {runningIds.length > 0 && (
+            <Button
+              variant="outline"
+              className="min-h-11 flex-1 gap-2"
+              onClick={() => finishMut.mutate(runningIds)}
+              disabled={anyPending}
+            >
+              <Square size={16} /> Encerrar{isTeam ? ` a equipe (${runningIds.length})` : ""}
+            </Button>
+          )}
         </div>
-      )}
-
-      {technicians.length > 1 && !lockToSelf && (
-        <div className="mt-3">
-          <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-            Técnico
-          </label>
-          <select
-            className="mt-1 h-11 w-full rounded-md border border-input bg-background px-2 text-sm"
-            value={selectedTech}
-            onChange={(e) => setSelectedTech(e.target.value)}
-          >
-            {technicians.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.full_name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+        {isTeam && mine && (
+          <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-2">
+            <span className="w-full text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              Apenas o meu tempo
+            </span>
+            {(mine.st.state === "idle" || mine.st.state === "finished") && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1 gap-2"
+                onClick={() => startMut.mutate([mine.tech.id])}
+                disabled={anyPending}
+              >
+                <Play size={14} /> Iniciar o meu
+              </Button>
+            )}
+            {mine.st.state === "running" && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1 gap-2"
+                  onClick={() => setPauseOpen(true)}
+                  disabled={anyPending}
+                >
+                  <Pause size={14} /> Pausar o meu
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={() => finishMut.mutate([mine.tech.id])}
+                  disabled={anyPending}
+                >
+                  <Square size={14} /> Encerrar o meu
+                </Button>
+              </>
+            )}
+            {mine.st.state === "paused" && (
+              <Button
+                size="sm"
+                className="flex-1 gap-2"
+                onClick={() => resumeMut.mutate([mine.tech.id])}
+                disabled={anyPending}
+              >
+                <Play size={14} /> Retomar o meu
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {
           const st = getTechnicianState(sessions, t.id);
-          const isSelected = lockToSelf
-            ? t.id === myTechId
-            : t.id === selectedTech || technicians.length === 1;
           return (
             <div
               key={t.id}
-              className={`rounded-xl border p-3 ${isSelected ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.04]"}`}
+              className={`rounded-xl border p-3 ${t.id === myTechId ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.04]"}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -345,60 +400,6 @@ export function ServiceOrderTimeControl({ order }: Props) {
                 </span>
               </div>
 
-              {isSelected && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {st.state === "idle" && (
-                    <Button
-                      className="min-h-11 flex-1 gap-2"
-                      onClick={() => startMut.mutate(t.id)}
-                      disabled={startMut.isPending}
-                    >
-                      <Play size={16} /> Iniciar serviço
-                    </Button>
-                  )}
-                  {st.state === "running" && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        className="min-h-11 flex-1 gap-2"
-                        onClick={() => {
-                          setPauseTech(t.id);
-                          setPauseOpen(true);
-                        }}
-                      >
-                        <Pause size={16} /> Pausar
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="min-h-11 flex-1 gap-2"
-                        onClick={() => finishMut.mutate(t.id)}
-                        disabled={finishMut.isPending}
-                      >
-                        <Square size={16} /> Encerrar meu tempo
-                      </Button>
-                    </>
-                  )}
-                  {st.state === "paused" && (
-                    <Button
-                      className="min-h-11 flex-1 gap-2"
-                      onClick={() => resumeMut.mutate(t.id)}
-                      disabled={resumeMut.isPending}
-                    >
-                      <Play size={16} /> Retomar serviço
-                    </Button>
-                  )}
-                  {st.state === "finished" && (
-                    <Button
-                      variant="secondary"
-                      className="min-h-11 flex-1 gap-2"
-                      onClick={() => startMut.mutate(t.id)}
-                      disabled={startMut.isPending}
-                    >
-                      <Play size={16} /> Reabrir serviço
-                    </Button>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}
@@ -423,10 +424,13 @@ export function ServiceOrderTimeControl({ order }: Props) {
         open={pauseOpen}
         onOpenChange={setPauseOpen}
         orderNumber={order.number}
-        technicianName={pauseTechName}
+        technicians={states
+          .filter(({ st }) => st.state === "running")
+          .map(({ tech }) => ({ id: tech.id, name: tech.full_name }))}
+        defaultSelectedIds={runningIds}
         pending={pauseMut.isPending}
-        onConfirm={({ reason, notes }) =>
-          pauseTech && pauseMut.mutate({ technicianId: pauseTech, reason, notes })
+        onConfirm={({ technicianIds, reason, notes }) =>
+          pauseMut.mutate({ technicianIds, reason, notes })
         }
       />
 
