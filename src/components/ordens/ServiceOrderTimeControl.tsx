@@ -227,6 +227,13 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const anyPending =
     startMut.isPending || pauseMut.isPending || resumeMut.isPending || finishMut.isPending;
   void isTecnico;
+  // OS encerrada: o controle vira somente leitura (totais + histórico), sem
+  // iniciar/pausar/retomar/encerrar. Ajustes ficam na "Apuração de horas".
+  const readOnly =
+    order.status === "finished" ||
+    order.status === "review" ||
+    order.status === "approved" ||
+    order.status === "cancelled";
 
   return (
     <GlassCard className="lemarc-os-time-control mt-4 p-4 sm:p-5">
@@ -252,6 +259,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
       )}
 
       {/* Barra de ações: equipe inteira ou apenas o próprio tempo. */}
+      {!readOnly && (
       <div className="mt-3 space-y-2">
         {startableIds.length > 0 && (
           <Button
@@ -347,6 +355,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
           </div>
         )}
       </div>
+      )}
 
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {

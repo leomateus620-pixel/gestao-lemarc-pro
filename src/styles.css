@@ -1166,6 +1166,42 @@
     inset 0 1px 0 oklch(1 0 0 / 0.08),
     0 18px 40px -32px oklch(0 0 0 / 0.9);
 }
+.lemarc-os-action-bar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid oklch(0.72 0.19 50 / 0.34);
+  border-radius: 1rem;
+  background: oklch(0.14 0.036 252 / 0.98);
+  color: oklch(0.985 0.005 250);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 18px 40px -32px oklch(0 0 0 / 0.9);
+}
+.lemarc-os-action-bar__text {
+  min-width: 0;
+}
+.lemarc-os-action-bar__cta > * {
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .lemarc-os-action-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.25rem;
+  }
+  .lemarc-os-action-bar__text {
+    flex: 1 1 auto;
+  }
+  .lemarc-os-action-bar__cta {
+    flex: 0 0 auto;
+    min-width: 15rem;
+  }
+}
 .lemarc-os-detail-summary {
   padding: 1rem;
 }
@@ -1254,10 +1290,6 @@
 @media (min-width: 1024px) {
   .lemarc-os-detail-primary {
     align-items: start;
-  }
-  .lemarc-os-next-action {
-    position: sticky;
-    top: calc(var(--lemarc-header-content-offset) + 0.5rem);
   }
 }
 @utility lemarc-page-enter {
