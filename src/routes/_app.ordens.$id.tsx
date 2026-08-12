@@ -161,25 +161,18 @@ function OrdemDetalhe() {
       if (technicians.length === 0) {
         throw new Error("Vincule ao menos um técnico para iniciar o serviço.");
       }
-      const results = await Promise.allSettled(
-        technicians.map((t) => startWorkFn({ data: { orderId: order.id, technicianId: t.id } })),
-      );
-      let started = 0;
-      let alreadyActive = 0;
-      const otherErrors: string[] = [];
-      for (const r of results) {
-        if (r.status === "fulfilled") {
-          started += 1;
-        } else {
-          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
-          if (/já existe uma sessão de trabalho ativa/i.test(msg)) alreadyActive += 1;
-          else otherErrors.push(msg);
-        }
+      // Uma única chamada em lote no servidor inicia o tempo de toda a equipe.
+      const res = await startWorkFn({
+        data: { orderId: order.id, technicianIds: technicians.map((t) => t.id) },
+      });
+      if (res.succeeded.length === 0 && res.failed.length > 0) {
+        throw new Error(res.failed[0].message);
       }
-      if (started === 0 && alreadyActive === 0 && otherErrors.length > 0) {
-        throw new Error(otherErrors[0]);
-      }
-      return { started, alreadyActive, total: technicians.length };
+      return {
+        started: res.succeeded.length,
+        alreadyActive: res.skipped.length,
+        total: technicians.length,
+      };
     },
     onSuccess: ({ started, alreadyActive, total }) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
