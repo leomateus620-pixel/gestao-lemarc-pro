@@ -103,13 +103,20 @@ export async function syncLaborEntriesFromSessions(
   orderId: string,
   syncedByUserId: string,
 ): Promise<LaborSyncOutcome> {
-  const { data: fin } = await sb
-    .from("service_order_financials")
-    .select("labor_entries_adjusted_at")
-    .eq("service_order_id", orderId)
-    .maybeSingle();
+  const [{ data: fin }, { data: order }] = await Promise.all([
+    sb
+      .from("service_order_financials")
+      .select("labor_entries_adjusted_at, finalized_at")
+      .eq("service_order_id", orderId)
+      .maybeSingle(),
+    sb.from("service_orders").select("status").eq("id", orderId).maybeSingle(),
+  ]);
 
-  if (fin?.labor_entries_adjusted_at) {
+  if (
+    fin?.labor_entries_adjusted_at ||
+    fin?.finalized_at ||
+    ["finished", "review", "approved", "cancelled"].includes(order?.status ?? "")
+  ) {
     return { synced: false, reason: "locked_by_admin" };
   }
 
@@ -201,6 +208,7 @@ export async function syncLaborEntriesFromSessions(
             ? `Intervalo ${idx + 1} de ${segments.length}`
             : "Trabalho executado",
         created_by: syncedByUserId,
+        entry_source: "session_sync",
       });
     });
   }
@@ -258,14 +266,22 @@ export async function reconcileLaborFromSessions(
         .eq("service_order_id", orderId),
     ]);
 
-    const { data: finRow } = await sb
-      .from("service_order_financials")
-      .select("labor_entries_adjusted_at, finalized_at")
-      .eq("service_order_id", orderId)
-      .maybeSingle();
+    const [{ data: finRow }, { data: orderRow }] = await Promise.all([
+      sb
+        .from("service_order_financials")
+        .select("labor_entries_adjusted_at, finalized_at")
+        .eq("service_order_id", orderId)
+        .maybeSingle(),
+      sb.from("service_orders").select("status").eq("id", orderId).maybeSingle(),
+    ]);
     const adjustedAt = finRow?.labor_entries_adjusted_at ?? null;
     // OS já finalizada pelo admin: nunca acrescentar horas automaticamente.
-    if (finRow?.finalized_at) return { appended: 0 };
+    if (
+      finRow?.finalized_at ||
+      ["finished", "review", "approved", "cancelled"].includes(orderRow?.status ?? "")
+    ) {
+      return { appended: 0 };
+    }
 
     const closedAll = (sessionsRaw ?? [])
       .filter((s: any) => s.technician_id && s.started_at && s.ended_at)
@@ -337,6 +353,7 @@ export async function reconcileLaborFromSessions(
           subtotal_cents: computeSubtotalCents(m.duration_minutes, rate),
           description: "Trabalho executado",
           created_by: userId,
+          entry_source: "session_sync",
         };
       });
       const { error: insErr } = await sb
