@@ -137,48 +137,120 @@ async function findOpenWork(sb: any, orderId: string, technicianId: string) {
   return data ? normalize(data) : null;
 }
 
+/**
+ * Resultado de uma operação em lote (equipe) de controle de tempo.
+ * `skipped` = técnico já estava no estado desejado (ex.: já em execução).
+ */
+export type TimeBatchResult = {
+  succeeded: string[];
+  skipped: Array<{ technicianId: string; message: string }>;
+  failed: Array<{ technicianId: string; message: string }>;
+};
+
+type BatchInput = {
+  orderId: string;
+  /** Compatibilidade: um único técnico. */
+  technicianId?: string | null;
+  /** Escopo em equipe. */
+  technicianIds?: string[];
+};
+
+function emptyBatch(): TimeBatchResult {
+  return { succeeded: [], skipped: [], failed: [] };
+}
+
+function errMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** Técnicos vinculados à OS (inclui o principal da própria OS). */
+async function listOrderTechnicianIds(sb: any, orderId: string): Promise<string[]> {
+  const [{ data: links }, { data: order }] = await Promise.all([
+    sb.from("service_order_technicians").select("technician_id").eq("service_order_id", orderId),
+    sb.from("service_orders").select("technician_id").eq("id", orderId).maybeSingle(),
+  ]);
+  const ids = new Set<string>();
+  for (const l of links ?? []) if (l?.technician_id) ids.add(l.technician_id as string);
+  if (order?.technician_id) ids.add(order.technician_id as string);
+  return Array.from(ids);
+}
+
+/**
+ * Normaliza o escopo pedido pelo cliente e valida que todos os técnicos
+ * pertencem à OS. Sem escopo explícito, aplica a toda a equipe.
+ */
+async function resolveScope(sb: any, data: BatchInput): Promise<string[]> {
+  const assigned = await listOrderTechnicianIds(sb, data.orderId);
+  const requested = [
+    ...(Array.isArray(data.technicianIds) ? data.technicianIds : []),
+    ...(data.technicianId ? [data.technicianId] : []),
+  ].filter((id): id is string => typeof id === "string" && id.length > 0);
+  const unique = Array.from(new Set(requested));
+  if (unique.length === 0) return assigned;
+  const invalid = unique.filter((id) => !assigned.includes(id));
+  if (invalid.length > 0) throw new Error("Técnico não vinculado a esta OS.");
+  return unique;
+}
+
 export const startWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { orderId: string; technicianId: string }) => data)
-  .handler(async ({ data, context }) => {
-    if (!data.orderId || !data.technicianId) throw new Error("Dados inválidos.");
+  .inputValidator((data: BatchInput) => data)
+  .handler(async ({ data, context }): Promise<TimeBatchResult> => {
+    if (!data.orderId) throw new Error("Dados inválidos.");
     const sb = context.supabase as any;
     const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
       "@/lib/serviceOrders/timeSessionWrite.server"
     );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
-    const open = await findOpenWork(sb, data.orderId, data.technicianId);
-    if (open) throw new Error("Já existe uma sessão de trabalho ativa para este técnico.");
+    const scope = await resolveScope(sb, data);
+    if (scope.length === 0) throw new Error("Vincule ao menos um técnico à OS.");
     const writer = await getTimeSessionWriter();
-    const { data: row, error } = await writer
-      .from("service_order_time_sessions")
-      .insert({
-        service_order_id: data.orderId,
-        technician_id: data.technicianId,
-        kind: "work",
-        started_at: new Date().toISOString(),
-        source: "mobile",
-        created_by: context.userId,
-      })
-      .select(SELECT)
-      .single();
-    if (error) throw new Error(error.message);
-    // Mark OS as running if still pending/dispatched/transit.
-    await sb
-      .from("service_orders")
-      .update({ status: "running", started_at: new Date().toISOString() })
-      .eq("id", data.orderId)
-      .in("status", ["pending", "dispatched", "transit"]);
-    return normalize(row);
+    const result = emptyBatch();
+
+    for (const technicianId of scope) {
+      try {
+        const open = await findOpenWork(sb, data.orderId, technicianId);
+        if (open) {
+          result.skipped.push({ technicianId, message: "Já estava com tempo em andamento." });
+          continue;
+        }
+        const { error } = await writer
+          .from("service_order_time_sessions")
+          .insert({
+            service_order_id: data.orderId,
+            technician_id: technicianId,
+            kind: "work",
+            started_at: new Date().toISOString(),
+            source: "mobile",
+            created_by: context.userId,
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        result.succeeded.push(technicianId);
+      } catch (e) {
+        result.failed.push({ technicianId, message: errMessage(e) });
+      }
+    }
+
+    if (result.succeeded.length > 0) {
+      // Mark OS as running if still pending/dispatched/transit.
+      await sb
+        .from("service_orders")
+        .update({ status: "running", started_at: new Date().toISOString() })
+        .eq("id", data.orderId)
+        .in("status", ["pending", "dispatched", "transit"]);
+    }
+    if (result.succeeded.length === 0 && result.skipped.length === 0) {
+      throw new Error(result.failed[0]?.message ?? "Não foi possível iniciar o serviço.");
+    }
+    return result;
   });
 
 export const pauseWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (data: { orderId: string; technicianId: string; reason: string; notes?: string | null }) =>
-      data,
-  )
-  .handler(async ({ data, context }) => {
+  .inputValidator((data: BatchInput & { reason: string; notes?: string | null }) => data)
+  .handler(async ({ data, context }): Promise<TimeBatchResult> => {
     if (!data.reason) throw new Error("Selecione o motivo da pausa.");
     if (data.reason === "outro" && !data.notes?.trim()) {
       throw new Error("Informe uma observação para o motivo 'Outro'.");
@@ -188,25 +260,37 @@ export const pauseWork = createServerFn({ method: "POST" })
       "@/lib/serviceOrders/timeSessionWrite.server"
     );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
-    const open = await findOpenWork(sb, data.orderId, data.technicianId);
-    if (!open) throw new Error("Nenhuma sessão ativa para pausar.");
+    const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
-    const { data: rows, error } = await writer
-      .from("service_order_time_sessions")
-      .update({
-        ended_at: new Date().toISOString(),
-        end_reason: "pause",
-        pause_reason: data.reason,
-        pause_notes: data.notes ?? null,
-      })
-      .eq("id", open.id)
-      .select(SELECT);
-    if (error) throw new Error(error.message);
-    const row = (rows ?? [])[0];
-    if (!row) {
-      throw new Error(
-        "Não foi possível registrar a pausa (nenhum registro atualizado). Tente novamente.",
-      );
+    const result = emptyBatch();
+
+    for (const technicianId of scope) {
+      try {
+        const open = await findOpenWork(sb, data.orderId, technicianId);
+        if (!open) {
+          result.skipped.push({ technicianId, message: "Não havia tempo em andamento." });
+          continue;
+        }
+        const { data: rows, error } = await writer
+          .from("service_order_time_sessions")
+          .update({
+            ended_at: new Date().toISOString(),
+            end_reason: "pause",
+            pause_reason: data.reason,
+            pause_notes: data.notes ?? null,
+          })
+          .eq("id", open.id)
+          .select("id");
+        if (error) throw new Error(error.message);
+        if (!(rows ?? [])[0]) throw new Error("Nenhum registro foi atualizado. Tente novamente.");
+        result.succeeded.push(technicianId);
+      } catch (e) {
+        result.failed.push({ technicianId, message: errMessage(e) });
+      }
+    }
+
+    if (result.succeeded.length === 0 && result.skipped.length === 0) {
+      throw new Error(result.failed[0]?.message ?? "Nenhuma sessão ativa para pausar.");
     }
     // Keep the order totals coherent right after the pause (best-effort),
     // including multi-day work where the labor rows already existed.
@@ -223,76 +307,107 @@ export const pauseWork = createServerFn({ method: "POST" })
       await syncServiceOrderOpenTimeAlerts({
         supabase: sb,
         serviceOrderId: data.orderId,
-        finishedTechnicianId: data.technicianId,
+        finishedTechnicianId: result.succeeded[0] ?? null,
         actorUserId: context.userId,
       });
     } catch {
       /* non-blocking */
     }
-    return normalize(row);
+    return result;
   });
 
 export const resumeWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { orderId: string; technicianId: string; notes?: string | null }) => data)
-  .handler(async ({ data, context }) => {
+  .inputValidator((data: BatchInput & { notes?: string | null }) => data)
+  .handler(async ({ data, context }): Promise<TimeBatchResult> => {
     const sb = context.supabase as any;
     const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
       "@/lib/serviceOrders/timeSessionWrite.server"
     );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
-    // Confirm the last session for this tech was a pause.
-    const { data: last, error: lastErr } = await sb
-      .from("service_order_time_sessions")
-      .select(SELECT)
-      .eq("service_order_id", data.orderId)
-      .eq("technician_id", data.technicianId)
-      .eq("kind", "work")
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (lastErr) throw new Error(lastErr.message);
-    if (!last || last.ended_at == null) throw new Error("Não há pausa ativa para retomar.");
-    if (last.end_reason !== "pause") throw new Error("A última sessão não estava pausada.");
+    const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
-    const { data: row, error } = await writer
-      .from("service_order_time_sessions")
-      .insert({
-        service_order_id: data.orderId,
-        technician_id: data.technicianId,
-        kind: "work",
-        started_at: new Date().toISOString(),
-        notes: data.notes ?? null,
-        source: "mobile",
-        created_by: context.userId,
-      })
-      .select(SELECT)
-      .single();
-    if (error) throw new Error(error.message);
-    return normalize(row);
+    const result = emptyBatch();
+
+    for (const technicianId of scope) {
+      try {
+        // Confirm the last session for this tech was a pause.
+        const { data: last, error: lastErr } = await sb
+          .from("service_order_time_sessions")
+          .select(SELECT)
+          .eq("service_order_id", data.orderId)
+          .eq("technician_id", technicianId)
+          .eq("kind", "work")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastErr) throw new Error(lastErr.message);
+        if (!last || last.ended_at == null || last.end_reason !== "pause") {
+          result.skipped.push({ technicianId, message: "Não estava pausado." });
+          continue;
+        }
+        const { error } = await writer
+          .from("service_order_time_sessions")
+          .insert({
+            service_order_id: data.orderId,
+            technician_id: technicianId,
+            kind: "work",
+            started_at: new Date().toISOString(),
+            notes: data.notes ?? null,
+            source: "mobile",
+            created_by: context.userId,
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        result.succeeded.push(technicianId);
+      } catch (e) {
+        result.failed.push({ technicianId, message: errMessage(e) });
+      }
+    }
+
+    if (result.succeeded.length === 0 && result.skipped.length === 0) {
+      throw new Error(result.failed[0]?.message ?? "Não há pausa ativa para retomar.");
+    }
+    return result;
   });
 
 export const finishWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { orderId: string; technicianId?: string | null }) => data)
+  .inputValidator((data: BatchInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
     const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
       "@/lib/serviceOrders/timeSessionWrite.server"
     );
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
+    const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
-    const q = writer
-      .from("service_order_time_sessions")
-      .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
-      .eq("service_order_id", data.orderId)
-      .eq("kind", "work")
-      .is("ended_at", null);
-    if (data.technicianId) q.eq("technician_id", data.technicianId);
-    const { data: closedRows, error } = await q.select("id");
-    if (error) throw new Error(error.message);
-    if ((closedRows ?? []).length === 0) {
-      throw new Error("Nenhum tempo em aberto foi encontrado para encerrar.");
+    const result = emptyBatch();
+    for (const technicianId of scope) {
+      try {
+        const { data: closedRows, error } = await writer
+          .from("service_order_time_sessions")
+          .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
+          .eq("service_order_id", data.orderId)
+          .eq("technician_id", technicianId)
+          .eq("kind", "work")
+          .is("ended_at", null)
+          .select("id");
+        if (error) throw new Error(error.message);
+        if ((closedRows ?? []).length === 0) {
+          result.skipped.push({ technicianId, message: "Não havia tempo em aberto." });
+          continue;
+        }
+        result.succeeded.push(technicianId);
+      } catch (e) {
+        result.failed.push({ technicianId, message: errMessage(e) });
+      }
+    }
+    if (result.succeeded.length === 0 && result.skipped.length === 0) {
+      throw new Error(
+        result.failed[0]?.message ?? "Nenhum tempo em aberto foi encontrado para encerrar.",
+      );
     }
     try {
       const { reconcileLaborFromSessions } = await import(
@@ -310,13 +425,13 @@ export const finishWork = createServerFn({ method: "POST" })
       openTimeAlert = await syncServiceOrderOpenTimeAlerts({
         supabase: sb,
         serviceOrderId: data.orderId,
-        finishedTechnicianId: data.technicianId ?? null,
+        finishedTechnicianId: result.succeeded[0] ?? null,
         actorUserId: context.userId,
       });
     } catch {
       /* non-blocking */
     }
-    return { ok: true, openTimeAlert };
+    return { ok: true, openTimeAlert, ...result };
   });
 
 /**
