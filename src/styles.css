@@ -1291,10 +1291,6 @@
   .lemarc-os-detail-primary {
     align-items: start;
   }
-  .lemarc-os-next-action {
-    position: sticky;
-    top: calc(var(--lemarc-header-content-offset) + 0.5rem);
-  }
 }
 @utility lemarc-page-enter {
   animation: lemarc-page-enter 0.42s ease both;
