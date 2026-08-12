@@ -204,7 +204,11 @@ export function ServiceOrderTimeControl({ order }: Props) {
     if (adjustedAt) return apuradoMinutesFor(technicianId) + openMinutesFor(technicianId);
     // Técnico sem cronômetro (horas só na apuração) mostra as horas apuradas.
     if (!hasSessionsFor(technicianId)) return apuradoMinutesFor(technicianId);
-    return computeTechnicianWorkedMinutes(sessions, technicianId);
+    const worked = computeTechnicianWorkedMinutes(sessions, technicianId);
+    // Sessões esquecidas em aberto são descartadas do cronômetro; nesse caso
+    // vale o que está apurado nas horas da OS.
+    if (worked === 0) return apuradoMinutesFor(technicianId);
+    return worked;
   };
   const totalWorked = technicians.reduce((acc, t) => acc + displayedMinutesFor(t.id), 0);
 
