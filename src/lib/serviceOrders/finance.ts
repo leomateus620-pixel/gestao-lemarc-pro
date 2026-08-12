@@ -155,3 +155,26 @@ export function describeDisplacement(d: DisplacementInput): string {
 }
 
 export const displacementTypes: DisplacementType[] = ["none", "per_km", "fixed"];
+
+/**
+ * O registro financeiro é criado automaticamente junto da apuração de horas
+ * com deslocamento "none"/0. Nesse estado o admin ainda não decidiu nada, então
+ * a revisão pode sugerir a distância cadastrada na unidade.
+ */
+export function isDisplacementUnset(
+  f:
+    | {
+        displacement_type: DisplacementType;
+        displacement_km_total?: number | string | null;
+        displacement_total_cents?: number | null;
+        finalized_at?: string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!f) return true;
+  if (f.finalized_at) return false;
+  if (f.displacement_type !== "none") return false;
+  if (Number(f.displacement_total_cents ?? 0) !== 0) return false;
+  return Number(f.displacement_km_total ?? 0) === 0;
+}
