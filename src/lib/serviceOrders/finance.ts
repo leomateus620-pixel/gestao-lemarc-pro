@@ -173,7 +173,6 @@ export function isDisplacementUnset(
     | undefined,
 ): boolean {
   if (!f) return true;
-  if (f.finalized_at) return false;
   if (f.displacement_type !== "none") return false;
   if (Number(f.displacement_total_cents ?? 0) !== 0) return false;
   return Number(f.displacement_km_total ?? 0) === 0;
