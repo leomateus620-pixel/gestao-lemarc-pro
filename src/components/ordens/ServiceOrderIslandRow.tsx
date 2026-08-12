@@ -119,6 +119,8 @@ export function ServiceOrderIslandRow({
   const timeSummary = getTimeSummary(order, financials);
   const valueSummary = getValueSummary(order, financials);
   const openedAt = formatServiceOrderDateTime(getOpenedAt(order)) ?? "Não informado";
+  // Data de abertura destacada já na versão reduzida (omitida quando não houver registro).
+  const openedChipLabel = formatServiceOrderDateTime(getOpenedAt(order));
   const startedAt =
     formatServiceOrderDateTime(order.started_at) ??
     (order.status === "running" ? "Em andamento" : "Não informado");
@@ -178,7 +180,10 @@ export function ServiceOrderIslandRow({
               </span>
             </span>
 
-            <OrderStatusCluster status={order.status} priority={order.priority} compact />
+            <span className="flex min-w-0 items-center justify-between gap-2">
+              <OrderStatusCluster status={order.status} priority={order.priority} compact />
+              {openedChipLabel && <OrderOpenedChip label={openedChipLabel} />}
+            </span>
 
             <span
               className="block min-w-0 truncate text-[12px] font-semibold leading-snug text-slate-100"
@@ -209,6 +214,11 @@ export function ServiceOrderIslandRow({
               <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
                 {locationSummary}
               </span>
+              {openedChipLabel && (
+                <span className="mt-1 flex min-w-0">
+                  <OrderOpenedChip label={openedChipLabel} />
+                </span>
+              )}
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-bold leading-tight text-slate-100">
