@@ -744,8 +744,9 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
     const { error: osErr } = await sb
       .from("service_orders")
       .update({
-        status: "finished",
+        status: "approved",
         finished_at: now,
+        approved_at: now,
         closed_at: now,
         worked_minutes: totalLaborMinutes,
         hour_rate: weightedRate,
