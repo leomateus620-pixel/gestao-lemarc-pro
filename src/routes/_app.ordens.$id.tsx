@@ -218,7 +218,8 @@ function OrdemDetalhe() {
     }
     try {
       // Encerra qualquer cronômetro aberto antes de mudar o status.
-      await finishWorkFn({ data: { orderId, technicianId: null } });
+      // Encerra o tempo de toda a equipe da OS.
+      await finishWorkFn({ data: { orderId } });
     } catch (e) {
       // Não bloqueia a finalização se não houver sessão aberta.
       void e;
