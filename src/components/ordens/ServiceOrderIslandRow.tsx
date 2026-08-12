@@ -422,6 +422,41 @@ function InlineMeta({
   );
 }
 
+/** Selo de abertura da OS exibido já no cartão recolhido. */
+function OrderOpenedChip({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex max-w-full min-w-0 shrink-0 items-center gap-1 rounded-full border border-primary/35 bg-primary/12 px-2 py-[2px] text-[10px] font-black uppercase leading-none tracking-[0.06em] text-primary"
+      title={`Aberta em ${label}`}
+    >
+      <CalendarClock size={11} aria-hidden="true" className="shrink-0" />
+      <span className="truncate tabular-nums">{label}</span>
+    </span>
+  );
+}
+
+function InlineMetaLegacy({
+  label,
+  value,
+  title,
+  tabular = false,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  tabular?: boolean;
+}) {
+  return (
+    <span
+      className={cn("block max-w-full min-w-0 truncate", tabular && "tabular-nums")}
+      title={title ?? value}
+    >
+      <span className="text-slate-500">{label}:</span>{" "}
+      <span className="font-bold text-slate-200">{value}</span>
+    </span>
+  );
+}
+
 function InlineMetric({
   label,
   value,
