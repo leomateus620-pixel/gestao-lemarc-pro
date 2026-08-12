@@ -15,6 +15,7 @@ import {
 } from "@/lib/serviceOrders/finance";
 import {
   findMissingSegments,
+  filterMaterializableSessions,
   splitSessionsByDay,
 } from "@/lib/serviceOrders/laborDerivation";
 import type {
@@ -316,6 +317,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const sb = context.supabase as any;
+    let orderStatus: string | undefined;
 
     // No order may be apurada/finalizada with time still open: otherwise those
     // hours never become labor entries (they are filtered out below) and the
@@ -327,6 +329,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
         .eq("id", data.orderId)
         .maybeSingle();
       const status = orderRow?.status as string | undefined;
+      orderStatus = status;
       if (status && ["finished", "review", "approved", "cancelled"].includes(status)) {
         const { closeOpenWorkSessions } = await import(
           "@/lib/serviceOrders/timeSessionWrite.server"
@@ -369,8 +372,16 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
 
     const storedEntries: LaborEntry[] = (labor.data ?? []).map(normalizeLabor);
     const financials = normalizeFinancials(fin.data);
+    // OS já revisada/finalizada: a leitura NUNCA grava horas. Isso evita que
+    // apontamentos "brotem" dias depois em OS enviadas para cobrança.
+    const isLocked =
+      Boolean(financials?.finalized_at) ||
+      Boolean(financials?.labor_entries_adjusted_at) ||
+      (orderStatus
+        ? ["finished", "review", "approved", "cancelled"].includes(orderStatus)
+        : false);
     const rawSessions = sessionsRes?.error ? [] : (sessionsRes?.data ?? []);
-    const closedWorkSessions: ClosedWorkSession[] = rawSessions
+    const allClosedWorkSessions: ClosedWorkSession[] = rawSessions
       .filter(
         (s: any) =>
           s.kind === "work" &&
@@ -386,6 +397,31 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
         ended_at: s.ended_at,
         duration_minutes: s.duration_minutes ?? 0,
       }));
+    // Sessões esquecidas em aberto (>14h ou atravessando dias sem pausa) não
+    // são materializadas: elas geravam blocos fantasma de 00:00–23:59.
+    const closedWorkSessions = filterMaterializableSessions(allClosedWorkSessions);
+
+    if (isLocked) {
+      const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
+      const totalLaborCents = storedEntries.reduce((a, e) => a + e.subtotal_cents, 0);
+      const effectiveFinancials =
+        financials &&
+        (financials.total_labor_minutes !== totalLaborMinutes ||
+          financials.total_labor_cents !== totalLaborCents)
+          ? {
+              ...financials,
+              total_labor_minutes: totalLaborMinutes,
+              total_labor_cents: totalLaborCents,
+              grand_total_cents:
+                totalLaborCents +
+                (financials.displacement_total_cents ?? 0) +
+                (financials.materials_total_cents ?? 0),
+            }
+          : financials;
+      if (storedEntries.length > 0 || !closedWorkSessions.length) {
+        return { entries: storedEntries, financials: effectiveFinancials };
+      }
+    }
 
     if (closedWorkSessions.length === 0) {
       // No time-tracking data — trust manually entered labor entries.

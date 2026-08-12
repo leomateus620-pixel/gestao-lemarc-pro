@@ -168,6 +168,69 @@ function hm(time: string): string {
   return time.slice(0, 5);
 }
 
+/** Minutos desde 00:00 de um "HH:mm(:ss)". */
+function toMinutes(time: string): number {
+  const [h, m] = hm(time).split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/**
+ * Limite operacional de uma sessão de trabalho contínua (sem pausa).
+ * Acima disso a sessão é considerada "esquecida em aberto" e NUNCA é
+ * materializada automaticamente como horas — o admin precisa ajustar.
+ */
+export const MAX_SESSION_MINUTES = 14 * 60;
+
+/**
+ * Sessão suspeita: duração acima do limite operacional ou que atravessa a
+ * meia-noite local sem nenhuma pausa. Ambos os casos indicam que o técnico
+ * (ou o encerramento em equipe) deixou o cronômetro rodando, e geravam os
+ * blocos fantasma de 00:00–23:59 (24:00) na apuração.
+ */
+export function isSuspiciousSession(session: SessionLike): boolean {
+  const duration =
+    session.duration_minutes && session.duration_minutes > 0
+      ? session.duration_minutes
+      : minutesBetween(session.started_at, session.ended_at);
+  if (duration > MAX_SESSION_MINUTES) return true;
+  return spDate(session.started_at) !== spDate(session.ended_at);
+}
+
+/** Sessões seguras para materialização automática. */
+export function filterMaterializableSessions<T extends SessionLike>(sessions: T[]): T[] {
+  return sessions.filter((s) => !isSuspiciousSession(s));
+}
+
+/** Sessões que precisam de ajuste manual do admin. */
+export function filterSuspiciousSessions<T extends SessionLike>(sessions: T[]): T[] {
+  return sessions.filter((s) => isSuspiciousSession(s));
+}
+
+/**
+ * Existe alguma linha do mesmo técnico, no mesmo dia, cujo intervalo se
+ * sobrepõe ao do segmento? Comparação por sobreposição (e não por chave
+ * exata) evita duplicar horas quando o admin ajustou entrada/saída.
+ */
+export function overlapsExisting(
+  segment: { technician_id: string | null; work_date: string; start_time: string; end_time: string },
+  existing: {
+    technician_id: string | null;
+    work_date: string;
+    start_time: string;
+    end_time: string;
+  }[],
+): boolean {
+  const start = toMinutes(segment.start_time);
+  const end = toMinutes(segment.end_time);
+  return existing.some((e) => {
+    if ((e.technician_id ?? "") !== (segment.technician_id ?? "")) return false;
+    if (e.work_date !== segment.work_date) return false;
+    const es = toMinutes(e.start_time);
+    const ee = toMinutes(e.end_time);
+    return start < ee && es < end;
+  });
+}
+
 /** Stable identity of a labor row / segment, tolerant to seconds precision. */
 export function segmentKey(e: {
   technician_id: string | null;
@@ -192,13 +255,14 @@ export function findMissingSegments(
     end_time: string;
   }[],
 ): LaborSegment[] {
-  const seen = new Set(existing.map(segmentKey));
+  const known = [...existing];
   const out: LaborSegment[] = [];
   for (const s of segments) {
-    const key = segmentKey(s);
-    if (seen.has(key)) continue;
-    // Guard against duplicated sessions producing duplicated rows.
-    seen.add(key);
+    // Sessões esquecidas em aberto nunca viram horas automáticas.
+    if (s.duration_minutes > MAX_SESSION_MINUTES) continue;
+    // Sobreposição com uma linha existente = a hora já está apurada.
+    if (overlapsExisting(s, known)) continue;
+    known.push(s);
     out.push(s);
   }
   return out;

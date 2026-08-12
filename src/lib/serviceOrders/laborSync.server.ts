@@ -10,6 +10,7 @@
 import { computeSubtotalCents } from "@/lib/serviceOrders/finance";
 import {
   findMissingSegments,
+  filterMaterializableSessions,
   minutesBetween,
   splitSessionsByDay,
 } from "@/lib/serviceOrders/laborDerivation";
@@ -121,7 +122,7 @@ export async function syncLaborEntriesFromSessions(
     .order("started_at", { ascending: true });
   if (sessErr) throw new Error(sessErr.message);
 
-  const closed: ClosedSession[] = (sessionsRaw ?? [])
+  const closedAll: ClosedSession[] = (sessionsRaw ?? [])
     .filter(
       (s: any) =>
         s.technician_id && s.started_at && s.ended_at && (s.duration_minutes ?? 0) > 0,
@@ -133,6 +134,8 @@ export async function syncLaborEntriesFromSessions(
       ended_at: s.ended_at,
       duration_minutes: s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at),
     }));
+  // Sessões esquecidas em aberto (>14h / atravessando dias) nunca viram horas.
+  const closed = filterMaterializableSessions(closedAll);
 
   // Preserve current rates/role/description so the recompute doesn't zero them out.
   const { data: existing, error: exErr } = await sb
@@ -257,12 +260,14 @@ export async function reconcileLaborFromSessions(
 
     const { data: finRow } = await sb
       .from("service_order_financials")
-      .select("labor_entries_adjusted_at")
+      .select("labor_entries_adjusted_at, finalized_at")
       .eq("service_order_id", orderId)
       .maybeSingle();
     const adjustedAt = finRow?.labor_entries_adjusted_at ?? null;
+    // OS já finalizada pelo admin: nunca acrescentar horas automaticamente.
+    if (finRow?.finalized_at) return { appended: 0 };
 
-    const closed = (sessionsRaw ?? [])
+    const closedAll = (sessionsRaw ?? [])
       .filter((s: any) => s.technician_id && s.started_at && s.ended_at)
       // With an admin consolidation in place, only newer work is appended.
       .filter((s: any) => !adjustedAt || new Date(s.ended_at) > new Date(adjustedAt))
@@ -276,6 +281,8 @@ export async function reconcileLaborFromSessions(
             ? (s.duration_minutes as number)
             : minutesBetween(s.started_at, s.ended_at),
       }));
+    // Sessões esquecidas em aberto exigem ajuste manual do admin.
+    const closed = filterMaterializableSessions(closedAll);
     if (closed.length === 0) return { appended: 0 };
 
     const existingRows = (existing ?? []) as {
