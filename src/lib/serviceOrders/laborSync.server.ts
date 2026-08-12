@@ -122,7 +122,7 @@ export async function syncLaborEntriesFromSessions(
     .order("started_at", { ascending: true });
   if (sessErr) throw new Error(sessErr.message);
 
-  const closed: ClosedSession[] = (sessionsRaw ?? [])
+  const closedAll: ClosedSession[] = (sessionsRaw ?? [])
     .filter(
       (s: any) =>
         s.technician_id && s.started_at && s.ended_at && (s.duration_minutes ?? 0) > 0,
@@ -134,6 +134,8 @@ export async function syncLaborEntriesFromSessions(
       ended_at: s.ended_at,
       duration_minutes: s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at),
     }));
+  // Sessões esquecidas em aberto (>14h / atravessando dias) nunca viram horas.
+  const closed = filterMaterializableSessions(closedAll);
 
   // Preserve current rates/role/description so the recompute doesn't zero them out.
   const { data: existing, error: exErr } = await sb
