@@ -15,8 +15,10 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   orderNumber: number | string;
-  technicianName?: string | null;
-  onConfirm: (data: { reason: string; notes: string | null }) => void;
+  /** Técnicos com tempo em andamento (candidatos à pausa). */
+  technicians: Array<{ id: string; name: string }>;
+  defaultSelectedIds: string[];
+  onConfirm: (data: { technicianIds: string[]; reason: string; notes: string | null }) => void;
   pending?: boolean;
 };
 
@@ -24,22 +26,28 @@ export function PauseServiceOrderDialog({
   open,
   onOpenChange,
   orderNumber,
-  technicianName,
+  technicians,
+  defaultSelectedIds,
   onConfirm,
   pending,
 }: Props) {
   const [reason, setReason] = useState<string>("almoco");
   const [notes, setNotes] = useState<string>("");
+  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
     if (open) {
       setReason("almoco");
       setNotes("");
+      setSelected(defaultSelectedIds);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const requiresNotes = reason === "outro";
-  const canConfirm = reason && (!requiresNotes || notes.trim().length > 0);
+  const canConfirm = reason && selected.length > 0 && (!requiresNotes || notes.trim().length > 0);
+  const toggle = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,11 +56,52 @@ export function PauseServiceOrderDialog({
           <DialogTitle>Pausar OS #{orderNumber}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          {technicianName && (
-            <p className="text-xs text-muted-foreground">
-              Pausando serviço de <span className="font-bold text-foreground">{technicianName}</span>
-            </p>
-          )}
+          <div>
+            <Label className="text-[10px] font-black uppercase tracking-wider">
+              Quem será pausado
+            </Label>
+            {technicians.length > 1 && (
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                  onClick={() => setSelected(technicians.map((t) => t.id))}
+                >
+                  Toda a equipe
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                  onClick={() => setSelected([])}
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
+            <div className="mt-2 space-y-1">
+              {technicians.map((t) => (
+                <label
+                  key={t.id}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${
+                    selected.includes(t.id)
+                      ? "border-primary/40 bg-primary/5 text-foreground"
+                      : "border-white/10 bg-white/[0.03] text-muted-foreground"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-current"
+                    checked={selected.includes(t.id)}
+                    onChange={() => toggle(t.id)}
+                  />
+                  <span className="truncate font-semibold">{t.name}</span>
+                </label>
+              ))}
+              {technicians.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum técnico em andamento.</p>
+              )}
+            </div>
+          </div>
           <div>
             <Label className="text-[10px] font-black uppercase tracking-wider">
               Motivo da pausa
@@ -87,7 +136,9 @@ export function PauseServiceOrderDialog({
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirm({ reason, notes: notes.trim() || null })}
+            onClick={() =>
+              onConfirm({ technicianIds: selected, reason, notes: notes.trim() || null })
+            }
             disabled={!canConfirm || pending}
           >
             {pending ? "Pausando…" : "Confirmar pausa"}
