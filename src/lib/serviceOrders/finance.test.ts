@@ -6,6 +6,7 @@ import {
   computeTotals,
   enrichEntry,
   formatBRL,
+  isDisplacementUnset,
   minutesToDecimalHours,
   parseBRLToCents,
   timeToMinutes,
