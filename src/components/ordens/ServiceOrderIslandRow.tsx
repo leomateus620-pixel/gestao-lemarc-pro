@@ -435,28 +435,6 @@ function OrderOpenedChip({ label }: { label: string }) {
   );
 }
 
-function InlineMetaLegacy({
-  label,
-  value,
-  title,
-  tabular = false,
-}: {
-  label: string;
-  value: string;
-  title?: string;
-  tabular?: boolean;
-}) {
-  return (
-    <span
-      className={cn("block max-w-full min-w-0 truncate", tabular && "tabular-nums")}
-      title={title ?? value}
-    >
-      <span className="text-slate-500">{label}:</span>{" "}
-      <span className="font-bold text-slate-200">{value}</span>
-    </span>
-  );
-}
-
 function InlineMetric({
   label,
   value,
