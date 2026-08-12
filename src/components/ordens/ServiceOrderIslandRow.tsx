@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   BadgeCheck,
   Building2,
+  CalendarClock,
   ChevronDown,
   Clock3,
   ExternalLink,
@@ -118,6 +119,8 @@ export function ServiceOrderIslandRow({
   const timeSummary = getTimeSummary(order, financials);
   const valueSummary = getValueSummary(order, financials);
   const openedAt = formatServiceOrderDateTime(getOpenedAt(order)) ?? "Não informado";
+  // Data de abertura destacada já na versão reduzida (omitida quando não houver registro).
+  const openedChipLabel = formatServiceOrderDateTime(getOpenedAt(order));
   const startedAt =
     formatServiceOrderDateTime(order.started_at) ??
     (order.status === "running" ? "Em andamento" : "Não informado");
@@ -177,7 +180,10 @@ export function ServiceOrderIslandRow({
               </span>
             </span>
 
-            <OrderStatusCluster status={order.status} priority={order.priority} compact />
+            <span className="flex min-w-0 items-center justify-between gap-2">
+              <OrderStatusCluster status={order.status} priority={order.priority} compact />
+              {openedChipLabel && <OrderOpenedChip label={openedChipLabel} />}
+            </span>
 
             <span
               className="block min-w-0 truncate text-[12px] font-semibold leading-snug text-slate-100"
@@ -208,6 +214,11 @@ export function ServiceOrderIslandRow({
               <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
                 {locationSummary}
               </span>
+              {openedChipLabel && (
+                <span className="mt-1 flex min-w-0">
+                  <OrderOpenedChip label={openedChipLabel} />
+                </span>
+              )}
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-bold leading-tight text-slate-100">
@@ -407,6 +418,19 @@ function InlineMeta({
     >
       <span className="text-slate-500">{label}:</span>{" "}
       <span className="font-bold text-slate-200">{value}</span>
+    </span>
+  );
+}
+
+/** Selo de abertura da OS exibido já no cartão recolhido. */
+function OrderOpenedChip({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex max-w-full min-w-0 shrink-0 items-center gap-1 rounded-full border border-primary/35 bg-primary/12 px-2 py-[2px] text-[10px] font-black uppercase leading-none tracking-[0.06em] text-primary"
+      title={`Aberta em ${label}`}
+    >
+      <CalendarClock size={11} aria-hidden="true" className="shrink-0" />
+      <span className="truncate tabular-nums">{label}</span>
     </span>
   );
 }
