@@ -76,6 +76,27 @@ function minutesBetween(a: string, b: string): number {
 }
 
 /** Live worked minutes for a technician (closed sessions + open one until now). */
+/**
+ * Sessões fechadas acima do limite operacional (14h) ou que atravessam dias
+ * sem pausa são cronômetros esquecidos em aberto: não contam como horas
+ * trabalhadas (as horas reais vêm da apuração feita pelo admin).
+ */
+const MAX_SESSION_MINUTES = 14 * 60;
+
+const SP_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function isAbandonedSession(s: TimeSession): boolean {
+  if (!s.ended_at) return false;
+  const minutes = s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at);
+  if (minutes > MAX_SESSION_MINUTES) return true;
+  return SP_DAY.format(new Date(s.started_at)) !== SP_DAY.format(new Date(s.ended_at));
+}
+
 export function computeTechnicianWorkedMinutes(
   sessions: TimeSession[],
   technicianId: string,
@@ -86,6 +107,7 @@ export function computeTechnicianWorkedMinutes(
   for (const s of sessions) {
     if (s.kind !== "work") continue;
     if (s.technician_id !== technicianId) continue;
+    if (isAbandonedSession(s)) continue;
     if (s.ended_at) total += s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at);
     else total += minutesBetween(s.started_at, nowIso);
   }
@@ -99,6 +121,7 @@ export function computeClosedWorkedMinutesByTech(
   const map: Record<string, number> = {};
   for (const s of sessions) {
     if (s.kind !== "work" || !s.ended_at || !s.technician_id) continue;
+    if (isAbandonedSession(s)) continue;
     map[s.technician_id] =
       (map[s.technician_id] ?? 0) + (s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at));
   }
