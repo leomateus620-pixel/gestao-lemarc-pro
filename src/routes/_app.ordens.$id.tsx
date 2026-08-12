@@ -269,12 +269,7 @@ function OrdemDetalhe() {
 
   return (
     <div className="lemarc-os-detail mx-auto w-full max-w-7xl">
-      <div
-        className={cn(
-          "lemarc-os-detail-primary mt-1",
-          showActionCard && "lg:grid-cols-[1fr_20rem]",
-        )}
-      >
+      <div className="lemarc-os-detail-primary mt-1">
         <section className="lemarc-os-detail-summary">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -354,18 +349,20 @@ function OrdemDetalhe() {
         </section>
 
         {showActionCard && (
-          <aside className="lemarc-os-next-action" aria-labelledby="next-action-title">
-            <p className="text-xs font-semibold text-primary">Próxima ação</p>
-            <h2
-              id="next-action-title"
-              className="mt-1 font-display text-lg font-bold text-foreground"
-            >
-              {adminReview ? adminReviewLabel : action.label}
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {adminReview ? adminReviewHint : "Avance a OS para a próxima etapa operacional."}
-            </p>
-            <div className="mt-4">
+          <aside className="lemarc-os-action-bar" aria-labelledby="next-action-title">
+            <div className="lemarc-os-action-bar__text">
+              <p className="text-xs font-semibold text-primary">Próxima ação</p>
+              <h2
+                id="next-action-title"
+                className="mt-0.5 font-display text-lg font-bold leading-tight text-foreground"
+              >
+                {adminReview ? adminReviewLabel : action.label}
+              </h2>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                {adminReview ? adminReviewHint : "Avance a OS para a próxima etapa operacional."}
+              </p>
+            </div>
+            <div className="lemarc-os-action-bar__cta">
               {tecnicoFinalize ? (
                 <PrimaryCTA
                   onClick={handleTecnicoFinish}
