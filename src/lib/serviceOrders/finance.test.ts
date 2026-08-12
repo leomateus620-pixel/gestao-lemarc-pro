@@ -163,7 +163,7 @@ describe("isDisplacementUnset", () => {
     ).toBe(true);
   });
 
-  it("respeita apuração finalizada", () => {
+  it("ainda sugere quando a apuração foi finalizada sem deslocamento", () => {
     expect(
       isDisplacementUnset({
         displacement_type: "none",
@@ -171,7 +171,7 @@ describe("isDisplacementUnset", () => {
         displacement_total_cents: 0,
         finalized_at: "2026-08-01T12:00:00Z",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("respeita deslocamento já definido", () => {
