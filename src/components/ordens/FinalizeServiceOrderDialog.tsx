@@ -490,17 +490,22 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     } else {
       // Sugestão automática: distância da unidade × valor global por km.
       const distance = order.client_unit?.distance_km_from_base ?? null;
+      const rateCents =
+        globalRateCents != null && globalRateCents > 0
+          ? globalRateCents
+          : (order.client_unit?.default_displacement_rate_cents ?? null);
       setGeneralNotes(f?.notes ?? "");
-      if (distance != null && distance > 0 && globalRateCents != null && globalRateCents > 0) {
-        setDisplacement({
-          type: "per_km",
-          count: "",
-          km_total: String(distance).replace(".", ","),
-          rate_input: (globalRateCents / 100).toFixed(2).replace(".", ","),
-          fixed_input: "",
-          notes: f?.displacement_notes ?? "",
-        });
-      }
+      setDisplacement({
+        type: "per_km",
+        count: "1",
+        km_total: distance != null && distance > 0 ? String(distance).replace(".", ",") : "",
+        rate_input:
+          rateCents != null && rateCents > 0
+            ? (rateCents / 100).toFixed(2).replace(".", ",")
+            : "",
+        fixed_input: "",
+        notes: f?.displacement_notes ?? "",
+      });
     }
     setStep(0);
   }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents]);
@@ -535,17 +540,21 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
 
   const unitDistance = order.client_unit?.distance_km_from_base ?? null;
   const displacementUnset = isDisplacementUnset(existing?.financials);
+  const fallbackRateCents =
+    globalRateCents != null && globalRateCents > 0
+      ? globalRateCents
+      : (order.client_unit?.default_displacement_rate_cents ?? null);
   const hasAutoDisplacementSuggestion =
     displacementUnset &&
     unitDistance != null &&
     unitDistance > 0 &&
-    globalRateCents != null &&
-    globalRateCents > 0;
+    fallbackRateCents != null &&
+    fallbackRateCents > 0;
   const missingGlobalRate =
     displacementUnset &&
     unitDistance != null &&
     unitDistance > 0 &&
-    (globalRateCents == null || globalRateCents <= 0);
+    (fallbackRateCents == null || fallbackRateCents <= 0);
 
   const updateEntry = (i: number, patch: Partial<DraftEntry>) => {
     setEntries((prev) => {
