@@ -195,10 +195,17 @@ export function ServiceOrderTimeControl({ order }: Props) {
         return acc + (ms > 0 ? Math.round(ms / 60000) : 0);
       }, 0);
   };
-  const displayedMinutesFor = (technicianId: string) =>
-    adjustedAt
-      ? (override?.minutesByTechnician[technicianId] ?? 0) + openMinutesFor(technicianId)
-      : computeTechnicianWorkedMinutes(sessions, technicianId);
+  /** Minutos lançados na apuração de horas (existem mesmo sem cronômetro). */
+  const apuradoMinutesFor = (technicianId: string) =>
+    override?.minutesByTechnician[technicianId] ?? 0;
+  const hasSessionsFor = (technicianId: string) =>
+    sessions.some((s: TimeSession) => s.technician_id === technicianId);
+  const displayedMinutesFor = (technicianId: string) => {
+    if (adjustedAt) return apuradoMinutesFor(technicianId) + openMinutesFor(technicianId);
+    // Técnico sem cronômetro (horas só na apuração) mostra as horas apuradas.
+    if (!hasSessionsFor(technicianId)) return apuradoMinutesFor(technicianId);
+    return computeTechnicianWorkedMinutes(sessions, technicianId);
+  };
   const totalWorked = technicians.reduce((acc, t) => acc + displayedMinutesFor(t.id), 0);
 
   const stateBadge =
@@ -360,6 +367,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {
           const st = getTechnicianState(sessions, t.id);
+          // Sem cronômetro, mas com horas na apuração: conta como tempo registrado.
+          const onlyApurado = st.state === "idle" && apuradoMinutesFor(t.id) > 0;
           return (
             <div
               key={t.id}
@@ -394,7 +403,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
                       ? "border-status-done/40 bg-status-done/12 text-status-done"
                       : st.state === "paused"
                         ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                        : st.state === "finished"
+                        : st.state === "finished" || onlyApurado
                           ? "border-primary/40 bg-primary/10 text-primary"
                           : "border-border bg-secondary/40 text-muted-foreground"
                   }`}
@@ -405,7 +414,9 @@ export function ServiceOrderTimeControl({ order }: Props) {
                       ? "Pausado"
                       : st.state === "finished"
                         ? "Encerrado"
-                        : "Aguardando"}
+                        : onlyApurado
+                          ? "Apurado"
+                          : "Aguardando"}
                 </span>
               </div>
 
