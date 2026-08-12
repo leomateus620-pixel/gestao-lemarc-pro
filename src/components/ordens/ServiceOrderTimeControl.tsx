@@ -367,6 +367,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {
           const st = getTechnicianState(sessions, t.id);
+          // Sem cronômetro, mas com horas na apuração: conta como tempo registrado.
+          const onlyApurado = st.state === "idle" && apuradoMinutesFor(t.id) > 0;
           return (
             <div
               key={t.id}
@@ -401,7 +403,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
                       ? "border-status-done/40 bg-status-done/12 text-status-done"
                       : st.state === "paused"
                         ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                        : st.state === "finished"
+                        : st.state === "finished" || onlyApurado
                           ? "border-primary/40 bg-primary/10 text-primary"
                           : "border-border bg-secondary/40 text-muted-foreground"
                   }`}
@@ -412,7 +414,9 @@ export function ServiceOrderTimeControl({ order }: Props) {
                       ? "Pausado"
                       : st.state === "finished"
                         ? "Encerrado"
-                        : "Aguardando"}
+                        : onlyApurado
+                          ? "Apurado"
+                          : "Aguardando"}
                 </span>
               </div>
 
