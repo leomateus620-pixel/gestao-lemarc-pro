@@ -355,6 +355,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
           </div>
         )}
       </div>
+      )}
 
       <div className="mt-3 space-y-2">
         {technicians.map((t) => {
