@@ -67,20 +67,6 @@ export function ServiceOrderTimeControl({ order }: Props) {
   });
   const adjustedAt = override?.adjustedAt ?? null;
 
-  const [selectedTech, setSelectedTech] = useState<string>("");
-  useEffect(() => {
-    if (technicians.length === 0) return;
-    // Técnico logado sempre opera o próprio cartão.
-    if (isTecnico && myTechId && selectedTech !== myTechId) {
-      setSelectedTech(myTechId);
-      return;
-    }
-    if (!selectedTech) {
-      const preferred = myTechId ?? technicians.find((t) => t.is_primary)?.id ?? technicians[0].id;
-      setSelectedTech(preferred);
-    }
-  }, [selectedTech, technicians, isTecnico, myTechId]);
-
   // Live tick to keep chronometer moving.
   const [tick, setTick] = useState(0);
   useEffect(() => {
