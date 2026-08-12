@@ -103,75 +103,68 @@ export function ServiceOrderTimeControl({ order }: Props) {
     queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
   };
 
-  const startMut = useMutation({
-    mutationFn: (technicianId: string) => startFn({ data: { orderId: order.id, technicianId } }),
-    onSuccess: () => {
-      toast.success("Serviço iniciado");
-      invalidate();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao iniciar"),
-  });
+  const techName = (id: string) => technicians.find((t) => t.id === id)?.full_name ?? "Técnico";
 
-  const bulkStartMut = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const results = await Promise.allSettled(
-        ids.map((technicianId) => startFn({ data: { orderId: order.id, technicianId } })),
+  /** Relata o resultado de uma ação em equipe: sucesso, parcial ou sem efeito. */
+  const reportBatch = (
+    result: { succeeded: string[]; skipped?: { technicianId: string }[]; failed?: { technicianId: string; message: string }[] },
+    doneLabel: string,
+  ) => {
+    const failed = result.failed ?? [];
+    const done = result.succeeded.length;
+    if (done > 0) {
+      const who = done === 1 ? techName(result.succeeded[0]) : `${done} técnicos`;
+      toast.success(`${doneLabel}: ${who}.`);
+    } else if (failed.length === 0) {
+      toast.info("Nenhum técnico precisava dessa ação.");
+    }
+    if (failed.length > 0) {
+      toast.error(
+        `Falhou para ${failed.map((f) => techName(f.technicianId)).join(", ")}: ${failed[0].message}`,
       );
-      const failed = results.filter((r) => r.status === "rejected");
-      if (failed.length === ids.length) {
-        const first = failed[0] as PromiseRejectedResult;
-        throw first.reason instanceof Error
-          ? first.reason
-          : new Error("Falha ao iniciar o serviço.");
-      }
-      return { started: ids.length - failed.length };
-    },
-    onSuccess: ({ started }) => {
-      toast.success(
-        started > 1 ? `Serviço iniciado para ${started} técnicos.` : "Serviço iniciado.",
-      );
-      invalidate();
-    },
+    }
+    invalidate();
+  };
+
+  const startMut = useMutation({
+    mutationFn: (technicianIds: string[]) =>
+      startFn({ data: { orderId: order.id, technicianIds } }),
+    onSuccess: (result: any) => reportBatch(result, "Serviço iniciado"),
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao iniciar"),
   });
 
   const [pauseOpen, setPauseOpen] = useState(false);
-  const [pauseTech, setPauseTech] = useState<string | null>(null);
   const pauseMut = useMutation({
-    mutationFn: (input: { technicianId: string; reason: string; notes: string | null }) =>
+    mutationFn: (input: { technicianIds: string[]; reason: string; notes: string | null }) =>
       pauseFn({
         data: {
           orderId: order.id,
-          technicianId: input.technicianId,
+          technicianIds: input.technicianIds,
           reason: input.reason,
           notes: input.notes,
         },
       }),
-    onSuccess: () => {
-      toast.success("Serviço pausado");
+    onSuccess: (result: any) => {
       setPauseOpen(false);
-      invalidate();
+      reportBatch(result, "Serviço pausado");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao pausar"),
   });
 
   const resumeMut = useMutation({
-    mutationFn: (technicianId: string) => resumeFn({ data: { orderId: order.id, technicianId } }),
-    onSuccess: () => {
-      toast.success("Serviço retomado");
-      invalidate();
-    },
+    mutationFn: (technicianIds: string[]) =>
+      resumeFn({ data: { orderId: order.id, technicianIds } }),
+    onSuccess: (result: any) => reportBatch(result, "Serviço retomado"),
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao retomar"),
   });
 
   const finishMut = useMutation({
-    mutationFn: (technicianId?: string) =>
-      finishFn({ data: { orderId: order.id, technicianId: technicianId ?? null } }),
+    mutationFn: (technicianIds: string[]) =>
+      finishFn({ data: { orderId: order.id, technicianIds } }),
     onSuccess: (result: any) => {
-      toast.success("Sessão encerrada");
+      reportBatch(result, "Tempo encerrado");
       const alert = (result?.openTimeAlert ?? null) as OpenTimeAlertDetails | null;
       if (alert) setOpenTimeAlert(alert);
-      invalidate();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar"),
   });
