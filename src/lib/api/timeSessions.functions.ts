@@ -635,7 +635,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     if (ordErr) throw new Error(ordErr.message);
     if (!order) throw new Error("Ordem de serviço não encontrada.");
 
-    const lockedStatuses = ["approved", "cancelled"];
+    const lockedStatuses = ["finished", "review", "approved", "cancelled"];
     if (lockedStatuses.includes(order.status)) {
       throw new Error("Esta OS já foi encerrada e não pode ser editada.");
     }

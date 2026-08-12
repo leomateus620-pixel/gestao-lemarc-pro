@@ -397,6 +397,7 @@ export type Database = {
           description: string | null
           duration_minutes: number
           end_time: string
+          entry_source: string
           hourly_rate_cents: number
           id: string
           role: string | null
@@ -413,6 +414,7 @@ export type Database = {
           description?: string | null
           duration_minutes: number
           end_time: string
+          entry_source?: string
           hourly_rate_cents: number
           id?: string
           role?: string | null
@@ -429,6 +431,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number
           end_time?: string
+          entry_source?: string
           hourly_rate_cents?: number
           id?: string
           role?: string | null

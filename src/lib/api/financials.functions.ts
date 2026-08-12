@@ -319,33 +319,15 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
     const sb = context.supabase as any;
     let orderStatus: string | undefined;
 
-    // No order may be apurada/finalizada with time still open: otherwise those
-    // hours never become labor entries (they are filtered out below) and the
-    // technician's time silently disappears from the totals and the PDF.
-    try {
-      const { data: orderRow } = await sb
-        .from("service_orders")
-        .select("status, finished_at, closed_at, updated_at")
-        .eq("id", data.orderId)
-        .maybeSingle();
-      const status = orderRow?.status as string | undefined;
-      orderStatus = status;
-      if (status && ["finished", "review", "approved", "cancelled"].includes(status)) {
-        const { closeOpenWorkSessions } = await import(
-          "@/lib/serviceOrders/timeSessionWrite.server"
-        );
-        await closeOpenWorkSessions(
-          data.orderId,
-          orderRow?.finished_at ??
-            orderRow?.closed_at ??
-            orderRow?.updated_at ??
-            new Date().toISOString(),
-          context.userId,
-        );
-      }
-    } catch {
-      /* non-blocking: never prevent the admin from opening the hours screen */
-    }
+    // This is a read endpoint: opening the hours screen must never close a
+    // timer or mutate an order that has already been reviewed/billed.
+    const { data: orderRow, error: orderError } = await sb
+      .from("service_orders")
+      .select("status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (orderError) throw new Error(orderError.message);
+    orderStatus = orderRow?.status as string | undefined;
 
     const [labor, fin, sessionsRes] = await Promise.all([
       sb
@@ -418,9 +400,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
                 (financials.materials_total_cents ?? 0),
             }
           : financials;
-      if (storedEntries.length > 0 || !closedWorkSessions.length) {
-        return { entries: storedEntries, financials: effectiveFinancials };
-      }
+      return { entries: storedEntries, financials: effectiveFinancials };
     }
 
     if (closedWorkSessions.length === 0) {
@@ -536,6 +516,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               subtotal_cents: src.subtotal_cents,
               description: src.description,
               created_by: context.userId,
+              entry_source: "session_sync",
             };
           })
           .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -596,6 +577,7 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
           subtotal_cents: e.subtotal_cents,
           description: e.description,
           created_by: context.userId,
+          entry_source: "session_sync",
         }));
 
         const { error: delErr } = await sb
@@ -731,6 +713,7 @@ export const finalizeServiceOrder = createServerFn({ method: "POST" })
         subtotal_cents: computeSubtotalCents(duration, e.hourly_rate_cents),
         description: e.description ?? null,
         created_by: context.userId,
+        entry_source: "admin_finalization",
       };
     });
 
@@ -1011,6 +994,7 @@ export const createLaborEntry = createServerFn({ method: "POST" })
       subtotal_cents: subtotal,
       description: e.description ?? "Ajuste manual",
       created_by: context.userId,
+      entry_source: "admin_adjustment",
     });
     if (error) throw new Error(error.message);
 

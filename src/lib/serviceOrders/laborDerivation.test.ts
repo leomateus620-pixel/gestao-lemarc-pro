@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterMaterializableSessions,
   findMissingSegments,
+  isSuspiciousSession,
   splitSessionByDay,
   splitSessionsByDay,
 } from "./laborDerivation";
@@ -119,6 +121,46 @@ describe("findMissingSegments", () => {
         },
       ]),
     ).toHaveLength(0);
+  });
+
+  it("does not duplicate a segment that overlaps an admin-adjusted row", () => {
+    const segments = splitSessionsByDay([
+      {
+        id: "overlap",
+        technician_id: "t1",
+        started_at: "2026-08-06T11:00:00.000Z",
+        ended_at: "2026-08-06T15:00:00.000Z",
+        duration_minutes: 240,
+      },
+    ]);
+    expect(
+      findMissingSegments(segments, [
+        {
+          technician_id: "t1",
+          work_date: "2026-08-06",
+          start_time: "08:15",
+          end_time: "11:45",
+        },
+      ]),
+    ).toHaveLength(0);
+  });
+});
+
+describe("suspicious sessions", () => {
+  const multiDay = {
+    id: "forgotten-open",
+    technician_id: "t1",
+    started_at: "2026-08-06T19:09:42.000Z",
+    ended_at: "2026-08-07T12:41:00.000Z",
+    duration_minutes: 1051,
+  };
+
+  it("flags a continuous multi-day timer", () => {
+    expect(isSuspiciousSession(multiDay)).toBe(true);
+  });
+
+  it("never materializes a continuous multi-day timer", () => {
+    expect(filterMaterializableSessions([multiDay])).toEqual([]);
   });
 });
 describe("dois técnicos simultâneos", () => {
