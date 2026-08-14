@@ -18,7 +18,6 @@ const validDraft: ServiceOrderWizardDraft = {
   clientId: "client-1",
   unitId: "unit-1",
   techIds: ["tech-1"],
-  noTech: false,
   requesterName: "Ana",
   type: "mecanica",
   typeOther: "",
@@ -52,9 +51,9 @@ describe("modelo do fluxo Nova OS", () => {
     expect(getWizardValidity({ ...validDraft, unitId: "" })[1]).toBe(true);
   });
 
-  it("aceita técnicos selecionados ou o estado explícito sem técnico", () => {
-    expect(getWizardValidity({ ...validDraft, techIds: [], noTech: false })[2]).toBe(false);
-    expect(getWizardValidity({ ...validDraft, techIds: [], noTech: true })[2]).toBe(true);
+  it("exige ao menos um técnico selecionado", () => {
+    expect(getWizardValidity({ ...validDraft, techIds: [] })[2]).toBe(false);
+    expect(getWizardValidity({ ...validDraft, techIds: ["tech-1"] })[2]).toBe(true);
   });
 
   it("exige descrição quando o tipo de serviço é Outro", () => {
