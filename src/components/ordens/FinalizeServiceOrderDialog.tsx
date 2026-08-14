@@ -1032,11 +1032,6 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                       <BadgeCheck size={18} className="mt-0.5 shrink-0 text-slate-300" />
                       <div>
                         <div className="font-black">Sem custo de deslocamento</div>
-                        <p className="mt-1 text-xs leading-5 text-slate-400">
-                          A OS seguirá para revisão apenas com mão de obra e materiais disponíveis.
-                          Pode finalizar assim: a escolha fica registrada e a sugestão automática de
-                          km não volta a ser aplicada.
-                        </p>
                       </div>
                     </div>
                   )}
