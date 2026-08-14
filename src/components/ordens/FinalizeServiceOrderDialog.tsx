@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -424,15 +424,25 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     notes: "",
   });
   const [generalNotes, setGeneralNotes] = useState("");
+  // Hidratação acontece uma única vez por abertura do diálogo: sem isso, um
+  // refetch de dados sobrescreveria a escolha manual do admin (ex.: "Sem
+  // deslocamento") de volta para a sugestão automática.
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) hydratedRef.current = false;
+  }, [open]);
 
   // Hydrate when dialog opens.
   useEffect(() => {
     if (!open) return;
+    if (hydratedRef.current) return;
     // Aguardar as sessões carregarem antes de auto-preencher: sem esse gate
     // o primeiro render usava fallback (start→finished_at) e incluía a pausa
     // no cálculo.
     const existingEntries = existing?.entries ?? [];
     if (existingEntries.length === 0 && !sessionsFetched) return;
+    hydratedRef.current = true;
 
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
     const fallbackStart = timeFromIso(order.started_at ?? order.opened_at);
