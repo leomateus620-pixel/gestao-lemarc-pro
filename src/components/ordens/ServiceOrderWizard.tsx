@@ -1008,17 +1008,9 @@ function TechnicianStep({
 
   return (
     <section className="lemarc-os-wizard-surface space-y-5 p-4 sm:p-6 lg:p-7">
-      <StepHeader
-        eyebrow="Etapa 3 · Solicitante e técnico"
-        title="Quem pediu e quem vai executar?"
-        description="Registre o solicitante e defina como a execução será atribuída."
-      />
+      <p className="lemarc-context-label">Etapa 3 · Solicitante e técnico</p>
 
       <div className="lemarc-wizard-subsection space-y-2">
-        <div>
-          <p className="text-sm font-semibold text-white">Contexto do cliente</p>
-          <p className="mt-0.5 text-xs text-slate-300">Quem solicitou a abertura desta OS.</p>
-        </div>
         <FieldLabel htmlFor="order-requester" required>
           Solicitante da OS
         </FieldLabel>
@@ -1031,181 +1023,154 @@ function TechnicianStep({
           maxLength={120}
           autoComplete="off"
           aria-invalid={Boolean(requesterError)}
-          aria-describedby={requesterError ? "order-requester-error" : "order-requester-hint"}
+          aria-describedby={requesterError ? "order-requester-error" : undefined}
           data-invalid={requesterError ? "true" : undefined}
         />
-        <div id="order-requester-hint">
-          <FieldHint>Pessoa responsável pela abertura desta OS no cliente.</FieldHint>
-        </div>
         <FieldError id="order-requester-error">{requesterError}</FieldError>
       </div>
 
-      <div
-        className="lemarc-wizard-subsection space-y-3 border-t border-white/10 pt-5"
-        aria-describedby={technicianError ? "order-technician-error" : undefined}
-      >
-        <div>
-          <p className="text-sm font-semibold text-white">Execução da OS</p>
-          <p className="mt-0.5 text-xs text-slate-300">
-            Se a equipe ainda não estiver definida, registre essa decisão explicitamente.
-          </p>
-        </div>
-        <button
-          type="button"
-          aria-pressed={draft.noTech}
-          onClick={() => {
-            set("noTech", !draft.noTech);
-            if (!draft.noTech) set("techIds", []);
-          }}
-          className={cn(
-            "lemarc-selection-row flex min-h-14 w-full items-center justify-between rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-            draft.noTech
-              ? "lemarc-choice-card-active"
-              : "lemarc-choice-card border-dashed hover:border-white/30 hover:bg-white/[0.06]",
-          )}
-          data-invalid={technicianError ? "true" : undefined}
-        >
-          <div>
-            <div className="text-sm font-semibold text-white">Sem técnico definido</div>
-            <div className="text-xs text-slate-300">
-              A equipe será atribuída depois, no painel da OS.
+      <div className="space-y-3 border-t border-white/10 pt-5">
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          items={[
+            { value: "select", label: "Selecionar existente" },
+            { value: "new", label: "Cadastrar novo" },
+          ]}
+        />
+
+        {draft.techIds.length > 0 && (
+          <div className="lemarc-selected-summary rounded-xl p-3">
+            <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <p className="min-w-0 truncate text-xs font-semibold text-primary">
+                Técnicos selecionados
+              </p>
+              <span className="shrink-0 rounded-full border border-primary/50 bg-primary/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
+                {draft.techIds.length} {draft.techIds.length === 1 ? "técnico" : "técnicos"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {draft.techIds.map((id) => {
+                const t = technicians.find((x) => x.id === id);
+                if (!t) return null;
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-white"
+                  >
+                    <span className="min-w-0 truncate">{t.full_name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remover ${t.full_name}`}
+                      onClick={() =>
+                        set(
+                          "techIds",
+                          draft.techIds.filter((x) => x !== id),
+                        )
+                      }
+                      className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-primary/45 text-primary-foreground hover:bg-primary/70"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           </div>
-          <span
-            className={cn(
-              "grid h-7 w-7 shrink-0 place-items-center rounded-full border",
-              draft.noTech
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-white/20 bg-white/[0.06] text-slate-300",
-            )}
-          >
-            {draft.noTech && <Check aria-hidden="true" size={14} />}
-          </span>
-        </button>
-        <FieldError id="order-technician-error">{technicianError}</FieldError>
-      </div>
+        )}
 
-      <Segmented
-        value={mode}
-        onChange={setMode}
-        items={[
-          { value: "select", label: "Selecionar existente" },
-          { value: "new", label: "Cadastrar novo" },
-        ]}
-      />
+        {mode === "select" ? (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search size={15} className={searchIconCls} />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar técnico ou função…"
+                className={cn(inputCls, "pl-10")}
+                aria-label="Buscar técnico por nome ou função"
+              />
+            </div>
 
-      {!draft.noTech && draft.techIds.length > 0 && (
-        <div className="lemarc-selected-summary rounded-xl p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-primary">Técnicos selecionados</p>
-            <span className="rounded-full border border-primary/50 bg-primary/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-100">
-              {draft.techIds.length} {draft.techIds.length === 1 ? "técnico" : "técnicos"}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {draft.techIds.map((id) => {
-              const t = technicians.find((x) => x.id === id);
-              if (!t) return null;
-              return (
-                <span
-                  key={id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-white"
-                >
-                  {t.full_name}
-                  <button
-                    type="button"
-                    aria-label={`Remover ${t.full_name}`}
-                    onClick={() =>
-                      set(
-                        "techIds",
-                        draft.techIds.filter((x) => x !== id),
-                      )
-                    }
-                    className="grid h-4 w-4 place-items-center rounded-full bg-primary/45 text-primary-foreground hover:bg-primary/70"
-                  >
-                    <X size={10} />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {mode === "select" ? (
-        <div className="space-y-3">
-          <div className="relative">
-            <Search size={15} className={searchIconCls} />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar técnico ou função…"
-              className={cn(inputCls, "pl-10")}
-              aria-label="Buscar técnico por nome ou função"
-            />
-          </div>
-          <p className="text-xs text-slate-300">
-            {filtered.length === 1
-              ? "1 técnico encontrado"
-              : `${filtered.length} técnicos encontrados`}
-          </p>
-          <div className="lemarc-selection-list space-y-1.5">
             {technicians.length > activeTechnicians.length && (
               <p className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-bold text-amber-100">
                 Colaboradores inativos ficam ocultos na criação de novas OS.
               </p>
             )}
-            {filtered.length === 0 && (
-              <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
-                Nenhum técnico encontrado.
+
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <p className="min-w-0 truncate text-xs font-semibold text-slate-300">
+                Técnicos disponíveis
               </p>
-            )}
-            {filtered.map((t) => {
-              const active = draft.techIds.includes(t.id) && !draft.noTech;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    set("noTech", false);
-                    if (active) {
-                      set(
-                        "techIds",
-                        draft.techIds.filter((x) => x !== t.id),
-                      );
-                    } else {
-                      set("techIds", Array.from(new Set([...draft.techIds, t.id])));
-                    }
-                  }}
-                  className={cn(
-                    "lemarc-selection-row flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-                    active
-                      ? "lemarc-choice-card-active"
-                      : "lemarc-choice-card hover:border-white/25 hover:bg-white/[0.07]",
-                  )}
-                >
-                  <div className="min-w-0">
-                    <div className="break-words text-sm font-semibold text-white">
-                      {t.full_name}
-                    </div>
-                    {t.role && (
-                      <div className="truncate text-[11px] font-semibold text-slate-300">
-                        {t.role}
-                      </div>
-                    )}
-                  </div>
-                  {active && (
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]">
-                      <Check size={14} />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+              <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                {filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`}
+              </span>
+            </div>
+
+            <div
+              className="lemarc-selection-list max-h-[22rem] overflow-y-auto pr-0.5 sm:max-h-[26rem]"
+              aria-describedby={technicianError ? "order-technician-error" : undefined}
+            >
+              {filtered.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm font-semibold text-slate-300">
+                  Nenhum técnico encontrado.
+                </p>
+              ) : (
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {filtered.map((t) => {
+                    const active = draft.techIds.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          if (active) {
+                            set(
+                              "techIds",
+                              draft.techIds.filter((x) => x !== t.id),
+                            );
+                          } else {
+                            set("techIds", Array.from(new Set([...draft.techIds, t.id])));
+                          }
+                        }}
+                        className={cn(
+                          "lemarc-selection-row grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                          active
+                            ? "lemarc-choice-card-active"
+                            : "lemarc-choice-card hover:border-white/25 hover:bg-white/[0.07]",
+                        )}
+                        data-invalid={technicianError ? "true" : undefined}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {t.full_name}
+                          </span>
+                          {t.role && (
+                            <span className="block truncate text-[11px] font-semibold text-slate-300">
+                              {t.role}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "grid h-6 w-6 shrink-0 place-items-center rounded-full border",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_18px_-10px_hsl(var(--primary)/0.9)]"
+                              : "border-white/20 bg-white/[0.06] text-transparent",
+                          )}
+                        >
+                          <Check size={14} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <FieldError id="order-technician-error">{technicianError}</FieldError>
           </div>
-        </div>
-      ) : (
+        ) : (
         <div className="space-y-4 border-t border-white/10 pt-5">
           <div className="space-y-2">
             <FieldLabel required>Nome do técnico</FieldLabel>
