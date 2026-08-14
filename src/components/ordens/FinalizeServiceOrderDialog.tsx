@@ -558,12 +558,14 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       : (order.client_unit?.default_displacement_rate_cents ?? null);
   const hasAutoDisplacementSuggestion =
     displacementUnset &&
+    displacement.type !== "none" &&
     unitDistance != null &&
     unitDistance > 0 &&
     fallbackRateCents != null &&
     fallbackRateCents > 0;
   const missingGlobalRate =
     displacementUnset &&
+    displacement.type !== "none" &&
     unitDistance != null &&
     unitDistance > 0 &&
     (fallbackRateCents == null || fallbackRateCents <= 0);
