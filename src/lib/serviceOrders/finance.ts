@@ -168,11 +168,14 @@ export function isDisplacementUnset(
         displacement_km_total?: number | string | null;
         displacement_total_cents?: number | null;
         finalized_at?: string | null;
+        displacement_decided?: boolean | null;
       }
     | null
     | undefined,
 ): boolean {
   if (!f) return true;
+  // Decisão explícita do admin (inclui "sem deslocamento") nunca é sobrescrita.
+  if (f.displacement_decided === true) return false;
   if (f.displacement_type !== "none") return false;
   if (Number(f.displacement_total_cents ?? 0) !== 0) return false;
   return Number(f.displacement_km_total ?? 0) === 0;
