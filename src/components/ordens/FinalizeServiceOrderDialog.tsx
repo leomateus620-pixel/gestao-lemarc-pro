@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -399,7 +399,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
-  const { data: globalRateCents } = useQuery({
+  const { data: globalRateCents, isFetched: globalRateFetched } = useQuery({
     queryKey: ["system-settings", "displacement-rate"],
     queryFn: () => globalRateFn(),
     enabled: open,
@@ -424,15 +424,27 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     notes: "",
   });
   const [generalNotes, setGeneralNotes] = useState("");
+  // Hidratação acontece uma única vez por abertura do diálogo: sem isso, um
+  // refetch de dados sobrescreveria a escolha manual do admin (ex.: "Sem
+  // deslocamento") de volta para a sugestão automática.
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) hydratedRef.current = false;
+  }, [open]);
 
   // Hydrate when dialog opens.
   useEffect(() => {
     if (!open) return;
+    if (hydratedRef.current) return;
     // Aguardar as sessões carregarem antes de auto-preencher: sem esse gate
     // o primeiro render usava fallback (start→finished_at) e incluía a pausa
     // no cálculo.
     const existingEntries = existing?.entries ?? [];
     if (existingEntries.length === 0 && !sessionsFetched) return;
+    // Espera o valor padrão por km para não hidratar a sugestão sem tarifa.
+    if (!globalRateFetched) return;
+    hydratedRef.current = true;
 
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
     const fallbackStart = timeFromIso(order.started_at ?? order.opened_at);
@@ -508,7 +520,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       });
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents]);
+  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents, globalRateFetched]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
@@ -546,12 +558,14 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       : (order.client_unit?.default_displacement_rate_cents ?? null);
   const hasAutoDisplacementSuggestion =
     displacementUnset &&
+    displacement.type !== "none" &&
     unitDistance != null &&
     unitDistance > 0 &&
     fallbackRateCents != null &&
     fallbackRateCents > 0;
   const missingGlobalRate =
     displacementUnset &&
+    displacement.type !== "none" &&
     unitDistance != null &&
     unitDistance > 0 &&
     (fallbackRateCents == null || fallbackRateCents <= 0);
@@ -947,7 +961,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   antes da revisão.
                 </StepIntro>
 
-                {unitDisplacementHint && (
+                {unitDisplacementHint && displacement.type !== "none" && (
                   <Notice>
                     <strong>Valor sugerido pela unidade.</strong> {unitDisplacementHint}
                   </Notice>
@@ -1020,6 +1034,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                         <div className="font-black">Sem custo de deslocamento</div>
                         <p className="mt-1 text-xs leading-5 text-slate-400">
                           A OS seguirá para revisão apenas com mão de obra e materiais disponíveis.
+                          Pode finalizar assim: a escolha fica registrada e a sugestão automática de
+                          km não volta a ser aplicada.
                         </p>
                       </div>
                     </div>

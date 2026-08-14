@@ -31,6 +31,7 @@ export type OrderFinancials = {
   displacement_rate_cents: number;
   displacement_total_cents: number;
   displacement_notes: string | null;
+  displacement_decided?: boolean;
   materials_total_cents: number;
   grand_total_cents: number;
   notes: string | null;

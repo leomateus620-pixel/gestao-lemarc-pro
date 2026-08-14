@@ -323,6 +323,7 @@ export type Database = {
         Row: {
           created_at: string
           displacement_count: number
+          displacement_decided: boolean
           displacement_km_total: number
           displacement_notes: string | null
           displacement_rate_cents: number
@@ -343,6 +344,7 @@ export type Database = {
         Insert: {
           created_at?: string
           displacement_count?: number
+          displacement_decided?: boolean
           displacement_km_total?: number
           displacement_notes?: string | null
           displacement_rate_cents?: number
@@ -363,6 +365,7 @@ export type Database = {
         Update: {
           created_at?: string
           displacement_count?: number
+          displacement_decided?: boolean
           displacement_km_total?: number
           displacement_notes?: string | null
           displacement_rate_cents?: number

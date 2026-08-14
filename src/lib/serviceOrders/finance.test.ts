@@ -177,6 +177,18 @@ describe("isDisplacementUnset", () => {
   it("respeita deslocamento já definido", () => {
     expect(
       isDisplacementUnset({
+        displacement_type: "none",
+        displacement_km_total: 0,
+        displacement_total_cents: 0,
+        finalized_at: null,
+        displacement_decided: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("respeita deslocamento por km já definido", () => {
+    expect(
+      isDisplacementUnset({
         displacement_type: "per_km",
         displacement_km_total: 110,
         displacement_total_cents: 27500,
