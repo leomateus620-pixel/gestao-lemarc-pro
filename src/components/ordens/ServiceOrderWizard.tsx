@@ -1171,7 +1171,7 @@ function TechnicianStep({
             <FieldError id="order-technician-error">{technicianError}</FieldError>
           </div>
         ) : (
-        <div className="space-y-4 border-t border-white/10 pt-5">
+          <div className="space-y-4">
           <div className="space-y-2">
             <FieldLabel required>Nome do técnico</FieldLabel>
             <Input
@@ -1199,8 +1199,9 @@ function TechnicianStep({
             <Plus size={16} />
             {techMutation.isPending ? "Salvando..." : "Salvar e selecionar"}
           </Button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
