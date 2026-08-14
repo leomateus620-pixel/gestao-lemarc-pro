@@ -961,7 +961,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                   antes da revisão.
                 </StepIntro>
 
-                {unitDisplacementHint && (
+                {unitDisplacementHint && displacement.type !== "none" && (
                   <Notice>
                     <strong>Valor sugerido pela unidade.</strong> {unitDisplacementHint}
                   </Notice>
@@ -1034,6 +1034,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                         <div className="font-black">Sem custo de deslocamento</div>
                         <p className="mt-1 text-xs leading-5 text-slate-400">
                           A OS seguirá para revisão apenas com mão de obra e materiais disponíveis.
+                          Pode finalizar assim: a escolha fica registrada e a sugestão automática de
+                          km não volta a ser aplicada.
                         </p>
                       </div>
                     </div>
