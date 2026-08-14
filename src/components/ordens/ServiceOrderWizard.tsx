@@ -107,7 +107,6 @@ export function ServiceOrderWizard({
     clientId: initialClientId ?? "",
     unitId: initialUnitId ?? "",
     techIds: [],
-    noTech: false,
     requesterName: "",
     type: "mecanica",
     typeOther: "",
@@ -144,7 +143,7 @@ export function ServiceOrderWizard({
           description: draft.description || null,
           client_id: draft.clientId || null,
           client_unit_id: draft.unitId || null,
-          technician_ids: draft.noTech ? [] : draft.techIds,
+          technician_ids: draft.techIds,
           service_type: draft.type,
           service_type_other: draft.type === "outro" ? draft.typeOther.trim() : null,
           priority: draft.priority,
@@ -238,7 +237,6 @@ export function ServiceOrderWizard({
               technicians={technicians}
               onCreated={(id) => {
                 set("techIds", Array.from(new Set([...draft.techIds, id])));
-                set("noTech", false);
               }}
               issues={visibleIssues}
             />
