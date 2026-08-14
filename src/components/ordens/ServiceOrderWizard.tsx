@@ -1423,7 +1423,7 @@ function ReviewStep({
             {draft.requesterName.trim() || "Não informado"}
           </ReviewField>
           <ReviewField label="Técnicos responsáveis" icon={HardHat}>
-            {draft.noTech || selectedTechs.length === 0 ? (
+            {selectedTechs.length === 0 ? (
               "Sem técnico definido"
             ) : (
               <span className="flex flex-col gap-1">
