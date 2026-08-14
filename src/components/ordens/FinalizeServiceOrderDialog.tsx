@@ -399,7 +399,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
-  const { data: globalRateCents } = useQuery({
+  const { data: globalRateCents, isFetched: globalRateFetched } = useQuery({
     queryKey: ["system-settings", "displacement-rate"],
     queryFn: () => globalRateFn(),
     enabled: open,
@@ -442,6 +442,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     // no cálculo.
     const existingEntries = existing?.entries ?? [];
     if (existingEntries.length === 0 && !sessionsFetched) return;
+    // Espera o valor padrão por km para não hidratar a sugestão sem tarifa.
+    if (!globalRateFetched) return;
     hydratedRef.current = true;
 
     const fallbackDate = dateFromIso(order.started_at ?? order.opened_at);
@@ -518,7 +520,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       });
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents]);
+  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents, globalRateFetched]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
