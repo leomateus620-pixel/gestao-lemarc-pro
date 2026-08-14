@@ -16,7 +16,6 @@ export type ServiceOrderWizardDraft = {
   clientId: string;
   unitId: string;
   techIds: string[];
-  noTech: boolean;
   requesterName: string;
   type: ServiceType;
   typeOther: string;
@@ -46,10 +45,10 @@ export function getWizardValidationIssues(draft: ServiceOrderWizardDraft) {
       message: "Informe o nome do solicitante com pelo menos 2 caracteres.",
     });
   }
-  if (draft.techIds.length === 0 && !draft.noTech) {
+  if (draft.techIds.length === 0) {
     issues[2].push({
       field: "technician",
-      message: "Selecione um técnico ou marque “Sem técnico definido” para continuar.",
+      message: "Selecione ao menos um técnico para continuar.",
     });
   }
   if (draft.type === "outro" && draft.typeOther.trim().length < 3) {
