@@ -1364,10 +1364,10 @@ function ReviewStep({
   const typeLabel =
     draft.type === "outro" ? draft.typeOther.trim() || "Outro" : serviceTypeLabel[draft.type];
   const priorityChip: Record<ServicePriority, string> = {
-    baixa: "border-slate-200/25 bg-white/10 text-slate-100",
-    media: "border-primary/70 bg-primary/22 text-orange-100",
-    alta: "border-amber-300/70 bg-amber-400/22 text-amber-100",
-    urgente: "border-rose-300/70 bg-rose-500/22 text-rose-100",
+    baixa: "border-slate-100/40 bg-slate-100/90 text-slate-900",
+    media: "border-primary bg-primary text-primary-foreground",
+    alta: "border-amber-300 bg-amber-300 text-slate-950",
+    urgente: "border-rose-400 bg-rose-500 text-white",
   };
   const optionalMissing = [
     !draft.description.trim() ? "Descrição inicial" : null,
@@ -1382,27 +1382,43 @@ function ReviewStep({
         title="Confira antes de criar"
         description="Você ainda pode voltar e ajustar qualquer dado."
       />
-      <div className="lemarc-review-identity border-l-2 border-primary pl-3 sm:pl-4">
-        <p className="text-xs font-semibold text-primary">Ordem de serviço</p>
-        <h3 className="mt-1 font-display text-xl font-bold leading-tight text-white sm:text-2xl">
-          {draft.title || "Não informado"}
-        </h3>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-100">
-            {typeLabel}
-          </span>
-          <span
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-xs font-semibold",
-              priorityChip[draft.priority],
-            )}
-          >
-            Prioridade {priorityLabel[draft.priority]}
-          </span>
+      <div className="lemarc-summary-panel rounded-2xl p-4 sm:p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+          <div className="min-w-0">
+            <p className="lemarc-review-label">Ordem de serviço</p>
+            <h3 className="mt-1.5 font-display text-2xl font-black leading-[1.15] text-white sm:text-3xl">
+              {draft.title || "Não informado"}
+            </h3>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/25 bg-white/[0.10] px-3 py-1 text-xs font-bold text-white">
+                {typeLabel}
+              </span>
+              <span
+                className={cn(
+                  "rounded-full border px-3 py-1 text-[0.7rem] font-black uppercase tracking-[0.1em]",
+                  priorityChip[draft.priority],
+                )}
+              >
+                Prioridade {priorityLabel[draft.priority]}
+              </span>
+            </div>
+          </div>
+          <dl className="grid min-w-0 gap-2.5 rounded-xl border border-white/12 bg-slate-950/30 p-3.5 sm:grid-cols-3 lg:grid-cols-1">
+            <SummaryLine label="Cliente" value={client?.name ?? null} />
+            <SummaryLine label="Unidade" value={unit?.name ?? client?.unit ?? null} />
+            <SummaryLine
+              label="Equipe"
+              value={
+                selectedTechs.length > 0
+                  ? `${selectedTechs.length} ${selectedTechs.length === 1 ? "técnico" : "técnicos"}`
+                  : null
+              }
+            />
+          </dl>
         </div>
       </div>
 
-      <div className="lemarc-review-grid grid gap-0 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2 md:gap-4">
         <ReviewSection title="Dados iniciais" icon={FileText} onEdit={() => onEdit(0)}>
           <ReviewField label="Descrição">
             {draft.description?.trim() || "Não informado"}
@@ -1426,20 +1442,32 @@ function ReviewStep({
             {selectedTechs.length === 0 ? (
               "Sem técnico definido"
             ) : (
-              <span className="flex flex-col gap-1">
+              <span className="flex flex-col gap-1.5">
                 {selectedTechs.map((t, idx) => (
-                  <span key={t.id} className="leading-snug">
-                    {t.full_name}
-                    {t.role ? (
-                      <span className="ml-1 text-[11px] font-semibold text-slate-300">
-                        · {t.role}
+                  <span
+                    key={t.id}
+                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5"
+                  >
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary/40 bg-primary/15 text-[0.6rem] font-black text-primary">
+                      {t.full_name.trim().charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-white">
+                        {t.full_name}
                       </span>
-                    ) : null}
+                      {t.role ? (
+                        <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                          {t.role}
+                        </span>
+                      ) : null}
+                    </span>
                     {idx === 0 && selectedTechs.length > 1 ? (
-                      <span className="ml-1 rounded-full border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-primary">
+                      <span className="shrink-0 rounded-full border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-primary">
                         Principal
                       </span>
-                    ) : null}
+                    ) : (
+                      <span />
+                    )}
                   </span>
                 ))}
               </span>
@@ -1487,22 +1515,41 @@ function ReviewSection({
   onEdit: () => void;
 }) {
   return (
-    <section className="lemarc-review-section py-4 md:px-4">
-      <div className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+    <section className="lemarc-review-block p-3.5 sm:p-4">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/12 text-primary">
           <Icon size={14} />
         </span>
-        <h3 className="flex-1 text-sm font-semibold text-white">{title}</h3>
+        <h3 className="min-w-0 truncate text-[0.72rem] font-black uppercase tracking-[0.14em] text-white">
+          {title}
+        </h3>
         <button
           type="button"
           onClick={onEdit}
-          className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/12 px-3 py-1.5 text-[0.7rem] font-bold text-primary transition-colors hover:border-primary/70 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
         >
+          <Pencil size={11} aria-hidden="true" />
           Editar
         </button>
       </div>
-      <dl className="mt-3 space-y-3">{children}</dl>
+      <dl className="mt-3.5 space-y-3 border-t border-white/8 pt-3.5">{children}</dl>
     </section>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="lemarc-review-label">{label}</dt>
+      <dd
+        className={cn(
+          "mt-0.5 truncate text-sm font-bold",
+          value ? "lemarc-review-value" : "lemarc-review-empty",
+        )}
+      >
+        {value ?? "Não informado"}
+      </dd>
+    </div>
   );
 }
 
@@ -1515,13 +1562,21 @@ function ReviewField({
   icon?: typeof Cog;
   children: React.ReactNode;
 }) {
+  const isEmpty = children === "Não informado" || children === "Sem técnico definido";
   return (
-    <div className="flex flex-col gap-1">
-      <dt className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
-        {Icon && <Icon size={11} />}
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className="lemarc-review-label flex items-center gap-1.5">
+        {Icon && <Icon size={11} aria-hidden="true" className="shrink-0 text-primary/80" />}
         {label}
       </dt>
-      <dd className="break-words text-sm font-semibold leading-relaxed text-white">{children}</dd>
+      <dd
+        className={cn(
+          "break-words text-sm leading-relaxed",
+          isEmpty ? "lemarc-review-empty" : "lemarc-review-value font-semibold",
+        )}
+      >
+        {children}
+      </dd>
     </div>
   );
 }
