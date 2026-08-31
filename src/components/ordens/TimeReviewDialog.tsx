@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Clock3, Loader2, Pencil, Plus, ShieldCheck } from "lucide-react";
@@ -55,6 +55,34 @@ function formatClock(totalSeconds: number) {
     .padStart(2, "0")}`;
 }
 
+const LiveTotal = memo(function LiveTotal({ sessions }: { sessions: TimeSession[] }) {
+  const hasOpenSession = sessions.some((session) => !session.ended_at);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!hasOpenSession) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [hasOpenSession]);
+
+  const totalMinutes = sessions.reduce((total, session) => total + sessionDurationMinutes(session), 0);
+  const totalSeconds = sessions.reduce((total, session) => total + sessionDurationSeconds(session), 0);
+  return <>{hasOpenSession ? formatClock(totalSeconds) : formatHHmm(totalMinutes)}</>;
+});
+
+const LiveSessionDuration = memo(function LiveSessionDuration({ session }: { session: TimeSession }) {
+  const isRunning = !session.ended_at;
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+
+  return <>{isRunning ? formatClock(sessionDurationSeconds(session)) : formatHHmm(sessionDurationMinutes(session))}</>;
+});
+
 export function TimeReviewDialog({
   orderId,
   orderNumber,
@@ -67,10 +95,8 @@ export function TimeReviewDialog({
   const getReviewFn = useServerFn(getOrderTimeReview);
   const saveReviewFn = useServerFn(saveOrderTimeReview);
   const createSessionFn = useServerFn(createManualTimeSession);
-  const [note, setNote] = useState("");
   const [editingSession, setEditingSession] = useState<TimeSession | null>(null);
   const [addingSession, setAddingSession] = useState(false);
-  const [tick, setTick] = useState(0);
 
   const reviewQuery = useQuery({
     queryKey: ["order-time-review", orderId],
@@ -81,7 +107,6 @@ export function TimeReviewDialog({
 
   useEffect(() => {
     if (open) {
-      setNote("");
       setEditingSession(null);
       setAddingSession(false);
       void reviewQuery.refetch();
@@ -90,13 +115,6 @@ export function TimeReviewDialog({
 
   const sessions: TimeSession[] = reviewQuery.data?.sessions ?? [];
   const hasOpenSession = sessions.some((session) => !session.ended_at);
-
-  useEffect(() => {
-    if (!open || !hasOpenSession) return;
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [open, hasOpenSession]);
-  void tick;
 
   const invalidateReview = async () => {
     await Promise.all([
@@ -110,7 +128,7 @@ export function TimeReviewDialog({
   };
 
   const saveMutation = useMutation({
-    mutationFn: () => saveReviewFn({ data: { orderId, note: note.trim() || null } }),
+    mutationFn: () => saveReviewFn({ data: { orderId, note: null } }),
     onSuccess: async () => {
       toast.success("Horários revisados e apuração atualizada.");
       await invalidateReview();
@@ -123,8 +141,6 @@ export function TimeReviewDialog({
 
   const technicianName = (id: string | null) =>
     technicians.find((technician) => technician.id === id)?.full_name ?? "Técnico";
-  const totalMinutes = sessions.reduce((total, session) => total + sessionDurationMinutes(session), 0);
-  const totalSeconds = sessions.reduce((total, session) => total + sessionDurationSeconds(session), 0);
   const canConfirm = !reviewQuery.isPending && !reviewQuery.isError;
   const eligibleIdsKey = (reviewQuery.data?.eligibleTechnicianIds ?? []).join(",");
   const eligibleTechnicians = useMemo(
@@ -136,23 +152,23 @@ export function TimeReviewDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="grid max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
+          <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-10 sm:px-6">
             <div className="flex items-start justify-between gap-3 pr-6">
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                  OS #{orderNumber} · conferência obrigatória
+                  OS #{orderNumber}
                 </p>
                 <DialogTitle className="mt-1">Revise os horários antes da assinatura</DialogTitle>
                 <DialogDescription className="mt-1">
-                  Confira os intervalos apontados na OS. A confirmação apenas revisa e atualiza a
-                  apuração de horas — o cronômetro em andamento continua correndo.
+                  Confira os intervalos registrados pela equipe.
                 </DialogDescription>
               </div>
               <ShieldCheck className="mt-1 shrink-0 text-primary" size={20} />
             </div>
           </DialogHeader>
 
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
           {reviewQuery.isPending ? (
             <div className="flex min-h-32 items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando horários…
@@ -177,7 +193,7 @@ export function TimeReviewDialog({
                     Total
                   </p>
                   <p className="mt-1 text-lg font-black tabular-nums text-foreground">
-                    {hasOpenSession ? formatClock(totalSeconds) : formatHHmm(totalMinutes)}
+                    <LiveTotal sessions={sessions} />
                   </p>
                 </div>
                 <div className="col-span-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-1">
@@ -208,7 +224,7 @@ export function TimeReviewDialog({
                 )}
               </div>
 
-              <div className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {sessions.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                     Nenhum intervalo registrado ainda.
@@ -219,7 +235,7 @@ export function TimeReviewDialog({
                     return (
                       <div
                         key={session.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-foreground">
@@ -231,7 +247,7 @@ export function TimeReviewDialog({
                             <span>{isRunning ? "em andamento" : formatDateHm(session.ended_at)}</span>
                             <span className={`inline-flex items-center gap-1 font-semibold ${isRunning ? "text-amber-200" : "text-foreground"}`}>
                               <Clock3 size={12} />
-                              {isRunning ? formatClock(sessionDurationSeconds(session)) : formatHHmm(sessionDurationMinutes(session))}
+                               <LiveSessionDuration session={session} />
                             </span>
                             {isRunning && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" aria-label="Cronômetro em andamento" />}
                           </p>
@@ -258,25 +274,11 @@ export function TimeReviewDialog({
                   })
                 )}
               </div>
-
-              <div className="space-y-1">
-                <label htmlFor="technician-time-review-note" className="text-xs font-semibold text-foreground">
-                  Observação (opcional)
-                </label>
-                <textarea
-                  id="technician-time-review-note"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  maxLength={500}
-                  rows={2}
-                  placeholder="Ex.: confirmei a pausa para almoço."
-                  className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
             </div>
           )}
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saveMutation.isPending}>
               Voltar
             </Button>

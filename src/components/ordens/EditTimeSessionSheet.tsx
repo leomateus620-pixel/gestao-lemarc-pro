@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
@@ -76,8 +76,8 @@ export function EditTimeSessionSheet({
   const [endInput, setEndInput] = useState("");
   const [technicianId, setTechnicianId] = useState("");
   const [pauseReason, setPauseReason] = useState<string>("");
-  const [pauseNotes, setPauseNotes] = useState<string>("");
   const [reason, setReason] = useState("");
+  const initializedDraftRef = useRef<string | null>(null);
 
   const isPaused = session?.end_reason === "pause";
   const isOpen = session ? !session.ended_at : false;
@@ -85,22 +85,29 @@ export function EditTimeSessionSheet({
   const defaultTechnicianId = availableTechnicians[0]?.id ?? "";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedDraftRef.current = null;
+      return;
+    }
+
+    const draftKey = session ? `edit:${session.id}` : "create";
+    if (initializedDraftRef.current === draftKey) return;
+    initializedDraftRef.current = draftKey;
+
     if (session) {
       setStartInput(isoToLocalInput(session.started_at));
       setEndInput(isoToLocalInput(session.ended_at));
       setTechnicianId(session.technician_id ?? "");
       setPauseReason(session.pause_reason ?? "");
-      setPauseNotes(session.pause_notes ?? "");
     } else {
       setStartInput(initialManualStart());
       setEndInput(initialManualEnd());
       setTechnicianId(defaultTechnicianId);
       setPauseReason("");
-      setPauseNotes("");
     }
     setReason("");
-    // Reinicia apenas ao abrir ou trocar a sessão editada — nunca a cada tique do cronômetro.
+    // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
+    // não podem reinicializar valores que o usuário já digitou.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, open]);
 
@@ -125,12 +132,9 @@ export function EditTimeSessionSheet({
       if (new Date(endIso).getTime() > Date.now() + 60_000) return "O fim não pode estar no futuro.";
     }
     if (new Date(startIso).getTime() > Date.now() + 60_000) return "O início não pode estar no futuro.";
-    if (isPaused && pauseReason === "outro" && !pauseNotes.trim()) {
-      return "Descreva o motivo em 'Outro'.";
-    }
     if (reason.trim().length < 3) return "Descreva o motivo do ajuste (mín. 3 caracteres).";
     return null;
-  }, [session, startInput, endInput, technicianId, pauseReason, pauseNotes, reason, isOpen, isPaused, isCreate]);
+  }, [session, startInput, endInput, technicianId, reason, isOpen, isCreate]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -162,7 +166,6 @@ export function EditTimeSessionSheet({
       }
       if (isPaused) {
         payload.pauseReason = pauseReason || null;
-        payload.pauseNotes = pauseNotes.trim() || null;
       }
       return updateFn({ data: payload });
     },
@@ -185,20 +188,19 @@ export function EditTimeSessionSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="grid max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-10 sm:px-6">
           <DialogTitle>{isCreate ? "Adicionar horário" : "Editar horário"}</DialogTitle>
           <DialogDescription>
             {isCreate
-              ? "Registre um intervalo trabalhado que faltou no histórico."
+              ? "Registre um intervalo que faltou no histórico."
               : technicianName
-                ? `Ajustar horário de ${technicianName}.`
-                : "Ajustar horário registrado."}{" "}
-            As alterações recalculam a apuração de horas, os totais e o PDF automaticamente.
+                ? `Ajuste o horário de ${technicianName}.`
+                : "Ajuste o horário registrado."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-1">
+        <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
           {isCreate && (
             <div className="space-y-1">
               <Label>Técnico</Label>
@@ -234,31 +236,24 @@ export function EditTimeSessionSheet({
           )}
 
           {isPaused && (
-            <>
-              <div className="space-y-1">
-                <Label>Motivo da pausa</Label>
-                <Select value={pauseReason} onValueChange={setPauseReason}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {PAUSE_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="edit-session-pause-notes">Observações da pausa {pauseReason === "outro" && <span className="text-rose-300">*</span>}</Label>
-                <Textarea id="edit-session-pause-notes" rows={2} value={pauseNotes} onChange={(e) => setPauseNotes(e.target.value)} placeholder={pauseReason === "outro" ? "Descreva o motivo" : "Opcional"} />
-              </div>
-            </>
+            <div className="space-y-1">
+              <Label>Motivo da pausa</Label>
+              <Select value={pauseReason} onValueChange={setPauseReason}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {PAUSE_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <div className="space-y-1">
             <Label htmlFor="edit-session-reason">Motivo do ajuste *</Label>
             <Textarea id="edit-session-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: esqueci de registrar este intervalo" />
-            <p className="text-[10px] text-muted-foreground">O ajuste fica registrado no histórico de auditoria da OS.</p>
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>Cancelar</Button>
           <Button
             disabled={!!validationError || mutation.isPending || (isCreate && availableTechnicians.length === 0)}
