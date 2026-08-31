@@ -696,7 +696,7 @@ function ClientStep({
                     )}
                   </div>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={onContinue}
                   className={cn(
@@ -707,7 +707,7 @@ function ClientStep({
                   )}
                 >
                   Continuar <ArrowRight size={16} />
-                </button>
+                </Button>
               </div>
             </div>
           )}
