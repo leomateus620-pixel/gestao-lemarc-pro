@@ -154,7 +154,8 @@ export function EditTimeSessionSheet({
             technicianId,
             startedAt: startIso,
             endedAt: endIso,
-            reason: reason.trim(),
+            reason: autoReason,
+
           },
         });
       }
