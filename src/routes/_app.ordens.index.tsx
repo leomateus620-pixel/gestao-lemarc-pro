@@ -30,7 +30,6 @@ import { getOrderTechnicians, getServiceOrderWorkedMinutes } from "@/lib/service
 import { getOpenedAt } from "@/lib/serviceOrders/time";
 import type { OrderFinancials } from "@/types/financials";
 import {
-  priorityLabel,
   serviceTypeLabel,
   type ServiceOrder,
   type ServiceOrderStatus,
@@ -323,6 +322,7 @@ function OrdensList() {
             <MoreFilters>{advancedFilters}</MoreFilters>
           </>
         }
+        desktopSingleLine
       >
         {primaryFilters}
         {advancedFilters}

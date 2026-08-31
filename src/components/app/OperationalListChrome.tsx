@@ -76,6 +76,7 @@ export function OperationalFilterBar({
   search,
   children,
   desktopChildren,
+  desktopSingleLine = false,
   activeCount,
   resultLabel,
   onReset,
@@ -83,6 +84,7 @@ export function OperationalFilterBar({
   search: ReactNode;
   children: ReactNode;
   desktopChildren?: ReactNode;
+  desktopSingleLine?: boolean;
   activeCount: number;
   resultLabel: string;
   onReset: () => void;
@@ -94,7 +96,14 @@ export function OperationalFilterBar({
       <div className="lemarc-filter-bar">
         <div className="min-w-0 flex-1">{search}</div>
 
-        <div className="lemarc-filter-controls hidden md:flex">{desktopChildren ?? children}</div>
+        <div
+          className={cn(
+            "lemarc-filter-controls hidden md:flex",
+            desktopSingleLine && "lemarc-filter-controls--single-line",
+          )}
+        >
+          {desktopChildren ?? children}
+        </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
