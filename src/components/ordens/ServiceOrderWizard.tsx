@@ -616,6 +616,9 @@ function ClientStep({
     return selectedUnits.find((u) => u.id === draft.unitId) ?? null;
   }, [draft.unitId, filteredUnits, selectedUnits]);
   const selectedClient = clients.find((client) => client.id === draft.clientId);
+  const selectedUnitName = draft.unitId
+    ? (selectedUnits.find((u) => u.id === draft.unitId)?.name ?? null)
+    : null;
   const clientError = issues.find((issue) => issue.field === "clientId")?.message;
 
   const clientMutation = useMutation({
