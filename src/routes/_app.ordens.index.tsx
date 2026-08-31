@@ -2,7 +2,7 @@ import { Suspense, useMemo, type ReactNode } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { Activity, Plus, Search } from "lucide-react";
+import { Activity, MoreHorizontal, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import {
   OperationalFilterBar,
@@ -13,6 +13,12 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { MetricPeriodFilter } from "@/components/dashboard/MetricPeriodFilter";
 import { ServiceOrderIslandRow } from "@/components/ordens/ServiceOrderIslandRow";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useServiceOrderFinancialSummariesQuery,
   useServiceOrdersQuery,
@@ -24,7 +30,6 @@ import { getOrderTechnicians, getServiceOrderWorkedMinutes } from "@/lib/service
 import { getOpenedAt } from "@/lib/serviceOrders/time";
 import type { OrderFinancials } from "@/types/financials";
 import {
-  priorityLabel,
   serviceTypeLabel,
   type ServiceOrder,
   type ServiceOrderStatus,
@@ -51,6 +56,7 @@ const searchSchema = z.object({
     "todas",
   ),
   client: fallback(z.string(), "all").default("all"),
+  unit: fallback(z.string(), "all").default("all"),
   technician: fallback(z.string(), "all").default("all"),
   sort: fallback(
     z.enum([
@@ -74,7 +80,22 @@ const searchSchema = z.object({
 type SearchState = z.infer<typeof searchSchema>;
 
 export const Route = createFileRoute("/_app/ordens/")({
-  head: () => ({ meta: [{ title: "Ordens de serviço — Gestão Lemarc" }] }),
+  head: () => ({
+    meta: [
+      { title: "Ordens de serviço — Gestão Lemarc" },
+      {
+        name: "description",
+        content: "Acompanhe as ordens de serviço da Gestão Lemarc por período, empresa, unidade e técnico.",
+      },
+      { property: "og:title", content: "Ordens de serviço — Gestão Lemarc" },
+      {
+        property: "og:description",
+        content: "Acompanhe as ordens de serviço da Gestão Lemarc por período, empresa, unidade e técnico.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   validateSearch: zodValidator(searchSchema),
   errorComponent: OrdensError,
   component: () => (
@@ -104,18 +125,7 @@ const priorityRank: Record<ServicePriority, number> = {
 
 function OrdensPage() {
   return (
-    <AppShell
-      title="Ordens de serviço"
-      action={
-        <Link
-          to="/ordens/nova"
-          className="lemarc-primary-action lemarc-pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-          aria-label="Nova OS"
-        >
-          <Plus size={18} />
-        </Link>
-      }
-    >
+    <AppShell hideTitle hideAction>
       <Suspense fallback={<OrdensSkeleton />}>
         <OrdensList />
       </Suspense>
@@ -124,7 +134,7 @@ function OrdensPage() {
 }
 
 function OrdensList() {
-  const { status, priority, client, technician, sort, period, from, to, filtro, q } =
+  const { status, priority, client, unit, technician, sort, period, from, to, filtro, q } =
     Route.useSearch();
   const navigate = useNavigate({ from: "/ordens/" });
   const { data: orders } = useServiceOrdersQuery();
@@ -142,7 +152,7 @@ function OrdensList() {
     [orders, period, periodRange],
   );
   const kpis = useMemo(() => computeKpis(periodOrders, financialMap), [financialMap, periodOrders]);
-  const options = useMemo(() => buildFilterOptions(periodOrders), [periodOrders]);
+  const options = useMemo(() => buildFilterOptions(periodOrders, client), [client, periodOrders]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -151,6 +161,7 @@ function OrdensList() {
         if (!matchesStatus(order, status as StatusFilter)) return false;
         if (priority !== "todas" && order.priority !== priority) return false;
         if (!matchesClient(order, client)) return false;
+        if (!matchesUnit(order, unit)) return false;
         if (!matchesTechnician(order, technician)) return false;
         if (filtro === "alertas" && !isAlert(order)) return false;
         if (filtro === "incompletas" && !isIncomplete(order)) return false;
@@ -158,7 +169,7 @@ function OrdensList() {
         return true;
       })
       .sort((a, b) => compareOrders(a, b, sort as SortMode, financialMap));
-  }, [client, financialMap, filtro, periodOrders, priority, q, sort, status, technician]);
+  }, [client, financialMap, filtro, periodOrders, priority, q, sort, status, technician, unit]);
 
   const setSearch = (patch: Partial<SearchState>) =>
     navigate({ search: (prev: SearchState) => ({ ...prev, ...patch }) });
@@ -176,6 +187,7 @@ function OrdensList() {
     status !== "todas",
     priority !== "todas",
     client !== "all",
+    unit !== "all",
     technician !== "all",
     period !== "all",
     filtro !== "none",
@@ -187,6 +199,7 @@ function OrdensList() {
         status: "todas",
         priority: "todas",
         client: "all",
+        unit: "all",
         technician: "all",
         sort: "recentes",
         period: "all",
@@ -197,45 +210,93 @@ function OrdensList() {
       },
     });
 
+  const primaryFilters = (
+    <>
+      <MetricPeriodFilter
+        value={period as Period}
+        range={periodRange}
+        onChange={setPeriodWithRange}
+        label="Período"
+        variant="inline"
+        className="lemarc-period-filter"
+      />
+      <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
+        <option value="todas">Status</option>
+        <option value="pendente">Pendentes</option>
+        <option value="andamento">Em campo</option>
+        <option value="revisao">Em revisão</option>
+        <option value="concluida">Finalizadas</option>
+        <option value="cancelada">Canceladas</option>
+      </Select>
+      <Select value={client} onChange={(value) => setSearch({ client: value, unit: "all" })}>
+        <option value="all">Empresa</option>
+        {options.clients.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+      <Select value={unit} onChange={(value) => setSearch({ unit: value })}>
+        <option value="all">Unidade</option>
+        {options.units.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+      <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
+        <option value="all">Técnico</option>
+        {options.technicians.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+    </>
+  );
+  const advancedFilters = (
+    <>
+      <Select value={priority} onChange={(value) => setSearch({ priority: value as PriorityFilter })}>
+        <option value="todas">Prioridade</option>
+        <option value="baixa">Baixa</option>
+        <option value="media">Média</option>
+        <option value="alta">Alta</option>
+        <option value="urgente">Urgente</option>
+      </Select>
+      <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
+        <option value="recentes">Mais recentes</option>
+        <option value="status">Status</option>
+        <option value="prioridade">Prioridade</option>
+        <option value="cliente">Empresa</option>
+        <option value="previsao">Previsão de início</option>
+        <option value="maior-tempo">Maior tempo</option>
+        <option value="maior-valor">Maior valor</option>
+      </Select>
+    </>
+  );
+
   return (
     <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
       <OperationalPageHeader
-        eyebrow="Operação Lemarc"
         title="Ordens de serviço"
-        description="Acompanhe abertura, atendimento, revisão e cobrança sem perder o contexto operacional."
         action={
           <Link
             to="/ordens/nova"
-            className="lemarc-primary-action lemarc-pressable inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 font-display text-xs font-bold sm:px-4"
+            className="lemarc-primary-action lemarc-pressable inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-3 font-display text-xs font-bold sm:px-4"
           >
             <Plus size={16} />
-            <span className="hidden sm:inline">Nova OS</span>
-            <span className="sm:hidden">Nova</span>
+            <span>Nova OS</span>
           </Link>
         }
         metrics={[
-          { label: "Total", value: kpis.total },
           { label: "Abertas", value: kpis.open },
           { label: "Em campo", value: kpis.inField },
           { label: "Em revisão", value: kpis.review },
-          { label: "Finalizadas", value: kpis.done },
           {
             label: "Horas",
             value: formatHHmm(kpis.realMinutes),
             evidence: "Apurado",
-            detail:
-              kpis.estimatedMinutes > 0
-                ? `${formatHHmm(kpis.estimatedMinutes)} estimado`
-                : "Sem estimativa pendente",
+            detail: kpis.estimatedMinutes > 0 ? `${formatHHmm(kpis.estimatedMinutes)} estimado` : undefined,
           },
           {
             label: "Valor",
             value: formatBRL(kpis.realValueCents),
-            evidence: "Apurado",
-            detail:
-              kpis.estimatedValueCents > 0
-                ? `${formatBRL(kpis.estimatedValueCents)} estimado`
-                : "Sem estimativa pendente",
+            evidence: undefined,
+            detail: kpis.estimatedValueCents > 0 ? `${formatBRL(kpis.estimatedValueCents)} estimado` : undefined,
           },
         ]}
       />
@@ -246,70 +307,25 @@ function OrdensList() {
         onReset={resetFilters}
         search={
           <div className="relative min-w-0">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               value={q}
               onChange={(event) => setSearch({ q: event.target.value })}
-              placeholder="Buscar OS..."
+              placeholder="OS, empresa ou unidade..."
               className="lemarc-form-control h-11 rounded-xl pl-9"
             />
           </div>
         }
+        desktopChildren={
+          <>
+            {primaryFilters}
+            <MoreFilters>{advancedFilters}</MoreFilters>
+          </>
+        }
+        desktopSingleLine
       >
-        <MetricPeriodFilter
-          value={period as Period}
-          range={periodRange}
-          onChange={setPeriodWithRange}
-          label="Período"
-          variant="inline"
-          className="lemarc-period-filter"
-        />
-        <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
-          <option value="todas">Status</option>
-          <option value="pendente">Pendentes</option>
-          <option value="andamento">Em campo</option>
-          <option value="revisao">Em revisão</option>
-          <option value="concluida">Finalizadas</option>
-          <option value="cancelada">Canceladas</option>
-        </Select>
-        <Select
-          value={priority}
-          onChange={(value) => setSearch({ priority: value as PriorityFilter })}
-        >
-          <option value="todas">Prioridade</option>
-          <option value="baixa">Baixa</option>
-          <option value="media">Média</option>
-          <option value="alta">Alta</option>
-          <option value="urgente">Urgente</option>
-        </Select>
-        <Select value={client} onChange={(value) => setSearch({ client: value })}>
-          <option value="all">Cliente</option>
-          {options.clients.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
-          <option value="all">Técnico</option>
-          {options.technicians.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
-          <option value="recentes">Mais recentes</option>
-          <option value="status">Status</option>
-          <option value="prioridade">Prioridade</option>
-          <option value="cliente">Cliente</option>
-          <option value="previsao">Previsão de início</option>
-          <option value="maior-tempo">Maior tempo</option>
-          <option value="maior-valor">Maior valor</option>
-        </Select>
+        {primaryFilters}
+        {advancedFilters}
       </OperationalFilterBar>
 
       {filtro !== "none" && (
@@ -365,6 +381,12 @@ function matchesClient(order: ServiceOrder, client: string) {
   if (client === "all") return true;
   if (client === "__none__") return !order.client_id;
   return order.client_id === client;
+}
+
+function matchesUnit(order: ServiceOrder, unit: string) {
+  if (unit === "all") return true;
+  if (unit === "__none__") return !order.client_unit_id;
+  return order.client_unit_id === unit;
 }
 
 function matchesTechnician(order: ServiceOrder, technician: string) {
@@ -502,15 +524,28 @@ function computeKpis(orders: ServiceOrder[], financialMap: Map<string, OrderFina
   };
 }
 
-function buildFilterOptions(orders: ServiceOrder[]) {
+function buildFilterOptions(orders: ServiceOrder[], selectedClient: string) {
   const clients = new Map<string, string>();
+  const units = new Map<string, { name: string; clientName: string }>();
   const technicians = new Map<string, string>();
   let hasNoClient = false;
+  let hasNoUnit = false;
   let hasNoTechnician = false;
 
   for (const order of orders) {
     if (order.client_id && order.client?.name) clients.set(order.client_id, order.client.name);
     else hasNoClient = true;
+
+    if (order.client_unit_id && order.client_unit?.name) {
+      if (selectedClient === "all" || order.client_id === selectedClient) {
+        units.set(order.client_unit_id, {
+          name: order.client_unit.name,
+          clientName: order.client?.name ?? "Sem empresa",
+        });
+      }
+    } else if (selectedClient === "all" || order.client_id === selectedClient) {
+      hasNoUnit = true;
+    }
 
     const orderTechnicians = getOrderTechnicians(order);
     if (orderTechnicians.length === 0) hasNoTechnician = true;
@@ -522,14 +557,44 @@ function buildFilterOptions(orders: ServiceOrder[]) {
   const clientOptions = Array.from(clients.entries())
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  const unitOptions = Array.from(units.entries())
+    .map(([value, unit]) => ({
+      value,
+      label: selectedClient === "all" ? `${unit.clientName} · ${unit.name}` : unit.name,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   const technicianOptions = Array.from(technicians.entries())
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
-  if (hasNoClient) clientOptions.push({ value: "__none__", label: "Sem cliente" });
+  if (hasNoClient) clientOptions.push({ value: "__none__", label: "Sem empresa" });
+  if (hasNoUnit) unitOptions.push({ value: "__none__", label: "Sem unidade" });
   if (hasNoTechnician) technicianOptions.push({ value: "__none__", label: "Sem técnico" });
 
-  return { clients: clientOptions, technicians: technicianOptions };
+  return { clients: clientOptions, units: unitOptions, technicians: technicianOptions };
+}
+
+function MoreFilters({ children }: { children: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="lemarc-filter-more h-10 shrink-0 gap-1.5 rounded-xl px-3 text-[11px] font-bold"
+        >
+          <MoreHorizontal size={15} />
+          Mais
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52 border-white/10 bg-popover p-2">
+        <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          Refinar lista
+        </p>
+        <div className="grid gap-2">{children}</div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function Select({
@@ -553,6 +618,7 @@ function Select({
 }
 
 function OrdensSkeleton() {
+
   return (
     <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
       <div className="relative h-28 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.045]">

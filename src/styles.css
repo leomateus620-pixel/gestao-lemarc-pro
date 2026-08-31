@@ -755,6 +755,22 @@
   justify-content: flex-end;
   gap: 0.4rem;
 }
+.lemarc-filter-controls--single-line {
+  flex-wrap: nowrap;
+  justify-content: stretch;
+}
+.lemarc-filter-controls--single-line > .lemarc-filter-control {
+  min-width: 6.5rem;
+  max-width: none;
+  flex: 1 1 7rem;
+}
+.lemarc-filter-controls--single-line > .lemarc-period-filter {
+  min-width: 13.5rem;
+  flex: 1.45 1 15rem;
+}
+.lemarc-filter-controls--single-line > .lemarc-filter-more {
+  flex: 0 0 auto;
+}
 .lemarc-filter-control {
   min-width: 8.25rem;
   max-width: 13rem;
@@ -820,8 +836,21 @@
     grid-template-columns: repeat(auto-fit, minmax(7.4rem, 1fr));
   }
   .lemarc-filter-bar > :first-child {
-    flex: 1 1 18rem;
-    max-width: 25rem;
+    flex: 0 1 clamp(13rem, 22vw, 20rem);
+    max-width: 20rem;
+  }
+  .lemarc-filter-controls--single-line > .lemarc-filter-control {
+    min-width: 5.75rem;
+  }
+  .lemarc-filter-controls--single-line > .lemarc-period-filter {
+    min-width: 10.5rem;
+  }
+  .lemarc-filter-controls--single-line {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .lemarc-filter-controls--single-line .lemarc-period-filter {
+    min-width: 12rem;
   }
 }
 @media (min-width: 768px) {

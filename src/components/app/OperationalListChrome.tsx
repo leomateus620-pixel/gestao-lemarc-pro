@@ -25,23 +25,30 @@ export function OperationalPageHeader({
   description,
   action,
   metrics,
+  showTitle = true,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   action: ReactNode;
   metrics: OperationalMetric[];
+  showTitle?: boolean;
 }) {
   return (
     <section className="lemarc-operational-header">
-      <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:gap-5">
         <div className="min-w-0">
-          <p className="lemarc-context-label">{eyebrow}</p>
-          <h1 className="lemarc-page-title">{title}</h1>
-          <p className="lemarc-page-description">{description}</p>
+          {eyebrow && <p className="lemarc-context-label">{eyebrow}</p>}
+          {showTitle ? (
+            <h1 className="lemarc-page-title">{title}</h1>
+          ) : (
+            <p className="lemarc-context-label">{title}</p>
+          )}
+          {description && <p className="lemarc-page-description">{description}</p>}
         </div>
-        <div className="w-full shrink-0 [&>*]:w-full sm:w-auto sm:[&>*]:w-auto">{action}</div>
+        <div className="shrink-0">{action}</div>
       </div>
+
 
       <div className="lemarc-operational-metrics" aria-label={`Indicadores de ${title}`}>
         {metrics.map((metric) => (
@@ -68,12 +75,16 @@ export function OperationalPageHeader({
 export function OperationalFilterBar({
   search,
   children,
+  desktopChildren,
+  desktopSingleLine = false,
   activeCount,
   resultLabel,
   onReset,
 }: {
   search: ReactNode;
   children: ReactNode;
+  desktopChildren?: ReactNode;
+  desktopSingleLine?: boolean;
   activeCount: number;
   resultLabel: string;
   onReset: () => void;
@@ -85,7 +96,14 @@ export function OperationalFilterBar({
       <div className="lemarc-filter-bar">
         <div className="min-w-0 flex-1">{search}</div>
 
-        <div className="lemarc-filter-controls hidden md:flex">{children}</div>
+        <div
+          className={cn(
+            "lemarc-filter-controls hidden md:flex",
+            desktopSingleLine && "lemarc-filter-controls--single-line",
+          )}
+        >
+          {desktopChildren ?? children}
+        </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
