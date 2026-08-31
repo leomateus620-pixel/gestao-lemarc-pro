@@ -790,9 +790,18 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     if (ordErr) throw new Error(ordErr.message);
     if (!order) throw new Error("Ordem de serviço não encontrada.");
 
-    const lockedStatuses = ["finished", "review", "approved", "cancelled"];
+    const lockedStatuses = ["review", "approved", "cancelled"];
     if (lockedStatuses.includes(order.status)) {
-      throw new Error("Esta OS já foi encerrada e não pode ser editada.");
+      throw new Error("Esta OS já foi revisada e não pode ser editada.");
+    }
+
+    const { data: financial } = await sb
+      .from("service_order_financials")
+      .select("finalized_at")
+      .eq("service_order_id", order.id)
+      .maybeSingle();
+    if (financial?.finalized_at) {
+      throw new Error("Esta OS já teve a apuração finalizada pelo administrador.");
     }
 
     if (!isAdmin && callerTechnicianId) {

@@ -121,7 +121,9 @@ export async function syncLaborEntriesFromSessions(
   sb: any,
   orderId: string,
   syncedByUserId: string,
+  writer?: any,
 ): Promise<LaborSyncOutcome> {
+  const w = writer ?? sb;
   const [{ data: fin }, { data: order }] = await Promise.all([
     sb
       .from("service_order_financials")
@@ -237,18 +239,18 @@ export async function syncLaborEntriesFromSessions(
   }
 
 
-  const { error: delErr } = await sb
+  const { error: delErr } = await w
     .from("service_order_labor_entries")
     .delete()
     .eq("service_order_id", orderId);
   if (delErr) throw new Error(delErr.message);
 
   if (inserts.length > 0) {
-    const { error: insErr } = await sb.from("service_order_labor_entries").insert(inserts);
+    const { error: insErr } = await w.from("service_order_labor_entries").insert(inserts);
     if (insErr) throw new Error(insErr.message);
   }
 
-  await recomputeOrderFinancials(sb, orderId, null);
+  await recomputeOrderFinancials(sb, orderId, null, w);
 
   const totalLaborMinutes = inserts.reduce(
     (a, r) => a + Number(r.duration_minutes ?? 0),
