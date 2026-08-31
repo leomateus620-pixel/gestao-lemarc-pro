@@ -109,7 +109,7 @@ export function EditTimeSessionSheet({
       setTechnicianId(defaultTechnicianId);
       setPauseReason("");
     }
-    setReason("");
+    // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
     // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
     // não podem reinicializar valores que o usuário já digitou.
     // eslint-disable-next-line react-hooks/exhaustive-deps
