@@ -52,6 +52,7 @@ import { SignatureBlock } from "@/components/ordens/signature/SignatureBlock";
 import { ExecutionReportSection } from "@/components/ordens/ExecutionReportSection";
 import { EditClientUnitDialog } from "@/components/ordens/EditClientUnitDialog";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
+import { TimeReviewDialog } from "@/components/ordens/TimeReviewDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
 import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/ServiceOrderMaterialsSection";
 import { finishWork, startWork } from "@/lib/api/timeSessions.functions";
@@ -198,6 +199,7 @@ function OrdemDetalhe() {
 
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
+  const [timeReviewOpen, setTimeReviewOpen] = useState(false);
   const hasSignature =
     Boolean((order as unknown as { signature?: unknown }).signature) ||
     Boolean(order.signature_waiver_reason);
@@ -215,8 +217,7 @@ function OrdemDetalhe() {
   async function handleTecnicoFinish() {
     const orderId = order!.id;
     if (!hasSignature) {
-      toastFn.error("Colete a assinatura do responsável antes de finalizar a OS.");
-      setSignOpen(true);
+      setTimeReviewOpen(true);
       return;
     }
     try {
@@ -432,12 +433,22 @@ function OrdemDetalhe() {
       )}
 
       {isTecnico && (
-        <SignatureCaptureDialog
-          orderId={order.id}
-          orderNumber={order.number}
-          open={signOpen}
-          onOpenChange={setSignOpen}
-        />
+        <>
+          <TimeReviewDialog
+            orderId={order.id}
+            orderNumber={order.number}
+            open={timeReviewOpen}
+            onOpenChange={setTimeReviewOpen}
+            technicians={technicians}
+            onReviewed={() => setSignOpen(true)}
+          />
+          <SignatureCaptureDialog
+            orderId={order.id}
+            orderNumber={order.number}
+            open={signOpen}
+            onOpenChange={setSignOpen}
+          />
+        </>
       )}
 
       {!tecnicoDone && <ServiceOrderTimeControl order={order} />}

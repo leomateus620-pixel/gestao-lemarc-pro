@@ -408,6 +408,8 @@ export type Database = {
           start_time: string
           subtotal_cents: number
           technician_id: string | null
+          technician_reviewed_at: string | null
+          technician_reviewed_by: string | null
           updated_at: string
           work_date: string
         }
@@ -425,6 +427,8 @@ export type Database = {
           start_time: string
           subtotal_cents: number
           technician_id?: string | null
+          technician_reviewed_at?: string | null
+          technician_reviewed_by?: string | null
           updated_at?: string
           work_date: string
         }
@@ -442,6 +446,8 @@ export type Database = {
           start_time?: string
           subtotal_cents?: number
           technician_id?: string | null
+          technician_reviewed_at?: string | null
+          technician_reviewed_by?: string | null
           updated_at?: string
           work_date?: string
         }
@@ -705,6 +711,9 @@ export type Database = {
           source: string
           started_at: string
           technician_id: string | null
+          technician_review_note: string | null
+          technician_reviewed_at: string | null
+          technician_reviewed_by: string | null
           updated_at: string
         }
         Insert: {
@@ -726,6 +735,9 @@ export type Database = {
           source?: string
           started_at?: string
           technician_id?: string | null
+          technician_review_note?: string | null
+          technician_reviewed_at?: string | null
+          technician_reviewed_by?: string | null
           updated_at?: string
         }
         Update: {
@@ -747,6 +759,9 @@ export type Database = {
           source?: string
           started_at?: string
           technician_id?: string | null
+          technician_review_note?: string | null
+          technician_reviewed_at?: string | null
+          technician_reviewed_by?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -799,6 +814,8 @@ export type Database = {
           started_at: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
+          time_review_completed_at: string | null
+          time_review_completed_by: string | null
           title: string
           updated_at: string
           worked_minutes: number | null
@@ -835,6 +852,8 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
+          time_review_completed_at?: string | null
+          time_review_completed_by?: string | null
           title: string
           updated_at?: string
           worked_minutes?: number | null
@@ -871,6 +890,8 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
+          time_review_completed_at?: string | null
+          time_review_completed_by?: string | null
           title?: string
           updated_at?: string
           worked_minutes?: number | null

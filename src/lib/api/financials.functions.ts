@@ -31,12 +31,13 @@ import type {
 const LABOR_SELECT = `
   id, service_order_id, technician_id, role, work_date, start_time, end_time,
   duration_minutes, hourly_rate_cents, subtotal_cents, description,
+  technician_reviewed_at, technician_reviewed_by,
   technician:technicians(id, full_name, role)
 `;
 
 const TIME_SESSION_SELECT = `
   id, service_order_id, technician_id, kind, started_at, ended_at,
-  duration_minutes, end_reason
+  duration_minutes, end_reason, technician_reviewed_at, technician_reviewed_by
 `;
 
 type ClosedWorkSession = {
@@ -45,6 +46,8 @@ type ClosedWorkSession = {
   started_at: string;
   ended_at: string;
   duration_minutes: number;
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
 };
 
 /**
@@ -120,6 +123,8 @@ function deriveEntriesFromSessions(
           segments.length > 1
             ? `Intervalo ${idx + 1} de ${segments.length}`
             : "Trabalho executado",
+        technician_reviewed_at: seg.technician_reviewed_at ?? null,
+        technician_reviewed_by: seg.technician_reviewed_by ?? null,
         technician: techObj,
       });
     });
@@ -205,6 +210,8 @@ function normalizeLabor(row: any): LaborEntry {
     hourly_rate_cents: row.hourly_rate_cents ?? 0,
     subtotal_cents: row.subtotal_cents ?? 0,
     description: row.description ?? null,
+    technician_reviewed_at: row.technician_reviewed_at ?? null,
+    technician_reviewed_by: row.technician_reviewed_by ?? null,
     technician: row.technician
       ? {
           id: row.technician.id,
@@ -381,6 +388,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
         started_at: s.started_at,
         ended_at: s.ended_at,
         duration_minutes: s.duration_minutes ?? 0,
+        technician_reviewed_at: s.technician_reviewed_at ?? null,
+        technician_reviewed_by: s.technician_reviewed_by ?? null,
       }));
     // Sessões esquecidas em aberto (>14h ou atravessando dias sem pausa) não
     // são materializadas: elas geravam blocos fantasma de 00:00–23:59.
@@ -500,7 +509,9 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
           duration_minutes: e.duration_minutes,
           segment_index: 0,
           segment_count: 1,
-        })),
+          technician_reviewed_at: e.technician_reviewed_at ?? null,
+          technician_reviewed_by: e.technician_reviewed_by ?? null,
+        })), 
         storedEntries,
       );
 
@@ -530,6 +541,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               hourly_rate_cents: src.hourly_rate_cents,
               subtotal_cents: src.subtotal_cents,
               description: src.description,
+              technician_reviewed_at: src.technician_reviewed_at ?? null,
+              technician_reviewed_by: src.technician_reviewed_by ?? null,
               created_by: context.userId,
               entry_source: "session_sync",
             };
@@ -595,6 +608,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
           hourly_rate_cents: e.hourly_rate_cents,
           subtotal_cents: e.subtotal_cents,
           description: e.description,
+          technician_reviewed_at: e.technician_reviewed_at ?? null,
+          technician_reviewed_by: e.technician_reviewed_by ?? null,
           created_by: context.userId,
           entry_source: "session_sync",
         }));
