@@ -11,6 +11,7 @@ import { computeSubtotalCents } from "@/lib/serviceOrders/finance";
 import {
   findMissingSegments,
   filterMaterializableSessions,
+  isAdminReviewedStatus,
   minutesBetween,
   splitSessionsByDay,
 } from "@/lib/serviceOrders/laborDerivation";
@@ -115,7 +116,7 @@ export async function syncLaborEntriesFromSessions(
   if (
     fin?.labor_entries_adjusted_at ||
     fin?.finalized_at ||
-    ["finished", "review", "approved", "cancelled"].includes(order?.status ?? "")
+    isAdminReviewedStatus(order?.status)
   ) {
     return { synced: false, reason: "locked_by_admin" };
   }
@@ -275,11 +276,9 @@ export async function reconcileLaborFromSessions(
       sb.from("service_orders").select("status").eq("id", orderId).maybeSingle(),
     ]);
     const adjustedAt = finRow?.labor_entries_adjusted_at ?? null;
-    // OS já finalizada pelo admin: nunca acrescentar horas automaticamente.
-    if (
-      finRow?.finalized_at ||
-      ["finished", "review", "approved", "cancelled"].includes(orderRow?.status ?? "")
-    ) {
+    // OS já revisada pelo admin: nunca acrescentar horas automaticamente.
+    // "finished" (técnico encerrou) continua liberado para reconciliação.
+    if (finRow?.finalized_at || isAdminReviewedStatus(orderRow?.status)) {
       return { appended: 0 };
     }
 
