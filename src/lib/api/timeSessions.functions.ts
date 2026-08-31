@@ -725,7 +725,10 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
     if (insErr) throw new Error(insErr.message);
 
     const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
-    if (laborPending) throw new Error(laborPending.message);
+    if (laborPending) {
+      await writer.from("service_order_time_sessions").delete().eq("id", inserted.id);
+      throw new Error(laborPending.message);
+    }
 
     return normalize(inserted);
   });
