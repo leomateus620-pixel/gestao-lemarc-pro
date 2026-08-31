@@ -965,20 +965,8 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       throw new Error("Esta OS já teve a apuração finalizada pelo administrador.");
     }
 
-    if (!isAdmin && callerTechnicianId) {
-      const [{ data: assigned }, isPrimary] = await Promise.all([
-        sb
-          .from("service_order_technicians")
-          .select("id")
-          .eq("service_order_id", order.id)
-          .eq("technician_id", callerTechnicianId)
-          .maybeSingle(),
-        Promise.resolve(order.technician_id === callerTechnicianId),
-      ]);
-      if (!assigned && !isPrimary) {
-        throw new Error("Você não está mais atribuído a esta OS.");
-      }
-    }
+    // O vínculo do autor com a OS já foi validado por assertOrderTimeAccess.
+
 
     // Validate times.
     const nextStartedAtIso = data.startedAt ?? session.started_at;
