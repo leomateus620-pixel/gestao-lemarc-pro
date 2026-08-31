@@ -156,6 +156,8 @@ export async function syncLaborEntriesFromSessions(
       started_at: s.started_at,
       ended_at: s.ended_at,
       duration_minutes: s.duration_minutes ?? minutesBetween(s.started_at, s.ended_at),
+      technician_reviewed_at: s.technician_reviewed_at ?? null,
+      technician_reviewed_by: s.technician_reviewed_by ?? null,
     }));
   // Sessões esquecidas em aberto (>14h / atravessando dias) nunca viram horas.
   const closed = filterMaterializableSessions(closedAll);
@@ -223,11 +225,14 @@ export async function syncLaborEntriesFromSessions(
           segments.length > 1
             ? `Intervalo ${idx + 1} de ${segments.length}`
             : "Trabalho executado",
+        technician_reviewed_at: seg.technician_reviewed_at ?? null,
+        technician_reviewed_by: seg.technician_reviewed_by ?? null,
         created_by: syncedByUserId,
         entry_source: "session_sync",
       });
     });
   }
+
 
   const { error: delErr } = await sb
     .from("service_order_labor_entries")
@@ -271,7 +276,9 @@ export async function reconcileLaborFromSessions(
     const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
       sb
         .from("service_order_time_sessions")
-        .select("id, technician_id, started_at, ended_at, duration_minutes")
+        .select(
+          "id, technician_id, started_at, ended_at, duration_minutes, technician_reviewed_at, technician_reviewed_by",
+        )
         .eq("service_order_id", orderId)
         .eq("kind", "work")
         .not("ended_at", "is", null)
