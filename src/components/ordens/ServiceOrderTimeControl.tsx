@@ -72,7 +72,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
   useEffect(() => {
     const anyOpen = sessions.some((s: TimeSession) => s.kind === "work" && !s.ended_at);
     if (!anyOpen) return;
-    const t = window.setInterval(() => setTick((n) => n + 1), 30_000);
+    const t = window.setInterval(() => setTick((n) => n + 1), 1_000);
     return () => window.clearInterval(t);
   }, [sessions]);
   void tick;

@@ -706,7 +706,7 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
         started_at: start.toISOString(),
         ended_at: end.toISOString(),
         end_reason: "finish",
-        source: isAdmin ? "admin_adjustment" : "technician_manual",
+        source: "admin_adjustment",
         created_by: context.userId,
         adjusted_by: context.userId,
         adjusted_at: new Date().toISOString(),
