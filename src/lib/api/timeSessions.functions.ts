@@ -444,13 +444,10 @@ export const finishWork = createServerFn({ method: "POST" })
         result.failed.push({ technicianId, message: errMessage(e) });
       }
     }
-    if (result.succeeded.length === 0 && result.skipped.length === 0) {
-      throw new Error(
-        result.failed[0]?.message ?? "Nenhum tempo em aberto foi encontrado para encerrar.",
-      );
-    }
-    if (result.succeeded.length > 0) {
-      result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
+    if (result.succeeded.length === 0 && result.failed.length === 0) {
+      // A OS pode estar pausada ou já sem intervalo aberto. A finalização
+      // continua válida; não há cronômetro para encerrar neste momento.
+      return { ok: true, openTimeAlert: null, ...result };
     }
     if (result.failed.length > 0) {
       throw new Error(result.failed[0]?.message ?? "Não foi possível encerrar todos os tempos.");
