@@ -182,6 +182,18 @@ function toMinutes(time: string): number {
 export const MAX_SESSION_MINUTES = 14 * 60;
 
 /**
+ * Status que representam revisão do admin: a partir deles a apuração nunca
+ * recebe horas automáticas. `finished` NÃO entra aqui — é ação do técnico
+ * (encerrar o serviço) e acontece antes da revisão, então as horas do
+ * histórico ainda precisam ser incorporadas.
+ */
+export const ADMIN_REVIEWED_STATUSES = ["review", "approved", "cancelled"];
+
+export function isAdminReviewedStatus(status: string | null | undefined): boolean {
+  return ADMIN_REVIEWED_STATUSES.includes(status ?? "");
+}
+
+/**
  * Sessão suspeita: duração acima do limite operacional ou que atravessa a
  * meia-noite local sem nenhuma pausa. Ambos os casos indicam que o técnico
  * (ou o encerramento em equipe) deixou o cronômetro rodando, e geravam os
