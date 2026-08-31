@@ -39,7 +39,10 @@ import {
   setServiceOrderTechnicians,
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
-import { getOrderFinancials } from "@/lib/api/financials.functions";
+import {
+  getOrderFinancials,
+  reconcileOrderLabor,
+} from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
@@ -681,6 +684,54 @@ function DetailField({
       <dd className="mt-1 break-words text-sm font-semibold leading-snug text-foreground">
         {children}
       </dd>
+    </div>
+  );
+}
+
+function PendingLaborBanner({
+  orderId,
+  pendingMinutes,
+}: {
+  orderId: string;
+  pendingMinutes: number;
+}) {
+  const qc = useQueryClient();
+  const reconcile = useServerFn(reconcileOrderLabor);
+  const mutation = useMutation({
+    mutationFn: () => reconcile({ data: { orderId } }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["order-financials", orderId] });
+      qc.invalidateQueries({ queryKey: ["service-order", orderId] });
+      if (res.pendingMinutes > 0) {
+        toastFn.error("Ainda restam horas do histórico fora da apuração.");
+      } else {
+        toastFn.success(
+          res.appended > 0
+            ? `${res.appended} registro(s) do histórico incorporado(s).`
+            : "Apuração já está completa.",
+        );
+      }
+    },
+    onError: (e: unknown) =>
+      toastFn.error(e instanceof Error ? e.message : "Não foi possível incorporar."),
+  });
+
+  if (pendingMinutes <= 0) return null;
+  return (
+    <div className="mb-3 flex flex-col gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs font-semibold text-amber-200">
+        Há {formatHHmm(pendingMinutes)} no histórico ainda fora da apuração.
+      </p>
+      <Button
+        size="sm"
+        variant="secondary"
+        className="gap-1.5"
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        <Calculator size={13} />
+        {mutation.isPending ? "Incorporando..." : "Incorporar agora"}
+      </Button>
     </div>
   );
 }
