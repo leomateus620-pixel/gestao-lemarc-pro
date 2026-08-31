@@ -530,7 +530,10 @@ export type OrderTimeReview = {
   reviewCompletedAt: string | null;
   pendingCount: number;
   reviewRequired: boolean;
+  /** Técnicos para quem o usuário atual pode lançar um horário manual. */
+  eligibleTechnicianIds: string[];
 };
+
 
 /**
  * Returns the whole team history of the order plus the caller's review scope.
