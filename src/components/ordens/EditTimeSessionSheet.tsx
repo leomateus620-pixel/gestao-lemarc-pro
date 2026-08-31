@@ -273,18 +273,8 @@ export function EditTimeSessionSheet({
               </Select>
             </div>
           )}
-
-          <div className="space-y-1">
-            <Label htmlFor="edit-session-reason">Motivo do ajuste *</Label>
-            <Textarea
-              id="edit-session-reason"
-              rows={2}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ex.: esqueci de registrar este intervalo"
-            />
-          </div>
         </div>
+
 
         <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
