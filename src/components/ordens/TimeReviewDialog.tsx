@@ -101,7 +101,11 @@ export function TimeReviewDialog({
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
                   OS #{orderNumber} · conferência obrigatória
                 </p>
-                <DialogTitle className="mt-1">Revise seus horários antes da assinatura</DialogTitle>
+                <DialogTitle className="mt-1">Revise os horários antes da assinatura</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Confira os intervalos apontados na OS. A confirmação encerra intervalos em
+                  andamento e atualiza a apuração de horas.
+                </DialogDescription>
               </div>
               <ShieldCheck className="mt-1 shrink-0 text-primary" size={20} />
             </div>
