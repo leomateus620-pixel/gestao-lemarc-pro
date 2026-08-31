@@ -221,6 +221,8 @@ export function ServiceOrderWizard({
               units={units}
               onCreated={(id) => set("clientId", id)}
               issues={visibleIssues}
+              onContinue={goNext}
+              canContinue={canGoNext}
             />
           </div>
         )}
