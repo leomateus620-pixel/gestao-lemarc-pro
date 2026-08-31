@@ -654,18 +654,9 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
     if (!assigned.includes(data.technicianId)) {
       throw new Error("Técnico não vinculado a esta OS.");
     }
-    if (!isAdmin) {
-      const { data: techRow } = await sb
-        .from("technicians")
-        .select("id")
-        .eq("user_id", context.userId)
-        .eq("active", true)
-        .maybeSingle();
-      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
-      if (techRow.id !== data.technicianId) {
-        throw new Error("Você só pode lançar horários para você mesmo.");
-      }
-    }
+    // Técnico vinculado à OS pode lançar horário para qualquer colega da mesma OS
+    // (o vínculo do alvo com a OS já foi validado acima).
+
 
     const start = new Date(data.startedAt);
     const end = new Date(data.endedAt);
