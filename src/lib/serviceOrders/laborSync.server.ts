@@ -251,7 +251,7 @@ export async function reconcileLaborFromSessions(
   sb: any,
   orderId: string,
   userId: string | null,
-): Promise<{ appended: number }> {
+): Promise<ReconcileOutcome> {
   try {
     const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
       sb
