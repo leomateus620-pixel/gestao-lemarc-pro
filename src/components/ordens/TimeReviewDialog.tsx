@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, Clock3, Loader2, Pencil, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock3, Loader2, Pencil, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,7 +12,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { getOrderTimeReview, saveOrderTimeReview } from "@/lib/api/timeSessions.functions";
+import {
+  createManualTimeSession,
+  getOrderTimeReview,
+  saveOrderTimeReview,
+} from "@/lib/api/timeSessions.functions";
 import { formatHHmm } from "@/lib/serviceOrders/finance";
 import { formatDateHm, type TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { AssignedTechnician } from "@/types/serviceOrder";
@@ -27,16 +31,28 @@ type Props = {
   onReviewed: () => void;
 };
 
-function sessionDuration(session: TimeSession) {
-  if (typeof session.duration_minutes === "number" && session.duration_minutes > 0) {
-    return session.duration_minutes;
-  }
-  if (!session.ended_at) return 0;
+function sessionDurationMinutes(session: TimeSession, nowMs = Date.now()) {
   const start = new Date(session.started_at).getTime();
-  const end = new Date(session.ended_at).getTime();
-  return Number.isFinite(start) && Number.isFinite(end) && end > start
-    ? Math.round((end - start) / 60000)
-    : 0;
+  const end = session.ended_at ? new Date(session.ended_at).getTime() : nowMs;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.round((end - start) / 60000);
+}
+
+function sessionDurationSeconds(session: TimeSession, nowMs = Date.now()) {
+  const start = new Date(session.started_at).getTime();
+  const end = session.ended_at ? new Date(session.ended_at).getTime() : nowMs;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.floor((end - start) / 1000);
+}
+
+function formatClock(totalSeconds: number) {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 export function TimeReviewDialog({
@@ -50,8 +66,11 @@ export function TimeReviewDialog({
   const qc = useQueryClient();
   const getReviewFn = useServerFn(getOrderTimeReview);
   const saveReviewFn = useServerFn(saveOrderTimeReview);
+  const createSessionFn = useServerFn(createManualTimeSession);
   const [note, setNote] = useState("");
   const [editingSession, setEditingSession] = useState<TimeSession | null>(null);
+  const [addingSession, setAddingSession] = useState(false);
+  const [tick, setTick] = useState(0);
 
   const reviewQuery = useQuery({
     queryKey: ["order-time-review", orderId],
@@ -64,21 +83,37 @@ export function TimeReviewDialog({
     if (open) {
       setNote("");
       setEditingSession(null);
+      setAddingSession(false);
       void reviewQuery.refetch();
     }
   }, [open]);
+
+  const sessions: TimeSession[] = reviewQuery.data?.sessions ?? [];
+  const hasOpenSession = sessions.some((session) => !session.ended_at);
+
+  useEffect(() => {
+    if (!open || !hasOpenSession) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [open, hasOpenSession]);
+  void tick;
+
+  const invalidateReview = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
+      qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
+      qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] }),
+      qc.invalidateQueries({ queryKey: ["order-labor-override", orderId] }),
+      qc.invalidateQueries({ queryKey: ["order-financials", orderId] }),
+      qc.invalidateQueries({ queryKey: ["service-order", orderId] }),
+    ]);
+  };
 
   const saveMutation = useMutation({
     mutationFn: () => saveReviewFn({ data: { orderId, note: note.trim() || null } }),
     onSuccess: async () => {
       toast.success("Horários revisados e apuração atualizada.");
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
-        qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
-        qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] }),
-        qc.invalidateQueries({ queryKey: ["order-financials", orderId] }),
-        qc.invalidateQueries({ queryKey: ["service-order", orderId] }),
-      ]);
+      await invalidateReview();
       onOpenChange(false);
       onReviewed();
     },
@@ -86,13 +121,14 @@ export function TimeReviewDialog({
       toast.error(error instanceof Error ? error.message : "Não foi possível revisar os horários."),
   });
 
-  const data = reviewQuery.data;
-  const sessions: TimeSession[] = data?.sessions ?? [];
   const technicianName = (id: string | null) =>
     technicians.find((technician) => technician.id === id)?.full_name ?? "Técnico";
-  const totalMinutes = sessions.reduce((total, session) => total + sessionDuration(session), 0);
-  const hasOpenSession = sessions.some((session) => !session.ended_at);
+  const totalMinutes = sessions.reduce((total, session) => total + sessionDurationMinutes(session), 0);
+  const totalSeconds = sessions.reduce((total, session) => total + sessionDurationSeconds(session), 0);
   const canConfirm = !reviewQuery.isPending && !reviewQuery.isError;
+  const eligibleTechnicians = technicians.filter((technician) =>
+    reviewQuery.data?.eligibleTechnicianIds.includes(technician.id),
+  );
 
   return (
     <>
@@ -131,16 +167,14 @@ export function TimeReviewDialog({
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Intervalos
                   </p>
-                  <p className="mt-1 text-lg font-black tabular-nums text-foreground">
-                    {sessions.length}
-                  </p>
+                  <p className="mt-1 text-lg font-black tabular-nums text-foreground">{sessions.length}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Total
                   </p>
                   <p className="mt-1 text-lg font-black tabular-nums text-foreground">
-                    {formatHHmm(totalMinutes)}
+                    {hasOpenSession ? formatClock(totalSeconds) : formatHHmm(totalMinutes)}
                   </p>
                 </div>
                 <div className="col-span-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-1">
@@ -159,44 +193,66 @@ export function TimeReviewDialog({
                 </p>
               )}
 
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Intervalos registrados
+                </p>
+                {eligibleTechnicians.length > 0 && (
+                  <Button type="button" size="sm" variant="secondary" className="gap-1.5" onClick={() => setAddingSession(true)}>
+                    <Plus size={15} /> Adicionar horário
+                  </Button>
+                )}
+              </div>
+
               <div className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-foreground">
-                        {technicianName(session.technician_id)}
-                      </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                        <span>{formatDateHm(session.started_at)}</span>
-                        <span>até</span>
-                        <span>{session.ended_at ? formatDateHm(session.ended_at) : "em andamento"}</span>
-                        <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-                          <Clock3 size={12} /> {formatHHmm(sessionDuration(session))}
-                        </span>
-                      </p>
-                    </div>
-                    {data?.canEditAll ||
-                    (data?.currentTechnicianId &&
-                      session.technician_id === data.currentTechnicianId) ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="shrink-0 gap-1.5"
-                        onClick={() => setEditingSession(session)}
+                {sessions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                    Nenhum intervalo registrado ainda.
+                  </p>
+                ) : (
+                  sessions.map((session) => {
+                    const isRunning = !session.ended_at;
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
                       >
-                        <Pencil size={13} /> Editar
-                      </Button>
-                    ) : (
-                      <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
-                        Somente leitura
-                      </span>
-                    )}
-                  </div>
-                ))}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-foreground">
+                            {technicianName(session.technician_id)}
+                          </p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                            <span>{formatDateHm(session.started_at)}</span>
+                            <span>até</span>
+                            <span>{isRunning ? "em andamento" : formatDateHm(session.ended_at)}</span>
+                            <span className={`inline-flex items-center gap-1 font-semibold ${isRunning ? "text-amber-200" : "text-foreground"}`}>
+                              <Clock3 size={12} />
+                              {isRunning ? formatClock(sessionDurationSeconds(session)) : formatHHmm(sessionDurationMinutes(session))}
+                            </span>
+                            {isRunning && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" aria-label="Cronômetro em andamento" />}
+                          </p>
+                        </div>
+                        {reviewQuery.data?.canEditAll ||
+                        (reviewQuery.data?.currentTechnicianId &&
+                          session.technician_id === reviewQuery.data.currentTechnicianId) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="shrink-0 gap-1.5"
+                            onClick={() => setEditingSession(session)}
+                          >
+                            <Pencil size={13} /> Editar
+                          </Button>
+                        ) : (
+                          <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
+                            Somente leitura
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               <div className="space-y-1">
@@ -234,14 +290,21 @@ export function TimeReviewDialog({
       </Dialog>
 
       <EditTimeSessionSheet
-        open={!!editingSession}
+        open={!!editingSession || addingSession}
         onOpenChange={(nextOpen) => {
-          if (!nextOpen) setEditingSession(null);
+          if (!nextOpen) {
+            setEditingSession(null);
+            setAddingSession(false);
+          }
         }}
         session={editingSession}
         orderId={orderId}
         technicianName={editingSession ? technicianName(editingSession.technician_id) : null}
-        onSaved={() => reviewQuery.refetch()}
+        availableTechnicians={eligibleTechnicians}
+        onSaved={async () => {
+          await invalidateReview();
+          await reviewQuery.refetch();
+        }}
       />
     </>
   );

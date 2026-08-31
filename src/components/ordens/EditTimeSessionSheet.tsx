@@ -22,8 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateOwnTimeSession } from "@/lib/api/timeSessions.functions";
+import { createManualTimeSession, updateOwnTimeSession } from "@/lib/api/timeSessions.functions";
 import { PAUSE_REASONS, type TimeSession } from "@/lib/serviceOrders/timeSessions";
+import type { AssignedTechnician } from "@/types/serviceOrder";
 
 type Props = {
   open: boolean;
@@ -31,13 +32,10 @@ type Props = {
   session: TimeSession | null;
   orderId: string;
   technicianName?: string | null;
+  availableTechnicians?: AssignedTechnician[];
   onSaved?: () => void | Promise<unknown>;
 };
 
-/**
- * Convert an ISO string into `<input type="datetime-local">`-friendly value
- * respecting the user's local timezone (input has no TZ semantics).
- */
 function isoToLocalInput(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -53,19 +51,30 @@ function localInputToIso(value: string): string | null {
   return d.toISOString();
 }
 
+function initialManualStart() {
+  return isoToLocalInput(new Date(Date.now() - 60 * 60 * 1000).toISOString());
+}
+
+function initialManualEnd() {
+  return isoToLocalInput(new Date().toISOString());
+}
+
 export function EditTimeSessionSheet({
   open,
   onOpenChange,
   session,
   orderId,
   technicianName,
+  availableTechnicians = [],
   onSaved,
 }: Props) {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateOwnTimeSession);
-
+  const createFn = useServerFn(createManualTimeSession);
+  const isCreate = !session;
   const [startInput, setStartInput] = useState("");
   const [endInput, setEndInput] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
   const [pauseReason, setPauseReason] = useState<string>("");
   const [pauseNotes, setPauseNotes] = useState<string>("");
   const [reason, setReason] = useState("");
@@ -74,37 +83,64 @@ export function EditTimeSessionSheet({
   const isOpen = session ? !session.ended_at : false;
 
   useEffect(() => {
-    if (!session) return;
-    setStartInput(isoToLocalInput(session.started_at));
-    setEndInput(isoToLocalInput(session.ended_at));
-    setPauseReason(session.pause_reason ?? "");
-    setPauseNotes(session.pause_notes ?? "");
+    if (!open) return;
+    if (session) {
+      setStartInput(isoToLocalInput(session.started_at));
+      setEndInput(isoToLocalInput(session.ended_at));
+      setTechnicianId(session.technician_id ?? "");
+      setPauseReason(session.pause_reason ?? "");
+      setPauseNotes(session.pause_notes ?? "");
+    } else {
+      setStartInput(initialManualStart());
+      setEndInput(initialManualEnd());
+      setTechnicianId(availableTechnicians[0]?.id ?? "");
+      setPauseReason("");
+      setPauseNotes("");
+    }
     setReason("");
-  }, [session?.id, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, open, availableTechnicians]);
 
   const validationError = useMemo(() => {
-    if (!session) return null;
     const startIso = localInputToIso(startInput);
     if (!startIso) return "Informe a data/hora de início.";
+    if (isCreate && !technicianId) return "Selecione o técnico.";
     if (!isOpen) {
       const endIso = localInputToIso(endInput);
       if (!endIso) return "Informe a data/hora de fim.";
       if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
         return "O fim precisa ser maior que o início.";
       }
+      if (new Date(endIso).getTime() - new Date(startIso).getTime() > 14 * 60 * 60 * 1000) {
+        return "Um intervalo não pode passar de 14 horas.";
+      }
+      if (new Date(endIso).getTime() > Date.now() + 60_000) return "O fim não pode estar no futuro.";
     }
+    if (new Date(startIso).getTime() > Date.now() + 60_000) return "O início não pode estar no futuro.";
     if (isPaused && pauseReason === "outro" && !pauseNotes.trim()) {
       return "Descreva o motivo em 'Outro'.";
     }
     if (reason.trim().length < 3) return "Descreva o motivo do ajuste (mín. 3 caracteres).";
     return null;
-  }, [session, startInput, endInput, pauseReason, pauseNotes, reason, isOpen, isPaused]);
+  }, [session, startInput, endInput, technicianId, pauseReason, pauseNotes, reason, isOpen, isPaused, isCreate]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!session) throw new Error("Sessão indisponível.");
       const startIso = localInputToIso(startInput);
       if (!startIso) throw new Error("Início inválido.");
+      if (isCreate) {
+        const endIso = localInputToIso(endInput);
+        if (!endIso || !technicianId) throw new Error("Informe técnico, início e fim.");
+        return createFn({
+          data: {
+            orderId,
+            technicianId,
+            startedAt: startIso,
+            endedAt: endIso,
+            reason: reason.trim(),
+          },
+        });
+      }
+
       const payload: Parameters<typeof updateFn>[0]["data"] = {
         sessionId: session.id,
         startedAt: startIso,
@@ -122,7 +158,7 @@ export function EditTimeSessionSheet({
       return updateFn({ data: payload });
     },
     onSuccess: async () => {
-      toast.success("Horário atualizado. Totais e relatórios recalculados.");
+      toast.success(isCreate ? "Horário adicionado. Totais e relatórios recalculados." : "Horário atualizado. Totais e relatórios recalculados.");
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
         qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
@@ -134,7 +170,7 @@ export function EditTimeSessionSheet({
       onOpenChange(false);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Falha ao atualizar horário");
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar horário");
     },
   });
 
@@ -142,38 +178,49 @@ export function EditTimeSessionSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar horário</DialogTitle>
+          <DialogTitle>{isCreate ? "Adicionar horário" : "Editar horário"}</DialogTitle>
           <DialogDescription>
-            {technicianName ? `Ajustar horário de ${technicianName}.` : "Ajustar horário registrado."}
-            {" "}As alterações recalculam a apuração de horas, os totais e o PDF automaticamente.
+            {isCreate
+              ? "Registre um intervalo trabalhado que faltou no histórico."
+              : technicianName
+                ? `Ajustar horário de ${technicianName}.`
+                : "Ajustar horário registrado."}{" "}
+            As alterações recalculam a apuração de horas, os totais e o PDF automaticamente.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-1">
+          {isCreate && (
+            <div className="space-y-1">
+              <Label>Técnico</Label>
+              <Select value={technicianId} onValueChange={setTechnicianId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o técnico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTechnicians.map((technician) => (
+                    <SelectItem key={technician.id} value={technician.id}>
+                      {technician.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1">
             <Label htmlFor="edit-session-start">Início</Label>
-            <Input
-              id="edit-session-start"
-              type="datetime-local"
-              value={startInput}
-              onChange={(e) => setStartInput(e.target.value)}
-            />
+            <Input id="edit-session-start" type="datetime-local" value={startInput} onChange={(e) => setStartInput(e.target.value)} />
           </div>
 
           {isOpen ? (
             <p className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
-              Esta sessão está em andamento. Você pode corrigir apenas o horário de início. Pause a
-              OS para fechar o intervalo.
+              Esta sessão está em andamento. Você pode corrigir apenas o horário de início. Pause a OS para fechar o intervalo.
             </p>
           ) : (
             <div className="space-y-1">
               <Label htmlFor="edit-session-end">Fim</Label>
-              <Input
-                id="edit-session-end"
-                type="datetime-local"
-                value={endInput}
-                onChange={(e) => setEndInput(e.target.value)}
-              />
+              <Input id="edit-session-end" type="datetime-local" value={endInput} onChange={(e) => setEndInput(e.target.value)} />
             </div>
           )}
 
@@ -182,58 +229,30 @@ export function EditTimeSessionSheet({
               <div className="space-y-1">
                 <Label>Motivo da pausa</Label>
                 <Select value={pauseReason} onValueChange={setPauseReason}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {PAUSE_REASONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
+                    {PAUSE_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="edit-session-pause-notes">
-                  Observações da pausa {pauseReason === "outro" && <span className="text-rose-300">*</span>}
-                </Label>
-                <Textarea
-                  id="edit-session-pause-notes"
-                  rows={2}
-                  value={pauseNotes}
-                  onChange={(e) => setPauseNotes(e.target.value)}
-                  placeholder={pauseReason === "outro" ? "Descreva o motivo" : "Opcional"}
-                />
+                <Label htmlFor="edit-session-pause-notes">Observações da pausa {pauseReason === "outro" && <span className="text-rose-300">*</span>}</Label>
+                <Textarea id="edit-session-pause-notes" rows={2} value={pauseNotes} onChange={(e) => setPauseNotes(e.target.value)} placeholder={pauseReason === "outro" ? "Descreva o motivo" : "Opcional"} />
               </div>
             </>
           )}
 
           <div className="space-y-1">
             <Label htmlFor="edit-session-reason">Motivo do ajuste *</Label>
-            <Textarea
-              id="edit-session-reason"
-              rows={2}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ex.: esqueci de pausar após o almoço"
-            />
-            <p className="text-[10px] text-muted-foreground">
-              O ajuste fica registrado no histórico de auditoria da OS.
-            </p>
+            <Textarea id="edit-session-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: esqueci de registrar este intervalo" />
+            <p className="text-[10px] text-muted-foreground">O ajuste fica registrado no histórico de auditoria da OS.</p>
           </div>
         </div>
 
         <DialogFooter className="gap-2">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>Cancelar</Button>
           <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={mutation.isPending}
-          >
-            Cancelar
-          </Button>
-          <Button
-            disabled={!!validationError || mutation.isPending || !session}
+            disabled={!!validationError || mutation.isPending || (isCreate && availableTechnicians.length === 0)}
             onClick={() => {
               if (validationError) {
                 toast.error(validationError);
@@ -242,14 +261,7 @@ export function EditTimeSessionSheet({
               mutation.mutate();
             }}
           >
-            {mutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando…
-              </>
-            ) : (
-              "Salvar ajuste"
-            )}
+            {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…</> : isCreate ? "Adicionar horário" : "Salvar ajuste"}
           </Button>
         </DialogFooter>
       </DialogContent>

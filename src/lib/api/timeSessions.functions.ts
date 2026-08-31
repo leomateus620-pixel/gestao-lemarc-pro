@@ -530,7 +530,10 @@ export type OrderTimeReview = {
   reviewCompletedAt: string | null;
   pendingCount: number;
   reviewRequired: boolean;
+  /** Técnicos para quem o usuário atual pode lançar um horário manual. */
+  eligibleTechnicianIds: string[];
 };
+
 
 /**
  * Returns the whole team history of the order plus the caller's review scope.
@@ -573,16 +576,163 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
       (session: TimeSession) => !session.technician_reviewed_at || !session.ended_at,
     ).length;
 
+    const currentTechnicianId = (technician?.id as string | undefined) ?? null;
+    const orderTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
+    const eligibleTechnicianIds = isAdmin
+      ? orderTechnicianIds
+      : orderTechnicianIds.filter((id) => id === currentTechnicianId);
+
     return {
       sessions,
-      currentTechnicianId: (technician?.id as string | undefined) ?? null,
+      currentTechnicianId,
       isAdmin,
       canEditAll: isAdmin,
       reviewCompletedAt: (order?.time_review_completed_at as string | null) ?? null,
       pendingCount,
       reviewRequired: sessions.length > 0 && pendingCount > 0,
+      eligibleTechnicianIds,
     };
   });
+
+/** Limite de segurança por lançamento manual, alinhado à derivação de horas. */
+const MAX_MANUAL_SESSION_MINUTES = 14 * 60;
+
+/**
+ * Lançamento manual de um intervalo de trabalho na OS ("+ Adicionar horário").
+ * Admin pode lançar para qualquer técnico da OS; técnico apenas para si.
+ * Após gravar, a apuração de horas é reconciliada para PDF/relatórios seguirem.
+ */
+export const createManualTimeSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: {
+      orderId: string;
+      technicianId: string;
+      startedAt: string;
+      endedAt: string;
+      reason: string;
+    }) => {
+      if (!data?.orderId) throw new Error("OS inválida.");
+      if (!data?.technicianId) throw new Error("Selecione o técnico.");
+      if (!data?.startedAt || !data?.endedAt) throw new Error("Informe início e fim.");
+      if (!data.reason?.trim() || data.reason.trim().length < 3) {
+        throw new Error("Informe um motivo para o lançamento (mín. 3 caracteres).");
+      }
+      return data;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
+    await assertOrderTimeAccess(sb, context.userId, data.orderId);
+
+    const [{ data: isAdminRaw }, { data: order }] = await Promise.all([
+      sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      sb.from("service_orders").select("id, status").eq("id", data.orderId).maybeSingle(),
+    ]);
+    const isAdmin = Boolean(isAdminRaw);
+    if (!order) throw new Error("Ordem de serviço não encontrada.");
+    if (["review", "approved", "cancelled"].includes(order.status)) {
+      throw new Error("Esta OS já foi revisada e não aceita novos horários.");
+    }
+
+    const { data: financial } = await sb
+      .from("service_order_financials")
+      .select("finalized_at")
+      .eq("service_order_id", data.orderId)
+      .maybeSingle();
+    if (financial?.finalized_at) {
+      throw new Error("Esta OS já teve a apuração finalizada pelo administrador.");
+    }
+
+    const assigned = await listOrderTechnicianIds(sb, data.orderId);
+    if (!assigned.includes(data.technicianId)) {
+      throw new Error("Técnico não vinculado a esta OS.");
+    }
+    if (!isAdmin) {
+      const { data: techRow } = await sb
+        .from("technicians")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("active", true)
+        .maybeSingle();
+      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+      if (techRow.id !== data.technicianId) {
+        throw new Error("Você só pode lançar horários para você mesmo.");
+      }
+    }
+
+    const start = new Date(data.startedAt);
+    const end = new Date(data.endedAt);
+    if (Number.isNaN(start.getTime())) throw new Error("Data/hora de início inválida.");
+    if (Number.isNaN(end.getTime())) throw new Error("Data/hora de fim inválida.");
+    if (end.getTime() <= start.getTime()) {
+      throw new Error("O horário de fim precisa ser maior que o de início.");
+    }
+    const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+    if (minutes > MAX_MANUAL_SESSION_MINUTES) {
+      throw new Error("Um intervalo não pode passar de 14 horas.");
+    }
+    const nowMs = Date.now();
+    if (start.getTime() > nowMs + 60_000 || end.getTime() > nowMs + 60_000) {
+      throw new Error("Não é possível lançar horários no futuro.");
+    }
+
+    const { data: siblings, error: sibErr } = await sb
+      .from("service_order_time_sessions")
+      .select("id, started_at, ended_at")
+      .eq("service_order_id", data.orderId)
+      .eq("technician_id", data.technicianId)
+      .eq("kind", "work");
+    if (sibErr) throw new Error(sibErr.message);
+    for (const s of siblings ?? []) {
+      const sStart = new Date(s.started_at).getTime();
+      const sEnd = s.ended_at ? new Date(s.ended_at).getTime() : Number.POSITIVE_INFINITY;
+      if (sStart < end.getTime() && sEnd > start.getTime()) {
+        throw new Error("O horário informado se sobrepõe a outro intervalo deste técnico.");
+      }
+    }
+
+    const writer = await getTimeSessionWriter();
+    const reason = data.reason.trim().slice(0, 500);
+    const { data: inserted, error: insErr } = await writer
+      .from("service_order_time_sessions")
+      .insert({
+        service_order_id: data.orderId,
+        technician_id: data.technicianId,
+        kind: "work",
+        started_at: start.toISOString(),
+        ended_at: end.toISOString(),
+        end_reason: "finish",
+        source: isAdmin ? "admin_adjustment" : "desktop",
+        created_by: context.userId,
+        adjusted_by: context.userId,
+        adjusted_at: new Date().toISOString(),
+        adjustment_reason: reason,
+        metadata: {
+          manual_entry: {
+            at: new Date().toISOString(),
+            by_user_id: context.userId,
+            by_admin: isAdmin,
+            reason,
+          },
+        },
+      })
+      .select(SELECT)
+      .single();
+    if (insErr) throw new Error(insErr.message);
+
+    const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
+    if (laborPending) {
+      await writer.from("service_order_time_sessions").delete().eq("id", inserted.id);
+      throw new Error(laborPending.message);
+    }
+
+    return normalize(inserted);
+  });
+
 
 /**
  * Confirms the recorded time history of the order before signature.
