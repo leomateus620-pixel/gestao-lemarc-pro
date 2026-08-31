@@ -1008,7 +1008,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     }
 
     // Overlap with other work sessions of the same technician on this OS.
-    const { data: siblings, error: sibErr } = await sb
+    const { data: siblings, error: sibErr } = await sessionWriter
       .from("service_order_time_sessions")
       .select("id, started_at, ended_at, kind, technician_id")
       .eq("service_order_id", session.service_order_id)
