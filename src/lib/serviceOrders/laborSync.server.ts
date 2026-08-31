@@ -59,7 +59,10 @@ export async function recomputeOrderFinancials(
   sb: any,
   orderId: string,
   adjustedBy: string | null,
+  /** Client usado para gravar (service role quando o chamador é técnico). */
+  writer?: any,
 ): Promise<void> {
+  const w = writer ?? sb;
   const { data: rows, error } = await sb
     .from("service_order_labor_entries")
     .select("duration_minutes, subtotal_cents")
