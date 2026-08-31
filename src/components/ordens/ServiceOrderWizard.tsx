@@ -538,6 +538,8 @@ function ClientStep({
   units,
   onCreated,
   issues,
+  onContinue,
+  canContinue,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
@@ -556,6 +558,8 @@ function ClientStep({
   }[];
   onCreated: (id: string) => void;
   issues: WizardValidationIssue[];
+  onContinue: () => void;
+  canContinue: boolean;
 }) {
   const queryClient = useQueryClient();
   const createCli = useServerFn(createCompany);
