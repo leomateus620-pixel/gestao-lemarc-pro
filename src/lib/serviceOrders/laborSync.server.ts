@@ -63,7 +63,7 @@ export async function recomputeOrderFinancials(
   writer?: any,
 ): Promise<void> {
   const w = writer ?? sb;
-  const { data: rows, error } = await sb
+  const { data: rows, error } = await w
     .from("service_order_labor_entries")
     .select("duration_minutes, subtotal_cents")
     .eq("service_order_id", orderId);
@@ -77,7 +77,7 @@ export async function recomputeOrderFinancials(
     0,
   );
 
-  const { data: fin } = await sb
+  const { data: fin } = await w
     .from("service_order_financials")
     .select("*")
     .eq("service_order_id", orderId)
@@ -168,7 +168,7 @@ export async function syncLaborEntriesFromSessions(
   const closed = filterMaterializableSessions(closedAll);
 
   // Preserve current rates/role/description so the recompute doesn't zero them out.
-  const { data: existing, error: exErr } = await sb
+  const { data: existing, error: exErr } = await w
     .from("service_order_labor_entries")
     .select("technician_id, role, hourly_rate_cents")
     .eq("service_order_id", orderId);
@@ -410,7 +410,7 @@ export async function reconcileLaborFromSessions(
     await recomputeOrderFinancials(sb, orderId, null, w);
 
     // Verificação: depois de reconciliar, nada do histórico pode continuar fora.
-    const { data: after } = await sb
+    const { data: after } = await w
       .from("service_order_labor_entries")
       .select("technician_id, work_date, start_time, end_time")
       .eq("service_order_id", orderId);
