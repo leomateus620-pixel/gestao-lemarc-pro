@@ -13,6 +13,7 @@ export function AppShell({
   back,
   action,
   hideAction = false,
+  hideTitle = false,
   fullscreenForm,
 }: {
   children: ReactNode;
@@ -20,6 +21,7 @@ export function AppShell({
   back?: boolean;
   action?: ReactNode;
   hideAction?: boolean;
+  hideTitle?: boolean;
   /**
    * Quando true, reserva o espaço inferior só para a barra de ações do
    * formulário (sem BottomNav) e remove o padding extra do menu.
@@ -88,11 +90,13 @@ export function AppShell({
                   </Link>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div
-                    className={`${back ? "block" : "hidden md:block"} truncate font-display text-sm font-bold text-white drop-shadow-sm sm:text-[15px]`}
-                  >
-                    {isHome ? "Gestão Lemarc" : title}
-                  </div>
+                  {!hideTitle && (
+                    <div
+                      className={`${back ? "block" : "hidden md:block"} truncate font-display text-sm font-bold text-white drop-shadow-sm sm:text-[15px]`}
+                    >
+                      {isHome ? "Gestão Lemarc" : title}
+                    </div>
+                  )}
                   <div className="hidden truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300 lg:block">
                     {isHome ? "Central de operação" : role === "gestor" ? "Gestor" : "Campo"} ·{" "}
                     {firstName}

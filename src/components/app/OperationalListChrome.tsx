@@ -75,12 +75,14 @@ export function OperationalPageHeader({
 export function OperationalFilterBar({
   search,
   children,
+  desktopChildren,
   activeCount,
   resultLabel,
   onReset,
 }: {
   search: ReactNode;
   children: ReactNode;
+  desktopChildren?: ReactNode;
   activeCount: number;
   resultLabel: string;
   onReset: () => void;
@@ -92,7 +94,7 @@ export function OperationalFilterBar({
       <div className="lemarc-filter-bar">
         <div className="min-w-0 flex-1">{search}</div>
 
-        <div className="lemarc-filter-controls hidden md:flex">{children}</div>
+        <div className="lemarc-filter-controls hidden md:flex">{desktopChildren ?? children}</div>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>

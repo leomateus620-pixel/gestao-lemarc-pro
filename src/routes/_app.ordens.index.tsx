@@ -162,6 +162,7 @@ function OrdensList() {
         if (!matchesStatus(order, status as StatusFilter)) return false;
         if (priority !== "todas" && order.priority !== priority) return false;
         if (!matchesClient(order, client)) return false;
+        if (!matchesUnit(order, unit)) return false;
         if (!matchesTechnician(order, technician)) return false;
         if (filtro === "alertas" && !isAlert(order)) return false;
         if (filtro === "incompletas" && !isIncomplete(order)) return false;
@@ -187,6 +188,7 @@ function OrdensList() {
     status !== "todas",
     priority !== "todas",
     client !== "all",
+    unit !== "all",
     technician !== "all",
     period !== "all",
     filtro !== "none",
@@ -198,6 +200,7 @@ function OrdensList() {
         status: "todas",
         priority: "todas",
         client: "all",
+        unit: "all",
         technician: "all",
         sort: "recentes",
         period: "all",
@@ -211,7 +214,65 @@ function OrdensList() {
   const primaryFilters = (
     <>
       <MetricPeriodFilter
-        value={perio      <OperationalPageHeader
+        value={period as Period}
+        range={periodRange}
+        onChange={setPeriodWithRange}
+        label="Período"
+        variant="inline"
+        className="lemarc-period-filter"
+      />
+      <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
+        <option value="todas">Status</option>
+        <option value="pendente">Pendentes</option>
+        <option value="andamento">Em campo</option>
+        <option value="revisao">Em revisão</option>
+        <option value="concluida">Finalizadas</option>
+        <option value="cancelada">Canceladas</option>
+      </Select>
+      <Select value={client} onChange={(value) => setSearch({ client: value, unit: "all" })}>
+        <option value="all">Empresa</option>
+        {options.clients.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+      <Select value={unit} onChange={(value) => setSearch({ unit: value })}>
+        <option value="all">Unidade</option>
+        {options.units.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+      <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
+        <option value="all">Técnico</option>
+        {options.technicians.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </Select>
+    </>
+  );
+  const advancedFilters = (
+    <>
+      <Select value={priority} onChange={(value) => setSearch({ priority: value as PriorityFilter })}>
+        <option value="todas">Prioridade</option>
+        <option value="baixa">Baixa</option>
+        <option value="media">Média</option>
+        <option value="alta">Alta</option>
+        <option value="urgente">Urgente</option>
+      </Select>
+      <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
+        <option value="recentes">Mais recentes</option>
+        <option value="status">Status</option>
+        <option value="prioridade">Prioridade</option>
+        <option value="cliente">Empresa</option>
+        <option value="previsao">Previsão de início</option>
+        <option value="maior-tempo">Maior tempo</option>
+        <option value="maior-valor">Maior valor</option>
+      </Select>
+    </>
+  );
+
+  return (
+    <main className="mx-auto max-w-6xl space-y-3 pb-8 xl:max-w-7xl">
+      <OperationalPageHeader
         title="Ordens de serviço"
         action={
           <Link
@@ -247,10 +308,7 @@ function OrdensList() {
         onReset={resetFilters}
         search={
           <div className="relative min-w-0">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               value={q}
               onChange={(event) => setSearch({ q: event.target.value })}
@@ -268,68 +326,6 @@ function OrdensList() {
       >
         {primaryFilters}
         {advancedFilters}
-      </OperationalFilterBar>
-            />
-            <Input
-              value={q}
-              onChange={(event) => setSearch({ q: event.target.value })}
-              placeholder="Buscar OS..."
-              className="lemarc-form-control h-11 rounded-xl pl-9"
-            />
-          </div>
-        }
-      >
-        <MetricPeriodFilter
-          value={period as Period}
-          range={periodRange}
-          onChange={setPeriodWithRange}
-          label="Período"
-          variant="inline"
-          className="lemarc-period-filter"
-        />
-        <Select value={status} onChange={(value) => setSearch({ status: value as StatusFilter })}>
-          <option value="todas">Status</option>
-          <option value="pendente">Pendentes</option>
-          <option value="andamento">Em campo</option>
-          <option value="revisao">Em revisão</option>
-          <option value="concluida">Finalizadas</option>
-          <option value="cancelada">Canceladas</option>
-        </Select>
-        <Select
-          value={priority}
-          onChange={(value) => setSearch({ priority: value as PriorityFilter })}
-        >
-          <option value="todas">Prioridade</option>
-          <option value="baixa">Baixa</option>
-          <option value="media">Média</option>
-          <option value="alta">Alta</option>
-          <option value="urgente">Urgente</option>
-        </Select>
-        <Select value={client} onChange={(value) => setSearch({ client: value })}>
-          <option value="all">Cliente</option>
-          {options.clients.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={technician} onChange={(value) => setSearch({ technician: value })}>
-          <option value="all">Técnico</option>
-          {options.technicians.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={sort} onChange={(value) => setSearch({ sort: value as SortMode })}>
-          <option value="recentes">Mais recentes</option>
-          <option value="status">Status</option>
-          <option value="prioridade">Prioridade</option>
-          <option value="cliente">Cliente</option>
-          <option value="previsao">Previsão de início</option>
-          <option value="maior-tempo">Maior tempo</option>
-          <option value="maior-valor">Maior valor</option>
-        </Select>
       </OperationalFilterBar>
 
       {filtro !== "none" && (
