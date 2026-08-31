@@ -167,6 +167,30 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+async function reconcileLaborOrThrow(
+  sb: any,
+  writer: any,
+  orderId: string,
+  userId: string,
+): Promise<void> {
+  const { reconcileLaborFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
+  let outcome = await reconcileLaborFromSessions(sb, orderId, userId, writer);
+  if (outcome.failed) {
+    outcome = await reconcileLaborFromSessions(sb, orderId, userId, writer);
+  }
+  if (outcome.failed) {
+    console.error("[labor-reconcile] pendência não incorporada", {
+      orderId,
+      pendingMinutes: outcome.pendingMinutes,
+      error: outcome.error,
+    });
+    throw new Error(
+      outcome.error ??
+        `Não foi possível atualizar a apuração de horas (${outcome.pendingMinutes} min pendentes).`,
+    );
+  }
+}
+
 /** Técnicos vinculados à OS (inclui o principal da própria OS). */
 async function listOrderTechnicianIds(sb: any, orderId: string): Promise<string[]> {
   const [{ data: links }, { data: order }] = await Promise.all([
@@ -296,27 +320,11 @@ export const pauseWork = createServerFn({ method: "POST" })
     if (result.succeeded.length === 0 && result.skipped.length === 0) {
       throw new Error(result.failed[0]?.message ?? "Nenhuma sessão ativa para pausar.");
     }
-    // Keep the order totals coherent right after the pause (best-effort),
-    // including multi-day work where the labor rows already existed.
-    try {
-      const { reconcileLaborFromSessions } = await import(
-        "@/lib/serviceOrders/laborSync.server"
-      );
-      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
-      // horas do histórico fora da apuração até alguém abrir a tela.
-      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      if (outcome.failed) {
-        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      }
-      if (outcome.failed) {
-        console.error("[labor-reconcile] pendência não incorporada", {
-          orderId: data.orderId,
-          pendingMinutes: outcome.pendingMinutes,
-          error: outcome.error,
-        });
-      }
-    } catch {
-      /* non-blocking */
+    if (result.succeeded.length > 0) {
+      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+    }
+    if (result.failed.length > 0) {
+      throw new Error(result.failed[0]?.message ?? "Não foi possível pausar todos os tempos.");
     }
     try {
       const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
@@ -385,6 +393,12 @@ export const resumeWork = createServerFn({ method: "POST" })
     if (result.succeeded.length === 0 && result.skipped.length === 0) {
       throw new Error(result.failed[0]?.message ?? "Não há pausa ativa para retomar.");
     }
+    if (result.succeeded.length > 0) {
+      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+    }
+    if (result.failed.length > 0) {
+      throw new Error(result.failed[0]?.message ?? "Não foi possível retomar todos os tempos.");
+    }
     return result;
   });
 
@@ -425,25 +439,11 @@ export const finishWork = createServerFn({ method: "POST" })
         result.failed[0]?.message ?? "Nenhum tempo em aberto foi encontrado para encerrar.",
       );
     }
-    try {
-      const { reconcileLaborFromSessions } = await import(
-        "@/lib/serviceOrders/laborSync.server"
-      );
-      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
-      // horas do histórico fora da apuração até alguém abrir a tela.
-      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      if (outcome.failed) {
-        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      }
-      if (outcome.failed) {
-        console.error("[labor-reconcile] pendência não incorporada", {
-          orderId: data.orderId,
-          pendingMinutes: outcome.pendingMinutes,
-          error: outcome.error,
-        });
-      }
-    } catch {
-      /* non-blocking */
+    if (result.succeeded.length > 0) {
+      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+    }
+    if (result.failed.length > 0) {
+      throw new Error(result.failed[0]?.message ?? "Não foi possível encerrar todos os tempos.");
     }
     let openTimeAlert = null as Awaited<
       ReturnType<typeof import("@/lib/api/notifications.functions").syncServiceOrderOpenTimeAlerts>
@@ -486,8 +486,9 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!assigned) throw new Error("Técnico não vinculado a esta OS.");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any)
+    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
+      .getTimeSessionWriter();
+    const { error } = await writer
       .from("service_order_time_sessions")
       .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
       .eq("service_order_id", data.orderId)
@@ -496,26 +497,7 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       .is("ended_at", null);
     if (error) throw new Error(error.message);
 
-    try {
-      const { reconcileLaborFromSessions } = await import(
-        "@/lib/serviceOrders/laborSync.server"
-      );
-      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
-      // horas do histórico fora da apuração até alguém abrir a tela.
-      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      if (outcome.failed) {
-        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-      }
-      if (outcome.failed) {
-        console.error("[labor-reconcile] pendência não incorporada", {
-          orderId: data.orderId,
-          pendingMinutes: outcome.pendingMinutes,
-          error: outcome.error,
-        });
-      }
-    } catch {
-      /* non-blocking */
-    }
+    await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
     try {
       const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
       await syncServiceOrderOpenTimeAlerts({
@@ -636,12 +618,7 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
-    const { reconcileLaborFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
-    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-    if (outcome.failed) outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-    if (outcome.failed) {
-      throw new Error("Os horários foram revisados, mas a apuração ainda está pendente. Tente novamente.");
-    }
+    await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
     return { ok: true, reviewedAt, closedSessions: openIds.length };
   });
 
@@ -790,9 +767,18 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     if (ordErr) throw new Error(ordErr.message);
     if (!order) throw new Error("Ordem de serviço não encontrada.");
 
-    const lockedStatuses = ["finished", "review", "approved", "cancelled"];
+    const lockedStatuses = ["review", "approved", "cancelled"];
     if (lockedStatuses.includes(order.status)) {
-      throw new Error("Esta OS já foi encerrada e não pode ser editada.");
+      throw new Error("Esta OS já foi revisada e não pode ser editada.");
+    }
+
+    const { data: financial } = await sb
+      .from("service_order_financials")
+      .select("finalized_at")
+      .eq("service_order_id", order.id)
+      .maybeSingle();
+    if (financial?.finalized_at) {
+      throw new Error("Esta OS já teve a apuração finalizada pelo administrador.");
     }
 
     if (!isAdmin && callerTechnicianId) {
@@ -931,7 +917,14 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     const { syncLaborEntriesFromSessions } = await import(
       "@/lib/serviceOrders/laborSync.server"
     );
-    const outcome = await syncLaborEntriesFromSessions(sb, session.service_order_id, userId);
+    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
+      .getTimeSessionWriter();
+    const outcome = await syncLaborEntriesFromSessions(
+      sb,
+      session.service_order_id,
+      userId,
+      writer,
+    );
     if (!outcome.synced) {
       throw new Error(
         "Esta OS está com apuração consolidada pelo administrador. Solicite o ajuste ao gestor.",

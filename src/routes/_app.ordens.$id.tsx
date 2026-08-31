@@ -221,14 +221,17 @@ function OrdemDetalhe() {
       return;
     }
     try {
-      // Encerra qualquer cronômetro aberto antes de mudar o status.
-      // Encerra o tempo de toda a equipe da OS.
+      // O servidor encerra os cronômetros e confirma a apuração antes de
+      // permitir que a OS avance para `finished`.
       await finishWorkFn({ data: { orderId } });
+      mutation.mutate("finished");
     } catch (e) {
-      // Não bloqueia a finalização se não houver sessão aberta.
-      void e;
+      toastFn.error(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível encerrar os horários da equipe. A OS não foi finalizada.",
+      );
     }
-    mutation.mutate("finished");
   }
 
   // Técnico não avança além de "finished". Também não abre a apuração financeira.

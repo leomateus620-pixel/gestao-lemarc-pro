@@ -59,8 +59,11 @@ export async function recomputeOrderFinancials(
   sb: any,
   orderId: string,
   adjustedBy: string | null,
+  /** Client usado para gravar (service role quando o chamador é técnico). */
+  writer?: any,
 ): Promise<void> {
-  const { data: rows, error } = await sb
+  const w = writer ?? sb;
+  const { data: rows, error } = await w
     .from("service_order_labor_entries")
     .select("duration_minutes, subtotal_cents")
     .eq("service_order_id", orderId);
@@ -74,7 +77,7 @@ export async function recomputeOrderFinancials(
     0,
   );
 
-  const { data: fin } = await sb
+  const { data: fin } = await w
     .from("service_order_financials")
     .select("*")
     .eq("service_order_id", orderId)
@@ -92,7 +95,7 @@ export async function recomputeOrderFinancials(
     patch.labor_entries_adjusted_at = new Date().toISOString();
     patch.labor_entries_adjusted_by = adjustedBy;
   }
-  const { error: upErr } = await sb
+  const { error: upErr } = await w
     .from("service_order_financials")
     .upsert(patch, { onConflict: "service_order_id" });
   if (upErr) throw new Error(upErr.message);
@@ -101,7 +104,7 @@ export async function recomputeOrderFinancials(
     totalLaborMinutes > 0
       ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
       : null;
-  await sb
+  await w
     .from("service_orders")
     .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
     .eq("id", orderId);
@@ -118,7 +121,9 @@ export async function syncLaborEntriesFromSessions(
   sb: any,
   orderId: string,
   syncedByUserId: string,
+  writer?: any,
 ): Promise<LaborSyncOutcome> {
+  const w = writer ?? sb;
   const [{ data: fin }, { data: order }] = await Promise.all([
     sb
       .from("service_order_financials")
@@ -163,7 +168,7 @@ export async function syncLaborEntriesFromSessions(
   const closed = filterMaterializableSessions(closedAll);
 
   // Preserve current rates/role/description so the recompute doesn't zero them out.
-  const { data: existing, error: exErr } = await sb
+  const { data: existing, error: exErr } = await w
     .from("service_order_labor_entries")
     .select("technician_id, role, hourly_rate_cents")
     .eq("service_order_id", orderId);
@@ -234,18 +239,18 @@ export async function syncLaborEntriesFromSessions(
   }
 
 
-  const { error: delErr } = await sb
+  const { error: delErr } = await w
     .from("service_order_labor_entries")
     .delete()
     .eq("service_order_id", orderId);
   if (delErr) throw new Error(delErr.message);
 
   if (inserts.length > 0) {
-    const { error: insErr } = await sb.from("service_order_labor_entries").insert(inserts);
+    const { error: insErr } = await w.from("service_order_labor_entries").insert(inserts);
     if (insErr) throw new Error(insErr.message);
   }
 
-  await recomputeOrderFinancials(sb, orderId, null);
+  await recomputeOrderFinancials(sb, orderId, null, w);
 
   const totalLaborMinutes = inserts.reduce(
     (a, r) => a + Number(r.duration_minutes ?? 0),
@@ -271,7 +276,14 @@ export async function reconcileLaborFromSessions(
   sb: any,
   orderId: string,
   userId: string | null,
+  /**
+   * Client de gravação. Técnicos não têm permissão de escrita em
+   * `service_order_labor_entries`, então as ações de tempo passam aqui o
+   * writer com credencial de serviço (a autorização já foi feita antes).
+   */
+  writer?: any,
 ): Promise<ReconcileOutcome> {
+  const w = writer ?? sb;
   try {
     const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
       sb
@@ -283,7 +295,7 @@ export async function reconcileLaborFromSessions(
         .eq("kind", "work")
         .not("ended_at", "is", null)
         .order("started_at", { ascending: true }),
-      sb
+      w
         .from("service_order_labor_entries")
         .select("technician_id, role, hourly_rate_cents, work_date, start_time, end_time")
         .eq("service_order_id", orderId),
@@ -381,10 +393,11 @@ export async function reconcileLaborFromSessions(
           entry_source: "session_sync",
         };
       });
-      const { error: insErr } = await sb
+      const { error: insErr } = await w
         .from("service_order_labor_entries")
         .insert(inserts);
       if (insErr) {
+        console.error("[laborSync] insert falhou", orderId, insErr.message);
         return {
           appended: 0,
           pendingMinutes: missing.reduce((a, m) => a + m.duration_minutes, 0),
@@ -394,10 +407,10 @@ export async function reconcileLaborFromSessions(
       }
     }
 
-    await recomputeOrderFinancials(sb, orderId, null);
+    await recomputeOrderFinancials(sb, orderId, null, w);
 
     // Verificação: depois de reconciliar, nada do histórico pode continuar fora.
-    const { data: after } = await sb
+    const { data: after } = await w
       .from("service_order_labor_entries")
       .select("technician_id, work_date, start_time, end_time")
       .eq("service_order_id", orderId);
