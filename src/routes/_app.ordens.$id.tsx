@@ -39,6 +39,7 @@ import {
   setServiceOrderTechnicians,
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
+import { AddOrderTechniciansDialog } from "@/components/ordens/AddOrderTechniciansDialog";
 import {
   getOrderFinancials,
   reconcileOrderLabor,
@@ -215,16 +216,18 @@ function OrdemDetalhe() {
   const alreadyFinalized = Boolean(financialsData?.financials?.finalized_at);
 
   async function handleTecnicoFinish() {
-    const orderId = order!.id;
-    if (!hasSignature) {
-      setTimeReviewOpen(true);
-      return;
-    }
+    const orderId = order.id;
+    // A revisão sempre vem antes da finalização. Ela não encerra os cronômetros;
+    // o encerramento acontece somente depois que a etapa final for autorizada.
+    setTimeReviewOpen(true);
+  }
+
+  async function finishTechnicianOrder() {
     try {
       // O servidor encerra os cronômetros e materializa a apuração antes de
       // permitir que a OS avance para `finished`. Se o encerramento falhar,
       // o status não muda.
-      const res = await finishWorkFn({ data: { orderId } });
+      const res = await finishWorkFn({ data: { orderId: order.id } });
       if (res?.laborPending) {
         toastFn.warning(
           `Horários encerrados, mas ${res.laborPending.minutes} min ainda não entraram na apuração. Avise o administrador.`,

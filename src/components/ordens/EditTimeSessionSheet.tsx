@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -109,7 +108,6 @@ export function EditTimeSessionSheet({
       setTechnicianId(defaultTechnicianId);
       setPauseReason("");
     }
-    // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
     // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
     // não podem reinicializar valores que o usuário já digitou.
     // eslint-disable-next-line react-hooks/exhaustive-deps
