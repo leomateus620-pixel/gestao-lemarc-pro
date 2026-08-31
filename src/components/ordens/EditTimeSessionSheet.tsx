@@ -31,6 +31,7 @@ type Props = {
   session: TimeSession | null;
   orderId: string;
   technicianName?: string | null;
+  onSaved?: () => void | Promise<unknown>;
 };
 
 /**
@@ -58,6 +59,7 @@ export function EditTimeSessionSheet({
   session,
   orderId,
   technicianName,
+  onSaved,
 }: Props) {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateOwnTimeSession);
@@ -119,11 +121,16 @@ export function EditTimeSessionSheet({
       }
       return updateFn({ data: payload });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Horário atualizado. Totais e relatórios recalculados.");
-      qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] });
-      qc.invalidateQueries({ queryKey: ["order-financials", orderId] });
-      qc.invalidateQueries({ queryKey: ["service-order", orderId] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-financials", orderId] }),
+        qc.invalidateQueries({ queryKey: ["service-order", orderId] }),
+      ]);
+      await onSaved?.();
       onOpenChange(false);
     },
     onError: (err) => {

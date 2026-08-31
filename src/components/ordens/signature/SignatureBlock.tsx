@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertCircle, Eye, PenLine, ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
@@ -16,10 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useAuth } from "@/components/app/AuthContext";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { waiveServiceOrderSignature } from "@/lib/api/signatures.functions";
-import { getOrderTimeReview } from "@/lib/api/timeSessions.functions";
 import { SignatureCaptureDialog } from "./SignatureCaptureDialog";
 import { TimeReviewDialog } from "../TimeReviewDialog";
 
@@ -40,29 +38,14 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
   const [waiveOpen, setWaiveOpen] = useState(false);
   const sig = order.signature ?? null;
   const hasWaiver = Boolean(order.signature_waiver_reason);
-  const { isAdmin, isTecnico } = useUserRole();
-  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
-  const isAssignedTechnician =
-    isTecnico && technicians.some((technician) => technician.user_id === user?.id);
-  // Admin e técnico da OS passam pela revisão de horas antes da assinatura.
-  const canReviewTime = isAdmin || isAssignedTechnician;
-
-  const reviewFn = useServerFn(getOrderTimeReview);
-  const reviewStateQuery = useQuery({
-    queryKey: ["order-time-review-state", order.id],
-    queryFn: () => reviewFn({ data: { orderId: order.id } }),
-    enabled: canReviewTime,
-    staleTime: 10_000,
-  });
-  const reviewRequired = reviewStateQuery.data?.reviewRequired ?? false;
 
   function startSignature() {
-    if (canReviewTime && (reviewStateQuery.isPending || reviewRequired)) {
-      setTimeReviewOpen(true);
-      return;
-    }
-    setCaptureOpen(true);
+    // A revisão é sempre a primeira etapa. A autorização real é validada no
+    // servidor; não dependa do vínculo local user_id, que pode estar ausente.
+    setCaptureOpen(false);
+    setTimeReviewOpen(true);
   }
 
 

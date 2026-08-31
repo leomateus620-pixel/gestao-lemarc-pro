@@ -649,14 +649,18 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
+    const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
+    if (laborPending) {
+      throw new Error(laborPending.message);
+    }
+
     const { error: orderError } = await writer
       .from("service_orders")
       .update({ time_review_completed_at: reviewedAt, time_review_completed_by: context.userId })
       .eq("id", data.orderId);
     if (orderError) throw new Error(orderError.message);
 
-    const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
-    return { ok: true, skipped: false, reviewedAt, closedSessions: openIds.length, laborPending };
+    return { ok: true, skipped: false, reviewedAt, closedSessions: openIds.length, laborPending: null };
   });
 
 export type OrderLaborOverride = {

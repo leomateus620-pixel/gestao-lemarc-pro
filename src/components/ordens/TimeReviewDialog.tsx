@@ -70,13 +70,15 @@ export function TimeReviewDialog({
 
   const saveMutation = useMutation({
     mutationFn: () => saveReviewFn({ data: { orderId, note: note.trim() || null } }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Horários revisados e apuração atualizada.");
-      qc.invalidateQueries({ queryKey: ["order-time-review", orderId] });
-      qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] });
-      qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] });
-      qc.invalidateQueries({ queryKey: ["order-financials", orderId] });
-      qc.invalidateQueries({ queryKey: ["service-order", orderId] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] }),
+        qc.invalidateQueries({ queryKey: ["order-financials", orderId] }),
+        qc.invalidateQueries({ queryKey: ["service-order", orderId] }),
+      ]);
       onOpenChange(false);
       onReviewed();
     },
@@ -239,6 +241,7 @@ export function TimeReviewDialog({
         session={editingSession}
         orderId={orderId}
         technicianName={editingSession ? technicianName(editingSession.technician_id) : null}
+        onSaved={() => reviewQuery.refetch()}
       />
     </>
   );
