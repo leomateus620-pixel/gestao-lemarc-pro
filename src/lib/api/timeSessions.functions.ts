@@ -918,8 +918,13 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       _role: "admin",
     });
 
-    // Load the session (RLS lets the owner or admin see it).
-    const { data: sessionRaw, error: sessErr } = await sb
+    const { getTimeSessionWriter, assertOrderTimeAccess } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
+    // Read with the service credential; authorization happens right after and
+    // is scoped to the session's own order.
+    const sessionWriter = await getTimeSessionWriter();
+    const { data: sessionRaw, error: sessErr } = await sessionWriter
       .from("service_order_time_sessions")
       .select(SELECT)
       .eq("id", data.sessionId)
@@ -932,22 +937,10 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       throw new Error("Apenas sessões de trabalho podem ser editadas por aqui.");
     }
 
-    // Resolve caller technician id.
-    let callerTechnicianId: string | null = null;
-    if (!isAdmin) {
-      const { data: techRow, error: techErr } = await sb
-        .from("technicians")
-        .select("id, active")
-        .eq("user_id", userId)
-        .eq("active", true)
-        .maybeSingle();
-      if (techErr) throw new Error(techErr.message);
-      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
-      callerTechnicianId = techRow.id as string;
-      if (session.technician_id !== callerTechnicianId) {
-        throw new Error("Você só pode editar seus próprios horários.");
-      }
-    }
+    // Admin, or any technician assigned to this OS, may adjust the team hours
+    // of that OS (including a colleague's interval).
+    await assertOrderTimeAccess(sb, userId, session.service_order_id);
+
 
     // Load the order to gate by status and confirm assignment for non-admins.
     const { data: order, error: ordErr } = await sb
