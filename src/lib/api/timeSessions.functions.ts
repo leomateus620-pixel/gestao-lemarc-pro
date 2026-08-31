@@ -794,7 +794,7 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("id", data.orderId);
     if (orderError) throw new Error(orderError.message);
 
-    return { ok: true, skipped: false, reviewedAt, closedSessions: openIds.length, laborPending: null };
+    return { ok: true, skipped: false, reviewedAt, closedSessions: 0, laborPending: null };
   });
 
 export type OrderLaborOverride = {
