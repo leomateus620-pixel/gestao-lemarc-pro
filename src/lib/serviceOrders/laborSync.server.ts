@@ -391,10 +391,11 @@ export async function reconcileLaborFromSessions(
           entry_source: "session_sync",
         };
       });
-      const { error: insErr } = await sb
+      const { error: insErr } = await w
         .from("service_order_labor_entries")
         .insert(inserts);
       if (insErr) {
+        console.error("[laborSync] insert falhou", orderId, insErr.message);
         return {
           appended: 0,
           pendingMinutes: missing.reduce((a, m) => a + m.duration_minutes, 0),
@@ -404,7 +405,7 @@ export async function reconcileLaborFromSessions(
       }
     }
 
-    await recomputeOrderFinancials(sb, orderId, null);
+    await recomputeOrderFinancials(sb, orderId, null, w);
 
     // Verificação: depois de reconciliar, nada do histórico pode continuar fora.
     const { data: after } = await sb
