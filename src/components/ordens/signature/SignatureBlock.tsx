@@ -130,7 +130,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
                   size="sm"
                   variant="ghost"
                   className="gap-1.5 text-[11px]"
-                  onClick={() => setCaptureOpen(true)}
+                  onClick={startSignature}
                 >
                   <PenLine size={13} /> Substituir
                 </Button>
