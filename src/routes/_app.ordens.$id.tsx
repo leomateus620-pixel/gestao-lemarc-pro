@@ -728,6 +728,10 @@ function FinancialBlock({
         </div>
       </Section>
       <Section title="Apuração de horas" icon={Calculator}>
+        <PendingLaborBanner
+          orderId={order.id}
+          pendingMinutes={data.laborPendingMinutes ?? 0}
+        />
         <LaborEntriesEditor order={order} entries={entries} />
         {canReview && (
           <div className="mt-4 flex justify-end border-t border-white/10 pt-4">
