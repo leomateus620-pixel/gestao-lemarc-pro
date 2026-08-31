@@ -226,7 +226,7 @@ function OrdemDetalhe() {
       // O servidor encerra os cronômetros e materializa a apuração antes de
       // permitir que a OS avance para `finished`. Se o encerramento falhar,
       // o status não muda.
-      const res = await finishWorkFn({ data: { orderId: order.id } });
+      const res = await finishWorkFn({ data: { orderId: id } });
       if (res?.laborPending) {
         toastFn.warning(
           `Horários encerrados, mas ${res.laborPending.minutes} min ainda não entraram na apuração. Avise o administrador.`,
