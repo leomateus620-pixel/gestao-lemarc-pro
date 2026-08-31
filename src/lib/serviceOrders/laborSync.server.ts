@@ -274,7 +274,14 @@ export async function reconcileLaborFromSessions(
   sb: any,
   orderId: string,
   userId: string | null,
+  /**
+   * Client de gravação. Técnicos não têm permissão de escrita em
+   * `service_order_labor_entries`, então as ações de tempo passam aqui o
+   * writer com credencial de serviço (a autorização já foi feita antes).
+   */
+  writer?: any,
 ): Promise<ReconcileOutcome> {
+  const w = writer ?? sb;
   try {
     const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
       sb
