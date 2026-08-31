@@ -42,7 +42,28 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
   const { isAdmin, isTecnico } = useUserRole();
   const { user } = useAuth();
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
-  const isAssignedTechnician = isTecnico && technicians.some((technician) => technician.user_id === user?.id);
+  const isAssignedTechnician =
+    isTecnico && technicians.some((technician) => technician.user_id === user?.id);
+  // Admin e técnico da OS passam pela revisão de horas antes da assinatura.
+  const canReviewTime = isAdmin || isAssignedTechnician;
+
+  const reviewFn = useServerFn(getOrderTimeReview);
+  const reviewStateQuery = useQuery({
+    queryKey: ["order-time-review-state", order.id],
+    queryFn: () => reviewFn({ data: { orderId: order.id } }),
+    enabled: canReviewTime,
+    staleTime: 10_000,
+  });
+  const reviewRequired = reviewStateQuery.data?.reviewRequired ?? false;
+
+  function startSignature() {
+    if (canReviewTime && (reviewStateQuery.isPending || reviewRequired)) {
+      setTimeReviewOpen(true);
+      return;
+    }
+    setCaptureOpen(true);
+  }
+
 
   return (
     <section className="mt-5">
