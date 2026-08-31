@@ -154,7 +154,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => (isAssignedTechnician ? setTimeReviewOpen(true) : setCaptureOpen(true))}
+                onClick={startSignature}
                 className="gap-2 bg-primary text-primary-foreground"
               >
                 <PenLine size={15} /> Coletar assinatura
