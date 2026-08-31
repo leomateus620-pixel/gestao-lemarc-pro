@@ -295,7 +295,7 @@ export async function reconcileLaborFromSessions(
         .eq("kind", "work")
         .not("ended_at", "is", null)
         .order("started_at", { ascending: true }),
-      sb
+      w
         .from("service_order_labor_entries")
         .select("technician_id, role, hourly_rate_cents, work_date, start_time, end_time")
         .eq("service_order_id", orderId),
