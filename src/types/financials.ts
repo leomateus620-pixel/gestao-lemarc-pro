@@ -18,6 +18,8 @@ export type LaborEntry = {
   hourly_rate_cents: number;
   subtotal_cents: number;
   description: string | null;
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
   technician?: { id: string; full_name: string; role: string | null } | null;
 };
 

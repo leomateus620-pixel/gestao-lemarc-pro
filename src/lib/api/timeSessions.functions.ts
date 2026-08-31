@@ -11,7 +11,8 @@ const SELECT = `
   id, service_order_id, technician_id, kind, started_at, ended_at,
   duration_minutes, pause_reason, pause_notes, end_reason, source,
   notes, metadata, created_by, created_at, updated_at,
-  adjusted_by, adjusted_at, adjustment_reason
+  adjusted_by, adjusted_at, adjustment_reason,
+  technician_reviewed_at, technician_reviewed_by, technician_review_note
 `;
 
 const DASHBOARD_LABOR_SELECT = `
@@ -40,6 +41,9 @@ function normalize(row: any): TimeSession {
     adjusted_by: row.adjusted_by ?? null,
     adjusted_at: row.adjusted_at ?? null,
     adjustment_reason: row.adjustment_reason ?? null,
+    technician_reviewed_at: row.technician_reviewed_at ?? null,
+    technician_reviewed_by: row.technician_reviewed_by ?? null,
+    technician_review_note: row.technician_review_note ?? null,
   };
 }
 
@@ -524,6 +528,121 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       /* non-blocking */
     }
     return { ok: true };
+  });
+
+export type OrderTimeReview = {
+  sessions: TimeSession[];
+  currentTechnicianId: string;
+};
+
+/** Returns the complete team history and the caller's technician identity. */
+export const getOrderTimeReview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string }) => data)
+  .handler(async ({ data, context }): Promise<OrderTimeReview> => {
+    const sb = context.supabase as any;
+    const { data: technician, error: technicianError } = await sb
+      .from("technicians")
+      .select("id, user_id, active")
+      .eq("user_id", context.userId)
+      .eq("active", true)
+      .maybeSingle();
+    if (technicianError) throw new Error(technicianError.message);
+    if (!technician?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+
+    const assigned = await listOrderTechnicianIds(sb, data.orderId);
+    if (!assigned.includes(technician.id)) {
+      throw new Error("Você não está vinculado a esta OS.");
+    }
+
+    const { data: rows, error } = await sb
+      .from("service_order_time_sessions")
+      .select(SELECT)
+      .eq("service_order_id", data.orderId)
+      .eq("kind", "work")
+      .order("started_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return {
+      sessions: (rows ?? []).map(normalize),
+      currentTechnicianId: technician.id as string,
+    };
+  });
+
+/**
+ * Confirms the signed-in technician's own time history before signature.
+ * Open work intervals are closed at this exact confirmation moment, then the
+ * same reconciliation path updates the admin review, totals and reports.
+ */
+export const saveOrderTimeReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; note?: string | null }) => {
+    if (!data?.orderId) throw new Error("OS inválida.");
+    if (data.note && data.note.length > 500) throw new Error("Observação muito longa.");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: technician, error: technicianError } = await sb
+      .from("technicians")
+      .select("id, active")
+      .eq("user_id", context.userId)
+      .eq("active", true)
+      .maybeSingle();
+    if (technicianError) throw new Error(technicianError.message);
+    if (!technician?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+
+    const assigned = await listOrderTechnicianIds(sb, data.orderId);
+    if (!assigned.includes(technician.id)) throw new Error("Você não está vinculado a esta OS.");
+
+    const { data: ownSessions, error: sessionsError } = await sb
+      .from("service_order_time_sessions")
+      .select("id, started_at, ended_at")
+      .eq("service_order_id", data.orderId)
+      .eq("technician_id", technician.id)
+      .eq("kind", "work");
+    if (sessionsError) throw new Error(sessionsError.message);
+    if (!ownSessions || ownSessions.length === 0) {
+      throw new Error("Nenhum horário seu foi registrado nesta OS.");
+    }
+
+    const reviewedAt = new Date().toISOString();
+    const openIds = (ownSessions as { id: string; started_at: string; ended_at: string | null }[])
+      .filter((session) => !session.ended_at)
+      .map((session) => session.id);
+    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server")).getTimeSessionWriter();
+    if (openIds.length > 0) {
+      const { error: closeError } = await writer
+        .from("service_order_time_sessions")
+        .update({
+          ended_at: reviewedAt,
+          end_reason: "finish",
+          adjusted_by: context.userId,
+          adjusted_at: reviewedAt,
+          adjustment_reason: "Intervalo encerrado na revisão do técnico antes da assinatura",
+        })
+        .in("id", openIds);
+      if (closeError) throw new Error(closeError.message);
+    }
+
+    const { error: reviewError } = await writer
+      .from("service_order_time_sessions")
+      .update({
+        technician_reviewed_at: reviewedAt,
+        technician_reviewed_by: context.userId,
+        technician_review_note: data.note?.trim() || null,
+      })
+      .eq("service_order_id", data.orderId)
+      .eq("technician_id", technician.id)
+      .eq("kind", "work");
+    if (reviewError) throw new Error(reviewError.message);
+
+    const { reconcileLaborFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
+    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    if (outcome.failed) outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    if (outcome.failed) {
+      throw new Error("Os horários foram revisados, mas a apuração ainda está pendente. Tente novamente.");
+    }
+    return { ok: true, reviewedAt, closedSessions: openIds.length };
   });
 
 export type OrderLaborOverride = {

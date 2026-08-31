@@ -23,6 +23,8 @@ type ClosedSession = {
   started_at: string;
   ended_at: string;
   duration_minutes: number;
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
 };
 
 type TechInfo = {
@@ -136,7 +138,7 @@ export async function syncLaborEntriesFromSessions(
 
   const { data: sessionsRaw, error: sessErr } = await sb
     .from("service_order_time_sessions")
-    .select("id, technician_id, kind, started_at, ended_at, duration_minutes")
+    .select("id, technician_id, kind, started_at, ended_at, duration_minutes, technician_reviewed_at, technician_reviewed_by")
     .eq("service_order_id", orderId)
     .eq("kind", "work")
     .not("ended_at", "is", null)

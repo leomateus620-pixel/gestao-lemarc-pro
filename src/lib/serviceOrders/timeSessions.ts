@@ -33,6 +33,9 @@ export type TimeSession = {
   adjusted_by?: string | null;
   adjusted_at?: string | null;
   adjustment_reason?: string | null;
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
+  technician_review_note?: string | null;
 };
 
 export type TechnicianTimeState = {

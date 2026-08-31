@@ -128,6 +128,8 @@ export type ServiceOrder = {
   closed_at: string | null;
   hour_rate: number | null;
   worked_minutes: number | null;
+  time_review_completed_at?: string | null;
+  time_review_completed_by?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

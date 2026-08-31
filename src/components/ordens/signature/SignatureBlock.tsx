@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertCircle, Eye, PenLine, ShieldCheck, ShieldOff } from "lucide-react";
@@ -16,8 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/components/app/AuthContext";
+import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { waiveServiceOrderSignature } from "@/lib/api/signatures.functions";
 import { SignatureCaptureDialog } from "./SignatureCaptureDialog";
+import { TimeReviewDialog } from "../TimeReviewDialog";
 
 function fmtDateTime(iso: string) {
   const d = new Date(iso);
@@ -31,11 +34,15 @@ function fmtDateTime(iso: string) {
 
 export function SignatureBlock({ order }: { order: ServiceOrder }) {
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [timeReviewOpen, setTimeReviewOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [waiveOpen, setWaiveOpen] = useState(false);
   const sig = order.signature ?? null;
   const hasWaiver = Boolean(order.signature_waiver_reason);
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isTecnico } = useUserRole();
+  const { user } = useAuth();
+  const technicians = useMemo(() => getOrderTechnicians(order), [order]);
+  const isAssignedTechnician = isTecnico && technicians.some((technician) => technician.user_id === user?.id);
 
   return (
     <section className="mt-5">
@@ -125,7 +132,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => setCaptureOpen(true)}
+                onClick={() => (isAssignedTechnician ? setTimeReviewOpen(true) : setCaptureOpen(true))}
                 className="gap-2 bg-primary text-primary-foreground"
               >
                 <PenLine size={15} /> Coletar assinatura
@@ -139,6 +146,15 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
           </div>
         )}
       </GlassCard>
+
+      <TimeReviewDialog
+        orderId={order.id}
+        orderNumber={order.number}
+        open={timeReviewOpen}
+        onOpenChange={setTimeReviewOpen}
+        technicians={technicians}
+        onReviewed={() => setCaptureOpen(true)}
+      />
 
       <SignatureCaptureDialog
         orderId={order.id}

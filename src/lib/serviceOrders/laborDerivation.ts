@@ -45,6 +45,9 @@ export type SessionLike = {
   started_at: string;
   ended_at: string;
   duration_minutes?: number | null;
+  /** Revisão feita pelo técnico antes da assinatura (propagada à apuração). */
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
 };
 
 export type LaborSegment = {
@@ -57,6 +60,8 @@ export type LaborSegment = {
   /** 0-based index of the segment inside its own session (midnight split). */
   segment_index: number;
   segment_count: number;
+  technician_reviewed_at?: string | null;
+  technician_reviewed_by?: string | null;
 };
 
 /** Local-midnight boundaries (as UTC instants) strictly inside the session. */
@@ -143,6 +148,8 @@ export function splitSessionByDay(session: SessionLike): LaborSegment[] {
       duration_minutes: duration,
       segment_index: idx,
       segment_count: rawSegments.length,
+      technician_reviewed_at: session.technician_reviewed_at ?? null,
+      technician_reviewed_by: session.technician_reviewed_by ?? null,
     });
   });
 
