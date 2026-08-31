@@ -836,8 +836,14 @@
     grid-template-columns: repeat(auto-fit, minmax(7.4rem, 1fr));
   }
   .lemarc-filter-bar > :first-child {
-    flex: 0 1 clamp(15rem, 25vw, 22rem);
-    max-width: 22rem;
+    flex: 0 1 clamp(13rem, 22vw, 20rem);
+    max-width: 20rem;
+  }
+  .lemarc-filter-controls--single-line > .lemarc-filter-control {
+    min-width: 5.75rem;
+  }
+  .lemarc-filter-controls--single-line > .lemarc-period-filter {
+    min-width: 10.5rem;
   }
   .lemarc-filter-controls--single-line {
     flex: 1 1 auto;

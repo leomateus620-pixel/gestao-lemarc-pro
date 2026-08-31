@@ -543,7 +543,7 @@ function buildFilterOptions(orders: ServiceOrder[], selectedClient: string) {
           clientName: order.client?.name ?? "Sem empresa",
         });
       }
-    } else {
+    } else if (selectedClient === "all" || order.client_id === selectedClient) {
       hasNoUnit = true;
     }
 
