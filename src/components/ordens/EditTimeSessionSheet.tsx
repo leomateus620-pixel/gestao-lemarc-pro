@@ -76,8 +76,12 @@ export function EditTimeSessionSheet({
   const [endInput, setEndInput] = useState("");
   const [technicianId, setTechnicianId] = useState("");
   const [pauseReason, setPauseReason] = useState<string>("");
-  const [reason, setReason] = useState("");
   const initializedDraftRef = useRef<string | null>(null);
+  /** Motivo automático: mantém a auditoria sem pedir texto ao usuário. */
+  const autoReason = session
+    ? "Ajuste de horário feito na revisão de horas da OS"
+    : "Horário adicionado na revisão de horas da OS";
+
 
   const isPaused = session?.end_reason === "pause";
   const isOpen = session ? !session.ended_at : false;
