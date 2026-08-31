@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertCircle, Eye, PenLine, ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/components/app/AuthContext";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { waiveServiceOrderSignature } from "@/lib/api/signatures.functions";
+import { getOrderTimeReview } from "@/lib/api/timeSessions.functions";
 import { SignatureCaptureDialog } from "./SignatureCaptureDialog";
 import { TimeReviewDialog } from "../TimeReviewDialog";
 
@@ -42,7 +43,28 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
   const { isAdmin, isTecnico } = useUserRole();
   const { user } = useAuth();
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
-  const isAssignedTechnician = isTecnico && technicians.some((technician) => technician.user_id === user?.id);
+  const isAssignedTechnician =
+    isTecnico && technicians.some((technician) => technician.user_id === user?.id);
+  // Admin e técnico da OS passam pela revisão de horas antes da assinatura.
+  const canReviewTime = isAdmin || isAssignedTechnician;
+
+  const reviewFn = useServerFn(getOrderTimeReview);
+  const reviewStateQuery = useQuery({
+    queryKey: ["order-time-review-state", order.id],
+    queryFn: () => reviewFn({ data: { orderId: order.id } }),
+    enabled: canReviewTime,
+    staleTime: 10_000,
+  });
+  const reviewRequired = reviewStateQuery.data?.reviewRequired ?? false;
+
+  function startSignature() {
+    if (canReviewTime && (reviewStateQuery.isPending || reviewRequired)) {
+      setTimeReviewOpen(true);
+      return;
+    }
+    setCaptureOpen(true);
+  }
+
 
   return (
     <section className="mt-5">
@@ -108,7 +130,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
                   size="sm"
                   variant="ghost"
                   className="gap-1.5 text-[11px]"
-                  onClick={() => setCaptureOpen(true)}
+                  onClick={startSignature}
                 >
                   <PenLine size={13} /> Substituir
                 </Button>
@@ -132,7 +154,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => (isAssignedTechnician ? setTimeReviewOpen(true) : setCaptureOpen(true))}
+                onClick={startSignature}
                 className="gap-2 bg-primary text-primary-foreground"
               >
                 <PenLine size={15} /> Coletar assinatura

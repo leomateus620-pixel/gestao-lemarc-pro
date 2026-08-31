@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Clock3, Loader2, Pencil, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { getOrderTimeReview, saveOrderTimeReview } from "@/lib/api/timeSessions.functions";
 import { formatHHmm } from "@/lib/serviceOrders/finance";
@@ -66,6 +73,7 @@ export function TimeReviewDialog({
     onSuccess: () => {
       toast.success("Horários revisados e apuração atualizada.");
       qc.invalidateQueries({ queryKey: ["order-time-review", orderId] });
+      qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] });
       qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] });
       qc.invalidateQueries({ queryKey: ["order-financials", orderId] });
       qc.invalidateQueries({ queryKey: ["service-order", orderId] });
@@ -82,7 +90,7 @@ export function TimeReviewDialog({
     technicians.find((technician) => technician.id === id)?.full_name ?? "Técnico";
   const totalMinutes = sessions.reduce((total, session) => total + sessionDuration(session), 0);
   const hasOpenSession = sessions.some((session) => !session.ended_at);
-  const canConfirm = !reviewQuery.isPending && !reviewQuery.isError && sessions.length > 0;
+  const canConfirm = !reviewQuery.isPending && !reviewQuery.isError;
 
   return (
     <>
@@ -94,7 +102,11 @@ export function TimeReviewDialog({
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
                   OS #{orderNumber} · conferência obrigatória
                 </p>
-                <DialogTitle className="mt-1">Revise seus horários antes da assinatura</DialogTitle>
+                <DialogTitle className="mt-1">Revise os horários antes da assinatura</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Confira os intervalos apontados na OS. A confirmação encerra intervalos em
+                  andamento e atualiza a apuração de horas.
+                </DialogDescription>
               </div>
               <ShieldCheck className="mt-1 shrink-0 text-primary" size={20} />
             </div>
@@ -164,7 +176,9 @@ export function TimeReviewDialog({
                         </span>
                       </p>
                     </div>
-                    {session.technician_id === data?.currentTechnicianId ? (
+                    {data?.canEditAll ||
+                    (data?.currentTechnicianId &&
+                      session.technician_id === data.currentTechnicianId) ? (
                       <Button
                         type="button"
                         size="sm"
