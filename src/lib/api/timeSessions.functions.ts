@@ -578,7 +578,10 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
 
     const currentTechnicianId = (technician?.id as string | undefined) ?? null;
     const orderTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
-    const eligibleTechnicianIds = isAdmin
+    // Admin ou técnico vinculado à OS (assertOrderTimeAccess acima) pode revisar
+    // e ajustar os horários de toda a equipe daquela OS.
+    const canEditAll = isAdmin || Boolean(currentTechnicianId);
+    const eligibleTechnicianIds = canEditAll
       ? orderTechnicianIds
       : orderTechnicianIds.filter((id) => id === currentTechnicianId);
 
@@ -586,7 +589,7 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
       sessions,
       currentTechnicianId,
       isAdmin,
-      canEditAll: isAdmin,
+      canEditAll,
       reviewCompletedAt: (order?.time_review_completed_at as string | null) ?? null,
       pendingCount,
       reviewRequired: sessions.length > 0 && pendingCount > 0,
@@ -651,18 +654,9 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
     if (!assigned.includes(data.technicianId)) {
       throw new Error("Técnico não vinculado a esta OS.");
     }
-    if (!isAdmin) {
-      const { data: techRow } = await sb
-        .from("technicians")
-        .select("id")
-        .eq("user_id", context.userId)
-        .eq("active", true)
-        .maybeSingle();
-      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
-      if (techRow.id !== data.technicianId) {
-        throw new Error("Você só pode lançar horários para você mesmo.");
-      }
-    }
+    // Técnico vinculado à OS pode lançar horário para qualquer colega da mesma OS
+    // (o vínculo do alvo com a OS já foi validado acima).
+
 
     const start = new Date(data.startedAt);
     const end = new Date(data.endedAt);
@@ -736,8 +730,9 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
 
 /**
  * Confirms the recorded time history of the order before signature.
- * Open work intervals are closed at this exact confirmation moment, then the
- * same reconciliation path updates the admin review, totals and reports.
+ * Reviewing does NOT stop the clock: intervals still running stay open and keep
+ * counting; they are only closed when the OS is finalized. The confirmation
+ * marks the review and reconciles the admin hours/totals/reports.
  */
 export const saveOrderTimeReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -773,20 +768,9 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       return { ok: true, skipped: true, reviewedAt, closedSessions: 0, laborPending: null };
     }
 
-    const openIds = rows.filter((session) => !session.ended_at).map((session) => session.id);
-    if (openIds.length > 0) {
-      const { error: closeError } = await writer
-        .from("service_order_time_sessions")
-        .update({
-          ended_at: reviewedAt,
-          end_reason: "finish",
-          adjusted_by: context.userId,
-          adjusted_at: reviewedAt,
-          adjustment_reason: "Intervalo encerrado na revisão de horas antes da assinatura",
-        })
-        .in("id", openIds);
-      if (closeError) throw new Error(closeError.message);
-    }
+    // Revisar não encerra intervalos em andamento: o cronômetro segue correndo
+    // e só é encerrado na finalização da OS (closeOpenWorkSessions).
+
 
     const { error: reviewError } = await writer
       .from("service_order_time_sessions")
@@ -810,7 +794,7 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("id", data.orderId);
     if (orderError) throw new Error(orderError.message);
 
-    return { ok: true, skipped: false, reviewedAt, closedSessions: openIds.length, laborPending: null };
+    return { ok: true, skipped: false, reviewedAt, closedSessions: 0, laborPending: null };
   });
 
 export type OrderLaborOverride = {
@@ -918,8 +902,13 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       _role: "admin",
     });
 
-    // Load the session (RLS lets the owner or admin see it).
-    const { data: sessionRaw, error: sessErr } = await sb
+    const { getTimeSessionWriter, assertOrderTimeAccess } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
+    // Read with the service credential; authorization happens right after and
+    // is scoped to the session's own order.
+    const sessionWriter = await getTimeSessionWriter();
+    const { data: sessionRaw, error: sessErr } = await sessionWriter
       .from("service_order_time_sessions")
       .select(SELECT)
       .eq("id", data.sessionId)
@@ -932,22 +921,10 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       throw new Error("Apenas sessões de trabalho podem ser editadas por aqui.");
     }
 
-    // Resolve caller technician id.
-    let callerTechnicianId: string | null = null;
-    if (!isAdmin) {
-      const { data: techRow, error: techErr } = await sb
-        .from("technicians")
-        .select("id, active")
-        .eq("user_id", userId)
-        .eq("active", true)
-        .maybeSingle();
-      if (techErr) throw new Error(techErr.message);
-      if (!techRow?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
-      callerTechnicianId = techRow.id as string;
-      if (session.technician_id !== callerTechnicianId) {
-        throw new Error("Você só pode editar seus próprios horários.");
-      }
-    }
+    // Admin, or any technician assigned to this OS, may adjust the team hours
+    // of that OS (including a colleague's interval).
+    await assertOrderTimeAccess(sb, userId, session.service_order_id);
+
 
     // Load the order to gate by status and confirm assignment for non-admins.
     const { data: order, error: ordErr } = await sb
@@ -972,20 +949,8 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       throw new Error("Esta OS já teve a apuração finalizada pelo administrador.");
     }
 
-    if (!isAdmin && callerTechnicianId) {
-      const [{ data: assigned }, isPrimary] = await Promise.all([
-        sb
-          .from("service_order_technicians")
-          .select("id")
-          .eq("service_order_id", order.id)
-          .eq("technician_id", callerTechnicianId)
-          .maybeSingle(),
-        Promise.resolve(order.technician_id === callerTechnicianId),
-      ]);
-      if (!assigned && !isPrimary) {
-        throw new Error("Você não está mais atribuído a esta OS.");
-      }
-    }
+    // O vínculo do autor com a OS já foi validado por assertOrderTimeAccess.
+
 
     // Validate times.
     const nextStartedAtIso = data.startedAt ?? session.started_at;
@@ -1027,7 +992,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     }
 
     // Overlap with other work sessions of the same technician on this OS.
-    const { data: siblings, error: sibErr } = await sb
+    const { data: siblings, error: sibErr } = await sessionWriter
       .from("service_order_time_sessions")
       .select("id, started_at, ended_at, kind, technician_id")
       .eq("service_order_id", session.service_order_id)
@@ -1096,7 +1061,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     };
     patch.metadata = nextMeta;
 
-    const { data: updated, error: updErr } = await sb
+    const { data: updated, error: updErr } = await sessionWriter
       .from("service_order_time_sessions")
       .update(patch)
       .eq("id", session.id)
@@ -1108,14 +1073,13 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     const { syncLaborEntriesFromSessions } = await import(
       "@/lib/serviceOrders/laborSync.server"
     );
-    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
-      .getTimeSessionWriter();
     const outcome = await syncLaborEntriesFromSessions(
       sb,
       session.service_order_id,
       userId,
-      writer,
+      sessionWriter,
     );
+
     if (!outcome.synced) {
       throw new Error(
         "Esta OS está com apuração consolidada pelo administrador. Solicite o ajuste ao gestor.",
