@@ -129,9 +129,11 @@ export function EditTimeSessionSheet({
       if (new Date(endIso).getTime() - new Date(startIso).getTime() > 14 * 60 * 60 * 1000) {
         return "Um intervalo não pode passar de 14 horas.";
       }
-      if (new Date(endIso).getTime() > Date.now() + 60_000) return "O fim não pode estar no futuro.";
+      if (new Date(endIso).getTime() > Date.now() + 60_000)
+        return "O fim não pode estar no futuro.";
     }
-    if (new Date(startIso).getTime() > Date.now() + 60_000) return "O início não pode estar no futuro.";
+    if (new Date(startIso).getTime() > Date.now() + 60_000)
+      return "O início não pode estar no futuro.";
     if (reason.trim().length < 3) return "Descreva o motivo do ajuste (mín. 3 caracteres).";
     return null;
   }, [session, startInput, endInput, technicianId, reason, isOpen, isCreate]);
@@ -170,7 +172,11 @@ export function EditTimeSessionSheet({
       return updateFn({ data: payload });
     },
     onSuccess: async () => {
-      toast.success(isCreate ? "Horário adicionado. Totais e relatórios recalculados." : "Horário atualizado. Totais e relatórios recalculados.");
+      toast.success(
+        isCreate
+          ? "Horário adicionado. Totais e relatórios recalculados."
+          : "Horário atualizado. Totais e relatórios recalculados.",
+      );
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["order-time-review", orderId] }),
         qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] }),
@@ -221,17 +227,28 @@ export function EditTimeSessionSheet({
 
           <div className="space-y-1">
             <Label htmlFor="edit-session-start">Início</Label>
-            <Input id="edit-session-start" type="datetime-local" value={startInput} onChange={(e) => setStartInput(e.target.value)} />
+            <Input
+              id="edit-session-start"
+              type="datetime-local"
+              value={startInput}
+              onChange={(e) => setStartInput(e.target.value)}
+            />
           </div>
 
           {isOpen ? (
             <p className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
-              Esta sessão está em andamento. Você pode corrigir apenas o horário de início. Pause a OS para fechar o intervalo.
+              Esta sessão está em andamento. Você pode corrigir apenas o horário de início. Pause a
+              OS para fechar o intervalo.
             </p>
           ) : (
             <div className="space-y-1">
               <Label htmlFor="edit-session-end">Fim</Label>
-              <Input id="edit-session-end" type="datetime-local" value={endInput} onChange={(e) => setEndInput(e.target.value)} />
+              <Input
+                id="edit-session-end"
+                type="datetime-local"
+                value={endInput}
+                onChange={(e) => setEndInput(e.target.value)}
+              />
             </div>
           )}
 
@@ -239,9 +256,15 @@ export function EditTimeSessionSheet({
             <div className="space-y-1">
               <Label>Motivo da pausa</Label>
               <Select value={pauseReason} onValueChange={setPauseReason}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
-                  {PAUSE_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {PAUSE_REASONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -249,14 +272,26 @@ export function EditTimeSessionSheet({
 
           <div className="space-y-1">
             <Label htmlFor="edit-session-reason">Motivo do ajuste *</Label>
-            <Textarea id="edit-session-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: esqueci de registrar este intervalo" />
+            <Textarea
+              id="edit-session-reason"
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ex.: esqueci de registrar este intervalo"
+            />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
+            Cancelar
+          </Button>
           <Button
-            disabled={!!validationError || mutation.isPending || (isCreate && availableTechnicians.length === 0)}
+            disabled={
+              !!validationError ||
+              mutation.isPending ||
+              (isCreate && availableTechnicians.length === 0)
+            }
             onClick={() => {
               if (validationError) {
                 toast.error(validationError);
@@ -265,7 +300,15 @@ export function EditTimeSessionSheet({
               mutation.mutate();
             }}
           >
-            {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…</> : isCreate ? "Adicionar horário" : "Salvar ajuste"}
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…
+              </>
+            ) : isCreate ? (
+              "Adicionar horário"
+            ) : (
+              "Salvar ajuste"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

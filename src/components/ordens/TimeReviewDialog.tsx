@@ -65,12 +65,22 @@ const LiveTotal = memo(function LiveTotal({ sessions }: { sessions: TimeSession[
     return () => window.clearInterval(timer);
   }, [hasOpenSession]);
 
-  const totalMinutes = sessions.reduce((total, session) => total + sessionDurationMinutes(session), 0);
-  const totalSeconds = sessions.reduce((total, session) => total + sessionDurationSeconds(session), 0);
+  const totalMinutes = sessions.reduce(
+    (total, session) => total + sessionDurationMinutes(session),
+    0,
+  );
+  const totalSeconds = sessions.reduce(
+    (total, session) => total + sessionDurationSeconds(session),
+    0,
+  );
   return <>{hasOpenSession ? formatClock(totalSeconds) : formatHHmm(totalMinutes)}</>;
 });
 
-const LiveSessionDuration = memo(function LiveSessionDuration({ session }: { session: TimeSession }) {
+const LiveSessionDuration = memo(function LiveSessionDuration({
+  session,
+}: {
+  session: TimeSession;
+}) {
   const isRunning = !session.ended_at;
   const [, setTick] = useState(0);
 
@@ -80,7 +90,13 @@ const LiveSessionDuration = memo(function LiveSessionDuration({ session }: { ses
     return () => window.clearInterval(timer);
   }, [isRunning]);
 
-  return <>{isRunning ? formatClock(sessionDurationSeconds(session)) : formatHHmm(sessionDurationMinutes(session))}</>;
+  return (
+    <>
+      {isRunning
+        ? formatClock(sessionDurationSeconds(session))
+        : formatHHmm(sessionDurationMinutes(session))}
+    </>
+  );
 });
 
 export function TimeReviewDialog({
@@ -169,117 +185,139 @@ export function TimeReviewDialog({
           </DialogHeader>
 
           <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
-          {reviewQuery.isPending ? (
-            <div className="flex min-h-32 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando horários…
-            </div>
-          ) : reviewQuery.isError ? (
-            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {reviewQuery.error instanceof Error
-                ? reviewQuery.error.message
-                : "Não foi possível carregar os horários."}
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Intervalos
-                  </p>
-                  <p className="mt-1 text-lg font-black tabular-nums text-foreground">{sessions.length}</p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Total
-                  </p>
-                  <p className="mt-1 text-lg font-black tabular-nums text-foreground">
-                    <LiveTotal sessions={sessions} />
-                  </p>
-                </div>
-                <div className="col-span-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Equipe
-                  </p>
-                  <p className="mt-1 truncate text-sm font-bold text-foreground">
-                    {technicians.map((technician) => technician.full_name).join(", ") || "—"}
-                  </p>
-                </div>
+            {reviewQuery.isPending ? (
+              <div className="flex min-h-32 items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando horários…
               </div>
+            ) : reviewQuery.isError ? (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {reviewQuery.error instanceof Error
+                  ? reviewQuery.error.message
+                  : "Não foi possível carregar os horários."}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Intervalos
+                    </p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-foreground">
+                      {sessions.length}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Total
+                    </p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-foreground">
+                      <LiveTotal sessions={sessions} />
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Equipe
+                    </p>
+                    <p className="mt-1 truncate text-sm font-bold text-foreground">
+                      {technicians.map((technician) => technician.full_name).join(", ") || "—"}
+                    </p>
+                  </div>
+                </div>
 
-              {hasOpenSession && (
-                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                  O intervalo em andamento continua correndo após a revisão. Ele só será encerrado
-                  quando a OS for finalizada.
-                </p>
-              )}
-
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  Intervalos registrados
-                </p>
-                {eligibleTechnicians.length > 0 && (
-                  <Button type="button" size="sm" variant="secondary" className="gap-1.5" onClick={() => setAddingSession(true)}>
-                    <Plus size={15} /> Adicionar horário
-                  </Button>
+                {hasOpenSession && (
+                  <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                    O intervalo em andamento continua correndo após a revisão. Ele só será encerrado
+                    quando a OS for finalizada.
+                  </p>
                 )}
-              </div>
 
-              <div className="space-y-2">
-                {sessions.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                    Nenhum intervalo registrado ainda.
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Intervalos registrados
                   </p>
-                ) : (
-                  sessions.map((session) => {
-                    const isRunning = !session.ended_at;
-                    return (
-                      <div
-                        key={session.id}
-                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-foreground">
-                            {technicianName(session.technician_id)}
-                          </p>
-                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                            <span>{formatDateHm(session.started_at)}</span>
-                            <span>até</span>
-                            <span>{isRunning ? "em andamento" : formatDateHm(session.ended_at)}</span>
-                            <span className={`inline-flex items-center gap-1 font-semibold ${isRunning ? "text-amber-200" : "text-foreground"}`}>
-                              <Clock3 size={12} />
-                               <LiveSessionDuration session={session} />
+                  {eligibleTechnicians.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5"
+                      onClick={() => setAddingSession(true)}
+                    >
+                      <Plus size={15} /> Adicionar horário
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {sessions.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                      Nenhum intervalo registrado ainda.
+                    </p>
+                  ) : (
+                    sessions.map((session) => {
+                      const isRunning = !session.ended_at;
+                      return (
+                        <div
+                          key={session.id}
+                          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-foreground">
+                              {technicianName(session.technician_id)}
+                            </p>
+                            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                              <span>{formatDateHm(session.started_at)}</span>
+                              <span>até</span>
+                              <span>
+                                {isRunning ? "em andamento" : formatDateHm(session.ended_at)}
+                              </span>
+                              <span
+                                className={`inline-flex items-center gap-1 font-semibold ${isRunning ? "text-amber-200" : "text-foreground"}`}
+                              >
+                                <Clock3 size={12} />
+                                <LiveSessionDuration session={session} />
+                              </span>
+                              {isRunning && (
+                                <span
+                                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300"
+                                  aria-label="Cronômetro em andamento"
+                                />
+                              )}
+                            </p>
+                          </div>
+                          {reviewQuery.data?.canEditAll ||
+                          (reviewQuery.data?.currentTechnicianId &&
+                            session.technician_id === reviewQuery.data.currentTechnicianId) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="shrink-0 gap-1.5"
+                              onClick={() => setEditingSession(session)}
+                            >
+                              <Pencil size={13} /> Editar
+                            </Button>
+                          ) : (
+                            <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
+                              Somente leitura
                             </span>
-                            {isRunning && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" aria-label="Cronômetro em andamento" />}
-                          </p>
+                          )}
                         </div>
-                        {reviewQuery.data?.canEditAll ||
-                        (reviewQuery.data?.currentTechnicianId &&
-                          session.technician_id === reviewQuery.data.currentTechnicianId) ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="shrink-0 gap-1.5"
-                            onClick={() => setEditingSession(session)}
-                          >
-                            <Pencil size={13} /> Editar
-                          </Button>
-                        ) : (
-                          <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
-                            Somente leitura
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saveMutation.isPending}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={saveMutation.isPending}
+            >
               Voltar
             </Button>
             <Button
@@ -288,7 +326,11 @@ export function TimeReviewDialog({
               disabled={!canConfirm || saveMutation.isPending}
               className="gap-2"
             >
-              {saveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              {saveMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={16} />
+              )}
               {saveMutation.isPending ? "Confirmando…" : "Confirmar horários e continuar"}
             </Button>
           </DialogFooter>
