@@ -15,6 +15,7 @@ type Props = {
   orderNumber: number | string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
   replace?: boolean;
 };
 
@@ -23,6 +24,7 @@ export function SignatureCaptureDialog({
   orderNumber,
   open,
   onOpenChange,
+  onSaved,
   replace,
 }: Props) {
   const padRef = useRef<SignaturePadHandle>(null);
@@ -57,6 +59,7 @@ export function SignatureCaptureDialog({
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       onOpenChange(false);
       reset();
+      onSaved?.();
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Falha ao salvar assinatura"),

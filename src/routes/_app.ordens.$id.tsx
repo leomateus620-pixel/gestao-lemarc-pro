@@ -459,12 +459,13 @@ function OrdemDetalhe() {
              technicians={technicians}
              onReviewed={() => (hasSignature ? finishTechnicianOrder() : setSignOpen(true))}
           />
-          <SignatureCaptureDialog
-            orderId={order.id}
-            orderNumber={order.number}
-            open={signOpen}
-            onOpenChange={setSignOpen}
-          />
+           <SignatureCaptureDialog
+             orderId={order.id}
+             orderNumber={order.number}
+             open={signOpen}
+             onOpenChange={setSignOpen}
+             onSaved={finishTechnicianOrder}
+           />
         </>
       )}
 
