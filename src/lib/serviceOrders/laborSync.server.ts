@@ -116,7 +116,7 @@ export async function syncLaborEntriesFromSessions(
   if (
     fin?.labor_entries_adjusted_at ||
     fin?.finalized_at ||
-    ["finished", "review", "approved", "cancelled"].includes(order?.status ?? "")
+    isAdminReviewedStatus(order?.status)
   ) {
     return { synced: false, reason: "locked_by_admin" };
   }
