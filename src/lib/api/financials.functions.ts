@@ -355,14 +355,14 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
 
     const storedEntries: LaborEntry[] = (labor.data ?? []).map(normalizeLabor);
     const financials = normalizeFinancials(fin.data);
-    // OS já revisada/finalizada: a leitura NUNCA grava horas. Isso evita que
+    // OS já revisada pelo admin: a leitura NUNCA grava horas. Isso evita que
     // apontamentos "brotem" dias depois em OS enviadas para cobrança.
+    // Atenção: status "finished" é ação do técnico (encerrar serviço) e
+    // acontece antes da revisão — não pode travar a incorporação das horas.
     const isLocked =
       Boolean(financials?.finalized_at) ||
       Boolean(financials?.labor_entries_adjusted_at) ||
-      (orderStatus
-        ? ["finished", "review", "approved", "cancelled"].includes(orderStatus)
-        : false);
+      isAdminReviewedStatus(orderStatus);
     const rawSessions = sessionsRes?.error ? [] : (sessionsRes?.data ?? []);
     const allClosedWorkSessions: ClosedWorkSession[] = rawSessions
       .filter(
