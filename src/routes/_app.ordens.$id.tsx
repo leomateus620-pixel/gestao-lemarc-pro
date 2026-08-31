@@ -215,8 +215,7 @@ function OrdemDetalhe() {
   });
   const alreadyFinalized = Boolean(financialsData?.financials?.finalized_at);
 
-  async function handleTecnicoFinish() {
-    const orderId = order.id;
+  function handleTecnicoFinish() {
     // A revisão sempre vem antes da finalização. Ela não encerra os cronômetros;
     // o encerramento acontece somente depois que a etapa final for autorizada.
     setTimeReviewOpen(true);
