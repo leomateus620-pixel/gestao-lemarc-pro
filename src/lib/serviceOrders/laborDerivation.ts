@@ -279,3 +279,25 @@ export function findMissingSegments(
   }
   return out;
 }
+/**
+ * Minutos do histórico (sessões fechadas e materializáveis) que ainda NÃO
+ * estão representados na apuração de horas. Serve como verificação: depois de
+ * uma reconciliação bem-sucedida o valor deve ser 0. Sessões suspeitas
+ * (>14h / virada de meia-noite) são ignoradas de propósito — elas exigem
+ * ajuste manual do admin e não contam como pendência automática.
+ */
+export function pendingLaborMinutes(
+  sessions: SessionLike[],
+  existing: {
+    technician_id: string | null;
+    work_date: string;
+    start_time: string;
+    end_time: string;
+  }[],
+): number {
+  const segments = splitSessionsByDay(filterMaterializableSessions(sessions));
+  return findMissingSegments(segments, existing).reduce(
+    (acc, s) => acc + s.duration_minutes,
+    0,
+  );
+}
