@@ -730,8 +730,9 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
 
 /**
  * Confirms the recorded time history of the order before signature.
- * Open work intervals are closed at this exact confirmation moment, then the
- * same reconciliation path updates the admin review, totals and reports.
+ * Reviewing does NOT stop the clock: intervals still running stay open and keep
+ * counting; they are only closed when the OS is finalized. The confirmation
+ * marks the review and reconciles the admin hours/totals/reports.
  */
 export const saveOrderTimeReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
