@@ -359,6 +359,7 @@ export const addServiceOrderTechnicians = createServerFn({ method: "POST" })
       idsToAdd.map((technician_id) => ({
         service_order_id: data.orderId,
         technician_id,
+        assigned_at: new Date().toISOString(),
         assigned_by: context.userId,
         is_primary: false,
       })),
