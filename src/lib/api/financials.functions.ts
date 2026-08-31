@@ -388,6 +388,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
         started_at: s.started_at,
         ended_at: s.ended_at,
         duration_minutes: s.duration_minutes ?? 0,
+        technician_reviewed_at: s.technician_reviewed_at ?? null,
+        technician_reviewed_by: s.technician_reviewed_by ?? null,
       }));
     // Sessões esquecidas em aberto (>14h ou atravessando dias sem pausa) não
     // são materializadas: elas geravam blocos fantasma de 00:00–23:59.
