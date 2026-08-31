@@ -326,4 +326,25 @@ describe("pendingLaborMinutes (rede de segurança da apuração)", () => {
     ];
     expect(pendingLaborMinutes(sessions, existing)).toBe(0);
   });
+
+  it("não duplica apontamentos de poucos segundos já apurados", () => {
+    const sessions = [
+      {
+        id: "s1",
+        technician_id: "t1",
+        started_at: "2026-08-31T19:57:07.569Z",
+        ended_at: "2026-08-31T19:57:42.659Z",
+        duration_minutes: 1,
+      },
+    ];
+    const segments = splitSessionsByDay(sessions);
+    const existing = segments.map((s) => ({
+      technician_id: s.technician_id,
+      work_date: s.work_date,
+      start_time: s.start_time,
+      end_time: s.end_time,
+    }));
+    expect(findMissingSegments(segments, existing)).toHaveLength(0);
+    expect(pendingLaborMinutes(sessions, existing)).toBe(0);
+  });
 });

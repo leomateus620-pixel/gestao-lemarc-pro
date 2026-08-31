@@ -145,15 +145,26 @@ export function TimeReviewDialog({
 
   const saveMutation = useMutation({
     mutationFn: () => saveReviewFn({ data: { orderId, note: null } }),
-    onSuccess: async () => {
-      toast.success("Horários revisados e apuração atualizada.");
-      await invalidateReview();
+    onSuccess: async (result) => {
+      const pending = (result as { laborPending?: { minutes: number } | null } | null)
+        ?.laborPending;
+      if (pending) {
+        toast.warning(
+          `Horários revisados. ${pending.minutes} min ainda não entraram na apuração — avise o administrador.`,
+        );
+      } else {
+        toast.success("Horários revisados e apuração atualizada.");
+      }
+      // Fecha a revisão primeiro e só então avança, para o próximo diálogo
+      // (assinatura) abrir sem conflito de foco/overlay.
       onOpenChange(false);
-      onReviewed();
+      void invalidateReview();
+      window.setTimeout(() => onReviewed(), 180);
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível revisar os horários."),
   });
+
 
   const technicianName = (id: string | null) =>
     technicians.find((technician) => technician.id === id)?.full_name ?? "Técnico";
