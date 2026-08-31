@@ -175,7 +175,9 @@ export function TimeReviewDialog({
                         </span>
                       </p>
                     </div>
-                    {session.technician_id === data?.currentTechnicianId ? (
+                    {data?.canEditAll ||
+                    (data?.currentTechnicianId &&
+                      session.technician_id === data.currentTechnicianId) ? (
                       <Button
                         type="button"
                         size="sm"
