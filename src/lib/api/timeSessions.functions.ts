@@ -1077,7 +1077,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     };
     patch.metadata = nextMeta;
 
-    const { data: updated, error: updErr } = await sb
+    const { data: updated, error: updErr } = await sessionWriter
       .from("service_order_time_sessions")
       .update(patch)
       .eq("id", session.id)
@@ -1089,14 +1089,13 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     const { syncLaborEntriesFromSessions } = await import(
       "@/lib/serviceOrders/laborSync.server"
     );
-    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
-      .getTimeSessionWriter();
     const outcome = await syncLaborEntriesFromSessions(
       sb,
       session.service_order_id,
       userId,
-      writer,
+      sessionWriter,
     );
+
     if (!outcome.synced) {
       throw new Error(
         "Esta OS está com apuração consolidada pelo administrador. Solicite o ajuste ao gestor.",
