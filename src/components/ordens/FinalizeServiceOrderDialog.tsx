@@ -55,6 +55,7 @@ import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
 import type { AssignedTechnician, ServiceOrder } from "@/types/serviceOrder";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
+import { TimeReviewDialog } from "@/components/ordens/TimeReviewDialog";
 
 type Props = {
   order: ServiceOrder;
@@ -384,6 +385,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const hasWaiver = Boolean(order.signature_waiver_reason);
   const signatureOk = hasSignature || hasWaiver;
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [timeReviewOpen, setTimeReviewOpen] = useState(false);
 
   const { data: existing } = useQuery({
     queryKey: ["order-financials", order.id],
@@ -1290,7 +1292,10 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setCaptureOpen(true)}
+                  onClick={() => {
+                    setCaptureOpen(false);
+                    setTimeReviewOpen(true);
+                  }}
                   className="lemarc-secondary-action h-11 w-full rounded-xl sm:w-auto"
                 >
                   <FileText size={15} />
@@ -1322,6 +1327,15 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
             </div>
           )}
         </DialogFooter>
+
+        <TimeReviewDialog
+          orderId={order.id}
+          orderNumber={order.number}
+          open={timeReviewOpen}
+          onOpenChange={setTimeReviewOpen}
+          technicians={techs}
+          onReviewed={() => setCaptureOpen(true)}
+        />
 
         <SignatureCaptureDialog
           orderId={order.id}
