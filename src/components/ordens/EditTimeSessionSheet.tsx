@@ -163,7 +163,7 @@ export function EditTimeSessionSheet({
       const payload: Parameters<typeof updateFn>[0]["data"] = {
         sessionId: session.id,
         startedAt: startIso,
-        reason: reason.trim(),
+        reason: autoReason,
       };
       if (!isOpen) {
         const endIso = localInputToIso(endInput);
