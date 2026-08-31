@@ -95,7 +95,7 @@ export async function recomputeOrderFinancials(
     patch.labor_entries_adjusted_at = new Date().toISOString();
     patch.labor_entries_adjusted_by = adjustedBy;
   }
-  const { error: upErr } = await sb
+  const { error: upErr } = await w
     .from("service_order_financials")
     .upsert(patch, { onConflict: "service_order_id" });
   if (upErr) throw new Error(upErr.message);
@@ -104,7 +104,7 @@ export async function recomputeOrderFinancials(
     totalLaborMinutes > 0
       ? Math.round((totalLaborCents * 60) / totalLaborMinutes) / 100
       : null;
-  await sb
+  await w
     .from("service_orders")
     .update({ worked_minutes: totalLaborMinutes, hour_rate: weightedRate })
     .eq("id", orderId);
