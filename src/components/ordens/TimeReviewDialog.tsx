@@ -73,6 +73,7 @@ export function TimeReviewDialog({
     onSuccess: () => {
       toast.success("Horários revisados e apuração atualizada.");
       qc.invalidateQueries({ queryKey: ["order-time-review", orderId] });
+      qc.invalidateQueries({ queryKey: ["order-time-review-state", orderId] });
       qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] });
       qc.invalidateQueries({ queryKey: ["order-financials", orderId] });
       qc.invalidateQueries({ queryKey: ["service-order", orderId] });
