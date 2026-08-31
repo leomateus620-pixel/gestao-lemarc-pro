@@ -17,6 +17,7 @@ import {
   findMissingSegments,
   filterMaterializableSessions,
   isAdminReviewedStatus,
+  pendingLaborMinutes,
   splitSessionsByDay,
 } from "@/lib/serviceOrders/laborDerivation";
 import type {
@@ -384,6 +385,10 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
     // Sessões esquecidas em aberto (>14h ou atravessando dias sem pausa) não
     // são materializadas: elas geravam blocos fantasma de 00:00–23:59.
     const closedWorkSessions = filterMaterializableSessions(allClosedWorkSessions);
+    // Horas do histórico que continuam fora da apuração (0 quando bloqueado
+    // de propósito por ajuste do admin / OS revisada).
+    const pendingFor = (rows: LaborEntry[]) =>
+      isLocked ? 0 : pendingLaborMinutes(closedWorkSessions, rows);
 
     if (isLocked) {
       const totalLaborMinutes = storedEntries.reduce((a, e) => a + e.duration_minutes, 0);
@@ -402,7 +407,11 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
                 (financials.materials_total_cents ?? 0),
             }
           : financials;
-      return { entries: storedEntries, financials: effectiveFinancials };
+      return {
+        entries: storedEntries,
+        financials: effectiveFinancials,
+        laborPendingMinutes: 0,
+      };
     }
 
     if (closedWorkSessions.length === 0) {
@@ -419,9 +428,13 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
                 totalLaborCents,
               })
             : financials;
-        return { entries: storedEntries, financials: effectiveFinancials };
+        return {
+          entries: storedEntries,
+          financials: effectiveFinancials,
+          laborPendingMinutes: 0,
+        };
       }
-      return { entries: storedEntries, financials };
+      return { entries: storedEntries, financials, laborPendingMinutes: 0 };
     }
 
     // Fetch technician fallback for sessions whose tech has no existing entry.
@@ -550,13 +563,17 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               totalLaborCents,
             })
           : financials;
-      return { entries: entriesNow, financials: effectiveFinancials };
+      return {
+        entries: entriesNow,
+        financials: effectiveFinancials,
+        laborPendingMinutes: pendingFor(entriesNow),
+      };
     }
 
     // Nothing materialized yet, but an admin adjustment flag exists (rows were
     // all deleted on purpose): respect the admin decision.
     if (financials?.labor_entries_adjusted_at) {
-      return { entries: storedEntries, financials };
+      return { entries: storedEntries, financials, laborPendingMinutes: 0 };
     }
 
     // First editable read: materialize derived sessions as the admin working
@@ -604,9 +621,11 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               .order("work_date", { ascending: true })
               .order("start_time", { ascending: true });
             if (refreshed) {
+              const rows = refreshed.map(normalizeLabor);
               return {
-                entries: refreshed.map(normalizeLabor),
+                entries: rows,
                 financials: effectiveFinancials,
+                laborPendingMinutes: pendingFor(rows),
               };
             }
           }
@@ -628,7 +647,41 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
       };
     }
 
-    return { entries: derivedEntries, financials: effectiveFinancials };
+    return {
+      entries: derivedEntries,
+      financials: effectiveFinancials,
+      laborPendingMinutes: pendingFor(derivedEntries),
+    };
+  });
+
+/**
+ * Ação explícita do admin: incorpora agora as horas do histórico que ainda
+ * não estão na apuração. Idempotente e sem apagar/alterar linhas existentes.
+ */
+export const reconcileOrderLabor = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const sb = context.supabase as any;
+    const { reconcileLaborFromSessions } = await import(
+      "@/lib/serviceOrders/laborSync.server"
+    );
+    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    if (outcome.failed) {
+      outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    }
+    if (outcome.failed) {
+      throw new Error(
+        outcome.error ??
+          "Não foi possível incorporar as horas do histórico. Tente novamente.",
+      );
+    }
+    return {
+      appended: outcome.appended,
+      pendingMinutes: outcome.pendingMinutes,
+      locked: Boolean(outcome.locked),
+    };
   });
 
 export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET" })
