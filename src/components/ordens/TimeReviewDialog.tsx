@@ -90,7 +90,7 @@ export function TimeReviewDialog({
     technicians.find((technician) => technician.id === id)?.full_name ?? "Técnico";
   const totalMinutes = sessions.reduce((total, session) => total + sessionDuration(session), 0);
   const hasOpenSession = sessions.some((session) => !session.ended_at);
-  const canConfirm = !reviewQuery.isPending && !reviewQuery.isError && sessions.length > 0;
+  const canConfirm = !reviewQuery.isPending && !reviewQuery.isError;
 
   return (
     <>
