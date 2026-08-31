@@ -149,6 +149,8 @@ export type TimeBatchResult = {
   succeeded: string[];
   skipped: Array<{ technicianId: string; message: string }>;
   failed: Array<{ technicianId: string; message: string }>;
+  /** Preenchido quando a apuração de horas não pôde ser materializada. */
+  laborPending?: LaborPending | null;
 };
 
 type BatchInput = {
@@ -167,28 +169,36 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-async function reconcileLaborOrThrow(
+export type LaborPending = { minutes: number; message: string };
+
+/**
+ * Materializa a apuração com credencial de serviço. Não engole falhas: faz
+ * uma retentativa e, se ainda falhar, devolve a pendência ao cliente para
+ * aviso explícito (a operação de tempo em si já foi persistida).
+ */
+async function reconcileLaborSafe(
   sb: any,
   writer: any,
   orderId: string,
   userId: string,
-): Promise<void> {
+): Promise<LaborPending | null> {
   const { reconcileLaborFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
   let outcome = await reconcileLaborFromSessions(sb, orderId, userId, writer);
   if (outcome.failed) {
     outcome = await reconcileLaborFromSessions(sb, orderId, userId, writer);
   }
-  if (outcome.failed) {
-    console.error("[labor-reconcile] pendência não incorporada", {
-      orderId,
-      pendingMinutes: outcome.pendingMinutes,
-      error: outcome.error,
-    });
-    throw new Error(
+  if (!outcome.failed) return null;
+  console.error("[labor-reconcile] pendência não incorporada", {
+    orderId,
+    pendingMinutes: outcome.pendingMinutes,
+    error: outcome.error,
+  });
+  return {
+    minutes: outcome.pendingMinutes ?? 0,
+    message:
       outcome.error ??
-        `Não foi possível atualizar a apuração de horas (${outcome.pendingMinutes} min pendentes).`,
-    );
-  }
+      `Não foi possível atualizar a apuração de horas (${outcome.pendingMinutes ?? 0} min pendentes).`,
+  };
 }
 
 /** Técnicos vinculados à OS (inclui o principal da própria OS). */
@@ -321,7 +331,7 @@ export const pauseWork = createServerFn({ method: "POST" })
       throw new Error(result.failed[0]?.message ?? "Nenhuma sessão ativa para pausar.");
     }
     if (result.succeeded.length > 0) {
-      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+      result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
     }
     if (result.failed.length > 0) {
       throw new Error(result.failed[0]?.message ?? "Não foi possível pausar todos os tempos.");
@@ -394,7 +404,7 @@ export const resumeWork = createServerFn({ method: "POST" })
       throw new Error(result.failed[0]?.message ?? "Não há pausa ativa para retomar.");
     }
     if (result.succeeded.length > 0) {
-      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+      result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
     }
     if (result.failed.length > 0) {
       throw new Error(result.failed[0]?.message ?? "Não foi possível retomar todos os tempos.");
@@ -440,7 +450,7 @@ export const finishWork = createServerFn({ method: "POST" })
       );
     }
     if (result.succeeded.length > 0) {
-      await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+      result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
     }
     if (result.failed.length > 0) {
       throw new Error(result.failed[0]?.message ?? "Não foi possível encerrar todos os tempos.");
@@ -497,7 +507,7 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       .is("ended_at", null);
     if (error) throw new Error(error.message);
 
-    await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
+    const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
     try {
       const { syncServiceOrderOpenTimeAlerts } = await import("@/lib/api/notifications.functions");
       await syncServiceOrderOpenTimeAlerts({
@@ -509,7 +519,7 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
     } catch {
       /* non-blocking */
     }
-    return { ok: true };
+    return { ok: true, laborPending };
   });
 
 export type OrderTimeReview = {
@@ -618,8 +628,8 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
-    await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
-    return { ok: true, reviewedAt, closedSessions: openIds.length };
+    const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
+    return { ok: true, reviewedAt, closedSessions: openIds.length, laborPending };
   });
 
 export type OrderLaborOverride = {
