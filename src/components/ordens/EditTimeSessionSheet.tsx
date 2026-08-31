@@ -138,9 +138,8 @@ export function EditTimeSessionSheet({
     }
     if (new Date(startIso).getTime() > Date.now() + 60_000)
       return "O início não pode estar no futuro.";
-    if (reason.trim().length < 3) return "Descreva o motivo do ajuste (mín. 3 caracteres).";
     return null;
-  }, [session, startInput, endInput, technicianId, reason, isOpen, isCreate]);
+  }, [session, startInput, endInput, technicianId, isOpen, isCreate]);
 
   const mutation = useMutation({
     mutationFn: async () => {
