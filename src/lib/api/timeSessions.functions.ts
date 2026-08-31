@@ -768,20 +768,9 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       return { ok: true, skipped: true, reviewedAt, closedSessions: 0, laborPending: null };
     }
 
-    const openIds = rows.filter((session) => !session.ended_at).map((session) => session.id);
-    if (openIds.length > 0) {
-      const { error: closeError } = await writer
-        .from("service_order_time_sessions")
-        .update({
-          ended_at: reviewedAt,
-          end_reason: "finish",
-          adjusted_by: context.userId,
-          adjusted_at: reviewedAt,
-          adjustment_reason: "Intervalo encerrado na revisão de horas antes da assinatura",
-        })
-        .in("id", openIds);
-      if (closeError) throw new Error(closeError.message);
-    }
+    // Revisar não encerra intervalos em andamento: o cronômetro segue correndo
+    // e só é encerrado na finalização da OS (closeOpenWorkSessions).
+
 
     const { error: reviewError } = await writer
       .from("service_order_time_sessions")
