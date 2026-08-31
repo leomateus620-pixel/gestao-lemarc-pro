@@ -524,28 +524,41 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
 
 export type OrderTimeReview = {
   sessions: TimeSession[];
-  currentTechnicianId: string;
+  currentTechnicianId: string | null;
+  isAdmin: boolean;
+  canEditAll: boolean;
+  reviewCompletedAt: string | null;
+  pendingCount: number;
+  reviewRequired: boolean;
 };
 
-/** Returns the complete team history and the caller's technician identity. */
+/**
+ * Returns the whole team history of the order plus the caller's review scope.
+ * Authorized for admins and for technicians assigned to the order.
+ */
 export const getOrderTimeReview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string }) => data)
   .handler(async ({ data, context }): Promise<OrderTimeReview> => {
     const sb = context.supabase as any;
-    const { data: technician, error: technicianError } = await sb
-      .from("technicians")
-      .select("id, user_id, active")
-      .eq("user_id", context.userId)
-      .eq("active", true)
-      .maybeSingle();
-    if (technicianError) throw new Error(technicianError.message);
-    if (!technician?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+    const { assertOrderTimeAccess } = await import("@/lib/serviceOrders/timeSessionWrite.server");
+    await assertOrderTimeAccess(sb, context.userId, data.orderId);
 
-    const assigned = await listOrderTechnicianIds(sb, data.orderId);
-    if (!assigned.includes(technician.id)) {
-      throw new Error("Você não está vinculado a esta OS.");
-    }
+    const [{ data: isAdminRaw }, { data: technician }, { data: order }] = await Promise.all([
+      sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      sb
+        .from("technicians")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("active", true)
+        .maybeSingle(),
+      sb
+        .from("service_orders")
+        .select("time_review_completed_at")
+        .eq("id", data.orderId)
+        .maybeSingle(),
+    ]);
+    const isAdmin = Boolean(isAdminRaw);
 
     const { data: rows, error } = await sb
       .from("service_order_time_sessions")
@@ -554,14 +567,25 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
       .eq("kind", "work")
       .order("started_at", { ascending: true });
     if (error) throw new Error(error.message);
+
+    const sessions = (rows ?? []).map(normalize);
+    const pendingCount = sessions.filter(
+      (session) => !session.technician_reviewed_at || !session.ended_at,
+    ).length;
+
     return {
-      sessions: (rows ?? []).map(normalize),
-      currentTechnicianId: technician.id as string,
+      sessions,
+      currentTechnicianId: (technician?.id as string | undefined) ?? null,
+      isAdmin,
+      canEditAll: isAdmin,
+      reviewCompletedAt: (order?.time_review_completed_at as string | null) ?? null,
+      pendingCount,
+      reviewRequired: sessions.length > 0 && pendingCount > 0,
     };
   });
 
 /**
- * Confirms the signed-in technician's own time history before signature.
+ * Confirms the recorded time history of the order before signature.
  * Open work intervals are closed at this exact confirmation moment, then the
  * same reconciliation path updates the admin review, totals and reports.
  */
@@ -574,34 +598,32 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: technician, error: technicianError } = await sb
-      .from("technicians")
-      .select("id, active")
-      .eq("user_id", context.userId)
-      .eq("active", true)
-      .maybeSingle();
-    if (technicianError) throw new Error(technicianError.message);
-    if (!technician?.id) throw new Error("Perfil de técnico não encontrado ou inativo.");
+    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
+      "@/lib/serviceOrders/timeSessionWrite.server"
+    );
+    await assertOrderTimeAccess(sb, context.userId, data.orderId);
 
-    const assigned = await listOrderTechnicianIds(sb, data.orderId);
-    if (!assigned.includes(technician.id)) throw new Error("Você não está vinculado a esta OS.");
-
-    const { data: ownSessions, error: sessionsError } = await sb
+    const { data: sessions, error: sessionsError } = await sb
       .from("service_order_time_sessions")
       .select("id, started_at, ended_at")
       .eq("service_order_id", data.orderId)
-      .eq("technician_id", technician.id)
       .eq("kind", "work");
     if (sessionsError) throw new Error(sessionsError.message);
-    if (!ownSessions || ownSessions.length === 0) {
-      throw new Error("Nenhum horário seu foi registrado nesta OS.");
-    }
 
     const reviewedAt = new Date().toISOString();
-    const openIds = (ownSessions as { id: string; started_at: string; ended_at: string | null }[])
-      .filter((session) => !session.ended_at)
-      .map((session) => session.id);
-    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server")).getTimeSessionWriter();
+    const writer = await getTimeSessionWriter();
+
+    const rows = (sessions ?? []) as { id: string; started_at: string; ended_at: string | null }[];
+    if (rows.length === 0) {
+      // OS sem apontamento: nada a revisar, o fluxo segue para a assinatura.
+      await writer
+        .from("service_orders")
+        .update({ time_review_completed_at: reviewedAt, time_review_completed_by: context.userId })
+        .eq("id", data.orderId);
+      return { ok: true, skipped: true, reviewedAt, closedSessions: 0, laborPending: null };
+    }
+
+    const openIds = rows.filter((session) => !session.ended_at).map((session) => session.id);
     if (openIds.length > 0) {
       const { error: closeError } = await writer
         .from("service_order_time_sessions")
@@ -610,7 +632,7 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
           end_reason: "finish",
           adjusted_by: context.userId,
           adjusted_at: reviewedAt,
-          adjustment_reason: "Intervalo encerrado na revisão do técnico antes da assinatura",
+          adjustment_reason: "Intervalo encerrado na revisão de horas antes da assinatura",
         })
         .in("id", openIds);
       if (closeError) throw new Error(closeError.message);
@@ -624,12 +646,17 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
         technician_review_note: data.note?.trim() || null,
       })
       .eq("service_order_id", data.orderId)
-      .eq("technician_id", technician.id)
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
+    const { error: orderError } = await writer
+      .from("service_orders")
+      .update({ time_review_completed_at: reviewedAt, time_review_completed_by: context.userId })
+      .eq("id", data.orderId);
+    if (orderError) throw new Error(orderError.message);
+
     const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
-    return { ok: true, reviewedAt, closedSessions: openIds.length, laborPending };
+    return { ok: true, skipped: false, reviewedAt, closedSessions: openIds.length, laborPending };
   });
 
 export type OrderLaborOverride = {
