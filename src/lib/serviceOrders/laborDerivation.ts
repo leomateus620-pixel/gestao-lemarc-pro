@@ -239,16 +239,25 @@ export function overlapsExisting(
     end_time: string;
   }[],
 ): boolean {
-  const start = toMinutes(segment.start_time);
-  const end = toMinutes(segment.end_time);
+  const start = toSeconds(segment.start_time);
+  const end = toSeconds(segment.end_time);
   return existing.some((e) => {
     if ((e.technician_id ?? "") !== (segment.technician_id ?? "")) return false;
     if (e.work_date !== segment.work_date) return false;
-    const es = toMinutes(e.start_time);
-    const ee = toMinutes(e.end_time);
+    const es = toSeconds(e.start_time);
+    const ee = toSeconds(e.end_time);
+    // Intervalos de duração zero (apontamentos de poucos segundos, cujo
+    // start/end arredondam para o mesmo instante) nunca "sobrepõem" no
+    // sentido estrito e eram reinseridos a cada reconciliação. Basta o
+    // início coincidir — ou cair dentro da linha existente — para
+    // considerar a hora já apurada.
+    if (end <= start || ee <= es) {
+      return start === es || (start >= es && start <= ee) || (es >= start && es <= end);
+    }
     return start < ee && es < end;
   });
 }
+
 
 /** Stable identity of a labor row / segment, tolerant to seconds precision. */
 export function segmentKey(e: {
