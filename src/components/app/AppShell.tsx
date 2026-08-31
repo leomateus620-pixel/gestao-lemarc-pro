@@ -98,16 +98,17 @@ export function AppShell({
                     {firstName}
                   </div>
                 </div>
-                {action ??
-                  (!back && (
-                    <Link
-                      to="/ordens/nova"
-                      className="lemarc-pressable grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
-                      aria-label="Nova OS"
-                    >
-                      <Plus size={18} />
-                    </Link>
-                  ))}
+                {!hideAction &&
+                  (action ??
+                    (!back && (
+                      <Link
+                        to="/ordens/nova"
+                        className="lemarc-pressable grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lemarc-orange-glow"
+                        aria-label="Nova OS"
+                      >
+                        <Plus size={18} />
+                      </Link>
+                    )))}
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
