@@ -175,11 +175,12 @@ function hm(time: string): string {
   return time.slice(0, 5);
 }
 
-/** Minutos desde 00:00 de um "HH:mm(:ss)". */
-function toMinutes(time: string): number {
-  const [h, m] = hm(time).split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
+/** Segundos desde 00:00 de um "HH:mm(:ss)". */
+function toSeconds(time: string): number {
+  const [h, m, s] = time.split(":").map(Number);
+  return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
 }
+
 
 /**
  * Limite operacional de uma sessão de trabalho contínua (sem pausa).
