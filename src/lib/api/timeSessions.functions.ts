@@ -568,9 +568,9 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
       .order("started_at", { ascending: true });
     if (error) throw new Error(error.message);
 
-    const sessions = (rows ?? []).map(normalize);
+    const sessions: TimeSession[] = (rows ?? []).map(normalize);
     const pendingCount = sessions.filter(
-      (session) => !session.technician_reviewed_at || !session.ended_at,
+      (session: TimeSession) => !session.technician_reviewed_at || !session.ended_at,
     ).length;
 
     return {
