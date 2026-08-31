@@ -578,7 +578,10 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
 
     const currentTechnicianId = (technician?.id as string | undefined) ?? null;
     const orderTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
-    const eligibleTechnicianIds = isAdmin
+    // Admin ou técnico vinculado à OS (assertOrderTimeAccess acima) pode revisar
+    // e ajustar os horários de toda a equipe daquela OS.
+    const canEditAll = isAdmin || Boolean(currentTechnicianId);
+    const eligibleTechnicianIds = canEditAll
       ? orderTechnicianIds
       : orderTechnicianIds.filter((id) => id === currentTechnicianId);
 
@@ -586,7 +589,7 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
       sessions,
       currentTechnicianId,
       isAdmin,
-      canEditAll: isAdmin,
+      canEditAll,
       reviewCompletedAt: (order?.time_review_completed_at as string | null) ?? null,
       pendingCount,
       reviewRequired: sessions.length > 0 && pendingCount > 0,
