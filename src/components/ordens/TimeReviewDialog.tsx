@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Clock3, Loader2, Pencil, Plus, ShieldCheck } from "lucide-react";
@@ -126,8 +126,11 @@ export function TimeReviewDialog({
   const totalMinutes = sessions.reduce((total, session) => total + sessionDurationMinutes(session), 0);
   const totalSeconds = sessions.reduce((total, session) => total + sessionDurationSeconds(session), 0);
   const canConfirm = !reviewQuery.isPending && !reviewQuery.isError;
-  const eligibleTechnicians = technicians.filter((technician) =>
-    reviewQuery.data?.eligibleTechnicianIds.includes(technician.id),
+  const eligibleIdsKey = (reviewQuery.data?.eligibleTechnicianIds ?? []).join(",");
+  const eligibleTechnicians = useMemo(
+    () => technicians.filter((technician) => eligibleIdsKey.split(",").includes(technician.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eligibleIdsKey, technicians.map((t) => t.id).join(",")],
   );
 
   return (
