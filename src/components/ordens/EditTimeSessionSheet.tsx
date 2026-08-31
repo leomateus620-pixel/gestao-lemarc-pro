@@ -82,6 +82,8 @@ export function EditTimeSessionSheet({
   const isPaused = session?.end_reason === "pause";
   const isOpen = session ? !session.ended_at : false;
 
+  const defaultTechnicianId = availableTechnicians[0]?.id ?? "";
+
   useEffect(() => {
     if (!open) return;
     if (session) {
@@ -93,12 +95,19 @@ export function EditTimeSessionSheet({
     } else {
       setStartInput(initialManualStart());
       setEndInput(initialManualEnd());
-      setTechnicianId(availableTechnicians[0]?.id ?? "");
+      setTechnicianId(defaultTechnicianId);
       setPauseReason("");
       setPauseNotes("");
     }
     setReason("");
-  }, [session?.id, open, availableTechnicians]);
+    // Reinicia apenas ao abrir ou trocar a sessão editada — nunca a cada tique do cronômetro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, open]);
+
+  useEffect(() => {
+    if (!open || session) return;
+    setTechnicianId((current) => (current ? current : defaultTechnicianId));
+  }, [open, session, defaultTechnicianId]);
 
   const validationError = useMemo(() => {
     const startIso = localInputToIso(startInput);
