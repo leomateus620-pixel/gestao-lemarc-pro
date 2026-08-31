@@ -668,27 +668,43 @@ function ClientStep({
       {mode === "select" ? (
         <div className="space-y-3">
           {selectedClient && (
-            <div className="lemarc-selected-summary flex items-start gap-3 rounded-xl px-3.5 py-3">
-              <CheckCircle2
-                aria-hidden="true"
-                size={18}
-                className="mt-0.5 shrink-0 text-emerald-300"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-emerald-200">Cliente selecionado</p>
-                <p className="mt-0.5 break-words text-sm font-semibold text-white">
-                  {selectedClient.name}
-                </p>
-                {(selectedClient.unit || selectedClient.cnpj) && (
-                  <p className="mt-0.5 break-words text-xs text-slate-300">
-                    {[
-                      selectedClient.unit,
-                      selectedClient.cnpj ? maskCNPJ(selectedClient.cnpj) : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
+            <div className="sticky top-[var(--lemarc-header-content-offset,0px)] z-20">
+              <div className="lemarc-selected-summary flex flex-col gap-3 rounded-xl px-3.5 py-3 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <CheckCircle2
+                    aria-hidden="true"
+                    size={18}
+                    className="mt-0.5 shrink-0 text-emerald-300"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-emerald-200">Cliente selecionado</p>
+                    <p className="mt-0.5 break-words text-sm font-semibold text-white">
+                      {[selectedClient.name, selectedUnitName].filter(Boolean).join(" · ")}
+                    </p>
+                    {(selectedClient.unit || selectedClient.cnpj) && (
+                      <p className="mt-0.5 break-words text-xs text-slate-300">
+                        {[
+                          selectedClient.unit,
+                          selectedClient.cnpj ? maskCNPJ(selectedClient.cnpj) : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onContinue}
+                  className={cn(
+                    "lemarc-primary-action lemarc-pressable flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 font-display text-sm font-bold",
+                    canContinue
+                      ? "hover:-translate-y-0.5 active:scale-[0.98]"
+                      : "lemarc-primary-action--attention",
+                  )}
+                >
+                  Continuar <ArrowRight size={16} />
+                </button>
               </div>
             </div>
           )}
