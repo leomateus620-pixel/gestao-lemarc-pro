@@ -196,3 +196,42 @@ describe("dois técnicos simultâneos", () => {
     expect(missing[0]!.technician_id).toBe("joao");
   });
 });
+
+describe("isAdminReviewedStatus", () => {
+  it("não trava a OS apenas finalizada pelo técnico", () => {
+    expect(isAdminReviewedStatus("finished")).toBe(false);
+    expect(isAdminReviewedStatus("running")).toBe(false);
+  });
+
+  it("trava a OS revisada/aprovada/cancelada pelo admin", () => {
+    for (const status of ["review", "approved", "cancelled"]) {
+      expect(isAdminReviewedStatus(status)).toBe(true);
+    }
+  });
+});
+
+describe("horas do dia seguinte em OS finalizada pelo técnico", () => {
+  it("aponta os segmentos ainda ausentes na apuração", () => {
+    const segments = splitSessionsByDay([
+      {
+        id: "d1",
+        technician_id: "matheus",
+        started_at: "2026-08-19T13:29:00.000Z",
+        ended_at: "2026-08-19T15:45:00.000Z",
+        duration_minutes: 136,
+      },
+      {
+        id: "d2",
+        technician_id: "matheus",
+        started_at: "2026-08-20T11:36:00.000Z",
+        ended_at: "2026-08-20T15:05:00.000Z",
+        duration_minutes: 209,
+      },
+    ]);
+    const missing = findMissingSegments(segments, [
+      { technician_id: "matheus", work_date: "2026-08-19", start_time: "10:29", end_time: "12:45" },
+    ]);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.work_date).toBe("2026-08-20");
+  });
+});
