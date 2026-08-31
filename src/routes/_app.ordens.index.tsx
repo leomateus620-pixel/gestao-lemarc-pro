@@ -295,7 +295,7 @@ function OrdensList() {
           {
             label: "Valor",
             value: formatBRL(kpis.realValueCents),
-            evidence: "Apurado",
+            evidence: undefined,
             detail: kpis.estimatedValueCents > 0 ? `${formatBRL(kpis.estimatedValueCents)} estimado` : undefined,
           },
         ]}
