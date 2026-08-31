@@ -142,8 +142,8 @@ export function TimeReviewDialog({
                 </p>
                 <DialogTitle className="mt-1">Revise os horários antes da assinatura</DialogTitle>
                 <DialogDescription className="mt-1">
-                  Confira os intervalos apontados na OS. A confirmação encerra intervalos em
-                  andamento e atualiza a apuração de horas.
+                  Confira os intervalos apontados na OS. A confirmação apenas revisa e atualiza a
+                  apuração de horas — o cronômetro em andamento continua correndo.
                 </DialogDescription>
               </div>
               <ShieldCheck className="mt-1 shrink-0 text-primary" size={20} />
