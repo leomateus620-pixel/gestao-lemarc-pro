@@ -298,7 +298,19 @@ export const pauseWork = createServerFn({ method: "POST" })
       const { reconcileLaborFromSessions } = await import(
         "@/lib/serviceOrders/laborSync.server"
       );
-      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
+      // horas do histórico fora da apuração até alguém abrir a tela.
+      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      if (outcome.failed) {
+        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      }
+      if (outcome.failed) {
+        console.error("[labor-reconcile] pendência não incorporada", {
+          orderId: data.orderId,
+          pendingMinutes: outcome.pendingMinutes,
+          error: outcome.error,
+        });
+      }
     } catch {
       /* non-blocking */
     }
@@ -413,7 +425,19 @@ export const finishWork = createServerFn({ method: "POST" })
       const { reconcileLaborFromSessions } = await import(
         "@/lib/serviceOrders/laborSync.server"
       );
-      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
+      // horas do histórico fora da apuração até alguém abrir a tela.
+      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      if (outcome.failed) {
+        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      }
+      if (outcome.failed) {
+        console.error("[labor-reconcile] pendência não incorporada", {
+          orderId: data.orderId,
+          pendingMinutes: outcome.pendingMinutes,
+          error: outcome.error,
+        });
+      }
     } catch {
       /* non-blocking */
     }
@@ -472,7 +496,19 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       const { reconcileLaborFromSessions } = await import(
         "@/lib/serviceOrders/laborSync.server"
       );
-      await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      // Verificação + 1 retentativa: uma falha silenciosa aqui deixava as
+      // horas do histórico fora da apuração até alguém abrir a tela.
+      let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      if (outcome.failed) {
+        outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      }
+      if (outcome.failed) {
+        console.error("[labor-reconcile] pendência não incorporada", {
+          orderId: data.orderId,
+          pendingMinutes: outcome.pendingMinutes,
+          error: outcome.error,
+        });
+      }
     } catch {
       /* non-blocking */
     }

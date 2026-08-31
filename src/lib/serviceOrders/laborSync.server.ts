@@ -13,6 +13,7 @@ import {
   filterMaterializableSessions,
   isAdminReviewedStatus,
   minutesBetween,
+  pendingLaborMinutes,
   splitSessionsByDay,
 } from "@/lib/serviceOrders/laborDerivation";
 
@@ -29,6 +30,18 @@ type TechInfo = {
   full_name: string;
   role: string | null;
   hourly_rate_cents: number | null;
+};
+
+export type ReconcileOutcome = {
+  /** Linhas de apuração criadas nesta execução. */
+  appended: number;
+  /** Minutos do histórico que continuam fora da apuração após a execução. */
+  pendingMinutes: number;
+  /** Reconciliação não concluiu (erro de gravação/leitura) — vale nova tentativa. */
+  failed: boolean;
+  /** Bloqueado de propósito (ajuste do admin / OS revisada). */
+  locked?: boolean;
+  error?: string;
 };
 
 export type LaborSyncOutcome =
@@ -251,7 +264,7 @@ export async function reconcileLaborFromSessions(
   sb: any,
   orderId: string,
   userId: string | null,
-): Promise<{ appended: number }> {
+): Promise<ReconcileOutcome> {
   try {
     const [{ data: sessionsRaw }, { data: existing }] = await Promise.all([
       sb
@@ -279,7 +292,7 @@ export async function reconcileLaborFromSessions(
     // OS já revisada pelo admin: nunca acrescentar horas automaticamente.
     // "finished" (técnico encerrou) continua liberado para reconciliação.
     if (finRow?.finalized_at || isAdminReviewedStatus(orderRow?.status)) {
-      return { appended: 0 };
+      return { appended: 0, pendingMinutes: 0, failed: false, locked: true };
     }
 
     const closedAll = (sessionsRaw ?? [])
@@ -298,7 +311,7 @@ export async function reconcileLaborFromSessions(
       }));
     // Sessões esquecidas em aberto exigem ajuste manual do admin.
     const closed = filterMaterializableSessions(closedAll);
-    if (closed.length === 0) return { appended: 0 };
+    if (closed.length === 0) return { appended: 0, pendingMinutes: 0, failed: false };
 
     const existingRows = (existing ?? []) as {
       technician_id: string | null;
@@ -358,12 +371,31 @@ export async function reconcileLaborFromSessions(
       const { error: insErr } = await sb
         .from("service_order_labor_entries")
         .insert(inserts);
-      if (insErr) return { appended: 0 };
+      if (insErr) {
+        return {
+          appended: 0,
+          pendingMinutes: missing.reduce((a, m) => a + m.duration_minutes, 0),
+          failed: true,
+          error: insErr.message,
+        };
+      }
     }
 
     await recomputeOrderFinancials(sb, orderId, null);
-    return { appended: missing.length };
-  } catch {
-    return { appended: 0 };
+
+    // Verificação: depois de reconciliar, nada do histórico pode continuar fora.
+    const { data: after } = await sb
+      .from("service_order_labor_entries")
+      .select("technician_id, work_date, start_time, end_time")
+      .eq("service_order_id", orderId);
+    const pendingMinutes = pendingLaborMinutes(closed, (after ?? []) as any[]);
+    return { appended: missing.length, pendingMinutes, failed: pendingMinutes > 0 };
+  } catch (e) {
+    return {
+      appended: 0,
+      pendingMinutes: 0,
+      failed: true,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }

@@ -4,6 +4,7 @@ import {
   findMissingSegments,
   isAdminReviewedStatus,
   isSuspiciousSession,
+  pendingLaborMinutes,
   splitSessionByDay,
   splitSessionsByDay,
 } from "./laborDerivation";
@@ -234,5 +235,95 @@ describe("horas do dia seguinte em OS finalizada pelo técnico", () => {
     ]);
     expect(missing).toHaveLength(1);
     expect(missing[0]!.work_date).toBe("2026-08-20");
+  });
+});
+
+describe("pendingLaborMinutes (rede de segurança da apuração)", () => {
+  const sp = (d: string, t: string) => `${d}T${t}:00.000-03:00`;
+
+  it("acusa pendência quando o histórico do dia seguinte não foi apurado", () => {
+    const sessions = [
+      {
+        id: "s1",
+        technician_id: "t1",
+        started_at: sp("2026-08-19", "10:29"),
+        ended_at: sp("2026-08-19", "12:45"),
+        duration_minutes: 136,
+      },
+      {
+        id: "s2",
+        technician_id: "t1",
+        started_at: sp("2026-08-20", "08:36"),
+        ended_at: sp("2026-08-20", "12:05"),
+        duration_minutes: 209,
+      },
+    ];
+    const existing = [
+      {
+        technician_id: "t1",
+        work_date: "2026-08-19",
+        start_time: "10:29:00",
+        end_time: "12:45:00",
+      },
+    ];
+    expect(pendingLaborMinutes(sessions, existing)).toBe(209);
+    expect(pendingLaborMinutes(sessions, [])).toBe(345);
+  });
+
+  it("sessões curtas (poucos minutos) também contam como pendência", () => {
+    const sessions = [
+      {
+        id: "s1",
+        technician_id: "t1",
+        started_at: sp("2026-08-19", "16:28"),
+        ended_at: sp("2026-08-19", "16:33"),
+        duration_minutes: 5,
+      },
+    ];
+    expect(pendingLaborMinutes(sessions, [])).toBe(5);
+  });
+
+  it("sessões suspeitas (>14h ou virando o dia) NÃO geram pendência automática", () => {
+    const longSession = [
+      {
+        id: "s1",
+        technician_id: "t1",
+        started_at: sp("2026-08-19", "07:00"),
+        ended_at: sp("2026-08-19", "23:30"),
+        duration_minutes: 990,
+      },
+    ];
+    const overnight = [
+      {
+        id: "s2",
+        technician_id: "t1",
+        started_at: sp("2026-08-19", "18:00"),
+        ended_at: sp("2026-08-20", "09:00"),
+        duration_minutes: 900,
+      },
+    ];
+    expect(pendingLaborMinutes(longSession, [])).toBe(0);
+    expect(pendingLaborMinutes(overnight, [])).toBe(0);
+  });
+
+  it("apuração completa fica sem pendência (idempotente)", () => {
+    const sessions = [
+      {
+        id: "s1",
+        technician_id: "t1",
+        started_at: sp("2026-08-19", "08:00"),
+        ended_at: sp("2026-08-19", "12:00"),
+        duration_minutes: 240,
+      },
+    ];
+    const existing = [
+      {
+        technician_id: "t1",
+        work_date: "2026-08-19",
+        start_time: "08:00:00",
+        end_time: "12:00:00",
+      },
+    ];
+    expect(pendingLaborMinutes(sessions, existing)).toBe(0);
   });
 });
