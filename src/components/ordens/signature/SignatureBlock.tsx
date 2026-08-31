@@ -48,7 +48,6 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
     setTimeReviewOpen(true);
   }
 
-
   return (
     <section className="mt-5">
       <GlassCard className="overflow-hidden p-4">
@@ -136,10 +135,7 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
               celular. A assinatura fica vinculada à OS e aparece no relatório final.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={startSignature}
-                className="gap-2 bg-primary text-primary-foreground"
-              >
+              <Button onClick={startSignature} className="gap-2 bg-primary text-primary-foreground">
                 <PenLine size={15} /> Coletar assinatura
               </Button>
               {isAdmin && (

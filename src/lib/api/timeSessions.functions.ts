@@ -236,9 +236,8 @@ export const startWork = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<TimeBatchResult> => {
     if (!data.orderId) throw new Error("Dados inválidos.");
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const scope = await resolveScope(sb, data);
     if (scope.length === 0) throw new Error("Vincule ao menos um técnico à OS.");
@@ -294,9 +293,8 @@ export const pauseWork = createServerFn({ method: "POST" })
       throw new Error("Informe uma observação para o motivo 'Outro'.");
     }
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
@@ -355,9 +353,8 @@ export const resumeWork = createServerFn({ method: "POST" })
   .inputValidator((data: BatchInput & { notes?: string | null }) => data)
   .handler(async ({ data, context }): Promise<TimeBatchResult> => {
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
@@ -417,9 +414,8 @@ export const finishWork = createServerFn({ method: "POST" })
   .inputValidator((data: BatchInput) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
     const scope = await resolveScope(sb, data);
     const writer = await getTimeSessionWriter();
@@ -444,10 +440,10 @@ export const finishWork = createServerFn({ method: "POST" })
         result.failed.push({ technicianId, message: errMessage(e) });
       }
     }
-    if (result.succeeded.length === 0 && result.skipped.length === 0) {
-      throw new Error(
-        result.failed[0]?.message ?? "Nenhum tempo em aberto foi encontrado para encerrar.",
-      );
+    if (result.succeeded.length === 0 && result.failed.length === 0) {
+      // A OS pode estar pausada ou já sem intervalo aberto. A finalização
+      // continua válida; não há cronômetro para encerrar neste momento.
+      return { ok: true, openTimeAlert: null, ...result };
     }
     if (result.succeeded.length > 0) {
       result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
@@ -496,8 +492,9 @@ export const finishColleagueWork = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!assigned) throw new Error("Técnico não vinculado a esta OS.");
 
-    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
-      .getTimeSessionWriter();
+    const writer = await (
+      await import("@/lib/serviceOrders/timeSessionWrite.server")
+    ).getTimeSessionWriter();
     const { error } = await writer
       .from("service_order_time_sessions")
       .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
@@ -533,7 +530,6 @@ export type OrderTimeReview = {
   /** Técnicos para quem o usuário atual pode lançar um horário manual. */
   eligibleTechnicianIds: string[];
 };
-
 
 /**
  * Returns the whole team history of the order plus the caller's review scope.
@@ -626,9 +622,8 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
 
     const [{ data: isAdminRaw }, { data: order }] = await Promise.all([
@@ -656,7 +651,6 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
     }
     // Técnico vinculado à OS pode lançar horário para qualquer colega da mesma OS
     // (o vínculo do alvo com a OS já foi validado acima).
-
 
     const start = new Date(data.startedAt);
     const end = new Date(data.endedAt);
@@ -727,7 +721,6 @@ export const createManualTimeSession = createServerFn({ method: "POST" })
     return normalize(inserted);
   });
 
-
 /**
  * Confirms the recorded time history of the order before signature.
  * Reviewing does NOT stop the clock: intervals still running stay open and keep
@@ -743,9 +736,8 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { assertOrderTimeAccess, getTimeSessionWriter } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { assertOrderTimeAccess, getTimeSessionWriter } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     await assertOrderTimeAccess(sb, context.userId, data.orderId);
 
     const { data: sessions, error: sessionsError } = await sb
@@ -770,7 +762,6 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
 
     // Revisar não encerra intervalos em andamento: o cronômetro segue correndo
     // e só é encerrado na finalização da OS (closeOpenWorkSessions).
-
 
     const { error: reviewError } = await writer
       .from("service_order_time_sessions")
@@ -902,9 +893,8 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
       _role: "admin",
     });
 
-    const { getTimeSessionWriter, assertOrderTimeAccess } = await import(
-      "@/lib/serviceOrders/timeSessionWrite.server"
-    );
+    const { getTimeSessionWriter, assertOrderTimeAccess } =
+      await import("@/lib/serviceOrders/timeSessionWrite.server");
     // Read with the service credential; authorization happens right after and
     // is scoped to the session's own order.
     const sessionWriter = await getTimeSessionWriter();
@@ -924,7 +914,6 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     // Admin, or any technician assigned to this OS, may adjust the team hours
     // of that OS (including a colleague's interval).
     await assertOrderTimeAccess(sb, userId, session.service_order_id);
-
 
     // Load the order to gate by status and confirm assignment for non-admins.
     const { data: order, error: ordErr } = await sb
@@ -950,7 +939,6 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     }
 
     // O vínculo do autor com a OS já foi validado por assertOrderTimeAccess.
-
 
     // Validate times.
     const nextStartedAtIso = data.startedAt ?? session.started_at;
@@ -1027,9 +1015,10 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     }
 
     // Append before/after snapshot to metadata.adjustments for audit trail.
-    const prevMeta = (session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata))
-      ? (session.metadata as Record<string, unknown>)
-      : {};
+    const prevMeta =
+      session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata)
+        ? (session.metadata as Record<string, unknown>)
+        : {};
     const prevAdjustments = Array.isArray((prevMeta as any).adjustments)
       ? ((prevMeta as any).adjustments as unknown[])
       : [];
@@ -1051,10 +1040,8 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
           after: {
             started_at: patch.started_at,
             ended_at: patch.ended_at ?? session.ended_at,
-            pause_reason:
-              (patch.pause_reason as string | null | undefined) ?? session.pause_reason,
-            pause_notes:
-              (patch.pause_notes as string | null | undefined) ?? session.pause_notes,
+            pause_reason: (patch.pause_reason as string | null | undefined) ?? session.pause_reason,
+            pause_notes: (patch.pause_notes as string | null | undefined) ?? session.pause_notes,
           },
         },
       ],
@@ -1070,9 +1057,7 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     if (updErr) throw new Error(updErr.message);
 
     // Sync labor entries + recompute financials from sessions.
-    const { syncLaborEntriesFromSessions } = await import(
-      "@/lib/serviceOrders/laborSync.server"
-    );
+    const { syncLaborEntriesFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
     const outcome = await syncLaborEntriesFromSessions(
       sb,
       session.service_order_id,

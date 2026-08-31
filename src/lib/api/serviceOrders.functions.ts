@@ -310,6 +310,72 @@ export const createServiceOrder = createServerFn({ method: "POST" })
     return normalize(row);
   });
 
+export const addServiceOrderTechnicians = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; technicianIds: string[] }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const requestedIds = Array.from(new Set(data.technicianIds.filter(Boolean)));
+    if (requestedIds.length === 0) throw new Error("Selecione ao menos um técnico.");
+
+    const { data: isAdmin, error: roleError } = await sb.rpc("is_admin");
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Ação restrita ao administrador.");
+
+    const { data: order, error: orderError } = await sb
+      .from("service_orders")
+      .select("id, status, technician_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (orderError) throw new Error(orderError.message);
+    if (!order) throw new Error("OS não encontrada.");
+    if (["approved", "cancelled"].includes(order.status)) {
+      throw new Error("Não é possível adicionar técnicos a uma OS encerrada.");
+    }
+
+    const { data: activeTechnicians, error: techniciansError } = await sb
+      .from("technicians")
+      .select("id")
+      .in("id", requestedIds)
+      .eq("active", true);
+    if (techniciansError) throw new Error(techniciansError.message);
+    if ((activeTechnicians ?? []).length !== requestedIds.length) {
+      throw new Error("Só é possível adicionar técnicos ativos cadastrados no sistema.");
+    }
+
+    const { data: existingLinks, error: linksError } = await sb
+      .from("service_order_technicians")
+      .select("technician_id")
+      .eq("service_order_id", data.orderId);
+    if (linksError) throw new Error(linksError.message);
+    const existingIds = new Set<string>(
+      ((existingLinks ?? []) as { technician_id: string }[]).map((link) => link.technician_id),
+    );
+    if (order.technician_id) existingIds.add(order.technician_id as string);
+    const idsToAdd = requestedIds.filter((id) => !existingIds.has(id));
+    if (idsToAdd.length === 0) return { addedCount: 0 };
+
+    const { error: insertError } = await (sb.from("service_order_technicians") as any).insert(
+      idsToAdd.map((technician_id) => ({
+        service_order_id: data.orderId,
+        technician_id,
+        assigned_at: new Date().toISOString(),
+        assigned_by: context.userId,
+        is_primary: false,
+      })),
+    );
+    if (insertError) throw new Error(insertError.message);
+
+    await syncAssignmentNotificationsSafely({
+      supabase: context.supabase,
+      serviceOrderId: data.orderId,
+      technicianIds: [...existingIds, ...idsToAdd],
+      previousTechnicianIds: [...existingIds],
+      createdBy: context.userId,
+    });
+    return { addedCount: idsToAdd.length };
+  });
+
 export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string; technician_ids: string[] }) => data)

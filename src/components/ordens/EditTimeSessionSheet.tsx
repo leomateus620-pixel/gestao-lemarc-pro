@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -76,8 +75,11 @@ export function EditTimeSessionSheet({
   const [endInput, setEndInput] = useState("");
   const [technicianId, setTechnicianId] = useState("");
   const [pauseReason, setPauseReason] = useState<string>("");
-  const [reason, setReason] = useState("");
   const initializedDraftRef = useRef<string | null>(null);
+  /** Motivo automático: mantém a auditoria sem pedir texto ao usuário. */
+  const autoReason = session
+    ? "Ajuste de horário feito na revisão de horas da OS"
+    : "Horário adicionado na revisão de horas da OS";
 
   const isPaused = session?.end_reason === "pause";
   const isOpen = session ? !session.ended_at : false;
@@ -105,7 +107,6 @@ export function EditTimeSessionSheet({
       setTechnicianId(defaultTechnicianId);
       setPauseReason("");
     }
-    setReason("");
     // O rascunho pertence a esta abertura. Refetches, listas novas e o cronômetro
     // não podem reinicializar valores que o usuário já digitou.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,9 +135,8 @@ export function EditTimeSessionSheet({
     }
     if (new Date(startIso).getTime() > Date.now() + 60_000)
       return "O início não pode estar no futuro.";
-    if (reason.trim().length < 3) return "Descreva o motivo do ajuste (mín. 3 caracteres).";
     return null;
-  }, [session, startInput, endInput, technicianId, reason, isOpen, isCreate]);
+  }, [session, startInput, endInput, technicianId, isOpen, isCreate]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -151,7 +151,7 @@ export function EditTimeSessionSheet({
             technicianId,
             startedAt: startIso,
             endedAt: endIso,
-            reason: reason.trim(),
+            reason: autoReason,
           },
         });
       }
@@ -159,7 +159,7 @@ export function EditTimeSessionSheet({
       const payload: Parameters<typeof updateFn>[0]["data"] = {
         sessionId: session.id,
         startedAt: startIso,
-        reason: reason.trim(),
+        reason: autoReason,
       };
       if (!isOpen) {
         const endIso = localInputToIso(endInput);
@@ -269,17 +269,6 @@ export function EditTimeSessionSheet({
               </Select>
             </div>
           )}
-
-          <div className="space-y-1">
-            <Label htmlFor="edit-session-reason">Motivo do ajuste *</Label>
-            <Textarea
-              id="edit-session-reason"
-              rows={2}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ex.: esqueci de registrar este intervalo"
-            />
-          </div>
         </div>
 
         <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">

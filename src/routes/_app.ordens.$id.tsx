@@ -39,10 +39,8 @@ import {
   setServiceOrderTechnicians,
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
-import {
-  getOrderFinancials,
-  reconcileOrderLabor,
-} from "@/lib/api/financials.functions";
+import { AddOrderTechniciansDialog } from "@/components/ordens/AddOrderTechniciansDialog";
+import { getOrderFinancials, reconcileOrderLabor } from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
@@ -214,17 +212,18 @@ function OrdemDetalhe() {
   });
   const alreadyFinalized = Boolean(financialsData?.financials?.finalized_at);
 
-  async function handleTecnicoFinish() {
-    const orderId = order!.id;
-    if (!hasSignature) {
-      setTimeReviewOpen(true);
-      return;
-    }
+  function handleTecnicoFinish() {
+    // A revisão sempre vem antes da finalização. Ela não encerra os cronômetros;
+    // o encerramento acontece somente depois que a etapa final for autorizada.
+    setTimeReviewOpen(true);
+  }
+
+  async function finishTechnicianOrder() {
     try {
       // O servidor encerra os cronômetros e materializa a apuração antes de
       // permitir que a OS avance para `finished`. Se o encerramento falhar,
       // o status não muda.
-      const res = await finishWorkFn({ data: { orderId } });
+      const res = await finishWorkFn({ data: { orderId: id } });
       if (res?.laborPending) {
         toastFn.warning(
           `Horários encerrados, mas ${res.laborPending.minutes} min ainda não entraram na apuração. Avise o administrador.`,
@@ -347,6 +346,13 @@ function OrdemDetalhe() {
               {technicians.length === 0
                 ? "Sem técnico definido"
                 : technicians.map((t) => t.full_name).join(", ")}
+              {isAdmin &&
+                !["finished", "review", "approved", "cancelled"].includes(order.status) && (
+                  <AddOrderTechniciansDialog
+                    orderId={order.id}
+                    assignedTechnicianIds={technicians.map((technician) => technician.id)}
+                  />
+                )}
             </DetailField>
             <DetailField icon={UserRound} label="Solicitante">
               {order.requester_name || "Não informado"}
@@ -449,13 +455,14 @@ function OrdemDetalhe() {
             open={timeReviewOpen}
             onOpenChange={setTimeReviewOpen}
             technicians={technicians}
-            onReviewed={() => setSignOpen(true)}
+            onReviewed={() => (hasSignature ? finishTechnicianOrder() : setSignOpen(true))}
           />
           <SignatureCaptureDialog
             orderId={order.id}
             orderNumber={order.number}
             open={signOpen}
             onOpenChange={setSignOpen}
+            onSaved={finishTechnicianOrder}
           />
         </>
       )}
@@ -799,10 +806,7 @@ function FinancialBlock({
         </div>
       </Section>
       <Section title="Apuração de horas" icon={Calculator}>
-        <PendingLaborBanner
-          orderId={order.id}
-          pendingMinutes={data.laborPendingMinutes ?? 0}
-        />
+        <PendingLaborBanner orderId={order.id} pendingMinutes={data.laborPendingMinutes ?? 0} />
         <LaborEntriesEditor order={order} entries={entries} />
         {canReview && (
           <div className="mt-4 flex justify-end border-t border-white/10 pt-4">
