@@ -12,12 +12,14 @@ export function AppShell({
   title,
   back,
   action,
+  hideAction = false,
   fullscreenForm,
 }: {
   children: ReactNode;
   title?: string;
   back?: boolean;
   action?: ReactNode;
+  hideAction?: boolean;
   /**
    * Quando true, reserva o espaço inferior só para a barra de ações do
    * formulário (sem BottomNav) e remove o padding extra do menu.
