@@ -541,6 +541,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
               hourly_rate_cents: src.hourly_rate_cents,
               subtotal_cents: src.subtotal_cents,
               description: src.description,
+              technician_reviewed_at: src.technician_reviewed_at ?? null,
+              technician_reviewed_by: src.technician_reviewed_by ?? null,
               created_by: context.userId,
               entry_source: "session_sync",
             };
@@ -606,6 +608,8 @@ export const getOrderFinancials = createServerFn({ method: "GET" })
           hourly_rate_cents: e.hourly_rate_cents,
           subtotal_cents: e.subtotal_cents,
           description: e.description,
+          technician_reviewed_at: e.technician_reviewed_at ?? null,
+          technician_reviewed_by: e.technician_reviewed_by ?? null,
           created_by: context.userId,
           entry_source: "session_sync",
         }));
