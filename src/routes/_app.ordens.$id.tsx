@@ -343,13 +343,19 @@ function OrdemDetalhe() {
               {order.client_unit?.city || order.client_unit?.state
                 ? ` · ${[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}`
                 : ""}
-              {isAdmin && order.status !== "cancelled" && <EditClientUnitDialog order={order} />}
-            </DetailField>
-            <DetailField icon={HardHat} label="Técnico responsável">
-              {technicians.length === 0
-                ? "Sem técnico definido"
-                : technicians.map((t) => t.full_name).join(", ")}
-            </DetailField>
+               {isAdmin && order.status !== "cancelled" && <EditClientUnitDialog order={order} />}
+             </DetailField>
+             <DetailField icon={HardHat} label="Técnico responsável">
+               {technicians.length === 0
+                 ? "Sem técnico definido"
+                 : technicians.map((t) => t.full_name).join(", ")}
+               {isAdmin && !["finished", "review", "approved", "cancelled"].includes(order.status) && (
+                 <AddOrderTechniciansDialog
+                   orderId={order.id}
+                   assignedTechnicianIds={technicians.map((technician) => technician.id)}
+                 />
+               )}
+             </DetailField>
             <DetailField icon={UserRound} label="Solicitante">
               {order.requester_name || "Não informado"}
             </DetailField>
@@ -450,8 +456,8 @@ function OrdemDetalhe() {
             orderNumber={order.number}
             open={timeReviewOpen}
             onOpenChange={setTimeReviewOpen}
-            technicians={technicians}
-            onReviewed={() => setSignOpen(true)}
+             technicians={technicians}
+             onReviewed={() => (hasSignature ? finishTechnicianOrder() : setSignOpen(true))}
           />
           <SignatureCaptureDialog
             orderId={order.id}

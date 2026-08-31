@@ -14,7 +14,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { listTechnicians, addServiceOrderTechnicians } from "@/lib/api/serviceOrders.functions";
+import { addServiceOrderTechnicians, listTechnicians } from "@/lib/api/serviceOrders.functions";
+import type { TechnicianLite } from "@/types/serviceOrder";
 
 export function AddOrderTechniciansDialog({
   orderId,
@@ -36,7 +37,7 @@ export function AddOrderTechniciansDialog({
     enabled: open,
     staleTime: 60_000,
   });
-  const technicians = techniciansQuery.data ?? [];
+  const technicians = (techniciansQuery.data ?? []) as TechnicianLite[];
   const assigned = useMemo(() => new Set(assignedTechnicianIds), [assignedTechnicianIds]);
   const available = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -52,7 +53,7 @@ export function AddOrderTechniciansDialog({
 
   const mutation = useMutation({
     mutationFn: () => addFn({ data: { orderId, technicianIds: selected } }),
-    onSuccess: (result) => {
+    onSuccess: (result: { addedCount: number }) => {
       toast.success(
         result.addedCount === 1
           ? "Técnico adicionado à OS."
