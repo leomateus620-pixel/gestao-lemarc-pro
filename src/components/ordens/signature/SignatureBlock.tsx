@@ -19,6 +19,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/components/app/AuthContext";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 import { waiveServiceOrderSignature } from "@/lib/api/signatures.functions";
+import { getOrderTimeReview } from "@/lib/api/timeSessions.functions";
 import { SignatureCaptureDialog } from "./SignatureCaptureDialog";
 import { TimeReviewDialog } from "../TimeReviewDialog";
 
