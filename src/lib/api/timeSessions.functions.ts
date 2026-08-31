@@ -449,6 +449,9 @@ export const finishWork = createServerFn({ method: "POST" })
       // continua válida; não há cronômetro para encerrar neste momento.
       return { ok: true, openTimeAlert: null, ...result };
     }
+    if (result.succeeded.length > 0) {
+      result.laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
+    }
     if (result.failed.length > 0) {
       throw new Error(result.failed[0]?.message ?? "Não foi possível encerrar todos os tempos.");
     }
