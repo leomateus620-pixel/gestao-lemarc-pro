@@ -123,6 +123,8 @@ function deriveEntriesFromSessions(
           segments.length > 1
             ? `Intervalo ${idx + 1} de ${segments.length}`
             : "Trabalho executado",
+        technician_reviewed_at: seg.technician_reviewed_at ?? null,
+        technician_reviewed_by: seg.technician_reviewed_by ?? null,
         technician: techObj,
       });
     });

@@ -317,6 +317,8 @@ export async function reconcileLaborFromSessions(
           (s.duration_minutes ?? 0) > 0
             ? (s.duration_minutes as number)
             : minutesBetween(s.started_at, s.ended_at),
+        technician_reviewed_at: (s.technician_reviewed_at ?? null) as string | null,
+        technician_reviewed_by: (s.technician_reviewed_by ?? null) as string | null,
       }));
     // Sessões esquecidas em aberto exigem ajuste manual do admin.
     const closed = filterMaterializableSessions(closedAll);
@@ -373,6 +375,8 @@ export async function reconcileLaborFromSessions(
           hourly_rate_cents: rate,
           subtotal_cents: computeSubtotalCents(m.duration_minutes, rate),
           description: "Trabalho executado",
+          technician_reviewed_at: m.technician_reviewed_at ?? null,
+          technician_reviewed_by: m.technician_reviewed_by ?? null,
           created_by: userId,
           entry_source: "session_sync",
         };
