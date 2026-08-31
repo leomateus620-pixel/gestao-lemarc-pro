@@ -81,7 +81,6 @@ export function EditTimeSessionSheet({
     ? "Ajuste de horário feito na revisão de horas da OS"
     : "Horário adicionado na revisão de horas da OS";
 
-
   const isPaused = session?.end_reason === "pause";
   const isOpen = session ? !session.ended_at : false;
 
@@ -153,7 +152,6 @@ export function EditTimeSessionSheet({
             startedAt: startIso,
             endedAt: endIso,
             reason: autoReason,
-
           },
         });
       }
@@ -272,7 +270,6 @@ export function EditTimeSessionSheet({
             </div>
           )}
         </div>
-
 
         <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>

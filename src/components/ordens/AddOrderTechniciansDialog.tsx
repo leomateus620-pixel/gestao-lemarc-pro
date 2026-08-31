@@ -67,7 +67,9 @@ export function AddOrderTechniciansDialog({
       setOpen(false);
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Não foi possível adicionar os técnicos."),
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível adicionar os técnicos.",
+      ),
   });
 
   function toggleTechnician(id: string) {
@@ -170,7 +172,12 @@ export function AddOrderTechniciansDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={mutation.isPending}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={mutation.isPending}
+          >
             Cancelar
           </Button>
           <Button
@@ -178,7 +185,11 @@ export function AddOrderTechniciansDialog({
             onClick={() => mutation.mutate()}
             disabled={selected.length === 0 || mutation.isPending}
           >
-            {mutation.isPending ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
+            {mutation.isPending ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <Plus size={16} className="mr-2" />
+            )}
             {mutation.isPending ? "Adicionando…" : "Adicionar selecionados"}
           </Button>
         </DialogFooter>

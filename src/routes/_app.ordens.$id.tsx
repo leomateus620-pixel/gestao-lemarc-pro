@@ -40,10 +40,7 @@ import {
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
 import { AddOrderTechniciansDialog } from "@/components/ordens/AddOrderTechniciansDialog";
-import {
-  getOrderFinancials,
-  reconcileOrderLabor,
-} from "@/lib/api/financials.functions";
+import { getOrderFinancials, reconcileOrderLabor } from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
 import { FinalizeServiceOrderDialog } from "@/components/ordens/FinalizeServiceOrderDialog";
@@ -343,19 +340,20 @@ function OrdemDetalhe() {
               {order.client_unit?.city || order.client_unit?.state
                 ? ` · ${[order.client_unit?.city, order.client_unit?.state].filter(Boolean).join("/")}`
                 : ""}
-               {isAdmin && order.status !== "cancelled" && <EditClientUnitDialog order={order} />}
-             </DetailField>
-             <DetailField icon={HardHat} label="Técnico responsável">
-               {technicians.length === 0
-                 ? "Sem técnico definido"
-                 : technicians.map((t) => t.full_name).join(", ")}
-               {isAdmin && !["finished", "review", "approved", "cancelled"].includes(order.status) && (
-                 <AddOrderTechniciansDialog
-                   orderId={order.id}
-                   assignedTechnicianIds={technicians.map((technician) => technician.id)}
-                 />
-               )}
-             </DetailField>
+              {isAdmin && order.status !== "cancelled" && <EditClientUnitDialog order={order} />}
+            </DetailField>
+            <DetailField icon={HardHat} label="Técnico responsável">
+              {technicians.length === 0
+                ? "Sem técnico definido"
+                : technicians.map((t) => t.full_name).join(", ")}
+              {isAdmin &&
+                !["finished", "review", "approved", "cancelled"].includes(order.status) && (
+                  <AddOrderTechniciansDialog
+                    orderId={order.id}
+                    assignedTechnicianIds={technicians.map((technician) => technician.id)}
+                  />
+                )}
+            </DetailField>
             <DetailField icon={UserRound} label="Solicitante">
               {order.requester_name || "Não informado"}
             </DetailField>
@@ -456,16 +454,16 @@ function OrdemDetalhe() {
             orderNumber={order.number}
             open={timeReviewOpen}
             onOpenChange={setTimeReviewOpen}
-             technicians={technicians}
-             onReviewed={() => (hasSignature ? finishTechnicianOrder() : setSignOpen(true))}
+            technicians={technicians}
+            onReviewed={() => (hasSignature ? finishTechnicianOrder() : setSignOpen(true))}
           />
-           <SignatureCaptureDialog
-             orderId={order.id}
-             orderNumber={order.number}
-             open={signOpen}
-             onOpenChange={setSignOpen}
-             onSaved={finishTechnicianOrder}
-           />
+          <SignatureCaptureDialog
+            orderId={order.id}
+            orderNumber={order.number}
+            open={signOpen}
+            onOpenChange={setSignOpen}
+            onSaved={finishTechnicianOrder}
+          />
         </>
       )}
 
@@ -808,10 +806,7 @@ function FinancialBlock({
         </div>
       </Section>
       <Section title="Apuração de horas" icon={Calculator}>
-        <PendingLaborBanner
-          orderId={order.id}
-          pendingMinutes={data.laborPendingMinutes ?? 0}
-        />
+        <PendingLaborBanner orderId={order.id} pendingMinutes={data.laborPendingMinutes ?? 0} />
         <LaborEntriesEditor order={order} entries={entries} />
         {canReview && (
           <div className="mt-4 flex justify-end border-t border-white/10 pt-4">
