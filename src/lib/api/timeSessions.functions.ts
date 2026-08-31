@@ -774,10 +774,9 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
+    // Pendência de apuração não pode travar o fluxo do técnico: a revisão é
+    // marcada, o aviso volta para a interface e a assinatura pode seguir.
     const laborPending = await reconcileLaborSafe(sb, writer, data.orderId, context.userId);
-    if (laborPending) {
-      throw new Error(laborPending.message);
-    }
 
     const { error: orderError } = await writer
       .from("service_orders")
@@ -785,8 +784,9 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("id", data.orderId);
     if (orderError) throw new Error(orderError.message);
 
-    return { ok: true, skipped: false, reviewedAt, closedSessions: 0, laborPending: null };
+    return { ok: true, skipped: false, reviewedAt, closedSessions: 0, laborPending };
   });
+
 
 export type OrderLaborOverride = {
   adjustedAt: string | null;
