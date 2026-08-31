@@ -682,9 +682,11 @@ export const reconcileOrderLabor = createServerFn({ method: "POST" })
     const { reconcileLaborFromSessions } = await import(
       "@/lib/serviceOrders/laborSync.server"
     );
-    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
+      .getTimeSessionWriter();
+    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId, writer);
     if (outcome.failed) {
-      outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
+      outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId, writer);
     }
     if (outcome.failed) {
       throw new Error(

@@ -618,12 +618,7 @@ export const saveOrderTimeReview = createServerFn({ method: "POST" })
       .eq("kind", "work");
     if (reviewError) throw new Error(reviewError.message);
 
-    const { reconcileLaborFromSessions } = await import("@/lib/serviceOrders/laborSync.server");
-    let outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-    if (outcome.failed) outcome = await reconcileLaborFromSessions(sb, data.orderId, context.userId);
-    if (outcome.failed) {
-      throw new Error("Os horários foram revisados, mas a apuração ainda está pendente. Tente novamente.");
-    }
+    await reconcileLaborOrThrow(sb, writer, data.orderId, context.userId);
     return { ok: true, reviewedAt, closedSessions: openIds.length };
   });
 
@@ -922,7 +917,14 @@ export const updateOwnTimeSession = createServerFn({ method: "POST" })
     const { syncLaborEntriesFromSessions } = await import(
       "@/lib/serviceOrders/laborSync.server"
     );
-    const outcome = await syncLaborEntriesFromSessions(sb, session.service_order_id, userId);
+    const writer = await (await import("@/lib/serviceOrders/timeSessionWrite.server"))
+      .getTimeSessionWriter();
+    const outcome = await syncLaborEntriesFromSessions(
+      sb,
+      session.service_order_id,
+      userId,
+      writer,
+    );
     if (!outcome.synced) {
       throw new Error(
         "Esta OS está com apuração consolidada pelo administrador. Solicite o ajuste ao gestor.",
