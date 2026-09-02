@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.client_units_client_cnpj_unique;
