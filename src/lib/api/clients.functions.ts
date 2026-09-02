@@ -240,18 +240,8 @@ export const createCompany = createServerFn({ method: "POST" })
         created_by: context.userId,
         ...normalizeUnitFields(u),
       }));
-      // CNPJ duplicate check inside the same payload
-      const seen = new Set<string>();
-      for (const p of payload) {
-        const c = (p as { cnpj?: string | null }).cnpj;
-        if (c) {
-          if (seen.has(c))
-            throw new Error(
-              "Duas unidades desta empresa têm o mesmo CNPJ. Ajuste antes de salvar.",
-            );
-          seen.add(c);
-        }
-      }
+      // Unidades da mesma empresa podem compartilhar o CNPJ da matriz — não bloqueamos.
+
       const { error: uErr } = await context.supabase.from("client_units").insert(payload);
       if (uErr) throw new Error(uErr.message);
     }
