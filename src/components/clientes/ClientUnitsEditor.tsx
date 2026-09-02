@@ -161,12 +161,16 @@ export function ClientUnitsEditor({ clientId, units }: { clientId: string; units
       }
       return created;
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       toast.success("Unidade adicionada");
+      if (created?.duplicateCnpj) {
+        toast.warning("Atenção: já existe outra unidade desta empresa com o mesmo CNPJ.");
+      }
       setCreating(false);
       setNewDraft(emptyDraft());
       invalidate();
     },
+
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao criar unidade"),
   });
 

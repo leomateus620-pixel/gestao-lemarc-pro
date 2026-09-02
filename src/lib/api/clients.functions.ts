@@ -47,24 +47,26 @@ function normalizeUnitFields(input: Partial<ClientUnitInput>) {
   return out;
 }
 
-async function ensureUnitCnpjUnique(
+async function hasUnitWithSameCnpj(
   // The Supabase generated types are too narrow for our dynamic query chain here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: { supabase: any },
   clientId: string,
   cnpjDigits: string | null,
   excludeUnitId?: string,
-) {
-  if (!cnpjDigits) return;
+): Promise<boolean> {
+  if (!cnpjDigits) return false;
   let q = context.supabase
     .from("client_units")
     .select("id")
     .eq("client_id", clientId)
-    .eq("cnpj", cnpjDigits);
+    .eq("cnpj", cnpjDigits)
+    .limit(1);
   if (excludeUnitId) q = q.neq("id", excludeUnitId);
-  const { data: dup } = await q.maybeSingle();
-  if (dup) throw new Error("Já existe uma unidade desta empresa com este CNPJ.");
+  const { data: dup } = await q;
+  return Array.isArray(dup) && dup.length > 0;
 }
+
 
 export const listClientsFull = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -238,18 +240,8 @@ export const createCompany = createServerFn({ method: "POST" })
         created_by: context.userId,
         ...normalizeUnitFields(u),
       }));
-      // CNPJ duplicate check inside the same payload
-      const seen = new Set<string>();
-      for (const p of payload) {
-        const c = (p as { cnpj?: string | null }).cnpj;
-        if (c) {
-          if (seen.has(c))
-            throw new Error(
-              "Duas unidades desta empresa têm o mesmo CNPJ. Ajuste antes de salvar.",
-            );
-          seen.add(c);
-        }
-      }
+      // Unidades da mesma empresa podem compartilhar o CNPJ da matriz — não bloqueamos.
+
       const { error: uErr } = await context.supabase.from("client_units").insert(payload);
       if (uErr) throw new Error(uErr.message);
     }
@@ -306,7 +298,7 @@ export const createClientUnit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { client_id, ...rest } = data;
     const normalized = normalizeUnitFields(rest);
-    await ensureUnitCnpjUnique(
+    const duplicateCnpj = await hasUnitWithSameCnpj(
       context,
       client_id,
       (normalized.cnpj as string | null | undefined) ?? null,
@@ -323,8 +315,9 @@ export const createClientUnit = createServerFn({ method: "POST" })
       .select(UNIT_COLS)
       .single();
     if (error) throw new Error(error.message);
-    return row as ClientUnit;
+    return { ...(row as ClientUnit), duplicateCnpj };
   });
+
 
 export const updateClientUnit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -337,6 +330,7 @@ export const updateClientUnit = createServerFn({ method: "POST" })
     if (name !== undefined) (normalized as Record<string, unknown>).name = name;
     if (is_primary !== undefined) (normalized as Record<string, unknown>).is_primary = is_primary;
     if (active !== undefined) (normalized as Record<string, unknown>).active = active;
+    let duplicateCnpj = false;
     if ((normalized as { cnpj?: string | null }).cnpj !== undefined) {
       const { data: current } = await context.supabase
         .from("client_units")
@@ -345,7 +339,7 @@ export const updateClientUnit = createServerFn({ method: "POST" })
         .maybeSingle();
       const clientId = (current as { client_id?: string } | null)?.client_id;
       if (clientId)
-        await ensureUnitCnpjUnique(
+        duplicateCnpj = await hasUnitWithSameCnpj(
           context,
           clientId,
           ((normalized as { cnpj?: string | null }).cnpj as string | null) ?? null,
@@ -359,8 +353,9 @@ export const updateClientUnit = createServerFn({ method: "POST" })
       .select(UNIT_COLS)
       .single();
     if (error) throw new Error(error.message);
-    return row as ClientUnit;
+    return { ...(row as ClientUnit), duplicateCnpj };
   });
+
 
 export const deleteClientUnit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
