@@ -340,6 +340,7 @@ export const updateClientUnit = createServerFn({ method: "POST" })
     if (name !== undefined) (normalized as Record<string, unknown>).name = name;
     if (is_primary !== undefined) (normalized as Record<string, unknown>).is_primary = is_primary;
     if (active !== undefined) (normalized as Record<string, unknown>).active = active;
+    let duplicateCnpj = false;
     if ((normalized as { cnpj?: string | null }).cnpj !== undefined) {
       const { data: current } = await context.supabase
         .from("client_units")
@@ -348,7 +349,7 @@ export const updateClientUnit = createServerFn({ method: "POST" })
         .maybeSingle();
       const clientId = (current as { client_id?: string } | null)?.client_id;
       if (clientId)
-        await ensureUnitCnpjUnique(
+        duplicateCnpj = await hasUnitWithSameCnpj(
           context,
           clientId,
           ((normalized as { cnpj?: string | null }).cnpj as string | null) ?? null,
@@ -362,8 +363,9 @@ export const updateClientUnit = createServerFn({ method: "POST" })
       .select(UNIT_COLS)
       .single();
     if (error) throw new Error(error.message);
-    return row as ClientUnit;
+    return { ...(row as ClientUnit), duplicateCnpj };
   });
+
 
 export const deleteClientUnit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
