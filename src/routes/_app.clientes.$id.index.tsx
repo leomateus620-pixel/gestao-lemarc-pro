@@ -625,11 +625,17 @@ function UnitsSection({
           is_primary: units.length === 0,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (row) => {
       setAdding(false);
       qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
+      toast.success("Unidade adicionada");
+      if (row?.duplicateCnpj) {
+        toast.warning("Atenção: já existe outra unidade desta empresa com o mesmo CNPJ.");
+      }
     },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível adicionar a unidade."),
   });
 
   const editMut = useMutation({
@@ -654,11 +660,17 @@ function UnitsSection({
           },
         },
       }),
-    onSuccess: () => {
+    onSuccess: (row) => {
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
+      toast.success("Unidade atualizada");
+      if (row?.duplicateCnpj) {
+        toast.warning("Atenção: já existe outra unidade desta empresa com o mesmo CNPJ.");
+      }
     },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar a unidade."),
   });
 
   const toggleActive = useMutation({
@@ -667,6 +679,8 @@ function UnitsSection({
       qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
     },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível alterar a unidade."),
   });
 
   const removeMut = useMutation({
@@ -674,8 +688,12 @@ function UnitsSection({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-page", clientId] });
       qc.invalidateQueries({ queryKey: ["client-units"] });
+      toast.success("Unidade excluída");
     },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir a unidade."),
   });
+
 
   return (
     <div className="space-y-3">
