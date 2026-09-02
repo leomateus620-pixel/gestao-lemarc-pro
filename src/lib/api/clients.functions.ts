@@ -308,7 +308,7 @@ export const createClientUnit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { client_id, ...rest } = data;
     const normalized = normalizeUnitFields(rest);
-    await ensureUnitCnpjUnique(
+    const duplicateCnpj = await hasUnitWithSameCnpj(
       context,
       client_id,
       (normalized.cnpj as string | null | undefined) ?? null,
@@ -325,8 +325,9 @@ export const createClientUnit = createServerFn({ method: "POST" })
       .select(UNIT_COLS)
       .single();
     if (error) throw new Error(error.message);
-    return row as ClientUnit;
+    return { ...(row as ClientUnit), duplicateCnpj };
   });
+
 
 export const updateClientUnit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
