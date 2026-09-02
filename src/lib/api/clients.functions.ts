@@ -47,24 +47,26 @@ function normalizeUnitFields(input: Partial<ClientUnitInput>) {
   return out;
 }
 
-async function ensureUnitCnpjUnique(
+async function hasUnitWithSameCnpj(
   // The Supabase generated types are too narrow for our dynamic query chain here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: { supabase: any },
   clientId: string,
   cnpjDigits: string | null,
   excludeUnitId?: string,
-) {
-  if (!cnpjDigits) return;
+): Promise<boolean> {
+  if (!cnpjDigits) return false;
   let q = context.supabase
     .from("client_units")
     .select("id")
     .eq("client_id", clientId)
-    .eq("cnpj", cnpjDigits);
+    .eq("cnpj", cnpjDigits)
+    .limit(1);
   if (excludeUnitId) q = q.neq("id", excludeUnitId);
-  const { data: dup } = await q.maybeSingle();
-  if (dup) throw new Error("Já existe uma unidade desta empresa com este CNPJ.");
+  const { data: dup } = await q;
+  return Array.isArray(dup) && dup.length > 0;
 }
+
 
 export const listClientsFull = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
