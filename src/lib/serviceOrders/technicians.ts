@@ -54,6 +54,24 @@ export function getOrderTechnicians(
     .map(({ t }) => t);
 }
 
+/**
+ * Une os técnicos vinculados à OS com os técnicos que só existem no histórico
+ * (têm intervalos/horas registrados, mas foram removidos da equipe). Os de
+ * histórico entram no fim, marcados com `is_history`, para que a revisão do
+ * admin nunca descarte horas já trabalhadas.
+ */
+export function mergeHistoryTechnicians(
+  assigned: AssignedTechnician[],
+  history: TechnicianLite[] | null | undefined,
+): AssignedTechnician[] {
+  if (!history || history.length === 0) return assigned;
+  const seen = new Set(assigned.map((t) => t.id));
+  const extras = history
+    .filter((t) => t && t.id && !seen.has(t.id))
+    .map((t) => ({ ...t, is_primary: false, is_history: true }) as AssignedTechnician);
+  return extras.length === 0 ? assigned : [...assigned, ...extras];
+}
+
 export function getReportRowTechnicians(row: ReportOrderRow): ReportTechnician[] {
   if (row.technicians && row.technicians.length > 0) return row.technicians;
   if (row.technician_id && row.technician_name) {
