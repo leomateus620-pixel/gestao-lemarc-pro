@@ -15,10 +15,12 @@ import { Button } from "@/components/ui/button";
 import {
   createManualTimeSession,
   getOrderTimeReview,
+  listOrderHistoryTechnicians,
   saveOrderTimeReview,
 } from "@/lib/api/timeSessions.functions";
 import { formatHHmm } from "@/lib/serviceOrders/finance";
 import { formatDateHm, type TimeSession } from "@/lib/serviceOrders/timeSessions";
+import { mergeHistoryTechnicians } from "@/lib/serviceOrders/technicians";
 import type { AssignedTechnician } from "@/types/serviceOrder";
 import { EditTimeSessionSheet } from "./EditTimeSessionSheet";
 
