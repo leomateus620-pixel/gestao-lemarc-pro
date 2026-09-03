@@ -15,10 +15,12 @@ import { Button } from "@/components/ui/button";
 import {
   createManualTimeSession,
   getOrderTimeReview,
+  listOrderHistoryTechnicians,
   saveOrderTimeReview,
 } from "@/lib/api/timeSessions.functions";
 import { formatHHmm } from "@/lib/serviceOrders/finance";
 import { formatDateHm, type TimeSession } from "@/lib/serviceOrders/timeSessions";
+import { mergeHistoryTechnicians } from "@/lib/serviceOrders/technicians";
 import type { AssignedTechnician } from "@/types/serviceOrder";
 import { EditTimeSessionSheet } from "./EditTimeSessionSheet";
 
@@ -104,13 +106,14 @@ export function TimeReviewDialog({
   orderNumber,
   open,
   onOpenChange,
-  technicians,
+  technicians: assignedTechnicians,
   onReviewed,
 }: Props) {
   const qc = useQueryClient();
   const getReviewFn = useServerFn(getOrderTimeReview);
   const saveReviewFn = useServerFn(saveOrderTimeReview);
   const createSessionFn = useServerFn(createManualTimeSession);
+  const historyTechsFn = useServerFn(listOrderHistoryTechnicians);
   const [editingSession, setEditingSession] = useState<TimeSession | null>(null);
   const [addingSession, setAddingSession] = useState(false);
 
@@ -120,6 +123,20 @@ export function TimeReviewDialog({
     enabled: open,
     refetchOnWindowFocus: false,
   });
+
+  // Técnicos que já registraram tempo nesta OS mas saíram da equipe continuam
+  // aparecendo na revisão, com nome próprio.
+  const { data: historyTechnicians } = useQuery({
+    queryKey: ["order-history-technicians", orderId],
+    queryFn: () => historyTechsFn({ data: { orderId } }),
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const technicians = useMemo(
+    () => mergeHistoryTechnicians(assignedTechnicians, historyTechnicians),
+    [assignedTechnicians, historyTechnicians],
+  );
 
   useEffect(() => {
     if (open) {

@@ -391,8 +391,29 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string; technician_ids: string[] }) => data)
   .handler(async ({ data, context }) => {
-    const ids = Array.from(new Set((data.technician_ids ?? []).filter(Boolean)));
-    const primaryId = ids[0] ?? null;
+    const submittedIds = Array.from(new Set((data.technician_ids ?? []).filter(Boolean)));
+    const primaryId = submittedIds[0] ?? null;
+
+    // Técnicos que já registraram tempo/horas nesta OS nunca são desvinculados:
+    // o vínculo é o que faz as horas aparecerem na revisão e no PDF.
+    const [{ data: sessionRows }, { data: laborRows }] = await Promise.all([
+      context.supabase
+        .from("service_order_time_sessions")
+        .select("technician_id")
+        .eq("service_order_id", data.id),
+      context.supabase
+        .from("service_order_labor_entries")
+        .select("technician_id")
+        .eq("service_order_id", data.id),
+    ]);
+    const protectedIds = Array.from(
+      new Set(
+        [...(sessionRows ?? []), ...(laborRows ?? [])]
+          .map((row) => (row as { technician_id: string | null }).technician_id)
+          .filter((id): id is string => !!id && !submittedIds.includes(id)),
+      ),
+    );
+    const ids = [...submittedIds, ...protectedIds];
     const { data: previousLinks, error: previousErr } = await context.supabase
       .from("service_order_technicians")
       .select("technician_id")
@@ -450,7 +471,8 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
       supabase: context.supabase,
       serviceOrderId: data.id,
       technicianIds: ids,
-      previousTechnicianIds: previousIds,
+      // Técnicos preservados por já terem horas não geram nova notificação.
+      previousTechnicianIds: Array.from(new Set([...previousIds, ...protectedIds])),
       createdBy: context.userId,
     });
     return normalize(full);

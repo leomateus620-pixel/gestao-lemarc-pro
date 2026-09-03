@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TimeSession, JsonValue } from "@/lib/serviceOrders/timeSessions";
+import type { TechnicianLite } from "@/types/serviceOrder";
 import type {
   DashboardLaborEntry,
   DashboardTechnicianTimeDataset,
@@ -212,6 +213,53 @@ async function listOrderTechnicianIds(sb: any, orderId: string): Promise<string[
   if (order?.technician_id) ids.add(order.technician_id as string);
   return Array.from(ids);
 }
+
+/**
+ * Técnicos que possuem intervalos de tempo ou linhas de apuração nesta OS mas
+ * NÃO estão mais vinculados à equipe atual. Sem eles, a revisão do admin
+ * simplesmente descartava as horas de quem foi removido da OS depois de ter
+ * trabalhado (caso da OS #1124).
+ */
+export const listOrderHistoryTechnicians = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string }) => {
+    if (!data?.orderId) throw new Error("OS inválida.");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { assertOrderTimeAccess } = await import("@/lib/serviceOrders/timeSessionWrite.server");
+    await assertOrderTimeAccess(sb, context.userId, data.orderId);
+
+    const assigned = await listOrderTechnicianIds(sb, data.orderId);
+    const [{ data: sessions }, { data: entries }] = await Promise.all([
+      sb
+        .from("service_order_time_sessions")
+        .select("technician_id")
+        .eq("service_order_id", data.orderId),
+      sb
+        .from("service_order_labor_entries")
+        .select("technician_id")
+        .eq("service_order_id", data.orderId),
+    ]);
+
+    const orphanIds = new Set<string>();
+    for (const row of [...(sessions ?? []), ...(entries ?? [])]) {
+      const id = row?.technician_id as string | null | undefined;
+      if (id && !assigned.includes(id)) orphanIds.add(id);
+    }
+    if (orphanIds.size === 0) return [] as TechnicianLite[];
+
+    const { data: techs, error } = await sb
+      .from("technicians")
+      .select(
+        "id, full_name, role, hourly_rate_cents, hourly_rate_50_cents, hourly_rate_100_cents, active",
+      )
+      .in("id", Array.from(orphanIds));
+    if (error) throw new Error(error.message);
+    return (techs ?? []) as TechnicianLite[];
+  });
+
 
 /**
  * Normaliza o escopo pedido pelo cliente e valida que todos os técnicos
@@ -573,7 +621,15 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
     ).length;
 
     const currentTechnicianId = (technician?.id as string | undefined) ?? null;
-    const orderTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
+    const linkedTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
+    // Técnicos que só existem no histórico (têm sessões nesta OS) continuam
+    // editáveis: sem isso as horas deles ficavam invisíveis na revisão.
+    const orderTechnicianIds = Array.from(
+      new Set([
+        ...linkedTechnicianIds,
+        ...sessions.map((session) => session.technician_id).filter((id): id is string => !!id),
+      ]),
+    );
     // Admin ou técnico vinculado à OS (assertOrderTimeAccess acima) pode revisar
     // e ajustar os horários de toda a equipe daquela OS.
     const canEditAll = isAdmin || Boolean(currentTechnicianId);

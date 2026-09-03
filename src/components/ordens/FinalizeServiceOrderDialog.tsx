@@ -47,9 +47,12 @@ import {
   parseBRLToCents,
 } from "@/lib/serviceOrders/finance";
 import { isDisplacementUnset } from "@/lib/serviceOrders/finance";
-import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import { getOrderTechnicians, mergeHistoryTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
-import { listTimeSessions } from "@/lib/api/timeSessions.functions";
+import {
+  listOrderHistoryTechnicians,
+  listTimeSessions,
+} from "@/lib/api/timeSessions.functions";
 import { getDisplacementRateCents } from "@/lib/api/systemSettings.functions";
 import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
@@ -375,11 +378,11 @@ function SummaryRow({
 }
 
 export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props) {
-  const techs = useMemo(() => getOrderTechnicians(order), [order]);
   const queryClient = useQueryClient();
   const fetcher = useServerFn(getOrderFinancials);
   const finalizeFn = useServerFn(finalizeServiceOrder);
   const sessionsFn = useServerFn(listTimeSessions);
+  const historyTechsFn = useServerFn(listOrderHistoryTechnicians);
   const globalRateFn = useServerFn(getDisplacementRateCents);
   const hasSignature = Boolean(order.signature);
   const hasWaiver = Boolean(order.signature_waiver_reason);
@@ -401,12 +404,27 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
+  // Técnicos que trabalharam na OS mas não estão mais na equipe: sem eles a
+  // apuração perdia as horas já registradas.
+  const { data: historyTechs, isFetched: historyTechsFetched } = useQuery({
+    queryKey: ["order-history-technicians", order.id],
+    queryFn: () => historyTechsFn({ data: { orderId: order.id } }),
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const techs = useMemo(
+    () => mergeHistoryTechnicians(getOrderTechnicians(order), historyTechs),
+    [order, historyTechs],
+  );
+
   const { data: globalRateCents, isFetched: globalRateFetched } = useQuery({
     queryKey: ["system-settings", "displacement-rate"],
     queryFn: () => globalRateFn(),
     enabled: open,
     staleTime: 60_000,
   });
+
 
   const [step, setStep] = useState<StepIndex>(0);
   const [entries, setEntries] = useState<DraftEntry[]>([]);
@@ -444,6 +462,9 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     // no cálculo.
     const existingEntries = existing?.entries ?? [];
     if (existingEntries.length === 0 && !sessionsFetched) return;
+    // Espera a lista de técnicos do histórico para não perder as horas de quem
+    // saiu da equipe depois de já ter trabalhado.
+    if (!historyTechsFetched) return;
     // Espera o valor padrão por km para não hidratar a sugestão sem tarifa.
     if (!globalRateFetched) return;
     hydratedRef.current = true;
@@ -522,7 +543,17 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       });
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents, globalRateFetched]);
+  }, [
+    open,
+    existing,
+    order,
+    techs,
+    sessions,
+    sessionsFetched,
+    historyTechsFetched,
+    globalRateCents,
+    globalRateFetched,
+  ]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
@@ -788,6 +819,11 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                                 {autoCalculated && (
                                   <span className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.055] px-2 py-0.5 text-[0.68rem] font-black text-slate-200">
                                     <Clock3 size={11} /> Calculado pelo controle de tempo
+                                  </span>
+                                )}
+                                {tech?.is_history && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-400/12 px-2 py-0.5 text-[0.68rem] font-black text-amber-100">
+                                    Histórico da OS
                                   </span>
                                 )}
                               </div>
