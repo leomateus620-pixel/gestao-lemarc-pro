@@ -821,6 +821,11 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                                     <Clock3 size={11} /> Calculado pelo controle de tempo
                                   </span>
                                 )}
+                                {tech?.is_history && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-400/12 px-2 py-0.5 text-[0.68rem] font-black text-amber-100">
+                                    Histórico da OS
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
