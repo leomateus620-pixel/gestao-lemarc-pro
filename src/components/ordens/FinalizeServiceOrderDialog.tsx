@@ -462,6 +462,9 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     // no cálculo.
     const existingEntries = existing?.entries ?? [];
     if (existingEntries.length === 0 && !sessionsFetched) return;
+    // Espera a lista de técnicos do histórico para não perder as horas de quem
+    // saiu da equipe depois de já ter trabalhado.
+    if (!historyTechsFetched) return;
     // Espera o valor padrão por km para não hidratar a sugestão sem tarifa.
     if (!globalRateFetched) return;
     hydratedRef.current = true;
