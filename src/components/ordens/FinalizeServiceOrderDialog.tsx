@@ -543,7 +543,17 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
       });
     }
     setStep(0);
-  }, [open, existing, order, techs, sessions, sessionsFetched, globalRateCents, globalRateFetched]);
+  }, [
+    open,
+    existing,
+    order,
+    techs,
+    sessions,
+    sessionsFetched,
+    historyTechsFetched,
+    globalRateCents,
+    globalRateFetched,
+  ]);
 
   // Compute per-entry duration/subtotal preview.
   const computed: ComputedDraftEntry[] = entries.map((e) => {
