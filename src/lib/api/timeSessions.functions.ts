@@ -214,6 +214,53 @@ async function listOrderTechnicianIds(sb: any, orderId: string): Promise<string[
 }
 
 /**
+ * Técnicos que possuem intervalos de tempo ou linhas de apuração nesta OS mas
+ * NÃO estão mais vinculados à equipe atual. Sem eles, a revisão do admin
+ * simplesmente descartava as horas de quem foi removido da OS depois de ter
+ * trabalhado (caso da OS #1124).
+ */
+export const listOrderHistoryTechnicians = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string }) => {
+    if (!data?.orderId) throw new Error("OS inválida.");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { assertOrderTimeAccess } = await import("@/lib/serviceOrders/timeSessionWrite.server");
+    await assertOrderTimeAccess(sb, context.userId, data.orderId);
+
+    const assigned = await listOrderTechnicianIds(sb, data.orderId);
+    const [{ data: sessions }, { data: entries }] = await Promise.all([
+      sb
+        .from("service_order_time_sessions")
+        .select("technician_id")
+        .eq("service_order_id", data.orderId),
+      sb
+        .from("service_order_labor_entries")
+        .select("technician_id")
+        .eq("service_order_id", data.orderId),
+    ]);
+
+    const orphanIds = new Set<string>();
+    for (const row of [...(sessions ?? []), ...(entries ?? [])]) {
+      const id = row?.technician_id as string | null | undefined;
+      if (id && !assigned.includes(id)) orphanIds.add(id);
+    }
+    if (orphanIds.size === 0) return [] as TechnicianLite[];
+
+    const { data: techs, error } = await sb
+      .from("technicians")
+      .select(
+        "id, full_name, role, hourly_rate_cents, hourly_rate_50_cents, hourly_rate_100_cents, active",
+      )
+      .in("id", Array.from(orphanIds));
+    if (error) throw new Error(error.message);
+    return (techs ?? []) as TechnicianLite[];
+  });
+
+
+/**
  * Normaliza o escopo pedido pelo cliente e valida que todos os técnicos
  * pertencem à OS. Sem escopo explícito, aplica a toda a equipe.
  */
