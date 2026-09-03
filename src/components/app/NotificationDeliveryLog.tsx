@@ -5,6 +5,18 @@ import { listNotificationDeliveryLog, type PushEventType } from "@/lib/api/push.
 
 const statuses = ["all", "sent", "failed", "skipped_no_token", "unregistered"] as const;
 
+type DeliveryLogRow = {
+  id: string;
+  created_at: string;
+  event_type: string;
+  user_id: string | null;
+  recipient: string;
+  service_order_id: string | null;
+  status: string;
+  fcm_token_suffix: string | null;
+  error: string | null;
+};
+
 function eventLabel(value: string) {
   return value === "service_order_assigned" ? "OS atribuída" : "OS finalizada";
 }
@@ -17,9 +29,9 @@ export function NotificationDeliveryLog() {
   const [eventType, setEventType] = useState<PushEventType | "all">("all");
   const [status, setStatus] = useState<(typeof statuses)[number]>("all");
   const listFn = useServerFn(listNotificationDeliveryLog);
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading } = useQuery<DeliveryLogRow[]>({
     queryKey: ["notification-delivery-log", eventType, status],
-    queryFn: () => listFn({ data: { eventType, status } }),
+    queryFn: () => listFn({ data: { eventType, status } }) as Promise<DeliveryLogRow[]>,
   });
 
   return (
