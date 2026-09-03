@@ -4,7 +4,7 @@ import { registerPushDevice } from "@/lib/api/push.functions";
 
 const appId = import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_APP_ID ?? "1:862951876555:web:0bc9902c61dd44b9ee784e";
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_WEB_API_KEY ?? "AIzaSyBxJpQnoTZtAPnsxfQS88wObMYe6ZnGJQ",
+  apiKey: import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_WEB_API_KEY ?? "AIzaSyBxVJpQnoTZtAPnsxfQS88wObMYe6ZnGJQ",
   authDomain: "lemarc-7dc31.firebaseapp.com",
   projectId: import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_PROJECT_ID ?? "lemarc-7dc31",
   appId,
