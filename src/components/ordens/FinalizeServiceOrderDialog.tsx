@@ -378,11 +378,11 @@ function SummaryRow({
 }
 
 export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props) {
-  const techs = useMemo(() => getOrderTechnicians(order), [order]);
   const queryClient = useQueryClient();
   const fetcher = useServerFn(getOrderFinancials);
   const finalizeFn = useServerFn(finalizeServiceOrder);
   const sessionsFn = useServerFn(listTimeSessions);
+  const historyTechsFn = useServerFn(listOrderHistoryTechnicians);
   const globalRateFn = useServerFn(getDisplacementRateCents);
   const hasSignature = Boolean(order.signature);
   const hasWaiver = Boolean(order.signature_waiver_reason);
@@ -404,12 +404,27 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
+  // Técnicos que trabalharam na OS mas não estão mais na equipe: sem eles a
+  // apuração perdia as horas já registradas.
+  const { data: historyTechs, isFetched: historyTechsFetched } = useQuery({
+    queryKey: ["order-history-technicians", order.id],
+    queryFn: () => historyTechsFn({ data: { orderId: order.id } }),
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const techs = useMemo(
+    () => mergeHistoryTechnicians(getOrderTechnicians(order), historyTechs),
+    [order, historyTechs],
+  );
+
   const { data: globalRateCents, isFetched: globalRateFetched } = useQuery({
     queryKey: ["system-settings", "displacement-rate"],
     queryFn: () => globalRateFn(),
     enabled: open,
     staleTime: 60_000,
   });
+
 
   const [step, setStep] = useState<StepIndex>(0);
   const [entries, setEntries] = useState<DraftEntry[]>([]);
