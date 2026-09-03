@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS push_devices_updated_at ON public.push_devices;
