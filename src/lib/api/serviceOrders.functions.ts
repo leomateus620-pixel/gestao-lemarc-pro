@@ -2,7 +2,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { syncServiceOrderAssignmentNotifications } from "@/lib/api/notifications.functions";
-import { deliverPush, notifyAdminsOfFinishedOrder } from "@/lib/api/push.functions";
 import type { Database } from "@/integrations/supabase/types";
 import type {
   ServiceOrder,
@@ -238,6 +237,7 @@ async function syncAssignmentNotificationsSafely({
       createdBy,
     });
     if (result.userIds.length > 0) {
+      const { deliverPush } = await import("@/lib/api/push.server");
       await deliverPush({
         userIds: result.userIds,
         eventType: "service_order_assigned",
@@ -545,6 +545,7 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
       const unit = order.client_unit?.name ?? order.client?.unit ?? "Unidade não informada";
       const technician = order.technicians?.map((item) => item.full_name).filter(Boolean).join(", ") || order.technician?.full_name || "Técnico não informado";
       try {
+        const { notifyAdminsOfFinishedOrder } = await import("@/lib/api/push.server");
         await notifyAdminsOfFinishedOrder({ serviceOrderId: order.id, orderNumber: order.number, body: `${client} · ${unit} · ${technician}` });
       } catch (pushError) { console.warn("[push] Falha ao notificar administradores", pushError); }
     }
