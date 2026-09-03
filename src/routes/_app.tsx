@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { BottomNav } from "@/components/app/BottomNav";
+import { PushOptIn } from "@/components/app/PushOptIn";
 import { RoleProvider } from "@/components/app/RoleContext";
 import { AuthProvider, useAuth } from "@/components/app/AuthContext";
 import { safeInternalDestination } from "@/lib/modules";
@@ -23,6 +24,7 @@ function AppLayout() {
         <RoleProvider>
           <Outlet />
           <BottomNavSlot />
+          <PushOptIn />
         </RoleProvider>
       </AuthGate>
     </AuthProvider>

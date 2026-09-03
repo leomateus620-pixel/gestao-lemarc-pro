@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { syncServiceOrderAssignmentNotifications } from "@/lib/api/notifications.functions";
+import { deliverPush, notifyAdminsOfFinishedOrder } from "@/lib/api/push.functions";
 import type { Database } from "@/integrations/supabase/types";
 import type {
   ServiceOrder,
@@ -229,13 +230,23 @@ async function syncAssignmentNotificationsSafely({
   createdBy: string;
 }) {
   try {
-    await syncServiceOrderAssignmentNotifications({
+    const result = await syncServiceOrderAssignmentNotifications({
       supabase,
       serviceOrderId,
       technicianIds,
       previousTechnicianIds,
       createdBy,
     });
+    if (result.userIds.length > 0) {
+      await deliverPush({
+        userIds: result.userIds,
+        eventType: "service_order_assigned",
+        title: result.title,
+        body: result.body,
+        serviceOrderId,
+        data: { type: "service_order_assigned", service_order_id: serviceOrderId },
+      });
+    }
   } catch (error) {
     console.warn("[service-order-notifications] Falha ao sincronizar notificação de OS", error);
   }
