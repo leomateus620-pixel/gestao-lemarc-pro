@@ -283,71 +283,51 @@ export async function syncServiceOrderAssignmentNotifications({
   technicianIds: string[];
   previousTechnicianIds?: string[];
   createdBy: string;
-}) {
+}): Promise<{ userIds: string[]; title: string; body: string }> {
+  const empty = { userIds: [], title: "", body: "" };
   const nextIds = Array.from(new Set(technicianIds.filter(Boolean)));
   const previousIds = Array.from(new Set(previousTechnicianIds.filter(Boolean)));
   const removedIds = previousIds.filter((id) => !nextIds.includes(id));
-  await dismissRemovedTechnicianNotifications({
-    sb: supabase,
-    orderId: serviceOrderId,
-    technicianIds: removedIds,
-  });
+  await dismissRemovedTechnicianNotifications({ sb: supabase, orderId: serviceOrderId, technicianIds: removedIds });
 
-  if (nextIds.length === 0) return;
+  if (nextIds.length === 0) return empty;
   const order = await fetchNotificationOrder(supabase, serviceOrderId);
-  if (!order || order.status === "cancelled") return;
+  if (!order || order.status === "cancelled") return empty;
 
   const targets = await fetchTechnicianTargets(supabase, nextIds);
   const technicianNames = targets.map((target) => target.full_name).filter(Boolean);
   const existing = await fetchExistingNotifications(supabase, serviceOrderId, nextIds);
   const metadata = buildNotificationMetadata(order, technicianNames);
-
+  const title = buildNotificationTitle(order);
+  const body = buildNotificationMessage(order);
+  const pushUserIds: string[] = [];
   const insertRows: Database["public"]["Tables"]["service_order_notifications"]["Insert"][] = [];
-  const reactivateRows: { id: string; metadata: Record<string, Json> }[] = [];
+  const reactivateRows: { id: string; metadata: Record<string, Json>; userId: string }[] = [];
 
   for (const target of targets) {
     if (!target.user_id) continue;
     const current = existing.get(target.id);
     if (!current) {
-      insertRows.push({
-        service_order_id: serviceOrderId,
-        technician_id: target.id,
-        user_id: target.user_id,
-        type: ASSIGNED_NOTIFICATION_TYPE,
-        title: buildNotificationTitle(order),
-        message: buildNotificationMessage(order),
-        created_by: createdBy,
-        metadata,
-      });
+      insertRows.push({ service_order_id: serviceOrderId, technician_id: target.id, user_id: target.user_id, type: ASSIGNED_NOTIFICATION_TYPE, title, message: body, created_by: createdBy, metadata });
+      pushUserIds.push(target.user_id);
       continue;
     }
-
     const currentMetadata = asRecord(current.metadata);
     if (currentMetadata.cancel_reason === "technician_removed") {
-      reactivateRows.push({ id: current.id, metadata });
+      reactivateRows.push({ id: current.id, metadata, userId: target.user_id });
+      pushUserIds.push(target.user_id);
     }
   }
 
   if (insertRows.length > 0) {
     const { error } = await supabase.from("service_order_notifications").insert(insertRows);
-    if (error && error.code !== "23505" && !/duplicate key/i.test(error.message)) {
-      throw new Error(error.message);
-    }
+    if (error && error.code !== "23505" && !/duplicate key/i.test(error.message)) throw new Error(error.message);
   }
-
   for (const row of reactivateRows) {
-    const { error } = await supabase
-      .from("service_order_notifications")
-      .update({
-        read_at: null,
-        dismissed_at: null,
-        title: buildNotificationTitle(order),
-        message: buildNotificationMessage(order),
-        metadata: row.metadata,
-      })
-      .eq("id", row.id);
+    const { error } = await supabase.from("service_order_notifications").update({ read_at: null, dismissed_at: null, title, message: body, metadata: row.metadata }).eq("id", row.id);
     if (error) throw new Error(error.message);
   }
+  return { userIds: Array.from(new Set(pushUserIds)), title, body };
 }
 
 export const listTechnicianAssignedOrderNotifications = createServerFn({ method: "GET" })

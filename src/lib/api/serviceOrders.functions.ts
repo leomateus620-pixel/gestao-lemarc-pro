@@ -229,13 +229,24 @@ async function syncAssignmentNotificationsSafely({
   createdBy: string;
 }) {
   try {
-    await syncServiceOrderAssignmentNotifications({
+    const result = await syncServiceOrderAssignmentNotifications({
       supabase,
       serviceOrderId,
       technicianIds,
       previousTechnicianIds,
       createdBy,
     });
+    if (result.userIds.length > 0) {
+      const { deliverPush } = await import("@/lib/api/push.server");
+      await deliverPush({
+        userIds: result.userIds,
+        eventType: "service_order_assigned",
+        title: result.title,
+        body: result.body,
+        serviceOrderId,
+        data: { type: "service_order_assigned", service_order_id: serviceOrderId },
+      });
+    }
   } catch (error) {
     console.warn("[service-order-notifications] Falha ao sincronizar notificação de OS", error);
   }
@@ -500,71 +511,44 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; status: ServiceOrderStatus }) => data)
   .handler(async ({ data, context }) => {
     const now = new Date().toISOString();
+    const sb = context.supabase as any;
+    const { data: before, error: beforeError } = await sb.from("service_orders").select("status").eq("id", data.id).maybeSingle();
+    if (beforeError) throw new Error(beforeError.message);
     // Técnico não pode aprovar cobrança nem cancelar.
     if (data.status === "approved" || data.status === "cancelled") {
-      const sb = context.supabase as any;
       const { data: isAdmin } = await sb.rpc("is_admin");
       if (!isAdmin) throw new Error("Ação restrita ao administrador.");
     }
     // Bloqueio: ao finalizar/enviar para revisão/aprovar, exigir assinatura ou waiver.
     if (data.status === "finished" || data.status === "review" || data.status === "approved") {
-      const sb = context.supabase as any;
-      const { data: cur } = await sb
-        .from("service_orders")
-        .select("signature_waiver_reason")
-        .eq("id", data.id)
-        .maybeSingle();
+      const { data: cur } = await sb.from("service_orders").select("signature_waiver_reason").eq("id", data.id).maybeSingle();
       const hasWaiver = Boolean(cur?.signature_waiver_reason);
       if (!hasWaiver) {
-        const { data: sig } = await sb
-          .from("service_order_signatures")
-          .select("id")
-          .eq("service_order_id", data.id)
-          .is("revoked_at", null)
-          .maybeSingle();
-        if (!sig) {
-          throw new Error(
-            "Antes de finalizar a OS, colete a assinatura do responsável da empresa.",
-          );
-        }
+        const { data: sig } = await sb.from("service_order_signatures").select("id").eq("service_order_id", data.id).is("revoked_at", null).maybeSingle();
+        if (!sig) throw new Error("Antes de finalizar a OS, colete a assinatura do responsável da empresa.");
       }
     }
-    const patch: Database["public"]["Tables"]["service_orders"]["Update"] = {
-      status: data.status,
-    };
+    const patch: Database["public"]["Tables"]["service_orders"]["Update"] = { status: data.status };
     if (data.status === "running") patch.started_at = now;
-    if (data.status === "finished") {
-      patch.finished_at = now;
-      patch.closed_at = now;
-    }
-    if (data.status === "approved") {
-      patch.approved_at = now;
-      patch.closed_at = now;
-    }
-    if (data.status === "cancelled") {
-      patch.closed_at = now;
-    }
-    // Reabertura: limpa timestamps de fechamento para não exibir tempo total falso.
-    if (
-      data.status === "pending" ||
-      data.status === "dispatched" ||
-      data.status === "transit" ||
-      data.status === "running" ||
-      data.status === "review"
-    ) {
+    if (data.status === "finished") { patch.finished_at = now; patch.closed_at = now; }
+    if (data.status === "approved") { patch.approved_at = now; patch.closed_at = now; }
+    if (data.status === "cancelled") patch.closed_at = now;
+    if (data.status === "pending" || data.status === "dispatched" || data.status === "transit" || data.status === "running" || data.status === "review") {
       patch.closed_at = null;
-      if (data.status !== "review") {
-        patch.finished_at = null;
-        patch.approved_at = null;
-      }
+      if (data.status !== "review") { patch.finished_at = null; patch.approved_at = null; }
     }
-    const { data: row, error } = await context.supabase
-      .from("service_orders")
-      .update(patch)
-      .eq("id", data.id)
-      .select(ORDER_SELECT)
-      .single();
+    const { data: row, error } = await context.supabase.from("service_orders").update(patch).eq("id", data.id).select(ORDER_SELECT).single();
     if (error) throw new Error(error.message);
+    if ((data.status === "finished" || data.status === "approved") && before?.status !== "finished" && before?.status !== "approved") {
+      const order = normalize(row);
+      const client = order.client?.name ?? "Cliente não informado";
+      const unit = order.client_unit?.name ?? order.client?.unit ?? "Unidade não informada";
+      const technician = order.technicians?.map((item) => item.full_name).filter(Boolean).join(", ") || order.technician?.full_name || "Técnico não informado";
+      try {
+        const { notifyAdminsOfFinishedOrder } = await import("@/lib/api/push.server");
+        await notifyAdminsOfFinishedOrder({ serviceOrderId: order.id, orderNumber: order.number, body: `${client} · ${unit} · ${technician}` });
+      } catch (pushError) { console.warn("[push] Falha ao notificar administradores", pushError); }
+    }
     return normalize(row);
   });
 

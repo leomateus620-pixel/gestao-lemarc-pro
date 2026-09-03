@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Loader2, Save, Truck } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { NotificationDeliveryLog } from "@/components/app/NotificationDeliveryLog";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,7 @@ function ConfiguracoesPage() {
             </Button>
           </div>
         </GlassCard>
+        <NotificationDeliveryLog />
       </main>
     </AppShell>
   );
