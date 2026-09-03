@@ -621,7 +621,15 @@ export const getOrderTimeReview = createServerFn({ method: "GET" })
     ).length;
 
     const currentTechnicianId = (technician?.id as string | undefined) ?? null;
-    const orderTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
+    const linkedTechnicianIds = await listOrderTechnicianIds(sb, data.orderId);
+    // Técnicos que só existem no histórico (têm sessões nesta OS) continuam
+    // editáveis: sem isso as horas deles ficavam invisíveis na revisão.
+    const orderTechnicianIds = Array.from(
+      new Set([
+        ...linkedTechnicianIds,
+        ...sessions.map((session) => session.technician_id).filter((id): id is string => !!id),
+      ]),
+    );
     // Admin ou técnico vinculado à OS (assertOrderTimeAccess acima) pode revisar
     // e ajustar os horários de toda a equipe daquela OS.
     const canEditAll = isAdmin || Boolean(currentTechnicianId);
