@@ -47,9 +47,12 @@ import {
   parseBRLToCents,
 } from "@/lib/serviceOrders/finance";
 import { isDisplacementUnset } from "@/lib/serviceOrders/finance";
-import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
+import { getOrderTechnicians, mergeHistoryTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
-import { listTimeSessions } from "@/lib/api/timeSessions.functions";
+import {
+  listOrderHistoryTechnicians,
+  listTimeSessions,
+} from "@/lib/api/timeSessions.functions";
 import { getDisplacementRateCents } from "@/lib/api/systemSettings.functions";
 import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
