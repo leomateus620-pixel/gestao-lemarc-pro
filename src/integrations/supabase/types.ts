@@ -235,6 +235,62 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_delivery_log: {
+        Row: {
+          body: string | null
+          channel: string
+          created_at: string
+          error: string | null
+          event_type: string
+          fcm_message_id: string | null
+          fcm_token_suffix: string | null
+          id: string
+          metadata: Json
+          service_order_id: string | null
+          status: string
+          title: string | null
+          user_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          error?: string | null
+          event_type: string
+          fcm_message_id?: string | null
+          fcm_token_suffix?: string | null
+          id?: string
+          metadata?: Json
+          service_order_id?: string | null
+          status: string
+          title?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          error?: string | null
+          event_type?: string
+          fcm_message_id?: string | null
+          fcm_token_suffix?: string | null
+          id?: string
+          metadata?: Json
+          service_order_id?: string | null
+          status?: string
+          title?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_delivery_log_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -261,6 +317,39 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_devices: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen_at: string
+          platform: string
+          revoked_at: string | null
+          token: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          revoked_at?: string | null
+          token: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          revoked_at?: string | null
+          token?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
