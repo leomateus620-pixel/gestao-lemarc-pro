@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TimeSession, JsonValue } from "@/lib/serviceOrders/timeSessions";
+import type { TechnicianLite } from "@/types/serviceOrder";
 import type {
   DashboardLaborEntry,
   DashboardTechnicianTimeDataset,
