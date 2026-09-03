@@ -471,7 +471,8 @@ export const setServiceOrderTechnicians = createServerFn({ method: "POST" })
       supabase: context.supabase,
       serviceOrderId: data.id,
       technicianIds: ids,
-      previousTechnicianIds: previousIds,
+      // Técnicos preservados por já terem horas não geram nova notificação.
+      previousTechnicianIds: Array.from(new Set([...previousIds, ...protectedIds])),
       createdBy: context.userId,
     });
     return normalize(full);
