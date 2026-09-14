@@ -697,7 +697,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
             description: e.description ?? null,
           })),
           displacement: displacementInput,
-          materials_total_cents: 0,
+          materials_total_cents: materialsTotalCents,
           notes: generalNotes || null,
         },
       }),
