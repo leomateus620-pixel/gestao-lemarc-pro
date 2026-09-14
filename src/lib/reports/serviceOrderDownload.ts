@@ -26,6 +26,9 @@ type Input = {
   materialsNetCents?: number | null;
   /** File name of the first material attachment, shown in the totalization card. */
   materialsFileName?: string | null;
+  /** One entry per attached material PDF (file name + extracted Total Líquido). */
+  materialsItems?: { fileName: string | null; cents: number | null }[];
+
 };
 
 type TextOptions = {
@@ -490,11 +493,25 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
         displacementNoteLines.length * 3
       : 10;
 
-    const hasMaterialAttachment =
-      input.materialsNetCents !== undefined || Boolean(input.materialsFileName);
-    const materialsFailed =
-      hasMaterialAttachment && (input.materialsNetCents == null);
-    const materialsCardH = hasMaterialAttachment && financials ? 32 : 0;
+    const matItems: { fileName: string | null; cents: number | null }[] =
+      input.materialsItems && input.materialsItems.length > 0
+        ? input.materialsItems
+        : input.materialsNetCents !== undefined || input.materialsFileName
+          ? [{ fileName: input.materialsFileName ?? null, cents: input.materialsNetCents ?? null }]
+          : [];
+    const hasMaterialAttachment = matItems.length > 0;
+    const readMatItems = matItems.filter((m) => m.cents != null);
+    const materialsSumCents =
+      readMatItems.length > 0
+        ? readMatItems.reduce((acc, m) => acc + (m.cents ?? 0), 0)
+        : null;
+    const materialsFailed = hasMaterialAttachment && materialsSumCents == null;
+    const persistedMaterials = financials?.materials_total_cents ?? 0;
+    const materialsCardH =
+      hasMaterialAttachment && financials
+        ? 32 + Math.max(0, matItems.length - 1) * 4.25
+        : 0;
+
 
     const signatureH = order.signature
       ? 32
@@ -571,34 +588,34 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
         color: LEMARC_COLORS.navy,
       });
       let ry = y + 9;
+      const baseOsCents = financials.grand_total_cents - persistedMaterials;
       txt("Total da OS", marginX + 4, ry, { size: 7.5, color: LEMARC_COLORS.slate });
-      txt(formatBRL(financials.grand_total_cents), pageWidth - marginX - 4, ry, {
+      txt(formatBRL(baseOsCents), pageWidth - marginX - 4, ry, {
         size: 7.5,
         style: "bold",
         color: LEMARC_COLORS.ink,
         align: "right",
       });
       ry += 4.25;
-      const matLabel = input.materialsFileName
-        ? `Total dos materiais · ${input.materialsFileName}`
-        : "Total dos materiais (anexo)";
-      txt(matLabel, marginX + 4, ry, {
-        size: 7.5,
-        color: LEMARC_COLORS.slate,
-        maxWidth: contentWidth - 40,
-      });
-      txt(
-        materialsFailed ? "—" : formatBRL(input.materialsNetCents ?? 0),
-        pageWidth - marginX - 4,
-        ry,
-        {
+      matItems.forEach((m, idx) => {
+        const label = m.fileName
+          ? `Materiais · ${m.fileName}`
+          : matItems.length > 1
+            ? `Materiais (anexo ${idx + 1})`
+            : "Total dos materiais (anexo)";
+        txt(label, marginX + 4, ry, {
+          size: 7.5,
+          color: LEMARC_COLORS.slate,
+          maxWidth: contentWidth - 40,
+        });
+        txt(m.cents == null ? "—" : formatBRL(m.cents), pageWidth - marginX - 4, ry, {
           size: 7.5,
           style: "bold",
           color: LEMARC_COLORS.ink,
           align: "right",
-        },
-      );
-      ry += 4.25;
+        });
+        ry += 4.25;
+      });
       doc.setDrawColor(...LEMARC_COLORS.navy);
       doc.setLineWidth(0.35);
       doc.line(marginX + 3, ry - 1.6, pageWidth - marginX - 3, ry - 1.6);
@@ -607,9 +624,7 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
         style: "bold",
         color: LEMARC_COLORS.navy,
       });
-      const finalCents = materialsFailed
-        ? financials.grand_total_cents
-        : financials.grand_total_cents + (input.materialsNetCents ?? 0);
+      const finalCents = baseOsCents + (materialsSumCents ?? persistedMaterials);
       txt(formatBRL(finalCents), pageWidth - marginX - 4, ry + 3, {
         size: 10.5,
         style: "bold",
@@ -619,12 +634,15 @@ export async function buildServiceOrderReportPdfDocument(input: Input) {
       ry += 7.2;
       txt(
         materialsFailed
-          ? "Não foi possível extrair o Total Líquido do PDF de materiais — total final exibido considera apenas a OS."
-          : "Total Líquido extraído automaticamente do PDF de materiais anexado.",
+          ? "Não foi possível extrair o Total Líquido de todos os PDFs de materiais — confira os anexos anexados a seguir."
+          : matItems.length > 1
+            ? `Soma do Total Líquido dos ${matItems.length} PDFs de materiais anexados.`
+            : "Total Líquido extraído automaticamente do PDF de materiais anexado.",
         marginX + 4,
         ry,
         { size: 6.5, color: LEMARC_COLORS.slateSoft, maxWidth: contentWidth - 8 },
       );
+
       y += cardH + 2.5;
     }
 
@@ -895,46 +913,30 @@ export async function downloadServiceOrderReportPdf(input: Input) {
     }
   }
 
-  // Fetch first material once (bytes are reused for extraction + merge).
-  let firstMatBytes: ArrayBuffer | null = null;
+  // Read EVERY material PDF once (bytes reused for extraction + merge) and sum
+  // the "Total Líquido" of all of them.
+  let matBytes = new Map<string, ArrayBuffer>();
+  let materialsItems = input.materialsItems;
   let materialsNetCents: number | null | undefined = input.materialsNetCents;
   let materialsFileName: string | null | undefined = input.materialsFileName;
   if (matEntries.length > 0) {
-    const first = matEntries[0];
-    if (materialsFileName === undefined) materialsFileName = first.fileName;
-    if (materialsNetCents === undefined) {
-      try {
-        const res = await fetch(first.url);
-        if (res.ok) {
-          const buf = await res.arrayBuffer();
-          const head = new Uint8Array(buf.slice(0, 5));
-          const isPdf =
-            head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
-          if (isPdf) {
-            firstMatBytes = buf;
-            const { extractTotalLiquidoFromPdf } = await import(
-              "./materialsTotalExtractor"
-            );
-            const result = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
-            materialsNetCents = result.cents;
-          } else {
-            materialsNetCents = null;
-          }
-        } else {
-          materialsNetCents = null;
-        }
-      } catch (err) {
-        console.warn("Falha ao carregar PDF do primeiro material:", err);
-        materialsNetCents = null;
-      }
+    if (materialsFileName === undefined) materialsFileName = matEntries[0].fileName;
+    if (!materialsItems || materialsItems.length === 0) {
+      const { collectMaterialsTotals } = await import("./materialsTotals");
+      const collected = await collectMaterialsTotals(matEntries);
+      materialsItems = collected.items;
+      matBytes = collected.bytes;
+      if (materialsNetCents === undefined) materialsNetCents = collected.totalCents;
     }
   }
 
   const { doc, filename, pages } = await buildServiceOrderReportPdfDocument({
     ...input,
+    materialsItems,
     materialsNetCents,
     materialsFileName,
   });
+
   const materials = matEntries.map((m) => m.url);
   if (materials.length === 0) {
     doc.save(filename);
@@ -948,13 +950,15 @@ export async function downloadServiceOrderReportPdf(input: Input) {
       const url = materials[idx];
       try {
         let buf: ArrayBuffer;
-        if (idx === 0 && firstMatBytes) {
-          buf = firstMatBytes;
+        const cached = matBytes.get(url);
+        if (cached) {
+          buf = cached;
         } else {
           const res = await fetch(url);
           if (!res.ok) continue;
           buf = await res.arrayBuffer();
         }
+
         // Guard: signed URLs sometimes return HTML errors with 200; validate magic bytes.
         const head = new Uint8Array(buf.slice(0, 5));
         const isPdf =

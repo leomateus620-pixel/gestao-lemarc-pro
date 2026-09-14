@@ -54,6 +54,9 @@ import {
   listTimeSessions,
 } from "@/lib/api/timeSessions.functions";
 import { getDisplacementRateCents } from "@/lib/api/systemSettings.functions";
+import { listServiceOrderMaterialAttachments } from "@/lib/api/serviceOrderMaterialAttachments.functions";
+import { collectMaterialsTotals } from "@/lib/reports/materialsTotals";
+
 import type { TimeSession } from "@/lib/serviceOrders/timeSessions";
 import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/types/financials";
 import type { AssignedTechnician, ServiceOrder } from "@/types/serviceOrder";
@@ -390,6 +393,28 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const [captureOpen, setCaptureOpen] = useState(false);
   const [timeReviewOpen, setTimeReviewOpen] = useState(false);
 
+  // Soma o "Total Líquido" de TODOS os PDFs de materiais anexados à OS.
+  const materialsFn = useServerFn(listServiceOrderMaterialAttachments);
+  const { data: materialsInfo } = useQuery({
+    queryKey: ["finalize-materials-total", order.id],
+    enabled: open,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const rows = await materialsFn({ data: { orderId: order.id } });
+      const sources = (rows ?? [])
+        .filter((r: any) => Boolean(r.signed_url))
+        .map((r: any) => ({ url: r.signed_url as string, fileName: r.file_name ?? null }));
+      if (sources.length === 0) return { totalCents: 0, failedCount: 0, count: 0 };
+      const collected = await collectMaterialsTotals(sources);
+      return {
+        totalCents: collected.totalCents ?? 0,
+        failedCount: collected.failedCount,
+        count: sources.length,
+      };
+    },
+  });
+  const materialsTotalCents = materialsInfo?.totalCents ?? 0;
+
   const { data: existing } = useQuery({
     queryKey: ["order-financials", order.id],
     queryFn: () => fetcher({ data: { orderId: order.id } }),
@@ -578,7 +603,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     notes: displacement.notes || null,
   };
 
-  const totals = computeTotals(computed, displacementInput, 0);
+  const totals = computeTotals(computed, displacementInput, materialsTotalCents);
   const displacementCents = computeDisplacementCents(displacementInput);
   const unitDisplacementHint = useMemo(() => buildUnitDisplacementHint(order), [order]);
   const hasAutoCalculatedEntries = computed.some(isAutoCalculatedEntry);

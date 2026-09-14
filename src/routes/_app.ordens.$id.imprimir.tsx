@@ -10,7 +10,7 @@ import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { listServiceOrderMaterialAttachments } from "@/lib/api/serviceOrderMaterialAttachments.functions";
 import { ServiceOrderReportDocument } from "@/components/reports/print/ServiceOrderReportDocument";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
-import { extractTotalLiquidoFromPdf } from "@/lib/reports/materialsTotalExtractor";
+import { collectMaterialsTotals } from "@/lib/reports/materialsTotals";
 import { useAuth } from "@/components/app/AuthContext";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 
@@ -68,27 +68,20 @@ function PrintActions() {
       queryFn: () => matFn({ data: { orderId: id } }),
     }),
   );
-  const firstMaterial = materials.find((m) => m.signed_url) ?? null;
+  const matSources = materials
+    .filter((m) => Boolean(m.signed_url))
+    .map((m) => ({ url: m.signed_url as string, fileName: m.file_name ?? null }));
   const { data: materialsExtraction } = useQuery({
     queryKey: [
       "service-order-materials-net",
       id,
-      firstMaterial?.file_path ?? null,
+      materials.map((m) => m.file_path).join("|"),
     ],
-    enabled: Boolean(firstMaterial?.signed_url),
+    enabled: matSources.length > 0,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const res = await fetch(firstMaterial!.signed_url!);
-      if (!res.ok) return { cents: null as number | null };
-      const buf = await res.arrayBuffer();
-      const head = new Uint8Array(buf.slice(0, 5));
-      const isPdf =
-        head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
-      if (!isPdf) return { cents: null as number | null };
-      const r = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
-      return { cents: r.cents };
-    },
+    queryFn: () => collectMaterialsTotals(matSources),
   });
+
   const [downloading, setDownloading] = useState(false);
   if (!order) return null;
   const handleDownload = async () => {
@@ -103,10 +96,11 @@ function PrintActions() {
         materials: materials
           .map((m) => m.signed_url)
           .filter((u): u is string => Boolean(u)),
-        materialsNetCents: firstMaterial
-          ? (materialsExtraction?.cents ?? null)
-          : undefined,
-        materialsFileName: firstMaterial?.file_name ?? undefined,
+        materialsItems: materialsExtraction?.items,
+        materialsNetCents:
+          matSources.length > 0 ? (materialsExtraction?.totalCents ?? null) : undefined,
+        materialsFileName: matSources[0]?.fileName ?? undefined,
+
       });
       toast.success(`PDF da OS #${order.number} baixado`);
     } catch (error) {
@@ -153,27 +147,20 @@ function Body() {
       queryFn: () => matFn({ data: { orderId: id } }),
     }),
   );
-  const firstMaterial = materials.find((m) => m.signed_url) ?? null;
+  const matSources = materials
+    .filter((m) => Boolean(m.signed_url))
+    .map((m) => ({ url: m.signed_url as string, fileName: m.file_name ?? null }));
   const { data: materialsExtraction } = useQuery({
     queryKey: [
       "service-order-materials-net",
       id,
-      firstMaterial?.file_path ?? null,
+      materials.map((m) => m.file_path).join("|"),
     ],
-    enabled: Boolean(firstMaterial?.signed_url),
+    enabled: matSources.length > 0,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const res = await fetch(firstMaterial!.signed_url!);
-      if (!res.ok) return { cents: null as number | null };
-      const buf = await res.arrayBuffer();
-      const head = new Uint8Array(buf.slice(0, 5));
-      const isPdf =
-        head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
-      if (!isPdf) return { cents: null as number | null };
-      const r = await extractTotalLiquidoFromPdf(new Uint8Array(buf));
-      return { cents: r.cents };
-    },
+    queryFn: () => collectMaterialsTotals(matSources),
   });
+
   if (!order) throw notFound();
   const generatedAt = useMemo(() => new Date(), []);
   useEffect(() => {
@@ -186,10 +173,12 @@ function Body() {
       financials={fin.financials}
       generatedAt={generatedAt}
       authorName={displayName ?? null}
+      materialsItems={materialsExtraction?.items}
       materialsNetCents={
-        firstMaterial ? (materialsExtraction?.cents ?? null) : undefined
+        matSources.length > 0 ? (materialsExtraction?.totalCents ?? null) : undefined
       }
-      materialsFileName={firstMaterial?.file_name ?? undefined}
+      materialsFileName={matSources[0]?.fileName ?? undefined}
     />
   );
 }
+
