@@ -25,6 +25,9 @@ type Props = {
   materialsExtractionReason?: "not_found" | "parse_error" | null;
   /** Nome do primeiro anexo de materiais, exibido no card. */
   materialsFileName?: string | null;
+  /** Um item por PDF de materiais anexado (nome + Total Líquido extraído). */
+  materialsItems?: { fileName: string | null; cents: number | null }[];
+
 };
 
 const EMPTY = "—";
@@ -163,6 +166,8 @@ export function ServiceOrderReportDocument({
   materialsNetCents,
   materialsExtractionReason,
   materialsFileName,
+  materialsItems,
+
 }: Props) {
   const techs = getOrderTechnicians(order);
   const primary = techs.find((t) => t.is_primary) ?? techs[0];
@@ -198,12 +203,22 @@ export function ServiceOrderReportDocument({
   const unitName = order.client_unit?.name ?? order.client?.unit ?? EMPTY;
   const localSetor = joinParts([order.location, order.client_unit?.sector], " / ");
 
-  const hasMaterialAttachment =
-    materialsNetCents !== undefined || Boolean(materialsFileName);
-  const materialsExtractionFailed =
-    hasMaterialAttachment && materialsNetCents == null;
+  const matItems =
+    materialsItems && materialsItems.length > 0
+      ? materialsItems
+      : materialsNetCents !== undefined || materialsFileName
+        ? [{ fileName: materialsFileName ?? null, cents: materialsNetCents ?? null }]
+        : [];
+  const hasMaterialAttachment = matItems.length > 0;
+  const readMatItems = matItems.filter((m) => m.cents != null);
+  const materialsSumCents =
+    readMatItems.length > 0 ? readMatItems.reduce((a, m) => a + (m.cents ?? 0), 0) : null;
+  const materialsExtractionFailed = hasMaterialAttachment && materialsSumCents == null;
+  const persistedMaterialsCents = financials?.materials_total_cents ?? 0;
+  const baseOsCents = (financials?.grand_total_cents ?? 0) - persistedMaterialsCents;
   const grandTotalWithMaterialsCents =
-    (financials?.grand_total_cents ?? 0) + (materialsNetCents ?? 0);
+    baseOsCents + (materialsSumCents ?? persistedMaterialsCents);
+
 
   return (
     <div className="os-pdf">
@@ -384,35 +399,37 @@ export function ServiceOrderReportDocument({
               <div className="boxTitle">Total geral com materiais</div>
               <div className="totalRow">
                 <span>Total da OS</span>
-                <span>{formatBRL(financials.grand_total_cents)}</span>
+                <span>{formatBRL(baseOsCents)}</span>
               </div>
-              <div className="totalRow">
-                <span>
-                  Total dos materiais (anexo)
-                  {materialsFileName ? ` · ${materialsFileName}` : ""}
-                </span>
-                <span>
-                  {materialsExtractionFailed ? "—" : formatBRL(materialsNetCents ?? 0)}
-                </span>
-              </div>
+              {matItems.map((m, idx) => (
+                <div className="totalRow" key={`${m.fileName ?? "mat"}-${idx}`}>
+                  <span>
+                    {m.fileName
+                      ? `Materiais · ${m.fileName}`
+                      : matItems.length > 1
+                        ? `Materiais (anexo ${idx + 1})`
+                        : "Total dos materiais (anexo)"}
+                  </span>
+                  <span>{m.cents == null ? "—" : formatBRL(m.cents)}</span>
+                </div>
+              ))}
               <div className="totalRow grand">
                 <span>Total final</span>
-                <span>
-                  {materialsExtractionFailed
-                    ? formatBRL(financials.grand_total_cents)
-                    : formatBRL(grandTotalWithMaterialsCents)}
-                </span>
+                <span>{formatBRL(grandTotalWithMaterialsCents)}</span>
               </div>
               {materialsExtractionFailed ? (
                 <div className="mutedNote">
-                  Não foi possível extrair o Total Líquido do PDF de materiais — total final
-                  exibido considera apenas a OS.
+                  Não foi possível extrair o Total Líquido dos PDFs de materiais — confira os
+                  anexos nas páginas seguintes.
                 </div>
               ) : (
                 <div className="mutedNote">
-                  Total Líquido extraído automaticamente do PDF de materiais anexado.
+                  {matItems.length > 1
+                    ? `Soma do Total Líquido dos ${matItems.length} PDFs de materiais anexados.`
+                    : "Total Líquido extraído automaticamente do PDF de materiais anexado."}
                 </div>
               )}
+
             </div>
           )}
 

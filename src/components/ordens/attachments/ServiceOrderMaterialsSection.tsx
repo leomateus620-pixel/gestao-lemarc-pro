@@ -20,9 +20,47 @@ import {
   deleteServiceOrderMaterialAttachment,
   listServiceOrderMaterialAttachments,
 } from "@/lib/api/serviceOrderMaterialAttachments.functions";
+import { recalcOrderMaterialsTotal } from "@/lib/api/financials.functions";
+import { collectMaterialsTotals } from "@/lib/reports/materialsTotals";
 
 const MAX_FILES = 6;
 const MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Recalcula o total de materiais da OS (soma do "Total Líquido" de TODOS os
+ * PDFs anexados) e grava em service_order_financials. Não altera horas,
+ * deslocamento nem status.
+ */
+function useSyncMaterialsTotal(orderId: string) {
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listServiceOrderMaterialAttachments);
+  const recalcFn = useServerFn(recalcOrderMaterialsTotal);
+  return async () => {
+    try {
+      const rows = await listFn({ data: { orderId } });
+      const sources = (rows ?? [])
+        .filter((r: any) => Boolean(r.signed_url))
+        .map((r: any) => ({ url: r.signed_url as string, fileName: r.file_name ?? null }));
+      const collected =
+        sources.length > 0
+          ? await collectMaterialsTotals(sources)
+          : { totalCents: 0, failedCount: 0 };
+      await recalcFn({
+        data: { orderId, materials_total_cents: collected.totalCents ?? 0 },
+      });
+      queryClient.invalidateQueries({ queryKey: ["order-financials", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["service-order", orderId] });
+      if (sources.length > 0 && collected.failedCount > 0) {
+        toast.warning(
+          "Não foi possível ler o Total Líquido de todos os PDFs. Confira os valores na revisão.",
+        );
+      }
+    } catch (err) {
+      console.warn("Falha ao recalcular o total de materiais:", err);
+    }
+  };
+}
+
 
 function fmtSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -147,12 +185,16 @@ function MaterialRow({
 }) {
   const queryClient = useQueryClient();
   const deleteFn = useServerFn(deleteServiceOrderMaterialAttachment);
+  const syncMaterialsTotal = useSyncMaterialsTotal(orderId);
+
   const mutation = useMutation({
     mutationFn: () => deleteFn({ data: { attachmentId: attachment.id } }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("PDF removido.");
       queryClient.invalidateQueries({ queryKey: ["service-order-materials", orderId] });
+      await syncMaterialsTotal();
     },
+
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Falha ao remover o PDF."),
   });
@@ -213,6 +255,7 @@ function UploaderDialog({
 
   const queryClient = useQueryClient();
   const createFn = useServerFn(createServiceOrderMaterialAttachment);
+  const syncMaterialsTotal = useSyncMaterialsTotal(orderId);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -227,12 +270,14 @@ function UploaderDialog({
         },
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("PDF adicionado à OS.");
       queryClient.invalidateQueries({ queryKey: ["service-order-materials", orderId] });
       reset();
       onOpenChange(false);
+      await syncMaterialsTotal();
     },
+
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Falha ao anexar o PDF."),
   });

@@ -702,6 +702,44 @@ export const reconcileOrderLabor = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Atualiza SOMENTE o total de materiais da OS (soma dos PDFs de orçamento
+ * anexados) e recalcula o total geral. Não toca em horas, deslocamento,
+ * status, assinatura ou apontamentos.
+ */
+export const recalcOrderMaterialsTotal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; materials_total_cents: number }) => data)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const sb = context.supabase as any;
+    const materialsCents = Math.max(0, Math.round(data.materials_total_cents || 0));
+    const { data: row, error } = await sb
+      .from("service_order_financials")
+      .select("*")
+      .eq("service_order_id", data.orderId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return { updated: false, materials_total_cents: 0, grand_total_cents: 0 };
+    const laborCents = row.total_labor_cents ?? 0;
+    const displacementCents = row.displacement_total_cents ?? 0;
+    const grandTotal = laborCents + displacementCents + materialsCents;
+    const { error: upErr } = await sb
+      .from("service_order_financials")
+      .update({
+        materials_total_cents: materialsCents,
+        grand_total_cents: grandTotal,
+      })
+      .eq("service_order_id", data.orderId);
+    if (upErr) throw new Error(upErr.message);
+    return {
+      updated: true,
+      materials_total_cents: materialsCents,
+      grand_total_cents: grandTotal,
+    };
+  });
+
+
 export const listServiceOrderFinancialSummaries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
