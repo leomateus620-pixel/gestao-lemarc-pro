@@ -30,6 +30,7 @@ import { isAlert, isIncomplete, statusBucket } from "@/lib/serviceOrders/status"
 import { getOrderTechnicians, getServiceOrderWorkedMinutes } from "@/lib/serviceOrders/technicians";
 import { getOpenedAt } from "@/lib/serviceOrders/time";
 import type { OrderFinancials } from "@/types/financials";
+import type { ClientFull, ClientUnit } from "@/types/client";
 import {
   serviceTypeLabel,
   type ServiceOrder,
