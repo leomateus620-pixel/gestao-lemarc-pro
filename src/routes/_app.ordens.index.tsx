@@ -23,12 +23,14 @@ import {
   useServiceOrderFinancialSummariesQuery,
   useServiceOrdersQuery,
 } from "@/hooks/useServiceOrders";
+import { useAllUnitsQuery, useClientsFullQuery } from "@/hooks/useClients";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { filterByPeriod, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import { isAlert, isIncomplete, statusBucket } from "@/lib/serviceOrders/status";
 import { getOrderTechnicians, getServiceOrderWorkedMinutes } from "@/lib/serviceOrders/technicians";
 import { getOpenedAt } from "@/lib/serviceOrders/time";
 import type { OrderFinancials } from "@/types/financials";
+import type { ClientFull, ClientUnit } from "@/types/client";
 import {
   serviceTypeLabel,
   type ServiceOrder,
@@ -152,7 +154,12 @@ function OrdensList() {
     [orders, period, periodRange],
   );
   const kpis = useMemo(() => computeKpis(periodOrders, financialMap), [financialMap, periodOrders]);
-  const options = useMemo(() => buildFilterOptions(periodOrders, client), [client, periodOrders]);
+  const { data: registeredClients } = useClientsFullQuery();
+  const { data: registeredUnits } = useAllUnitsQuery();
+  const options = useMemo(
+    () => buildFilterOptions(periodOrders, client, unit, registeredClients, registeredUnits),
+    [client, unit, periodOrders, registeredClients, registeredUnits],
+  );
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -524,26 +531,22 @@ function computeKpis(orders: ServiceOrder[], financialMap: Map<string, OrderFina
   };
 }
 
-function buildFilterOptions(orders: ServiceOrder[], selectedClient: string) {
-  const clients = new Map<string, string>();
-  const units = new Map<string, { name: string; clientName: string }>();
+function buildFilterOptions(
+  orders: ServiceOrder[],
+  selectedClient: string,
+  selectedUnit: string,
+  registeredClients: ClientFull[],
+  registeredUnits: ClientUnit[],
+) {
+  const clientNameById = new Map(registeredClients.map((c) => [c.id, c.name]));
   const technicians = new Map<string, string>();
   let hasNoClient = false;
   let hasNoUnit = false;
   let hasNoTechnician = false;
 
   for (const order of orders) {
-    if (order.client_id && order.client?.name) clients.set(order.client_id, order.client.name);
-    else hasNoClient = true;
-
-    if (order.client_unit_id && order.client_unit?.name) {
-      if (selectedClient === "all" || order.client_id === selectedClient) {
-        units.set(order.client_unit_id, {
-          name: order.client_unit.name,
-          clientName: order.client?.name ?? "Sem empresa",
-        });
-      }
-    } else if (selectedClient === "all" || order.client_id === selectedClient) {
+    if (!order.client_id || !clientNameById.has(order.client_id)) hasNoClient = true;
+    if (!order.client_unit_id && (selectedClient === "all" || order.client_id === selectedClient)) {
       hasNoUnit = true;
     }
 
@@ -554,13 +557,24 @@ function buildFilterOptions(orders: ServiceOrder[], selectedClient: string) {
     }
   }
 
-  const clientOptions = Array.from(clients.entries())
-    .map(([value, label]) => ({ value, label }))
+  // Empresas e unidades vêm do cadastro (não das OS do período), para que a
+  // lista de opções nunca encolha por causa dos outros filtros.
+  const clientOptions = registeredClients
+    .filter((c) => c.active !== false || c.id === selectedClient)
+    .map((c) => ({ value: c.id, label: c.name }))
     .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  const unitOptions = Array.from(units.entries())
-    .map(([value, unit]) => ({
-      value,
-      label: selectedClient === "all" ? `${unit.clientName} · ${unit.name}` : unit.name,
+  const unitOptions = registeredUnits
+    .filter(
+      (u) =>
+        (selectedClient === "all" || u.client_id === selectedClient) &&
+        (u.active !== false || u.id === selectedUnit),
+    )
+    .map((u) => ({
+      value: u.id,
+      label:
+        selectedClient === "all"
+          ? `${clientNameById.get(u.client_id) ?? "Sem empresa"} · ${u.name}`
+          : u.name,
     }))
     .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   const technicianOptions = Array.from(technicians.entries())
