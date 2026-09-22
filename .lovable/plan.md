@@ -1,53 +1,51 @@
-# Materiais no PDF final da OS: somar todos os orçamentos anexados
+# Filtro de Unidade na lista de OS: sempre listar todas as unidades
 
-## Causa raiz (confirmada no código)
+## O que encontrei no código
 
-O valor de materiais no relatório **não vem do banco** — ele é extraído do PDF anexado no momento em que o relatório é gerado, e essa extração olha **somente o primeiro anexo**:
+O filtro fica em `src/routes/_app.ordens.index.tsx`. As opções de Empresa, Unidade e Técnico são montadas pela função `buildFilterOptions(periodOrders, client)`, que percorre **as ordens já carregadas e filtradas pelo período** e coleta as unidades que aparecem nelas.
 
-1. `src/lib/reports/serviceOrderDownload.ts` — na função de download, após listar os anexos, o código faz `const first = matEntries[0]` e extrai o "Total Líquido" apenas desse arquivo. Todos os anexos são **mesclados** ao PDF (por isso os 2 orçamentos aparecem como páginas), mas apenas o primeiro entra no valor.
-2. `src/routes/_app.ordens.$id.imprimir.tsx` — a pré-visualização faz `materials.find((m) => m.signed_url)`, ou seja, também só o primeiro.
-3. `src/components/reports/print/ServiceOrderReportDocument.tsx` — recebe um único `materialsNetCents` + um único `materialsFileName`.
-4. `service_order_financials.materials_total_cents` é gravado como **0**: `FinalizeServiceOrderDialog.tsx` envia `materials_total_cents: 0` na finalização, e `finalizeServiceOrder` grava esse zero e soma zero no `grand_total_cents`. Por isso as OS #1124 e #1129 têm materiais = 0 e total geral sem materiais.
+Consequências confirmadas na leitura do código:
 
-Ou seja: com 2 orçamentos, o card "Total dos materiais" mostra o valor de um só; e o total gravado na apuração ignora materiais completamente.
+- A lista de Unidade só mostra unidades que **têm alguma OS no período selecionado**. Unidades cadastradas sem OS (ou fora do período) simplesmente não aparecem — é o que dá a sensação de "a lista encolheu / só sobrou o que já escolhi".
+- O controle de Unidade hoje é um `select` de **seleção única** (valor `unit` na URL, `"all"` = todas). Ele não guarda várias unidades.
+- Não há trecho que remova opções por já estarem selecionadas — ou seja, a diagnose exata do relato ("passa a exibir somente as selecionadas") ainda **não está confirmada**; o efeito mais provável vem da fonte das opções (ordens do período) e não de um filtro sobre as selecionadas.
 
-## Correção proposta
+Premissa que estou assumindo: o filtro continua de seleção única. Se você quiser marcar **várias unidades ao mesmo tempo**, me diga — isso é uma mudança maior (multi-seleção + URL) e faço em seguida.
 
-Desenho: **os anexos de orçamento são a fonte da verdade**; o total de materiais é a **soma do "Total Líquido" de todos os PDFs anexados**, persistido na apuração para que relatórios gerenciais e o total geral fiquem consistentes.
+## Passo 1 — Reproduzir e fechar o diagnóstico
 
-### 1. Extração de todos os anexos (soma)
-- `materialsTotalExtractor.ts`: manter a extração por arquivo; adicionar um helper que recebe uma lista de PDFs e devolve `{ totalCents, items: [{ fileName, cents, reason }], failedCount }`.
-- `serviceOrderDownload.ts`: iterar todos os `matEntries` (buscando os bytes uma única vez e reaproveitando-os na mesclagem, como já é feito com o primeiro), somar os valores e alimentar o documento com a lista.
-- `_app.ordens.$id.imprimir.tsx`: mesma mudança na pré-visualização, para preview e download mostrarem o mesmo número.
+Abrir a lista de OS com sessão de administrador e registrar, antes de mudar código: quantas unidades aparecem no filtro com "Todas as empresas", quantas após escolher uma empresa, e o que muda ao escolher uma unidade. Com isso confirmo se o encolhimento vem da origem das opções (esperado) ou de outro ponto.
 
-### 2. Exibição (mudança mínima, sem redesenho)
-- `ServiceOrderReportDocument.tsx` e o gerador jsPDF passam a aceitar `materialsItems` (arquivo + valor) além do total.
-- O card existente "Total dos materiais" vira: uma linha por orçamento (nome do arquivo + valor) e a linha de soma. Com 1 anexo o visual fica idêntico ao atual.
-- Se algum arquivo falhar na leitura, ele aparece com "—" e o aviso atual de extração é mantido; a soma dos que foram lidos continua sendo exibida.
+## Passo 2 — Correção
 
-### 3. Persistência na apuração
-- Na finalização (`FinalizeServiceOrderDialog.tsx`), extrair o total dos anexos e enviar o valor real em vez de `0`; mostrar o valor somado (somente leitura, com opção de ajuste manual caso a extração falhe).
-- Nova server function `recalcOrderMaterialsTotal` (em `financials.functions.ts`, admin-only) que recebe `{ orderId, materials_total_cents }`, grava `materials_total_cents` e recalcula `grand_total_cents = labor + deslocamento + materiais`, **sem tocar** em horas, deslocamento, status, assinatura ou apontamentos.
-- Chamar essa função ao **anexar** e ao **remover** um PDF de materiais (`ServiceOrderMaterialsSection.tsx`), inclusive em OS já aprovada — o recálculo altera apenas a linha de materiais/total.
-- Garantir que os outros pontos que recalculam totais (`financials.functions.ts` linhas ~294, ~657) continuem preservando `materials_total_cents`, como já fazem.
+Trocar a fonte das opções de Unidade: em vez de derivar das ordens, usar o cadastro de unidades (`listAllUnits` / `useAllUnitsQuery`, já usado em outras telas), aplicando somente:
 
-### 4. Dados das OS #1124 e #1129
-Após o código entrar, para cada OS: ler os 2 orçamentos, somar os "Total Líquido", gravar em `materials_total_cents` e recalcular `grand_total_cents` (labor 162.887 + desloc. 62.000 + materiais para a #1124; 410.540 + 120.000 + materiais para a #1129). Se algum PDF não tiver camada de texto, informo os valores extraídos e peço confirmação do valor manual antes de gravar.
+- filtro pela empresa selecionada (quando houver);
+- unidades ativas, mais a unidade atualmente selecionada mesmo que inativa;
+- ordenação alfabética; rótulo "Empresa · Unidade" quando nenhuma empresa está selecionada;
+- manter a opção "Sem unidade" quando existirem OS sem unidade.
 
-## Validação
-- Testes unitários: soma de 0, 1 e 2+ arquivos; um arquivo sem "Total Líquido" (soma parcial + aviso); arquivo não-PDF ignorado.
-- Teste do documento de relatório: com 2 anexos o total geral = labor + deslocamento + soma dos dois orçamentos.
-- Manual: gerar PDF das #1124 e #1129 e conferir card de materiais, total geral e as páginas anexadas.
+A seleção atual nunca é removida da lista, e a lista **não** depende de período, status ou das unidades já escolhidas. O filtro das OS em si (`matchesUnit`) não muda.
 
-## Checklist de regressão
-- [ ] OS sem anexo: relatório idêntico ao atual (sem card de materiais).
-- [ ] OS com 1 anexo: valor e layout inalterados.
-- [ ] Mesclagem dos anexos a partir da página 2 continua funcionando.
-- [ ] Horas, apontamentos e deslocamento inalterados após recálculo de materiais.
-- [ ] Assinatura, finalização e aprovação sem alteração de fluxo.
-- [ ] Técnico continua sem ver anexos de materiais (rota admin-only preservada).
-- [ ] Relatórios gerenciais refletem o novo total geral.
+A lista de Empresa passa pelo mesmo ajuste de fonte (cadastro de clientes) para ficar coerente; Técnico, Status, Prioridade, Período e ordenação ficam intactos.
 
-## Riscos
-- PDFs escaneados (sem texto) não permitem extração automática — tratados com "—" e ajuste manual.
-- Ler vários PDFs deixa a geração um pouco mais lenta; mitigado reaproveitando os bytes já baixados para a mesclagem.
+## Detalhes técnicos
+
+- `src/routes/_app.ordens.index.tsx`: `buildFilterOptions` deixa de gerar `units` (e `clients`) a partir de `periodOrders`; passa a receber as listas do cadastro. Carregamento via `useServerFn` + React Query com `staleTime`, no mesmo padrão de `src/hooks/useClients.ts`.
+- Nada muda em `matchesUnit`, `matchesClient`, KPIs, ordenação ou `ServiceOrderIslandRow`.
+- Sem mudança de layout: os mesmos controles, apenas com mais opções disponíveis.
+
+## Como validar
+
+1. Selecionar 1 unidade: a lista de OS filtra certo e, ao reabrir o seletor, todas as unidades da empresa continuam lá.
+2. Selecionar outra unidade em seguida: troca sem precisar limpar nada.
+3. "Limpar filtros": volta para "Unidade = todas" e a lista completa.
+4. Trocar a empresa: a lista de unidades passa a ser só daquela empresa e a unidade selecionada é zerada (comportamento atual preservado).
+5. Empresa = todas: unidades aparecem com o nome da empresa na frente.
+6. Conferir que unidade sem nenhuma OS agora aparece no filtro e resulta em lista vazia (e não em opção escondida).
+
+## Riscos de regressão
+
+- Muitas unidades cadastradas deixam o seletor longo; mitigado pela ordenação e pelo recorte por empresa.
+- Uma requisição adicional para carregar o cadastro; com cache, sem impacto perceptível.
+- Empresa/unidade inativas: incluo a selecionada para nunca "perder" um filtro já aplicado via link.
