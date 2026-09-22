@@ -23,6 +23,7 @@ import {
   useServiceOrderFinancialSummariesQuery,
   useServiceOrdersQuery,
 } from "@/hooks/useServiceOrders";
+import { useAllUnitsQuery, useClientsFullQuery } from "@/hooks/useClients";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { filterByPeriod, type Period, type PeriodRange } from "@/lib/serviceOrders/period";
 import { isAlert, isIncomplete, statusBucket } from "@/lib/serviceOrders/status";
@@ -152,7 +153,12 @@ function OrdensList() {
     [orders, period, periodRange],
   );
   const kpis = useMemo(() => computeKpis(periodOrders, financialMap), [financialMap, periodOrders]);
-  const options = useMemo(() => buildFilterOptions(periodOrders, client), [client, periodOrders]);
+  const { data: registeredClients } = useClientsFullQuery();
+  const { data: registeredUnits } = useAllUnitsQuery();
+  const options = useMemo(
+    () => buildFilterOptions(periodOrders, client, unit, registeredClients, registeredUnits),
+    [client, unit, periodOrders, registeredClients, registeredUnits],
+  );
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
