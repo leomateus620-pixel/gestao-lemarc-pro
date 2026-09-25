@@ -104,6 +104,41 @@ function filterByTechnician(
   });
 }
 
+// When a technician is selected, replace each OS's hours/value with only
+// that technician's own labor entries (matches the dedicated technician view).
+async function applyTechnicianShare(
+  supabase: any,
+  rows: ReportOrderRow[],
+  technicianId: string | null | undefined,
+): Promise<ReportOrderRow[]> {
+  if (!technicianId || rows.length === 0) return rows;
+  const ids = rows.map((r) => r.id);
+  const totals = new Map<string, { minutes: number; cents: number }>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("service_order_labor_entries")
+      .select("service_order_id, duration_minutes, subtotal_cents")
+      .eq("technician_id", technicianId)
+      .in("service_order_id", ids.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    for (const e of (data ?? []) as any[]) {
+      const cur = totals.get(e.service_order_id) ?? { minutes: 0, cents: 0 };
+      cur.minutes += Number(e.duration_minutes) || 0;
+      cur.cents += Number(e.subtotal_cents) || 0;
+      totals.set(e.service_order_id, cur);
+    }
+  }
+  return rows.map((r) => {
+    const t = totals.get(r.id) ?? { minutes: 0, cents: 0 };
+    return {
+      ...r,
+      worked_minutes_effective: t.minutes,
+      worked_minutes_source: t.minutes > 0 ? "reported" : "none",
+      estimated_value: t.cents / 100,
+    };
+  });
+}
+
 const filtersInput = (data: { filters: ReportFilters }) => data;
 
 export const getReportOrders = createServerFn({ method: "POST" })
@@ -118,7 +153,8 @@ export const getReportOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const normalized = (rows ?? []).map(normalize);
-    return filterByTechnician(normalized, data.filters.technicianId);
+    const filtered = filterByTechnician(normalized, data.filters.technicianId);
+    return applyTechnicianShare(context.supabase, filtered, data.filters.technicianId);
   });
 
 export const getClientReport = createServerFn({ method: "POST" })
