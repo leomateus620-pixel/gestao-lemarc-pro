@@ -157,6 +157,45 @@ export function ReportsFilters({
                 />
               </div>
             )}
+
+            <Select
+              value={filters.technicianId ?? ALL}
+              onValueChange={(value) =>
+                setSearch({ technicianId: value === ALL ? null : value })
+              }
+            >
+              <SelectTrigger
+                className={cn(
+                  "lemarc-report-control h-11 w-full rounded-xl font-bold sm:w-[200px]",
+                  filters.technicianId && "border-primary/45 text-primary",
+                )}
+                aria-label="Selecionar técnico"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <User size={15} className="shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {filters.technicianId
+                      ? (lookups.data.technicians.find(
+                          (t) => t.id === filters.technicianId,
+                        )?.full_name ?? "Técnico")
+                      : "Técnico"}
+                  </span>
+                  {filters.technicianId && (
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-foreground">
+                      1
+                    </span>
+                  )}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={ALL}>Todos</SelectItem>
+                {lookups.data.technicians.map((tech) => (
+                  <SelectItem key={tech.id} value={tech.id}>
+                    {tech.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {customInvalid && (
             <p className="mt-1.5 text-xs font-bold text-destructive" role="alert">
