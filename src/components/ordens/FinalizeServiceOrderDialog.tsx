@@ -438,10 +438,16 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     staleTime: 0,
   });
 
-  const techs = useMemo(
-    () => mergeHistoryTechnicians(getOrderTechnicians(order), historyTechs),
-    [order, historyTechs],
-  );
+  // Técnicos incluídos pelo admin durante esta apuração (ainda não refletidos
+  // no objeto `order` até o refetch).
+  const [extraTechs, setExtraTechs] = useState<AssignedTechnician[]>([]);
+  const [addTechOpen, setAddTechOpen] = useState(false);
+  const techs = useMemo(() => {
+    const base = mergeHistoryTechnicians(getOrderTechnicians(order), historyTechs);
+    const seen = new Set(base.map((t) => t.id));
+    const extra = extraTechs.filter((t) => !seen.has(t.id));
+    return extra.length ? [...base, ...extra] : base;
+  }, [order, historyTechs, extraTechs]);
 
   const { data: globalRateCents, isFetched: globalRateFetched } = useQuery({
     queryKey: ["system-settings", "displacement-rate"],
@@ -636,8 +642,8 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     });
   };
 
-  const addEntry = (technicianId?: string) => {
-    const tech = techs.find((t) => t.id === technicianId) ?? techs[0];
+  const addEntry = (technicianId?: string, override?: AssignedTechnician) => {
+    const tech = override ?? techs.find((t) => t.id === technicianId) ?? techs[0];
     if (!tech) return;
     const nowTime = timeFromIso(new Date().toISOString());
     setEntries((prev) => [
@@ -999,6 +1005,14 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                           <Plus size={13} /> Lançar para {shortName(t.full_name)}
                         </Button>
                       ))}
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setAddTechOpen(true)}
+                        className="h-10"
+                      >
+                        <Plus size={13} /> Adicionar técnico
+                      </Button>
                     </div>
                   </div>
                 </div>
