@@ -132,6 +132,17 @@ function LoadingState() {
   );
 }
 
+function TechnicianReportSectionLoader({
+  technicianId,
+  filters,
+}: {
+  technicianId: string;
+  filters: ReportFilters;
+}) {
+  const { data: report } = useTechnicianReportQuery(technicianId, filters);
+  return <TechnicianReportSection report={report} />;
+}
+
 function RelatoriosContent() {
   const search = Route.useSearch();
   const navigate = useNavigate();
