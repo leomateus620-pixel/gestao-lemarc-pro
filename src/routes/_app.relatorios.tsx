@@ -1,8 +1,10 @@
 import { Suspense, useMemo } from "react";
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import {
   AlertTriangle,
+  ArrowRight,
+  User,
   CheckCircle2,
   Clock,
   DollarSign,
@@ -139,8 +141,41 @@ function TechnicianReportSectionLoader({
   technicianId: string;
   filters: ReportFilters;
 }) {
+  const search = Route.useSearch();
   const { data: report } = useTechnicianReportQuery(technicianId, filters);
-  return <TechnicianReportSection report={report} />;
+  const name = report.technician?.full_name ?? "Técnico selecionado";
+
+  return (
+    <section
+      aria-labelledby="technician-report-title"
+      className="lemarc-report-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+          <User size={20} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <p className="lemarc-report-section-kicker">Desempenho do técnico</p>
+          <h2
+            id="technician-report-title"
+            className="truncate text-sm font-black text-white sm:text-base"
+          >
+            {name}
+          </h2>
+          <p className="mt-0.5 text-[11px] font-bold text-slate-300 sm:text-xs">
+            {formatNumber(report.total_orders)} OS · {formatHoursDecimal(report.total_minutes)}h ·{" "}
+            {formatCurrency(report.total_value_cents / 100)} no período
+          </p>
+        </div>
+      </div>
+      <Button asChild size="sm" className="shrink-0 gap-2">
+        <Link to="/relatorios/tecnico/$id" params={{ id: technicianId }} search={search}>
+          Ver desempenho completo
+          <ArrowRight size={15} aria-hidden="true" />
+        </Link>
+      </Button>
+    </section>
+  );
 }
 
 function RelatoriosContent() {
