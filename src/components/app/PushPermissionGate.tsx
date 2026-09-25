@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Bell, Download, Loader2, Share } from "lucide-react";
+import { Bell, Copy, Download, Loader2, Share } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { enableWebPush } from "@/lib/push/firebaseClient";
-import { canInstall, getPushStatus, onInstallAvailable, promptInstall, type PushStatus } from "@/lib/push/pushStatus";
+import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
 
-const SNOOZE_KEY = "lemarc:push-snoozed";
+const SNOOZE_KEY = "lemarc:push-snoozed-until";
+const SNOOZE_MS = 24 * 60 * 60 * 1000;
+const PROMPT_STATUSES: PushStatus[] = ["default", "needs-install", "denied", "in-app-browser", "unsupported"];
 let silentDone = false;
 
 export function PushPermissionGate() {
@@ -24,8 +26,9 @@ export function PushPermissionGate() {
       silentDone = true;
       void enableWebPush();
     }
-    const snoozed = sessionStorage.getItem(SNOOZE_KEY) === "1";
-    if ((s === "default" || s === "needs-install") && !snoozed) {
+    const until = Number(localStorage.getItem(SNOOZE_KEY) ?? 0);
+    const snoozed = Number.isFinite(until) && until > Date.now();
+    if (PROMPT_STATUSES.includes(s) && !snoozed) {
       const t = setTimeout(() => setOpen(true), 1200);
       return () => { clearTimeout(t); off(); };
     }
@@ -33,7 +36,7 @@ export function PushPermissionGate() {
   }, []);
 
   function snooze() {
-    sessionStorage.setItem(SNOOZE_KEY, "1");
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
     setOpen(false);
   }
 
@@ -48,7 +51,15 @@ export function PushPermissionGate() {
       return;
     }
     toast.error(result.message);
-    if (result.status === "denied") setOpen(false);
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+      toast.success("Link copiado. Cole no Google Chrome.");
+    } catch {
+      toast.error(`Copie este endereço: ${window.location.origin}`);
+    }
   }
 
   return (
@@ -69,11 +80,16 @@ export function PushPermissionGate() {
             <li>2. Escolha "Adicionar à Tela de Início"</li>
             <li>3. Abra o Lemarc pelo ícone e toque em "Permitir"</li>
           </ol>
+        ) : status === "denied" || status === "in-app-browser" || status === "unsupported" ? (
+          <p className="rounded-xl bg-white/5 p-3 text-sm text-foreground">{pushStatusLabels[status].hint}</p>
         ) : null}
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          {status === "default" && (
+          {status === "in-app-browser" && (
+            <Button onClick={() => void copyLink()} className="w-full font-bold"><Copy /> Copiar link</Button>
+          )}
+          {(status === "default" || status === "denied") && (
             <Button onClick={allow} disabled={pending} className="w-full font-bold">
-              {pending ? <Loader2 className="animate-spin" /> : <Bell />} Permitir notificações
+              {pending ? <Loader2 className="animate-spin" /> : <Bell />} {status === "denied" ? "Já liberei, tentar de novo" : "Permitir notificações"}
             </Button>
           )}
           {installable && (
