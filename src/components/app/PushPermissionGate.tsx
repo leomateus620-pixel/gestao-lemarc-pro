@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { enableWebPush } from "@/lib/push/firebaseClient";
 import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
 
-const SNOOZE_KEY = "lemarc:push-snoozed-until";
-const SNOOZE_MS = 24 * 60 * 60 * 1000;
+const SNOOZE_KEY = "lemarc:push-snoozed-session";
 const PROMPT_STATUSES: PushStatus[] = ["default", "needs-install", "denied", "in-app-browser", "unsupported"];
 let silentDone = false;
 
@@ -26,17 +25,22 @@ export function PushPermissionGate() {
       silentDone = true;
       void enableWebPush();
     }
-    const until = Number(localStorage.getItem(SNOOZE_KEY) ?? 0);
-    const snoozed = Number.isFinite(until) && until > Date.now();
+    const snoozed = sessionStorage.getItem(SNOOZE_KEY) === "1";
     if (PROMPT_STATUSES.includes(s) && !snoozed) {
-      const t = setTimeout(() => setOpen(true), 1200);
-      return () => { clearTimeout(t); off(); };
+      // Espera outras janelas (ex.: "OS vinculada a você") fecharem antes de abrir.
+      const t = setInterval(() => {
+        if (!document.querySelector('[role="dialog"], [role="alertdialog"]')) {
+          clearInterval(t);
+          setOpen(true);
+        }
+      }, 1500);
+      return () => { clearInterval(t); off(); };
     }
     return off;
   }, []);
 
   function snooze() {
-    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
+    sessionStorage.setItem(SNOOZE_KEY, "1");
     setOpen(false);
   }
 
