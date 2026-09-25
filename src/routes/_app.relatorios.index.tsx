@@ -219,10 +219,11 @@ function RelatoriosContent() {
       wideOnMobile: true,
     },
     {
-      label: "Valor estimado",
+      label: filters.technicianId ? "Valor do técnico" : "Valor estimado",
       value: hasEstimatedValues ? formatCurrency(overview.estimatedValue) : DATA_UNAVAILABLE_LABEL,
-      hint:
-        overview.ordersMissingRate > 0
+      hint: filters.technicianId
+        ? "Soma das horas lançadas pelo técnico, com o valor dele em cada OS."
+        : overview.ordersMissingRate > 0
           ? `${overview.ordersMissingRate} OS com horas, mas sem valor/hora cadastrado.`
           : hasEstimatedValues
             ? "Estimativa calculada com as horas e o valor/hora cadastrados."
