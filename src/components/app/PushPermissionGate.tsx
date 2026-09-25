@@ -107,6 +107,11 @@ export function PushPermissionGate() {
               <Download /> Instalar app
             </Button>
           )}
+          {showAndroidInstallGuide() && (
+            <p className="rounded-xl bg-white/5 p-3 text-xs text-muted-foreground">
+              Para instalar o app: toque nos <span className="font-bold text-foreground">3 pontinhos (⋮)</span> no canto do Chrome e escolha <span className="font-bold text-foreground">"Instalar app"</span> ou <span className="font-bold text-foreground">"Adicionar à tela inicial"</span>.
+            </p>
+          )}
           <Button variant="ghost" onClick={snooze} className="w-full">Agora não</Button>
         </DialogFooter>
       </DialogContent>
