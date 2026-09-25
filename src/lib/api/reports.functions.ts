@@ -167,6 +167,116 @@ export const updateBillingStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export type TechnicianReportRow = {
+  order_id: string;
+  number: number;
+  title: string;
+  status: ServiceOrderStatus;
+  first_work_date: string;
+  last_work_date: string;
+  minutes: number;
+  value_cents: number;
+};
+
+export type TechnicianReport = {
+  technician: { id: string; full_name: string } | null;
+  rows: TechnicianReportRow[];
+  total_orders: number;
+  total_minutes: number;
+  total_value_cents: number;
+};
+
+// Per-technician report: sums the technician's own labor entries per OS.
+export const getTechnicianReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { technicianId: string; filters: ReportFilters }) => data)
+  .handler(async ({ data, context }): Promise<TechnicianReport> => {
+    const { technicianId, filters } = data;
+    const range = resolvePeriodRange(filters);
+
+    let q = context.supabase
+      .from("service_order_labor_entries")
+      .select(
+        `service_order_id, work_date, duration_minutes, subtotal_cents,
+         order:service_orders!service_order_labor_entries_service_order_id_fkey(
+           id, number, title, status, client_id, client_unit_id, service_type, billing_status, hour_rate, description
+         )`,
+      )
+      .eq("technician_id", technicianId)
+      .order("work_date", { ascending: false });
+
+    if (range.from) q = q.gte("work_date", range.from.toISOString().slice(0, 10));
+    if (range.to) q = q.lte("work_date", range.to.toISOString().slice(0, 10));
+
+    const { data: entries, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const byOrder = new Map<string, TechnicianReportRow>();
+    for (const entry of (entries ?? []) as any[]) {
+      const order = entry?.order;
+      if (!order) continue;
+      // Apply the same OS-level filters used in the general report.
+      if (filters.clientId && order.client_id !== filters.clientId) continue;
+      if (filters.unitId && order.client_unit_id !== filters.unitId) continue;
+      if (filters.status && order.status !== filters.status) continue;
+      if (filters.serviceType && order.service_type !== filters.serviceType) continue;
+      if (filters.billingStatus && (order.billing_status ?? "pending") !== filters.billingStatus)
+        continue;
+      if (filters.onlyWithRate && !(Number(order.hour_rate) > 0)) continue;
+      if (filters.onlyCompleted && !["finished", "approved"].includes(order.status)) continue;
+      if (
+        filters.onlyAwaitingBilling &&
+        !(
+          ["pending", "ready"].includes(order.billing_status ?? "pending") &&
+          ["finished", "review", "approved"].includes(order.status)
+        )
+      )
+        continue;
+      if (filters.onlyWithObservations && !order.description) continue;
+
+      const existing = byOrder.get(order.id);
+      const minutes = Number(entry.duration_minutes) || 0;
+      const cents = Number(entry.subtotal_cents) || 0;
+      const workDate = String(entry.work_date);
+      if (existing) {
+        existing.minutes += minutes;
+        existing.value_cents += cents;
+        if (workDate < existing.first_work_date) existing.first_work_date = workDate;
+        if (workDate > existing.last_work_date) existing.last_work_date = workDate;
+      } else {
+        byOrder.set(order.id, {
+          order_id: order.id,
+          number: order.number,
+          title: order.title,
+          status: order.status as ServiceOrderStatus,
+          first_work_date: workDate,
+          last_work_date: workDate,
+          minutes,
+          value_cents: cents,
+        });
+      }
+    }
+
+    const rows = [...byOrder.values()].sort((a, b) =>
+      b.last_work_date.localeCompare(a.last_work_date),
+    );
+
+    const { data: technician, error: tErr } = await context.supabase
+      .from("technicians")
+      .select("id, full_name")
+      .eq("id", technicianId)
+      .maybeSingle();
+    if (tErr) throw new Error(tErr.message);
+
+    return {
+      technician: technician ?? null,
+      rows,
+      total_orders: rows.length,
+      total_minutes: rows.reduce((sum, row) => sum + row.minutes, 0),
+      total_value_cents: rows.reduce((sum, row) => sum + row.value_cents, 0),
+    };
+  });
+
 // Light lookups for filter dropdowns
 export const listReportLookups = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
