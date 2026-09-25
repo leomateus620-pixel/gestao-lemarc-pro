@@ -568,7 +568,8 @@ export const updateServiceOrderStatus = createServerFn({ method: "POST" })
       const technician = order.technicians?.map((item) => item.full_name).filter(Boolean).join(", ") || order.technician?.full_name || "Técnico não informado";
       try {
         const { notifyAdminsOfFinishedOrder } = await import("@/lib/api/push.server");
-        await notifyAdminsOfFinishedOrder({ serviceOrderId: order.id, orderNumber: order.number, body: `${client} · ${unit} · ${technician}` });
+        const orderTitle = (order.title ?? "").trim() || "OS sem título";
+        await notifyAdminsOfFinishedOrder({ serviceOrderId: order.id, orderNumber: order.number, body: `${orderTitle} · ${client} · ${unit} · ${technician}` });
       } catch (pushError) { console.warn("[push] Falha ao notificar administradores", pushError); }
     }
     return normalize(row);

@@ -185,21 +185,16 @@ function buildNotificationMetadata(
   };
 }
 
-function buildNotificationTitle(order: NotificationOrderRow) {
-  return `Nova OS #${order.number ?? "—"} atribuída a você`;
+function buildNotificationTitle(_order: NotificationOrderRow) {
+  return "Uma OS foi vinculada a você";
 }
 
 function buildNotificationMessage(order: NotificationOrderRow) {
-  const client = order.client?.name ?? "cliente não informado";
-  const unit = order.client_unit?.name ?? order.client?.unit ?? "unidade não informada";
-  const type =
-    order.service_type === "outro" && order.service_type_other
-      ? order.service_type_other
-      : order.service_type
-        ? serviceTypeLabel[order.service_type]
-        : "serviço não informado";
-  const priority = order.priority ? priorityLabel[order.priority].toLowerCase() : "sem prioridade";
-  return `${client} · ${unit} · ${type} · prioridade ${priority}`;
+  const name = (order.title ?? "").trim() || "OS sem título";
+  const rawDescription = ((order as { description?: string | null }).description ?? "").replace(/\s+/g, " ").trim();
+  const description = rawDescription.length > 120 ? `${rawDescription.slice(0, 117).trimEnd()}…` : rawDescription;
+  const head = `OS #${order.number ?? "—"} — ${name}`;
+  return description ? `${head} · ${description}` : head;
 }
 
 async function fetchNotificationOrder(sb: SupabaseClient, orderId: string) {
