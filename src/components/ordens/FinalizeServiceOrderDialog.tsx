@@ -62,6 +62,7 @@ import type { DisplacementInput, DisplacementType, LaborEntryInput } from "@/typ
 import type { AssignedTechnician, ServiceOrder } from "@/types/serviceOrder";
 import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureCaptureDialog";
 import { TimeReviewDialog } from "@/components/ordens/TimeReviewDialog";
+import { AddTechnicianToLaborDialog } from "@/components/ordens/AddTechnicianToLaborDialog";
 
 type Props = {
   order: ServiceOrder;
