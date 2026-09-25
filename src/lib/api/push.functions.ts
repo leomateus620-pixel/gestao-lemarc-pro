@@ -45,3 +45,19 @@ export const listNotificationDeliveryLog = createServerFn({ method: "GET" })
     const profileMap = new Map(((profiles ?? []) as { user_id: string; email: string | null; full_name: string | null }[]).map((profile) => [profile.user_id, profile]));
     return ((rows ?? []) as Array<Record<string, Json>>).map((row) => ({ ...row, recipient: row.user_id ? profileMap.get(String(row.user_id))?.full_name ?? profileMap.get(String(row.user_id))?.email ?? "Usuário" : "—" }));
   });
+
+export const sendTestPush = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { count } = await context.supabase.from("push_devices").select("id", { count: "exact", head: true }).eq("user_id", context.userId).is("revoked_at", null);
+    if (!count) return { sent: 0 };
+    const { deliverPush } = await import("./push.server");
+    await deliverPush({
+      userIds: [context.userId],
+      eventType: "service_order_assigned",
+      title: "Teste de notificação — Gestão Lemarc",
+      body: "Tudo certo! Você vai receber os avisos das OS neste aparelho.",
+      data: { type: "test_push" },
+    });
+    return { sent: count };
+  });
