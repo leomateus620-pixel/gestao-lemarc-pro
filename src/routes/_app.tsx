@@ -25,6 +25,7 @@ function AppLayout() {
           <Outlet />
           <BottomNavSlot />
           <PushPermissionGate />
+          <AutoRefresh />
         </RoleProvider>
       </AuthGate>
     </AuthProvider>
@@ -39,6 +40,35 @@ function BottomNavSlot() {
   const fullscreenForm = useFullscreenFormFlag();
   if (hide || fullscreenForm) return null;
   return <BottomNav />;
+}
+
+const RESUME_RELOAD_MS = 30 * 60 * 1000;
+
+// No app instalado, recarrega sozinho ao voltar após muito tempo em segundo
+// plano, para sempre usar a versão publicada mais recente.
+function useAutoRefreshOnResume() {
+  useEffect(() => {
+    if (!window.matchMedia("(display-mode: standalone)").matches) return;
+    let hiddenAt = 0;
+    const onChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (!hiddenAt || Date.now() - hiddenAt < RESUME_RELOAD_MS) return;
+      const busy =
+        document.documentElement.dataset.fullscreenForm === "true" ||
+        !!document.querySelector('[role="dialog"], [role="alertdialog"]');
+      if (!busy) window.location.reload();
+    };
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+}
+
+function AutoRefresh() {
+  useAutoRefreshOnResume();
+  return null;
 }
 
 function useFullscreenFormFlag() {
