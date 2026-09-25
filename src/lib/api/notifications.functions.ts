@@ -2,12 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
-import {
-  priorityLabel,
-  serviceTypeLabel,
-  type ServicePriority,
-  type ServiceType,
-} from "@/types/serviceOrder";
+import type { ServicePriority, ServiceType } from "@/types/serviceOrder";
 import type {
   AssignedOrderNotificationSummary,
   OpenTimeAlertDetails,
