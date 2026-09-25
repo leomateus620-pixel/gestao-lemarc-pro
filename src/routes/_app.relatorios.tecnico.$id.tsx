@@ -61,6 +61,23 @@ function TechnicianReportPage() {
   );
 }
 
+function formatIsoDay(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function periodDescription(filters: ReturnType<typeof searchToFilters>): string {
+  if (filters.period === "custom") {
+    const from = formatIsoDay(filters.from);
+    const to = formatIsoDay(filters.to);
+    if (from && to) return `${from} a ${to}`;
+    if (from) return `a partir de ${from}`;
+    if (to) return `até ${to}`;
+  }
+  return getPeriodLabel(filters.period);
+}
+
 function TechnicianReportContent() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
