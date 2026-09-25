@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { IdCard, LogOut, Settings, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
+import { NotificationSettings } from "@/components/app/NotificationSettings";
 import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { useAuth } from "@/components/app/AuthContext";
 import { RoleSwitcher } from "@/components/app/RoleSwitcher";
@@ -105,6 +106,7 @@ function MaisPage() {
             </Link>
           </div>
         </section>
+        <div className="mt-4"><NotificationSettings /></div>
       </main>
     </AppShell>
   );
