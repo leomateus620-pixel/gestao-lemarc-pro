@@ -1404,6 +1404,16 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
           )}
         </DialogFooter>
 
+        <AddTechnicianToLaborDialog
+          open={addTechOpen}
+          onOpenChange={setAddTechOpen}
+          orderId={order.id}
+          existingIds={techs.map((t) => t.id)}
+          onAdded={(tech) => {
+            setExtraTechs((prev) => [...prev, tech]);
+            addEntry(tech.id, tech);
+          }}
+        />
         <TimeReviewDialog
           orderId={order.id}
           orderNumber={order.number}
