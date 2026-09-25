@@ -9,6 +9,7 @@ import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatu
 const SNOOZE_KEY = "lemarc:push-snoozed-session";
 const PROMPT_STATUSES: PushStatus[] = ["default", "needs-install", "denied", "in-app-browser", "unsupported"];
 let silentDone = false;
+let promptShown = false;
 
 export function PushPermissionGate() {
   const [status, setStatus] = useState<PushStatus>("unsupported");
@@ -26,11 +27,16 @@ export function PushPermissionGate() {
       void enableWebPush();
     }
     const snoozed = sessionStorage.getItem(SNOOZE_KEY) === "1";
-    if (PROMPT_STATUSES.includes(s) && !snoozed) {
+    if (PROMPT_STATUSES.includes(s) && !snoozed && !promptShown) {
       // Espera outras janelas (ex.: "OS vinculada a você") fecharem antes de abrir.
       const t = setInterval(() => {
+        if (promptShown || ("Notification" in window && Notification.permission === "granted")) {
+          clearInterval(t);
+          return;
+        }
         if (!document.querySelector('[role="dialog"], [role="alertdialog"]')) {
           clearInterval(t);
+          promptShown = true;
           setOpen(true);
         }
       }, 1500);
