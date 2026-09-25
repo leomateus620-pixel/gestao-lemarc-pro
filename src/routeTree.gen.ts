@@ -35,6 +35,7 @@ import { Route as LeitosProducaoIndexRouteImport } from './routes/leitos.produca
 import { Route as LeitosPedidosIndexRouteImport } from './routes/leitos.pedidos.index'
 import { Route as LeitosEstoqueIndexRouteImport } from './routes/leitos.estoque.index'
 import { Route as LeitosConfiguracoesIndexRouteImport } from './routes/leitos.configuracoes.index'
+import { Route as AppRelatoriosIndexRouteImport } from './routes/_app.relatorios.index'
 import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
 import { Route as AppColaboradoresIndexRouteImport } from './routes/_app.colaboradores.index'
 import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
@@ -194,6 +195,11 @@ const LeitosConfiguracoesIndexRoute =
     path: '/',
     getParentRoute: () => LeitosConfiguracoesRoute,
   } as any)
+const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRelatoriosRoute,
+} as any)
 const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
   id: '/ordens/',
   path: '/ordens/',
@@ -380,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/clientes/': typeof AppClientesIndexRoute
   '/colaboradores/': typeof AppColaboradoresIndexRoute
   '/ordens/': typeof AppOrdensIndexRoute
+  '/relatorios/': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
@@ -405,7 +412,6 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
-  '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/leitos/faturamento': typeof LeitosFaturamentoRoute
   '/leitos/mais': typeof LeitosMaisRoute
   '/leitos/movimentacoes': typeof LeitosMovimentacoesRoute
@@ -427,6 +433,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof AppClientesIndexRoute
   '/colaboradores': typeof AppColaboradoresIndexRoute
   '/ordens': typeof AppOrdensIndexRoute
+  '/relatorios': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos': typeof LeitosPedidosIndexRoute
@@ -484,6 +491,7 @@ export interface FileRoutesById {
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/colaboradores/': typeof AppColaboradoresIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
+  '/_app/relatorios/': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
@@ -541,6 +549,7 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/colaboradores/'
     | '/ordens/'
+    | '/relatorios/'
     | '/leitos/configuracoes/'
     | '/leitos/estoque/'
     | '/leitos/pedidos/'
@@ -566,7 +575,6 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/mais'
-    | '/relatorios'
     | '/leitos/faturamento'
     | '/leitos/mais'
     | '/leitos/movimentacoes'
@@ -588,6 +596,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/colaboradores'
     | '/ordens'
+    | '/relatorios'
     | '/leitos/configuracoes'
     | '/leitos/estoque'
     | '/leitos/pedidos'
@@ -644,6 +653,7 @@ export interface FileRouteTypes {
     | '/_app/clientes/'
     | '/_app/colaboradores/'
     | '/_app/ordens/'
+    | '/_app/relatorios/'
     | '/leitos/configuracoes/'
     | '/leitos/estoque/'
     | '/leitos/pedidos/'
@@ -855,6 +865,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/leitos/configuracoes/'
       preLoaderRoute: typeof LeitosConfiguracoesIndexRouteImport
       parentRoute: typeof LeitosConfiguracoesRoute
+    }
+    '/_app/relatorios/': {
+      id: '/_app/relatorios/'
+      path: '/'
+      fullPath: '/relatorios/'
+      preLoaderRoute: typeof AppRelatoriosIndexRouteImport
+      parentRoute: typeof AppRelatoriosRoute
     }
     '/_app/ordens/': {
       id: '/_app/ordens/'
@@ -1097,10 +1114,12 @@ const AppColaboradoresRouteWithChildren =
   AppColaboradoresRoute._addFileChildren(AppColaboradoresRouteChildren)
 
 interface AppRelatoriosRouteChildren {
+  AppRelatoriosIndexRoute: typeof AppRelatoriosIndexRoute
   AppRelatoriosTecnicoIdRoute: typeof AppRelatoriosTecnicoIdRoute
 }
 
 const AppRelatoriosRouteChildren: AppRelatoriosRouteChildren = {
+  AppRelatoriosIndexRoute: AppRelatoriosIndexRoute,
   AppRelatoriosTecnicoIdRoute: AppRelatoriosTecnicoIdRoute,
 }
 
