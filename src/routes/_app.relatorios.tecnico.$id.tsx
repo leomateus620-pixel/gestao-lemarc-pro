@@ -61,6 +61,23 @@ function TechnicianReportPage() {
   );
 }
 
+function formatIsoDay(value: string | null | undefined): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function periodDescription(filters: ReturnType<typeof searchToFilters>): string {
+  if (filters.period === "custom") {
+    const from = formatIsoDay(filters.from);
+    const to = formatIsoDay(filters.to);
+    if (from && to) return `${from} a ${to}`;
+    if (from) return `a partir de ${from}`;
+    if (to) return `até ${to}`;
+  }
+  return getPeriodLabel(filters.period);
+}
+
 function TechnicianReportContent() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
@@ -81,7 +98,7 @@ function TechnicianReportContent() {
             <span className="truncate">{name}</span>
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-relaxed text-slate-200/86 sm:text-sm">
-            Período analisado: {getPeriodLabel(filters.period)}. Todas as OS em que ele lançou
+            Período analisado: {periodDescription(filters)}. Todas as OS em que ele lançou
             horas, com o valor dele em cada uma.
           </p>
         </div>

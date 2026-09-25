@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Filter, RotateCcw, User, X } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarDays, CalendarRange, Filter, RotateCcw, User, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   PERIOD_OPTIONS,
   countActiveFilters,
@@ -196,6 +199,8 @@ export function ReportsFilters({
                 ))}
               </SelectContent>
             </Select>
+
+            <PeriodRangePicker filters={filters} onApply={setSearch} />
           </div>
           {customInvalid && (
             <p className="mt-1.5 text-xs font-bold text-destructive" role="alert">
@@ -423,6 +428,127 @@ export function ReportsFilters({
         </span>
       </div>
     </section>
+  );
+}
+
+function parseIsoDay(value: string | null | undefined): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return Number.isFinite(dt.getTime()) ? dt : undefined;
+}
+
+function toIsoDay(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function PeriodRangePicker({
+  filters,
+  onApply,
+}: {
+  filters: ReportFilters;
+  onApply: (patch: Patch) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState<Date | undefined>();
+  const [to, setTo] = useState<Date | undefined>();
+
+  const active = filters.period === "custom" && !!filters.from && !!filters.to;
+  const invalid = !!(from && to && from.getTime() > to.getTime());
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setFrom(parseIsoDay(filters.from));
+      setTo(parseIsoDay(filters.to));
+    }
+    setOpen(next);
+  };
+
+  const apply = () => {
+    if (!from || !to || invalid) return;
+    onApply({ period: "custom", from: toIsoDay(from), to: toIsoDay(to) });
+    setOpen(false);
+  };
+
+  const clear = () => {
+    onApply({ period: "month", from: null, to: null });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Selecionar período por datas"
+          className={cn(
+            "lemarc-report-control flex h-11 w-full items-center gap-2 rounded-xl px-3 font-bold sm:w-[190px]",
+            active && "border-primary/45 text-primary",
+          )}
+        >
+          <CalendarRange size={15} className="shrink-0" aria-hidden="true" />
+          <span className="truncate">
+            {active
+              ? `${format(parseIsoDay(filters.from)!, "dd/MM")} – ${format(parseIsoDay(filters.to)!, "dd/MM")}`
+              : "Período"}
+          </span>
+          {active && (
+            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-foreground">
+              1
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto max-w-[calc(100vw-2rem)] p-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="min-w-0">
+            <div className="lemarc-report-field-label mb-1">De</div>
+            <Calendar
+              mode="single"
+              selected={from}
+              onSelect={setFrom}
+              initialFocus
+              className="pointer-events-auto p-1"
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="lemarc-report-field-label mb-1">Até</div>
+            <Calendar
+              mode="single"
+              selected={to}
+              onSelect={setTo}
+              className="pointer-events-auto p-1"
+            />
+          </div>
+        </div>
+        {invalid && (
+          <p className="mt-2 text-xs font-bold text-destructive" role="alert">
+            A data inicial não pode ser posterior à data final.
+          </p>
+        )}
+        <div className="mt-3 flex gap-2 border-t border-white/10 pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 flex-1 rounded-xl"
+            onClick={clear}
+            disabled={!active}
+          >
+            Limpar
+          </Button>
+          <Button
+            type="button"
+            className="h-10 flex-1 rounded-xl font-black"
+            onClick={apply}
+            disabled={!from || !to || invalid}
+          >
+            Aplicar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
