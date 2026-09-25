@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   getClientReport,
   getReportOrders,
+  getTechnicianReport,
   listReportLookups,
   updateBillingStatus,
 } from "@/lib/api/reports.functions";
@@ -44,6 +45,17 @@ export function useClientReportQuery(clientId: string, filters: ReportFilters) {
     queryOptions({
       queryKey: ["client-report", clientId, ...filtersKey(filters)],
       queryFn: () => fetcher({ data: { clientId, filters } }),
+      staleTime: 20_000,
+    }),
+  );
+}
+
+export function useTechnicianReportQuery(technicianId: string, filters: ReportFilters) {
+  const fetcher = useServerFn(getTechnicianReport);
+  return useSuspenseQuery(
+    queryOptions({
+      queryKey: ["technician-report", technicianId, ...filtersKey(filters)],
+      queryFn: () => fetcher({ data: { technicianId, filters } }),
       staleTime: 20_000,
     }),
   );
