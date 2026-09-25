@@ -98,7 +98,7 @@ function TechnicianReportContent() {
             <span className="truncate">{name}</span>
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-relaxed text-slate-200/86 sm:text-sm">
-            Período analisado: {getPeriodLabel(filters.period)}. Todas as OS em que ele lançou
+            Período analisado: {periodDescription(filters)}. Todas as OS em que ele lançou
             horas, com o valor dele em cada uma.
           </p>
         </div>
