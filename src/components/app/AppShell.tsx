@@ -1,4 +1,6 @@
-import { Boxes, ChevronLeft, LogOut, Plus } from "lucide-react";
+import { Bell, Boxes, ChevronLeft, LogOut, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { NotificationSettings } from "./NotificationSettings";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
@@ -135,6 +137,23 @@ export function AppShell({
                     <Boxes size={17} />
                   </Link>
                 ) : null}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      className="lemarc-pressable grid size-11 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      aria-label="Notificações"
+                      title="Notificações"
+                    >
+                      <Bell size={16} />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Notificações</DialogTitle>
+                    </DialogHeader>
+                    <NotificationSettings />
+                  </DialogContent>
+                </Dialog>
                 <button
                   onClick={handleSignOut}
                   className="lemarc-pressable grid size-11 shrink-0 place-items-center rounded-xl border border-white/12 bg-white/[0.07] text-slate-300 transition hover:bg-white/[0.11] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
