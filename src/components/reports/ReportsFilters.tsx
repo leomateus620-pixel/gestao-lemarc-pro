@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Filter, RotateCcw, User, X } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarDays, CalendarRange, Filter, RotateCcw, User, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   PERIOD_OPTIONS,
   countActiveFilters,
