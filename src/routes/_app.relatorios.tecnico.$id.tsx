@@ -61,7 +61,7 @@ function TechnicianReportPage() {
   );
 }
 
-function formatIsoDay(value: string | null): string | null {
+function formatIsoDay(value: string | null | undefined): string | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split("-");
   return `${d}/${m}/${y}`;

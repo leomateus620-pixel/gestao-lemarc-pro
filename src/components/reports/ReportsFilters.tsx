@@ -431,7 +431,7 @@ export function ReportsFilters({
   );
 }
 
-function parseIsoDay(value: string | null): Date | undefined {
+function parseIsoDay(value: string | null | undefined): Date | undefined {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
   const [y, m, d] = value.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
