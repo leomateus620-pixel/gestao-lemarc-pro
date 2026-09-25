@@ -66,43 +66,47 @@ function MaisPage() {
         <section className="grid gap-3 sm:grid-cols-3">
           <InfoPanel icon={IdCard} label="Perfil" value={role === "gestor" ? "Gestor" : "Campo"} />
           <InfoPanel icon={ShieldCheck} label="Sessão" value="Autenticada" />
-          <div className="lemarc-horizontal-row min-h-[5.25rem] items-center">
-            <span className="grid size-10 place-items-center rounded-2xl border border-primary/35 bg-primary/14 text-primary">
-              <SlidersHorizontal size={17} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="lemarc-technical-label block">Visualização</span>
-              <span className="mt-1 block text-sm font-black text-white">Modo operacional</span>
-            </span>
-            <RoleSwitcher />
-          </div>
+          {isAdmin && (
+            <div className="lemarc-horizontal-row min-h-[5.25rem] items-center">
+              <span className="grid size-10 place-items-center rounded-2xl border border-primary/35 bg-primary/14 text-primary">
+                <SlidersHorizontal size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="lemarc-technical-label block">Visualização</span>
+                <span className="mt-1 block text-sm font-black text-white">Modo operacional</span>
+              </span>
+              <RoleSwitcher />
+            </div>
+          )}
         </section>
 
-        <section className="lemarc-wizard-card p-5 sm:p-6">
-          <p className="lemarc-technical-label">Atalhos</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              to="/colaboradores"
-              className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-primary/35 bg-primary/14 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-primary hover:bg-primary/20"
-            >
-              <UserRound size={14} />
-              Colaboradores
-            </Link>
-            <Link
-              to="/relatorios"
-              className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
-            >
-              Relatórios
-            </Link>
-            <Link
-              to="/configuracoes"
-              className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
-            >
-              <Settings size={14} />
-              Configurações
-            </Link>
-          </div>
-        </section>
+        {isAdmin && (
+          <section className="lemarc-wizard-card p-5 sm:p-6">
+            <p className="lemarc-technical-label">Atalhos</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                to="/colaboradores"
+                className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-primary/35 bg-primary/14 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-primary hover:bg-primary/20"
+              >
+                <UserRound size={14} />
+                Colaboradores
+              </Link>
+              <Link
+                to="/relatorios"
+                className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
+              >
+                Relatórios
+              </Link>
+              <Link
+                to="/configuracoes"
+                className="lemarc-pressable inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/35"
+              >
+                <Settings size={14} />
+                Configurações
+              </Link>
+            </div>
+          </section>
+        )}
         <div className="mt-4"><NotificationSettings /></div>
       </main>
     </AppShell>
