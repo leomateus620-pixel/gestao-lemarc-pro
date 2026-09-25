@@ -6,16 +6,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
 import { enableWebPush } from "@/lib/push/firebaseClient";
 import { sendTestPush } from "@/lib/api/push.functions";
-import { canInstall, getPushStatus, onInstallAvailable, promptInstall, type PushStatus } from "@/lib/push/pushStatus";
-
-const labels: Record<PushStatus, { text: string; hint: string }> = {
-  granted: { text: "Ativadas", hint: "Este aparelho recebe avisos das OS." },
-  denied: { text: "Bloqueadas", hint: "Libere nas configurações do navegador: cadeado ao lado do endereço → Notificações → Permitir." },
-  default: { text: "Não ativadas", hint: "Toque em Ativar para receber avisos das OS." },
-  "needs-install": { text: "Precisa instalar", hint: "No iPhone: Compartilhar → \"Adicionar à Tela de Início\", abra pelo ícone e ative aqui." },
-  unsupported: { text: "Indisponível", hint: "Este navegador não oferece notificações." },
-  iframe: { text: "Abra em nova aba", hint: "Abra o sistema em uma aba própria ou no site publicado para ativar." },
-};
+import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
 
 export function NotificationSettings() {
   const [status, setStatus] = useState<PushStatus>("unsupported");
@@ -52,7 +43,7 @@ export function NotificationSettings() {
     }
   }
 
-  const info = labels[status];
+  const info = pushStatusLabels[status];
   return (
     <GlassCard className="p-4">
       <div className="flex items-center gap-3">
@@ -64,9 +55,9 @@ export function NotificationSettings() {
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{info.hint}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(status === "default" || status === "granted") && (
+        {(status === "default" || status === "granted" || status === "denied") && (
           <Button size="sm" onClick={activate} disabled={pending}>
-            {pending ? <Loader2 className="animate-spin" /> : <Bell />} {status === "granted" ? "Reativar" : "Ativar notificações"}
+            {pending ? <Loader2 className="animate-spin" /> : <Bell />} {status === "granted" ? "Reativar" : status === "denied" ? "Já liberei, tentar de novo" : "Ativar notificações"}
           </Button>
         )}
         {installable && (
