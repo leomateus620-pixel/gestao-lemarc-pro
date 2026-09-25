@@ -170,3 +170,37 @@ export const revokeServiceOrderSignature = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const updateSignatureSigner = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { signatureId: string; name: string; role?: string | null }) => {
+    if (!data?.signatureId) throw new Error("signatureId obrigatório");
+    const name = String(data.name ?? "").trim();
+    if (name.length < 2 || name.length > 120) throw new Error("Nome deve ter entre 2 e 120 caracteres.");
+    const role = String(data.role ?? "").trim().slice(0, 120);
+    return { signatureId: data.signatureId, name, role: role || null };
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin } = await sb.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Apenas administradores podem editar o responsável.");
+    const { data: current, error: readError } = await sb
+      .from("service_order_signatures")
+      .select("signed_by_name, signed_by_role, metadata")
+      .eq("id", data.signatureId)
+      .single();
+    if (readError || !current) throw new Error(readError?.message ?? "Assinatura não encontrada.");
+    const metadata = (current.metadata ?? {}) as Record<string, any>;
+    const corrections = Array.isArray(metadata.name_corrections) ? metadata.name_corrections : [];
+    corrections.push({
+      from: current.signed_by_name, to: data.name,
+      role_from: current.signed_by_role ?? null, role_to: data.role,
+      by: context.userId, at: new Date().toISOString(),
+    });
+    const { error } = await sb
+      .from("service_order_signatures")
+      .update({ signed_by_name: data.name, signed_by_role: data.role, metadata: { ...metadata, name_corrections: corrections } })
+      .eq("id", data.signatureId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
