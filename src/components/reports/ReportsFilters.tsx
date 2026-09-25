@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Filter, RotateCcw, X } from "lucide-react";
+import { CalendarDays, Filter, RotateCcw, User, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
