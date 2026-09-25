@@ -2,24 +2,21 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { IdCard, LogOut, Settings, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { NotificationSettings } from "@/components/app/NotificationSettings";
-import { RequireAdmin } from "@/lib/auth/requireAdmin";
 import { useAuth } from "@/components/app/AuthContext";
 import { RoleSwitcher } from "@/components/app/RoleSwitcher";
 import { useRole } from "@/components/app/RoleContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export const Route = createFileRoute("/_app/mais")({
   head: () => ({ meta: [{ title: "Mais — Gestão Lemarc" }] }),
-  component: () => (
-    <RequireAdmin>
-      <MaisPage />
-    </RequireAdmin>
-  ),
+  component: () => <MaisPage />,
 });
 
 function MaisPage() {
   const navigate = useNavigate();
   const { displayName, email, avatarUrl, signOut } = useAuth();
   const { role } = useRole();
+  const { isAdmin } = useUserRole();
   const firstName = displayName.split(" ")[0] || "Operação";
 
   async function handleSignOut() {
