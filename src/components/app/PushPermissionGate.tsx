@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { enableWebPush } from "@/lib/push/firebaseClient";
-import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
+import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, showAndroidInstallGuide, type PushStatus } from "@/lib/push/pushStatus";
 
 const SNOOZE_KEY = "lemarc:push-snoozed-session";
 const PROMPT_STATUSES: PushStatus[] = ["default", "needs-install", "denied", "in-app-browser", "unsupported"];
@@ -106,6 +106,11 @@ export function PushPermissionGate() {
             <Button variant="secondary" onClick={() => void promptInstall()} className="w-full">
               <Download /> Instalar app
             </Button>
+          )}
+          {showAndroidInstallGuide() && (
+            <p className="rounded-xl bg-white/5 p-3 text-xs text-muted-foreground">
+              Para instalar o app: toque nos <span className="font-bold text-foreground">3 pontinhos (⋮)</span> no canto do Chrome e escolha <span className="font-bold text-foreground">"Instalar app"</span> ou <span className="font-bold text-foreground">"Adicionar à tela inicial"</span>.
+            </p>
           )}
           <Button variant="ghost" onClick={snooze} className="w-full">Agora não</Button>
         </DialogFooter>

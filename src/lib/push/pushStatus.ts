@@ -21,6 +21,16 @@ export function isIOS() {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+export function isAndroid() {
+  if (typeof navigator === "undefined") return false;
+  return /android/i.test(navigator.userAgent);
+}
+
+/** Guia manual de instalação no Android quando o beforeinstallprompt não dispara. */
+export function showAndroidInstallGuide() {
+  return isAndroid() && !isStandalone() && !canInstall() && !isInAppBrowser();
+}
+
 export function isStandalone() {
   if (typeof window === "undefined") return false;
   return window.matchMedia?.("(display-mode: standalone)").matches ||
