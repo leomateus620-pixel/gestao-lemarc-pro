@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { enableWebPush } from "@/lib/push/firebaseClient";
-import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
+import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, showAndroidInstallGuide, type PushStatus } from "@/lib/push/pushStatus";
 
 const SNOOZE_KEY = "lemarc:push-snoozed-session";
 const PROMPT_STATUSES: PushStatus[] = ["default", "needs-install", "denied", "in-app-browser", "unsupported"];

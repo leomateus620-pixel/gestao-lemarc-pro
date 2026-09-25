@@ -6,7 +6,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
 import { enableWebPush } from "@/lib/push/firebaseClient";
 import { sendTestPush } from "@/lib/api/push.functions";
-import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, type PushStatus } from "@/lib/push/pushStatus";
+import { canInstall, getPushStatus, onInstallAvailable, promptInstall, pushStatusLabels, showAndroidInstallGuide, type PushStatus } from "@/lib/push/pushStatus";
 
 export function NotificationSettings() {
   const [status, setStatus] = useState<PushStatus>("unsupported");
