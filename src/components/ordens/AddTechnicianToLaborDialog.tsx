@@ -80,15 +80,21 @@ export function AddTechnicianToLaborDialog({
   };
 
   const finish = async (tech: TechnicianLite) => {
-    await addFn({ data: { orderId, technicianIds: [tech.id] } });
+    // Adiciona na apuração imediatamente; as horas são gravadas na finalização
+    // por technician_id. Vincular à equipe é best-effort e não bloqueia.
+    onAdded({ ...tech, is_primary: false, is_history: false });
+    toast.success(`${tech.full_name} adicionado à apuração.`);
+    reset();
+    onOpenChange(false);
+    try {
+      await addFn({ data: { orderId, technicianIds: [tech.id] } });
+    } catch (e) {
+      console.warn("Vínculo do técnico à equipe não gravado:", e);
+    }
     queryClient.invalidateQueries({ queryKey: ["service-order", orderId] });
     queryClient.invalidateQueries({ queryKey: ["service-orders"] });
     queryClient.invalidateQueries({ queryKey: ["order-history-technicians", orderId] });
     queryClient.invalidateQueries({ queryKey: ["technicians"] });
-    onAdded({ ...tech, is_primary: false, is_history: false });
-    toast.success(`${tech.full_name} adicionado à OS.`);
-    reset();
-    onOpenChange(false);
   };
 
   const pickMutation = useMutation({
