@@ -35,6 +35,7 @@ import { Route as LeitosProducaoIndexRouteImport } from './routes/leitos.produca
 import { Route as LeitosPedidosIndexRouteImport } from './routes/leitos.pedidos.index'
 import { Route as LeitosEstoqueIndexRouteImport } from './routes/leitos.estoque.index'
 import { Route as LeitosConfiguracoesIndexRouteImport } from './routes/leitos.configuracoes.index'
+import { Route as AppRelatoriosIndexRouteImport } from './routes/_app.relatorios.index'
 import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
 import { Route as AppColaboradoresIndexRouteImport } from './routes/_app.colaboradores.index'
 import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
@@ -56,6 +57,7 @@ import { Route as AppClientesIdIndexRouteImport } from './routes/_app.clientes.$
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LeitosProdutosProductIdEditarRouteImport } from './routes/leitos.produtos.$productId.editar'
 import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
+import { Route as AppRelatoriosTecnicoIdRouteImport } from './routes/_app.relatorios.tecnico.$id'
 import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
 import { Route as AppColaboradoresIdPrecificacaoRouteImport } from './routes/_app.colaboradores.$id.precificacao'
 import { Route as AppColaboradoresIdOrdensRouteImport } from './routes/_app.colaboradores.$id.ordens'
@@ -193,6 +195,11 @@ const LeitosConfiguracoesIndexRoute =
     path: '/',
     getParentRoute: () => LeitosConfiguracoesRoute,
   } as any)
+const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRelatoriosRoute,
+} as any)
 const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
   id: '/ordens/',
   path: '/ordens/',
@@ -304,6 +311,11 @@ const AppRelatoriosClienteClientIdRoute =
     path: '/relatorios/cliente/$clientId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppRelatoriosTecnicoIdRoute = AppRelatoriosTecnicoIdRouteImport.update({
+  id: '/tecnico/$id',
+  path: '/tecnico/$id',
+  getParentRoute: () => AppRelatoriosRoute,
+} as any)
 const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
   id: '/imprimir',
   path: '/imprimir',
@@ -347,7 +359,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
-  '/relatorios': typeof AppRelatoriosRoute
+  '/relatorios': typeof AppRelatoriosRouteWithChildren
   '/leitos/configuracoes': typeof LeitosConfiguracoesRouteWithChildren
   '/leitos/estoque': typeof LeitosEstoqueRouteWithChildren
   '/leitos/faturamento': typeof LeitosFaturamentoRoute
@@ -374,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/clientes/': typeof AppClientesIndexRoute
   '/colaboradores/': typeof AppColaboradoresIndexRoute
   '/ordens/': typeof AppOrdensIndexRoute
+  '/relatorios/': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
@@ -385,6 +398,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
   '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
+  '/relatorios/tecnico/$id': typeof AppRelatoriosTecnicoIdRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -398,7 +412,6 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
-  '/relatorios': typeof AppRelatoriosRoute
   '/leitos/faturamento': typeof LeitosFaturamentoRoute
   '/leitos/mais': typeof LeitosMaisRoute
   '/leitos/movimentacoes': typeof LeitosMovimentacoesRoute
@@ -420,6 +433,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof AppClientesIndexRoute
   '/colaboradores': typeof AppColaboradoresIndexRoute
   '/ordens': typeof AppOrdensIndexRoute
+  '/relatorios': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos': typeof LeitosPedidosIndexRoute
@@ -431,6 +445,7 @@ export interface FileRoutesByTo {
   '/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
   '/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
+  '/relatorios/tecnico/$id': typeof AppRelatoriosTecnicoIdRoute
   '/relatorios/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -449,7 +464,7 @@ export interface FileRoutesById {
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/mais': typeof AppMaisRoute
-  '/_app/relatorios': typeof AppRelatoriosRoute
+  '/_app/relatorios': typeof AppRelatoriosRouteWithChildren
   '/leitos/configuracoes': typeof LeitosConfiguracoesRouteWithChildren
   '/leitos/estoque': typeof LeitosEstoqueRouteWithChildren
   '/leitos/faturamento': typeof LeitosFaturamentoRoute
@@ -476,6 +491,7 @@ export interface FileRoutesById {
   '/_app/clientes/': typeof AppClientesIndexRoute
   '/_app/colaboradores/': typeof AppColaboradoresIndexRoute
   '/_app/ordens/': typeof AppOrdensIndexRoute
+  '/_app/relatorios/': typeof AppRelatoriosIndexRoute
   '/leitos/configuracoes/': typeof LeitosConfiguracoesIndexRoute
   '/leitos/estoque/': typeof LeitosEstoqueIndexRoute
   '/leitos/pedidos/': typeof LeitosPedidosIndexRoute
@@ -487,6 +503,7 @@ export interface FileRoutesById {
   '/_app/colaboradores/$id/ordens': typeof AppColaboradoresIdOrdensRoute
   '/_app/colaboradores/$id/precificacao': typeof AppColaboradoresIdPrecificacaoRoute
   '/_app/ordens/$id/imprimir': typeof AppOrdensIdImprimirRoute
+  '/_app/relatorios/tecnico/$id': typeof AppRelatoriosTecnicoIdRoute
   '/_app/relatorios_/cliente/$clientId': typeof AppRelatoriosClienteClientIdRoute
   '/leitos/produtos/$productId/editar': typeof LeitosProdutosProductIdEditarRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -532,6 +549,7 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/colaboradores/'
     | '/ordens/'
+    | '/relatorios/'
     | '/leitos/configuracoes/'
     | '/leitos/estoque/'
     | '/leitos/pedidos/'
@@ -543,6 +561,7 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/ordens'
     | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
+    | '/relatorios/tecnico/$id'
     | '/relatorios/cliente/$clientId'
     | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
@@ -556,7 +575,6 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/mais'
-    | '/relatorios'
     | '/leitos/faturamento'
     | '/leitos/mais'
     | '/leitos/movimentacoes'
@@ -578,6 +596,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/colaboradores'
     | '/ordens'
+    | '/relatorios'
     | '/leitos/configuracoes'
     | '/leitos/estoque'
     | '/leitos/pedidos'
@@ -589,6 +608,7 @@ export interface FileRouteTypes {
     | '/colaboradores/$id/ordens'
     | '/colaboradores/$id/precificacao'
     | '/ordens/$id/imprimir'
+    | '/relatorios/tecnico/$id'
     | '/relatorios/cliente/$clientId'
     | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
@@ -633,6 +653,7 @@ export interface FileRouteTypes {
     | '/_app/clientes/'
     | '/_app/colaboradores/'
     | '/_app/ordens/'
+    | '/_app/relatorios/'
     | '/leitos/configuracoes/'
     | '/leitos/estoque/'
     | '/leitos/pedidos/'
@@ -644,6 +665,7 @@ export interface FileRouteTypes {
     | '/_app/colaboradores/$id/ordens'
     | '/_app/colaboradores/$id/precificacao'
     | '/_app/ordens/$id/imprimir'
+    | '/_app/relatorios/tecnico/$id'
     | '/_app/relatorios_/cliente/$clientId'
     | '/leitos/produtos/$productId/editar'
     | '/lovable/email/queue/process'
@@ -844,6 +866,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeitosConfiguracoesIndexRouteImport
       parentRoute: typeof LeitosConfiguracoesRoute
     }
+    '/_app/relatorios/': {
+      id: '/_app/relatorios/'
+      path: '/'
+      fullPath: '/relatorios/'
+      preLoaderRoute: typeof AppRelatoriosIndexRouteImport
+      parentRoute: typeof AppRelatoriosRoute
+    }
     '/_app/ordens/': {
       id: '/_app/ordens/'
       path: '/ordens'
@@ -991,6 +1020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/relatorios/tecnico/$id': {
+      id: '/_app/relatorios/tecnico/$id'
+      path: '/tecnico/$id'
+      fullPath: '/relatorios/tecnico/$id'
+      preLoaderRoute: typeof AppRelatoriosTecnicoIdRouteImport
+      parentRoute: typeof AppRelatoriosRoute
+    }
     '/_app/ordens/$id/imprimir': {
       id: '/_app/ordens/$id/imprimir'
       path: '/imprimir'
@@ -1077,6 +1113,20 @@ const AppColaboradoresRouteChildren: AppColaboradoresRouteChildren = {
 const AppColaboradoresRouteWithChildren =
   AppColaboradoresRoute._addFileChildren(AppColaboradoresRouteChildren)
 
+interface AppRelatoriosRouteChildren {
+  AppRelatoriosIndexRoute: typeof AppRelatoriosIndexRoute
+  AppRelatoriosTecnicoIdRoute: typeof AppRelatoriosTecnicoIdRoute
+}
+
+const AppRelatoriosRouteChildren: AppRelatoriosRouteChildren = {
+  AppRelatoriosIndexRoute: AppRelatoriosIndexRoute,
+  AppRelatoriosTecnicoIdRoute: AppRelatoriosTecnicoIdRoute,
+}
+
+const AppRelatoriosRouteWithChildren = AppRelatoriosRoute._addFileChildren(
+  AppRelatoriosRouteChildren,
+)
+
 interface AppOrdensIdRouteChildren {
   AppOrdensIdImprimirRoute: typeof AppOrdensIdImprimirRoute
 }
@@ -1095,7 +1145,7 @@ interface AppRouteChildren {
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppMaisRoute: typeof AppMaisRoute
-  AppRelatoriosRoute: typeof AppRelatoriosRoute
+  AppRelatoriosRoute: typeof AppRelatoriosRouteWithChildren
   AppOrdensIdRoute: typeof AppOrdensIdRouteWithChildren
   AppOrdensNovaRoute: typeof AppOrdensNovaRoute
   AppRelatoriosImprimirRoute: typeof AppRelatoriosImprimirRoute
@@ -1109,7 +1159,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppMaisRoute: AppMaisRoute,
-  AppRelatoriosRoute: AppRelatoriosRoute,
+  AppRelatoriosRoute: AppRelatoriosRouteWithChildren,
   AppOrdensIdRoute: AppOrdensIdRouteWithChildren,
   AppOrdensNovaRoute: AppOrdensNovaRoute,
   AppRelatoriosImprimirRoute: AppRelatoriosImprimirRoute,
