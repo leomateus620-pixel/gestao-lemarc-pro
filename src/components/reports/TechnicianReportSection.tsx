@@ -106,9 +106,7 @@ export function TechnicianReportSection({ report }: { report: TechnicianReport }
                     <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-200">
                       {formatWorkDate(row)}
                     </td>
-                    <td className="max-w-64 truncate px-4 py-3 font-semibold text-slate-200">
-                      {row.title}
-                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-200">{row.title}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-300">
                       {statusLabel[row.status]}
                     </td>

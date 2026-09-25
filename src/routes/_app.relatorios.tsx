@@ -46,7 +46,6 @@ import { ReportOrdersMobileList, ReportOrdersTable } from "@/components/reports/
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { ClientReportDrawer } from "@/components/reports/ClientReportDrawer";
 import { ReportGenerateDialog } from "@/components/reports/ReportGenerateDialog";
-import { TechnicianReportSection } from "@/components/reports/TechnicianReportSection";
 import { useTechnicianReportQuery } from "@/hooks/useReports";
 import type { ReportFilters } from "@/types/reports";
 
