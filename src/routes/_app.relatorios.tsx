@@ -44,6 +44,9 @@ import { ReportOrdersMobileList, ReportOrdersTable } from "@/components/reports/
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { ClientReportDrawer } from "@/components/reports/ClientReportDrawer";
 import { ReportGenerateDialog } from "@/components/reports/ReportGenerateDialog";
+import { TechnicianReportSection } from "@/components/reports/TechnicianReportSection";
+import { useTechnicianReportQuery } from "@/hooks/useReports";
+import type { ReportFilters } from "@/types/reports";
 
 export const Route = createFileRoute("/_app/relatorios")({
   head: () => ({
@@ -279,6 +282,22 @@ function RelatoriosContent() {
       ) : (
         <>
           <ReportsKpiGrid kpis={kpis} />
+
+          {filters.technicianId && (
+            <Suspense
+              fallback={
+                <div
+                  className="lemarc-report-card h-48 animate-pulse motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              }
+            >
+              <TechnicianReportSectionLoader
+                technicianId={filters.technicianId}
+                filters={filters}
+              />
+            </Suspense>
+          )}
 
           <section aria-labelledby="report-comparison-title" className="space-y-3">
             <div className="lemarc-report-section-heading">
