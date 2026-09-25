@@ -46,6 +46,31 @@ export const listNotificationDeliveryLog = createServerFn({ method: "GET" })
     return ((rows ?? []) as Array<Record<string, Json>>).map((row) => ({ ...row, recipient: row.user_id ? profileMap.get(String(row.user_id))?.full_name ?? profileMap.get(String(row.user_id))?.email ?? "Usuário" : "—" }));
   });
 
+export const sendAdminPush = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { userId: string; title: string; body: string; serviceOrderId?: string; eventType?: PushEventType }) => data)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: isAdmin, error: roleError } = await sb.rpc("is_admin");
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Ação restrita ao administrador.");
+    const title = data.title.trim();
+    const body = data.body.trim();
+    if (!title || !body) throw new Error("Título e texto são obrigatórios.");
+    const { count } = await sb.from("push_devices").select("id", { count: "exact", head: true }).eq("user_id", data.userId).is("revoked_at", null);
+    if (!count) return { sent: 0 };
+    const { deliverPush } = await import("./push.server");
+    await deliverPush({
+      userIds: [data.userId],
+      eventType: data.eventType ?? "service_order_finished",
+      title,
+      body,
+      serviceOrderId: data.serviceOrderId ?? null,
+      data: data.serviceOrderId ? { type: data.eventType ?? "service_order_finished", serviceOrderId: data.serviceOrderId } : { type: "admin_push" },
+    });
+    return { sent: count };
+  });
+
 export const sendTestPush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
