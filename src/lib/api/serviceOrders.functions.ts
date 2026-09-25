@@ -340,8 +340,9 @@ export const addServiceOrderTechnicians = createServerFn({ method: "POST" })
       .maybeSingle();
     if (orderError) throw new Error(orderError.message);
     if (!order) throw new Error("OS não encontrada.");
-    if (["approved", "cancelled"].includes(order.status)) {
-      throw new Error("Não é possível adicionar técnicos a uma OS encerrada.");
+    // Admin pode revisar novamente OS aprovadas; apenas canceladas ficam bloqueadas.
+    if (order.status === "cancelled") {
+      throw new Error("Não é possível adicionar técnicos a uma OS cancelada.");
     }
 
     const { data: activeTechnicians, error: techniciansError } = await sb
