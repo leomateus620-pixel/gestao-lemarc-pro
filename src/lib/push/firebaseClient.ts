@@ -33,6 +33,7 @@ export async function enableWebPush(): Promise<PushEnableResult> {
   try {
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     const registration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?apiKey=${encodeURIComponent(firebaseConfig.apiKey)}&projectId=${encodeURIComponent(firebaseConfig.projectId)}&appId=${encodeURIComponent(appId)}&messagingSenderId=${encodeURIComponent(firebaseConfig.messagingSenderId)}`);
+    void registration.update().catch(() => undefined);
     const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: registration });
     if (!token) return { status: "denied", message: "O navegador não retornou um token de notificação." };
     await registerPushDevice({ data: { token, platform: "web", userAgent: navigator.userAgent } });
