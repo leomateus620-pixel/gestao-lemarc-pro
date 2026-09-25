@@ -199,6 +199,8 @@ export function ReportsFilters({
                 ))}
               </SelectContent>
             </Select>
+
+            <PeriodRangePicker filters={filters} onApply={setSearch} />
           </div>
           {customInvalid && (
             <p className="mt-1.5 text-xs font-bold text-destructive" role="alert">
