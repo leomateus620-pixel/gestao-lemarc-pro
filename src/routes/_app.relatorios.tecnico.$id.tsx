@@ -68,7 +68,6 @@ function TechnicianReportContent() {
   const { data: report } = useTechnicianReportQuery(id, filters);
 
   const name = report.technician?.full_name ?? "Técnico selecionado";
-  const role = report.technician?.role_label ?? null;
 
   return (
     <>
@@ -82,8 +81,8 @@ function TechnicianReportContent() {
             <span className="truncate">{name}</span>
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-relaxed text-slate-200/86 sm:text-sm">
-            {role ? `${role} · ` : ""}Período analisado: {getPeriodLabel(filters.period)}. Todas as
-            OS em que ele lançou horas, com o valor dele em cada uma.
+            Período analisado: {getPeriodLabel(filters.period)}. Todas as OS em que ele lançou
+            horas, com o valor dele em cada uma.
           </p>
         </div>
       </header>
