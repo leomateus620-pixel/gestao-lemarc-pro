@@ -16,7 +16,45 @@ export type PushEnableResult =
   | { status: "registered" }
   | { status: "open-in-new-tab" | "denied" | "unsupported" | "not-configured"; message: string };
 
-export async function enableWebPush(): Promise<PushEnableResult> {
+let inflight: Promise<PushEnableResult> | null = null;
+
+// Uma única ativação por vez: chamadas simultâneas reaproveitam a mesma promessa.
+export function enableWebPush(): Promise<PushEnableResult> {
+  if (!inflight) {
+    inflight = doEnableWebPush().finally(() => {
+      inflight = null;
+    });
+  }
+  return inflight;
+}
+
+const TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Não foi possível ativar agora. Tente de novo.")), TIMEOUT_MS),
+    ),
+  ]);
+}
+
+function waitActive(reg: ServiceWorkerRegistration): Promise<ServiceWorkerRegistration> {
+  if (reg.active) return Promise.resolve(reg);
+  const sw = reg.installing ?? reg.waiting;
+  if (!sw) return navigator.serviceWorker.ready.then(() => reg);
+  return new Promise((resolve) => {
+    const onChange = () => {
+      if (sw.state === "activated") {
+        sw.removeEventListener("statechange", onChange);
+        resolve(reg);
+      }
+    };
+    sw.addEventListener("statechange", onChange);
+  });
+}
+
+async function doEnableWebPush(): Promise<PushEnableResult> {
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !appId || !vapidKey) {
     return { status: "not-configured", message: "Atualize a conexão Firebase com a opção de web push." };
   }
@@ -31,13 +69,19 @@ export async function enableWebPush(): Promise<PushEnableResult> {
     return { status: "denied", message: "Permissão bloqueada. Libere notificações nas configurações do navegador." };
   }
   try {
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const registration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?apiKey=${encodeURIComponent(firebaseConfig.apiKey)}&projectId=${encodeURIComponent(firebaseConfig.projectId)}&appId=${encodeURIComponent(appId)}&messagingSenderId=${encodeURIComponent(firebaseConfig.messagingSenderId)}`);
-    void registration.update().catch(() => undefined);
-    const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: registration });
-    if (!token) return { status: "denied", message: "O navegador não retornou um token de notificação." };
-    await registerPushDevice({ data: { token, platform: "web", userAgent: navigator.userAgent } });
-    return { status: "registered" };
+    return await withTimeout(
+      (async (): Promise<PushEnableResult> => {
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const registration = await waitActive(
+          await navigator.serviceWorker.register(`/firebase-messaging-sw.js?apiKey=${encodeURIComponent(firebaseConfig.apiKey)}&projectId=${encodeURIComponent(firebaseConfig.projectId)}&appId=${encodeURIComponent(appId)}&messagingSenderId=${encodeURIComponent(firebaseConfig.messagingSenderId)}`),
+        );
+        const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: registration });
+        if (!token) return { status: "denied", message: "O navegador não retornou um token de notificação." };
+        await registerPushDevice({ data: { token, platform: "web", userAgent: navigator.userAgent } });
+        void registration.update().catch(() => undefined);
+        return { status: "registered" };
+      })(),
+    );
   } catch (error) {
     return { status: "denied", message: error instanceof Error ? error.message : "Não foi possível ativar notificações." };
   }
