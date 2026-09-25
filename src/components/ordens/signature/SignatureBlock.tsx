@@ -17,7 +17,45 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ServiceOrder } from "@/types/serviceOrder";
 import { useUserRole } from "@/hooks/useUserRole";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
-import { waiveServiceOrderSignature } from "@/lib/api/signatures.functions";
+import { waiveServiceOrderSignature, updateSignatureSigner } from "@/lib/api/signatures.functions";
+import { Input } from "@/components/ui/input";
+
+function EditSignerButton({ orderId, signatureId, name, role }: { orderId: string; signatureId: string; name: string; role: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState(name);
+  const [newRole, setNewRole] = useState(role ?? "");
+  const queryClient = useQueryClient();
+  const fn = useServerFn(updateSignatureSigner);
+  const mutation = useMutation({
+    mutationFn: () => fn({ data: { signatureId, name: newName, role: newRole } }),
+    onSuccess: () => {
+      toast.success("Nome do responsável atualizado");
+      queryClient.invalidateQueries({ queryKey: ["service-order", orderId] });
+      setOpen(false);
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Falha ao atualizar"),
+  });
+  return (
+    <>
+      <Button size="sm" variant="ghost" className="gap-1.5 text-[11px]" onClick={() => { setNewName(name); setNewRole(role ?? ""); setOpen(true); }}>
+        <PenLine size={13} /> Editar nome
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Editar responsável</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>Nome</Label><Input value={newName} onChange={(e) => setNewName(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Cargo</Label><Input value={newRole} onChange={(e) => setNewRole(e.target.value)} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button disabled={mutation.isPending || newName.trim().length < 2} onClick={() => mutation.mutate()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 import { SignatureCaptureDialog } from "./SignatureCaptureDialog";
 import { TimeReviewDialog } from "../TimeReviewDialog";
 
@@ -108,14 +146,22 @@ export function SignatureBlock({ order }: { order: ServiceOrder }) {
                 <Eye size={13} /> Ver
               </Button>
               {isAdmin && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5 text-[11px]"
-                  onClick={startSignature}
-                >
-                  <PenLine size={13} /> Substituir
-                </Button>
+                <>
+                  <EditSignerButton
+                    orderId={order.id}
+                    signatureId={sig.id}
+                    name={sig.signed_by_name}
+                    role={(sig as { signed_by_role?: string | null }).signed_by_role ?? null}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 text-[11px]"
+                    onClick={startSignature}
+                  >
+                    <PenLine size={13} /> Substituir
+                  </Button>
+                </>
               )}
             </div>
           </div>
