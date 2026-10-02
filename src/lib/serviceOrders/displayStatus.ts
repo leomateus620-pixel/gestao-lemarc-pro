@@ -96,3 +96,6 @@ export function pausedSubLabel(d: OrderDisplayStatus): string | null {
   if (d.key !== "running" || d.pausedCount <= 0) return null;
   return d.pausedCount === 1 ? "1 pausado" : `${d.pausedCount} pausados`;
 }
+
+/** Tons âmbar (mesmos do ServiceOrderTimeControl) para o badge "Pausada". */
+export const PAUSED_BADGE_TONE = "border-amber-400/50 bg-amber-500/15 text-amber-200";

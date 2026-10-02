@@ -1,6 +1,9 @@
 import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
-import { pausedSubLabel, type OrderDisplayStatus } from "@/lib/serviceOrders/displayStatus";
-import { PAUSED_BADGE_TONE } from "@/components/app/ServiceOrderCard";
+import {
+  PAUSED_BADGE_TONE,
+  pausedSubLabel,
+  type OrderDisplayStatus,
+} from "@/lib/serviceOrders/displayStatus";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";

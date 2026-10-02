@@ -28,7 +28,11 @@ import { cn } from "@/lib/utils";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { isAlert, isIncomplete, missingFields, statusBucket } from "@/lib/serviceOrders/status";
 import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
-import { pausedSubLabel, type OrderDisplayStatus } from "@/lib/serviceOrders/displayStatus";
+import {
+  PAUSED_BADGE_TONE,
+  pausedSubLabel,
+  type OrderDisplayStatus,
+} from "@/lib/serviceOrders/displayStatus";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
@@ -383,7 +387,6 @@ function OrderPdfButton({ order, className }: { order: ServiceOrder; className?:
   );
 }
 
-export const PAUSED_BADGE_TONE = "border-amber-400/50 bg-amber-500/15 text-amber-200";
 
 function ServiceOrderStatusBadge({
   status,
