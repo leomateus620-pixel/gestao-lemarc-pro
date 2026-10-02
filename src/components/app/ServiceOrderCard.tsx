@@ -383,7 +383,7 @@ function OrderPdfButton({ order, className }: { order: ServiceOrder; className?:
   );
 }
 
-export const PAUSED_BADGE_TONE = "border-amber-400/45 bg-amber-400/[0.13] text-amber-300";
+export const PAUSED_BADGE_TONE = "border-amber-400/50 bg-amber-500/15 text-amber-200";
 
 function ServiceOrderStatusBadge({
   status,
