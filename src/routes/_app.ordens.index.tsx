@@ -1,3 +1,5 @@
+import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
+import { countPausedOrders, type OrderTimeSummary } from "@/lib/serviceOrders/displayStatus";
 import { Suspense, useMemo, type ReactNode } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -38,7 +40,14 @@ import {
   type ServicePriority,
 } from "@/types/serviceOrder";
 
-type StatusFilter = "todas" | "pendente" | "andamento" | "revisao" | "concluida" | "cancelada";
+type StatusFilter =
+  | "todas"
+  | "pendente"
+  | "andamento"
+  | "pausada"
+  | "revisao"
+  | "concluida"
+  | "cancelada";
 type PriorityFilter = "todas" | ServicePriority;
 type SortMode =
   | "recentes"
@@ -51,7 +60,7 @@ type SortMode =
 
 const searchSchema = z.object({
   status: fallback(
-    z.enum(["todas", "pendente", "andamento", "revisao", "concluida", "cancelada"]),
+    z.enum(["todas", "pendente", "andamento", "pausada", "revisao", "concluida", "cancelada"]),
     "todas",
   ).default("todas"),
   priority: fallback(z.enum(["todas", "baixa", "media", "alta", "urgente"]), "todas").default(
@@ -161,11 +170,13 @@ function OrdensList() {
     [client, unit, periodOrders, registeredClients, registeredUnits],
   );
 
+  const { data: timeState } = useRunningOrderTimeStateQuery();
+  const pausedInPeriod = countPausedOrders(periodOrders, timeState);
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return periodOrders
       .filter((order) => {
-        if (!matchesStatus(order, status as StatusFilter)) return false;
+        if (!matchesStatus(order, status as StatusFilter, timeState)) return false;
         if (priority !== "todas" && order.priority !== priority) return false;
         if (!matchesClient(order, client)) return false;
         if (!matchesUnit(order, unit)) return false;
@@ -176,7 +187,7 @@ function OrdensList() {
         return true;
       })
       .sort((a, b) => compareOrders(a, b, sort as SortMode, financialMap));
-  }, [client, financialMap, filtro, periodOrders, priority, q, sort, status, technician, unit]);
+  }, [client, financialMap, filtro, periodOrders, priority, q, sort, status, technician, timeState, unit]);
 
   const setSearch = (patch: Partial<SearchState>) =>
     navigate({ search: (prev: SearchState) => ({ ...prev, ...patch }) });
@@ -231,6 +242,7 @@ function OrdensList() {
         <option value="todas">Status</option>
         <option value="pendente">Pendentes</option>
         <option value="andamento">Em campo</option>
+        <option value="pausada">Pausadas</option>
         <option value="revisao">Em revisão</option>
         <option value="concluida">Finalizadas</option>
         <option value="cancelada">Canceladas</option>
@@ -291,7 +303,14 @@ function OrdensList() {
         }
         metrics={[
           { label: "Abertas", value: kpis.open },
-          { label: "Em campo", value: kpis.inField },
+          {
+            label: "Em campo",
+            value: kpis.inField,
+            detail:
+              pausedInPeriod > 0
+                ? `${kpis.inField - pausedInPeriod} em execução · ${pausedInPeriod} ${pausedInPeriod === 1 ? "pausada" : "pausadas"}`
+                : undefined,
+          },
           { label: "Em revisão", value: kpis.review },
           {
             label: "Horas",
@@ -373,8 +392,14 @@ function OrdensList() {
   );
 }
 
-function matchesStatus(order: ServiceOrder, status: StatusFilter) {
+function matchesStatus(
+  order: ServiceOrder,
+  status: StatusFilter,
+  timeState?: Record<string, OrderTimeSummary>,
+) {
   if (status === "todas") return true;
+  if (status === "pausada")
+    return order.status === "running" && timeState?.[order.id]?.key === "paused";
   if (status === "cancelada") return order.status === "cancelled";
   const bucket = statusBucket[order.status];
   if (status === "pendente") return bucket === "pending";

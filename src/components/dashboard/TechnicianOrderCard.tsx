@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarClock, Clock3, Factory, HardHat, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
 import { technicianOrderNeedsAction } from "@/components/dashboard/technicianOrderUtils";
 import {
   formatRelativeServiceOrderTime,
@@ -60,13 +61,17 @@ const statusTone: Record<ServiceOrderStatus, { border: string; text: string; dot
 };
 
 export function TechnicianOrderCard({ order }: { order: ServiceOrder }) {
-  const tone = statusTone[order.status];
+  const display = useOrderDisplayStatus(order);
+  const paused = display.key === "paused";
+  const tone = paused
+    ? { ...statusTone[order.status], text: "text-amber-200", dot: "bg-amber-300" }
+    : statusTone[order.status];
   const technicians = getOrderTechnicians(order);
   const technicianLabel = technicians.length ? formatTechnicianList(technicians, 2) : "Técnico";
   const unitName = order.client_unit?.name ?? order.client?.unit ?? "Unidade não informada";
   const localName = order.location ?? order.client_unit?.sector ?? "Local não informado";
   const serviceType = serviceTypeName(order);
-  const time = timeStateLabel(order);
+  const time = paused ? display.label : timeStateLabel(order);
   const scheduled = formatServiceOrderDateTime(order.scheduled_for);
   const needsAction = technicianOrderNeedsAction(order);
 
@@ -87,7 +92,7 @@ export function TechnicianOrderCard({ order }: { order: ServiceOrder }) {
             <span className="text-slate-500">·</span>
             <span className={cn("inline-flex items-center gap-1.5", tone.text)}>
               <span className={cn("size-1.5 rounded-full", tone.dot)} />
-              {statusLabel[order.status]}
+              {paused ? "Pausada" : statusLabel[order.status]}
             </span>
             {order.priority && (
               <>

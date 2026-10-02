@@ -1,3 +1,9 @@
+import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
+import {
+  PAUSED_BADGE_TONE,
+  pausedSubLabel,
+  type OrderDisplayStatus,
+} from "@/lib/serviceOrders/displayStatus";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -104,6 +110,7 @@ export function ServiceOrderIslandRow({
   compact = false,
 }: ServiceOrderIslandRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const displayStatus = useOrderDisplayStatus(order);
   const technicians = useMemo(() => getOrderTechnicians(order), [order]);
   const clientName = clean(order.client?.name) ?? "Não informado";
   const hasUnit = Boolean(clean(order.client_unit?.name) ?? clean(order.client?.unit));
@@ -230,6 +237,7 @@ export function ServiceOrderIslandRow({
             </span>
             <OrderStatusCluster
               status={order.status}
+              display={displayStatus}
               priority={order.priority}
               compact
               className="lg:flex-col lg:items-start lg:justify-center"
@@ -283,7 +291,7 @@ export function ServiceOrderIslandRow({
               <OrderExpandedRow label="Tipo" value={serviceType} />
               <OrderExpandedRow
                 label="Status"
-                value={statusLabel[order.status]}
+                value={displayStatus.label}
                 icon={BadgeCheck}
               />
               <OrderExpandedRow
@@ -329,18 +337,20 @@ function OrderIdentity({ number }: { number: number }) {
 
 function OrderStatusCluster({
   status,
+  display,
   priority,
   compact = false,
   className,
 }: {
   status: ServiceOrderStatus;
+  display?: OrderDisplayStatus;
   priority: ServicePriority | null;
   compact?: boolean;
   className?: string;
 }) {
   return (
     <span className={cn("flex min-w-0 flex-wrap items-center gap-1 lg:justify-end", className)}>
-      <StatusPill status={status} compact={compact} />
+      <StatusPill status={status} display={display} compact={compact} />
       <PriorityPill priority={priority} compact={compact} />
     </span>
   );
@@ -348,22 +358,29 @@ function OrderStatusCluster({
 
 function StatusPill({
   status,
+  display,
   compact = false,
 }: {
   status: ServiceOrderStatus;
+  display?: OrderDisplayStatus;
   compact?: boolean;
 }) {
+  const paused = display?.key === "paused";
+  const sub = display ? pausedSubLabel(display) : null;
   return (
-    <span
-      className={cn(
-        "inline-flex w-fit items-center gap-1.5 rounded-full border font-black uppercase tracking-[0.04em]",
-        compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
-        statusTone[status],
-      )}
-    >
-      <span className="size-1.5 rounded-full bg-current" />
-      {statusLabel[status]}
-    </span>
+    <>
+      <span
+        className={cn(
+          "inline-flex w-fit items-center gap-1.5 rounded-full border font-black uppercase tracking-[0.04em]",
+          compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
+          paused ? PAUSED_BADGE_TONE : statusTone[status],
+        )}
+      >
+        <span className="size-1.5 rounded-full bg-current" />
+        {paused ? display!.label : statusLabel[status]}
+      </span>
+      {sub && <span className="text-[9px] font-bold text-amber-200/90">{sub}</span>}
+    </>
   );
 }
 

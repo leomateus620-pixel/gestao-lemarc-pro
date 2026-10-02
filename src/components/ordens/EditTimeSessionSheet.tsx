@@ -183,6 +183,8 @@ export function EditTimeSessionSheet({
         qc.invalidateQueries({ queryKey: ["order-time-sessions", orderId] }),
         qc.invalidateQueries({ queryKey: ["order-financials", orderId] }),
         qc.invalidateQueries({ queryKey: ["service-order", orderId] }),
+        qc.invalidateQueries({ queryKey: ["service-orders"] }),
+        qc.invalidateQueries({ queryKey: ["running-order-time-state"] }),
       ]);
       await onSaved?.();
       onOpenChange(false);

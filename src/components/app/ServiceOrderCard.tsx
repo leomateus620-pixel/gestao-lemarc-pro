@@ -27,6 +27,12 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { isAlert, isIncomplete, missingFields, statusBucket } from "@/lib/serviceOrders/status";
+import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
+import {
+  PAUSED_BADGE_TONE,
+  pausedSubLabel,
+  type OrderDisplayStatus,
+} from "@/lib/serviceOrders/displayStatus";
 import { getOrderFinancials } from "@/lib/api/financials.functions";
 import { downloadServiceOrderReportPdf } from "@/lib/reports/serviceOrderDownload";
 import { useAuth } from "@/components/app/AuthContext";
@@ -85,8 +91,9 @@ const priorityTone: Record<ServicePriority, string> = {
   urgente: "border-destructive/[0.45] bg-destructive/[0.13] text-destructive",
 };
 
-function cardAccent(order: ServiceOrder): CardAccent {
+function cardAccent(order: ServiceOrder, paused = false): CardAccent {
   if (order.priority === "urgente" || isAlert(order)) return "red";
+  if (paused) return "amber";
 
   const bucket = statusBucket[order.status];
   if (bucket === "pending") return "orange";
@@ -98,7 +105,8 @@ function cardAccent(order: ServiceOrder): CardAccent {
 }
 
 export function ServiceOrderCard({ order, children, variant = "default" }: ServiceOrderCardProps) {
-  const accent = accentConfig[cardAccent(order)];
+  const displayStatus = useOrderDisplayStatus(order);
+  const accent = accentConfig[cardAccent(order, displayStatus.key === "paused")];
   const navigate = useNavigate();
   const isDashboardVariant = variant === "dashboard";
   const physics = usePhysicsCard<HTMLDivElement>({
@@ -192,7 +200,7 @@ export function ServiceOrderCard({ order, children, variant = "default" }: Servi
               </span>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              <ServiceOrderStatusBadge status={order.status} />
+              <ServiceOrderStatusBadge status={order.status} display={displayStatus} />
               {!isClosedOrder && <ServiceOrderPriorityBadge priority={order.priority} />}
             </div>
           </div>
@@ -379,16 +387,30 @@ function OrderPdfButton({ order, className }: { order: ServiceOrder; className?:
   );
 }
 
-function ServiceOrderStatusBadge({ status }: { status: ServiceOrderStatus }) {
+
+function ServiceOrderStatusBadge({
+  status,
+  display,
+}: {
+  status: ServiceOrderStatus;
+  display?: OrderDisplayStatus;
+}) {
+  const paused = display?.key === "paused";
+  const sub = display ? pausedSubLabel(display) : null;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.12em]",
-        statusTone[status],
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.12em]",
+          paused ? PAUSED_BADGE_TONE : statusTone[status],
+        )}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_9px_currentColor]" />
+        {paused ? display!.label : statusLabel[status]}
+      </span>
+      {sub && (
+        <span className="text-[0.6rem] font-bold text-amber-300/90">{sub}</span>
       )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_9px_currentColor]" />
-      {statusLabel[status]}
     </span>
   );
 }

@@ -87,6 +87,9 @@ export function ServiceOrderTimeControl({ order }: Props) {
     queryClient.invalidateQueries({ queryKey: ["order-time-sessions", order.id] });
     queryClient.invalidateQueries({ queryKey: ["order-labor-override", order.id] });
     queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
+    queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard-technician-time"] });
   };
 
   const techName = (id: string) => technicians.find((t) => t.id === id)?.full_name ?? "Técnico";

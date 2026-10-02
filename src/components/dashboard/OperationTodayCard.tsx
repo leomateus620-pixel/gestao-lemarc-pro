@@ -4,6 +4,8 @@ import { ClipboardList, CheckCircle2, Activity, FileCheck2, Plus } from "lucide-
 import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import type { Period, PeriodRange } from "@/lib/serviceOrders/period";
 import { periodContextLabel, periodLabel } from "@/lib/serviceOrders/period";
+import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
+import { countPausedOrders } from "@/lib/serviceOrders/displayStatus";
 
 function greetingPrefix(): string {
   const h = new Date().getHours();
@@ -24,6 +26,8 @@ export function OperationTodayCard({
   periodRange?: PeriodRange;
 }) {
   const pendingTotal = metrics.pending + metrics.inProgress + metrics.awaitingReview;
+  const { data: timeState } = useRunningOrderTimeStateQuery();
+  const pausedCount = countPausedOrders(metrics.inProgressOrders, timeState);
   const contextLabel = periodContextLabel(period, periodRange);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -126,7 +130,17 @@ export function OperationTodayCard({
         {/* mini status modules */}
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Abertas" value={metrics.pending} icon={ClipboardList} tone="steel" />
-          <Stat label="Em execução" value={metrics.inProgress} icon={Activity} tone="orange" />
+          <Stat
+            label="Em execução"
+            value={metrics.inProgress}
+            icon={Activity}
+            tone="orange"
+            hint={
+              pausedCount > 0
+                ? `${metrics.inProgress - pausedCount} em execução · ${pausedCount} ${pausedCount === 1 ? "pausada" : "pausadas"}`
+                : undefined
+            }
+          />
           <Stat
             label="Aguard. revisão"
             value={metrics.awaitingReview}
@@ -145,11 +159,13 @@ function Stat({
   value,
   icon: Icon,
   tone,
+  hint,
 }: {
   label: string;
   value: number;
   icon: typeof ClipboardList;
   tone: "steel" | "orange" | "amber" | "green";
+  hint?: string;
 }) {
   const tones = {
     steel: {
@@ -185,6 +201,7 @@ function Stat({
       <p className="mt-2.5 font-display text-2xl font-black leading-none tracking-tight text-foreground tabular-nums sm:text-[1.75rem]">
         {formatted}
       </p>
+      {hint && <p className="mt-1.5 text-[10px] font-bold text-amber-200/90">{hint}</p>}
     </div>
   );
 }
