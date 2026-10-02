@@ -55,6 +55,8 @@ import { periodContextLabel, type Period, type PeriodRange } from "@/lib/service
 import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
 import { TechnicianOrderCard } from "@/components/dashboard/TechnicianOrderCard";
 import { toast } from "sonner";
+import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
+import { countPausedOrders } from "@/lib/serviceOrders/displayStatus";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Central de Operação — Gestão Lemarc" }] }),
@@ -307,7 +309,7 @@ function averageWorkedTimeLabel(orders: ServiceOrder[]) {
   return minutes ? `${hours}h${String(minutes).padStart(2, "0")}` : `${hours}h`;
 }
 
-function buildCardSummaries(metrics: DashboardMetrics) {
+function buildCardSummaries(metrics: DashboardMetrics, pausedCount = 0) {
   const activeOrders = [
     ...metrics.pendingOrders,
     ...metrics.inProgressOrders,
@@ -331,7 +333,8 @@ function buildCardSummaries(metrics: DashboardMetrics) {
       { label: "Abertas no período", value: metrics.pendingOrders.length },
     ],
     inProgress: [
-      { label: "Serviços ativos", value: metrics.inProgress },
+      { label: "Em execução", value: metrics.inProgress - pausedCount },
+      { label: "Pausadas", value: pausedCount },
       { label: "Técnicos em execução", value: metrics.techniciansInField },
       { label: "Deslocamentos", value: transitOrders.length },
     ],
@@ -377,7 +380,12 @@ function Dashboard() {
   const firstName = displayName.split(" ")[0];
   const periodText = periodContextLabel(period, periodRange);
   const periodSearch = periodSearchParams(period, periodRange);
-  const summaries = useMemo(() => buildCardSummaries(metrics), [metrics]);
+  const { data: timeState } = useRunningOrderTimeStateQuery();
+  const pausedCount = countPausedOrders(metrics.inProgressOrders, timeState);
+  const summaries = useMemo(
+    () => buildCardSummaries(metrics, pausedCount),
+    [metrics, pausedCount],
+  );
   const recent = useMemo(() => getRecentServiceOrders(orders, 4), [orders]);
   const recentOrderIds = useMemo(() => recent.map((order) => order.id), [recent]);
   const { data: technicianTimeData } = useDashboardTechnicianTimeQuery(recentOrderIds);

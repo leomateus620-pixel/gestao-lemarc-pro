@@ -99,3 +99,12 @@ export function pausedSubLabel(d: OrderDisplayStatus): string | null {
 
 /** Tons âmbar (mesmos do ServiceOrderTimeControl) para o badge "Pausada". */
 export const PAUSED_BADGE_TONE = "border-amber-400/50 bg-amber-500/15 text-amber-200";
+
+/** Quantas OS (status running) estão totalmente pausadas, pelo resumo leve. */
+export function countPausedOrders(
+  orders: Array<{ id: string; status: ServiceOrderStatus }>,
+  summaries: Record<string, OrderTimeSummary> | null | undefined,
+): number {
+  if (!summaries) return 0;
+  return orders.filter((o) => o.status === "running" && summaries[o.id]?.key === "paused").length;
+}
