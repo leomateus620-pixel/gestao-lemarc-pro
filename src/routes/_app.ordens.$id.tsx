@@ -53,7 +53,12 @@ import { SignatureCaptureDialog } from "@/components/ordens/signature/SignatureC
 import { TimeReviewDialog } from "@/components/ordens/TimeReviewDialog";
 import { ServiceOrderAttachmentsSection } from "@/components/ordens/attachments/ServiceOrderAttachmentsSection";
 import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/ServiceOrderMaterialsSection";
-import { finishWork, startWork } from "@/lib/api/timeSessions.functions";
+import { finishWork, listTimeSessions, startWork } from "@/lib/api/timeSessions.functions";
+import {
+  getOrderDisplayStatus,
+  PAUSED_BADGE_TONE,
+  pausedSubLabel,
+} from "@/lib/serviceOrders/displayStatus";
 import { Link } from "@tanstack/react-router";
 import { useTechniciansQuery } from "@/hooks/useServiceOrders";
 import { getOrderTechnicians } from "@/lib/serviceOrders/technicians";
@@ -138,10 +143,21 @@ function OrdemDetalhe() {
   const updateStatus = useServerFn(updateServiceOrderStatus);
   const finishWorkFn = useServerFn(finishWork);
   const startWorkFn = useServerFn(startWork);
+  const listSessionsFn = useServerFn(listTimeSessions);
+  // Mesma chave do ServiceOrderTimeControl: reaproveita as sessões já carregadas.
+  const { data: headerSessions } = useQuery({
+    queryKey: ["order-time-sessions", order.id],
+    queryFn: () => listSessionsFn({ data: { orderId: order.id } }),
+    enabled: order.status === "running",
+    refetchOnWindowFocus: true,
+  });
+  const headerDisplay = getOrderDisplayStatus(order, headerSessions);
+  const headerSub = pausedSubLabel(headerDisplay);
   const mutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => updateStatus({ data: { id: order.id, status } }),
     onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", id] });
       queryClient.invalidateQueries({ queryKey: ["order-time-sessions", id] });
       if (isTecnico && status === "finished") {
@@ -178,6 +194,7 @@ function OrdemDetalhe() {
     },
     onSuccess: ({ started, alreadyActive, total }) => {
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", id] });
       queryClient.invalidateQueries({ queryKey: ["order-time-sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-technician-time"] });
@@ -298,8 +315,18 @@ function OrdemDetalhe() {
                 {order.title}
               </h1>
             </div>
-            <span className={cn("lemarc-status-chip", statusTone[order.status])}>
-              {statusLabel[order.status]}
+            <span className="flex flex-col items-end gap-1">
+              <span
+                className={cn(
+                  "lemarc-status-chip",
+                  headerDisplay.key === "paused" ? PAUSED_BADGE_TONE : statusTone[order.status],
+                )}
+              >
+                {headerDisplay.key === "paused" ? headerDisplay.label : statusLabel[order.status]}
+              </span>
+              {headerSub && (
+                <span className="text-[11px] font-bold text-amber-200/90">{headerSub}</span>
+              )}
             </span>
           </div>
 
@@ -566,6 +593,7 @@ function EditTechniciansDialog({ order }: { order: ServiceOrder }) {
     onSuccess: () => {
       toast.success("Técnicos atualizados");
       queryClient.invalidateQueries({ queryKey: ["service-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
       queryClient.invalidateQueries({ queryKey: ["service-order", order.id] });
       queryClient.invalidateQueries({ queryKey: ["report-orders"] });
       setOpen(false);
