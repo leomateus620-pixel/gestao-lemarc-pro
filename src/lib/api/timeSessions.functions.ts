@@ -88,6 +88,38 @@ export const listTimeSessions = createServerFn({ method: "GET" })
     return (rows ?? []).map(normalize);
   });
 
+/**
+ * Resumo leve do estado de tempo (em execução x pausada) das OS 'running'.
+ * Uma única query; RLS normal. Retorna só o resumo por OS (sem sessões).
+ */
+export const listRunningOrderTimeState = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as any;
+    const { data: rows, error } = await sb
+      .from("service_order_time_sessions")
+      .select(
+        "id, service_order_id, technician_id, kind, started_at, ended_at, end_reason, pause_reason, order:service_orders!inner(status)",
+      )
+      .eq("kind", "work")
+      .eq("order.status", "running")
+      .order("started_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const { summarizeOrderTime } = await import("@/lib/serviceOrders/displayStatus");
+    const byOrder = new Map<string, any[]>();
+    for (const r of rows ?? []) {
+      const list = byOrder.get(r.service_order_id) ?? [];
+      list.push(r);
+      byOrder.set(r.service_order_id, list);
+    }
+    const result: Record<
+      string,
+      { key: "running" | "paused"; pauseReason: string | null; pausedCount: number; runningCount: number }
+    > = {};
+    for (const [id, list] of byOrder) result[id] = summarizeOrderTime(list);
+    return result;
+  });
+
 export const listDashboardTechnicianTime = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderIds?: string[] }) => {

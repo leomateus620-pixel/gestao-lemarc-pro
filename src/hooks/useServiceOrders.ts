@@ -1,12 +1,16 @@
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listClients, listServiceOrders, listTechnicians } from "@/lib/api/serviceOrders.functions";
 import {
   listServiceOrderFinancialSummaries,
   listTechnicianLaborHistory,
 } from "@/lib/api/financials.functions";
-import { listDashboardTechnicianTime } from "@/lib/api/timeSessions.functions";
-import type { TechnicianLite } from "@/types/serviceOrder";
+import {
+  listDashboardTechnicianTime,
+  listRunningOrderTimeState,
+} from "@/lib/api/timeSessions.functions";
+import { displayFromSummary } from "@/lib/serviceOrders/displayStatus";
+import type { ServiceOrderStatus, TechnicianLite } from "@/types/serviceOrder";
 
 export function useServiceOrdersQuery() {
   const fetcher = useServerFn(listServiceOrders);
@@ -77,4 +81,27 @@ export function useDashboardTechnicianTimeQuery(orderIds: string[]) {
       staleTime: 15_000,
     }),
   );
+}
+
+export const RUNNING_ORDER_TIME_STATE_KEY = ["running-order-time-state"] as const;
+
+/**
+ * Estado leve "Em execução x Pausada" das OS running. Não-suspense: se ainda
+ * não carregou, os componentes mostram o status gravado (como antes).
+ */
+export function useRunningOrderTimeStateQuery() {
+  const fetcher = useServerFn(listRunningOrderTimeState);
+  return useQuery({
+    queryKey: RUNNING_ORDER_TIME_STATE_KEY,
+    queryFn: () => fetcher(),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Status exibido de uma OS usando o resumo leve (fallback: status gravado). */
+export function useOrderDisplayStatus(order: { id: string; status: ServiceOrderStatus }) {
+  const { data } = useRunningOrderTimeStateQuery();
+  return displayFromSummary(order.status, data?.[order.id]);
 }
