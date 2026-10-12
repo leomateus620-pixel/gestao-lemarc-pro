@@ -5,6 +5,7 @@ import { clearUserRoleCache } from "@/hooks/useUserRole";
 import { logAuthIssue, withTimeout } from "@/lib/auth/withTimeout";
 import {
   classifyAuthError,
+  hasSignOutReason,
   isSessionTooOld,
   setSignOutReason,
   startVisibilityAutoRefresh,
@@ -82,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         clearUserRoleCache();
         // Saída não pedida pela pessoa = servidor recusou a renovação.
-        if (!userSignOutRef.current) setSignOutReason("server_rejected");
+        if (!userSignOutRef.current && !hasSignOutReason()) setSignOutReason("server_rejected");
         userSignOutRef.current = false;
       }
       if (event !== "SIGNED_OUT" && enforceMaxAge(s)) return;

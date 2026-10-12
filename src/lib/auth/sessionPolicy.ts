@@ -111,6 +111,14 @@ export function setSignOutReason(reason: SignOutReason) {
   }
 }
 
+export function hasSignOutReason(): boolean {
+  try {
+    return Boolean(sessionStorage.getItem(SIGNOUT_REASON_KEY));
+  } catch {
+    return false;
+  }
+}
+
 export function consumeSignOutReason(): SignOutReason | null {
   try {
     const value = sessionStorage.getItem(SIGNOUT_REASON_KEY);
