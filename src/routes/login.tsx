@@ -157,6 +157,8 @@ function LoginPage() {
           return;
         }
         storePreferredModule(module);
+        if (!hasLoginRecord(user.id)) markLogin(user.id);
+        await requestPersistentStorage();
         window.location.assign(safeInternalDestination(search.redirect, module));
       } catch (cause) {
         logAuthIssue("moduleAccess", { error: cause, durationMs: Date.now() - startedAt });
@@ -172,25 +174,63 @@ function LoginPage() {
   );
 
   useEffect(() => {
+    const reason = consumeSignOutReason();
+    if (reason) setError(SIGNOUT_MESSAGES[reason]);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const startedAt = Date.now();
+    setSessionCheckFailed(false);
+    const expire = async () => {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch (cause) {
+        logAuthIssue("expiredSignOut", { error: cause });
+      }
+      if (!cancelled) {
+        setSessionActive(false);
+        setError(SIGNOUT_MESSAGES.expired_30d);
+      }
+    };
     withTimeout(supabase.auth.getSession(), INITIAL_SESSION_TIMEOUT_MS, "initialSession")
-      .then(({ data, error: sessionError }) => {
+      .then(async ({ data, error: sessionError }) => {
         if (sessionError) throw sessionError;
         if (cancelled || !data.session) return;
+        if (isSessionTooOld(data.session)) {
+          await expire();
+          return;
+        }
         void finishAuthentication(data.session.user);
       })
-      .catch((cause) => {
-        // Sessão antiga travada ou inválida: limpa só neste aparelho.
+      .catch(async (cause) => {
         logAuthIssue("initialSession", { error: cause, durationMs: Date.now() - startedAt });
-        clearLocalAuthSession();
-        if (!cancelled) setSessionActive(false);
+        if (classifyAuthError(cause) === "definitive") {
+          // Servidor recusou a sessão: limpa só neste aparelho.
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch {
+            clearLocalAuthSession();
+          }
+          if (!cancelled) {
+            setSessionActive(false);
+            setError(SIGNOUT_MESSAGES.server_rejected);
+          }
+          return;
+        }
+        // Tempo esgotado/rede: NÃO apaga a sessão salva.
+        if (!cancelled) setSessionCheckFailed(true);
       });
     // Callback síncrono; trabalho adiado para não segurar o lock do cliente.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
         setTimeout(() => {
-          if (!cancelled) void finishAuthentication(session.user);
+          if (cancelled) return;
+          if (isSessionTooOld(session)) {
+            void expire();
+            return;
+          }
+          void finishAuthentication(session.user);
         }, 0);
       }
     });
@@ -198,7 +238,7 @@ function LoginPage() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [finishAuthentication]);
+  }, [finishAuthentication, sessionCheck]);
 
   async function handleGoogle() {
     if (isSubmitting) return;
@@ -302,8 +342,7 @@ function LoginPage() {
       await finishAuthentication(data.session.user);
     } catch (err) {
       logAuthIssue("continueSession", { error: err });
-      clearLocalAuthSession();
-      setSessionActive(false);
+      // Tempo esgotado/rede: mantém a sessão salva; só a pessoa decide limpar.
       setError(AUTH_TIMEOUT_MESSAGE);
       resetLoading();
     }
