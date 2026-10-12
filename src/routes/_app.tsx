@@ -87,7 +87,7 @@ function useFullscreenFormFlag() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading, timedOut } = useAuth();
+  const { user, loading, timedOut, retry } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectRef = useRef(safeInternalDestination(location.href, "os"));
@@ -110,7 +110,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         className="lemarc-app-bg grid min-h-dvh place-items-center text-foreground"
         spinnerClassName="size-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
         timedOut={timedOut}
-        loginHref={`/login?module=os&redirect=${encodeURIComponent(redirectRef.current)}`}
+        onRetry={retry}
       />
     );
   }

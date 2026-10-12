@@ -3,6 +3,7 @@ import { clearLocalAuthSession } from "@/lib/auth/withTimeout";
 
 const SHOW_CLEAR_AFTER_MS = 10_000;
 
+/** Só quando a pessoa toca no botão: apaga a sessão deste aparelho e recarrega. */
 export function clearSessionAndReload() {
   clearLocalAuthSession();
   window.location.reload();
@@ -26,26 +27,39 @@ export function SessionWaitScreen({
   className,
   spinnerClassName,
   timedOut,
-  loginHref,
+  onRetry,
 }: {
   className: string;
   spinnerClassName: string;
+  /** Rede/tempo esgotado: sessão salva continua no aparelho. */
   timedOut: boolean;
-  loginHref: string;
+  onRetry: () => void;
 }) {
   const slow = useSlowWait(!timedOut);
   return (
     <div className={className} role="status" aria-label="Validando sessão">
       <div className="flex max-w-sm flex-col items-center gap-4 px-6 text-center">
         {timedOut ? (
-          <p className="text-sm font-semibold">Não foi possível carregar sua sessão.</p>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">Sem conexão no momento.</p>
+            <p className="text-sm opacity-70">
+              Você continua conectado neste aparelho. Verifique a internet e tente de novo.
+            </p>
+          </div>
         ) : (
           <div className={spinnerClassName} />
         )}
         {(slow || timedOut) && (
           <div className="flex flex-col items-center gap-2">
-            {!timedOut && (
-              <p className="text-sm opacity-70">Está demorando mais que o normal.</p>
+            {!timedOut && <p className="text-sm opacity-70">Está demorando mais que o normal.</p>}
+            {timedOut && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Tentar de novo
+              </button>
             )}
             <button
               type="button"
@@ -54,11 +68,6 @@ export function SessionWaitScreen({
             >
               Limpar sessão e tentar de novo
             </button>
-            {timedOut && (
-              <a href={loginHref} className="text-sm underline">
-                Voltar ao login
-              </a>
-            )}
           </div>
         )}
       </div>

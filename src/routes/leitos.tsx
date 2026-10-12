@@ -26,7 +26,7 @@ function WireTrayLayout() {
 }
 
 function WireTrayAuthGate({ children }: { children: ReactNode }) {
-  const { user, loading, timedOut } = useAuth();
+  const { user, loading, timedOut, retry } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectRef = useRef(safeInternalDestination(location.href, "wire_trays"));
@@ -49,7 +49,7 @@ function WireTrayAuthGate({ children }: { children: ReactNode }) {
         className="wire-root grid min-h-dvh place-items-center text-slate-800"
         spinnerClassName="size-10 animate-spin rounded-full border-2 border-orange-200 border-t-orange-700"
         timedOut={timedOut}
-        loginHref={`/login?module=wire_trays&redirect=${encodeURIComponent(redirectRef.current)}`}
+        onRetry={retry}
       />
     );
   }
