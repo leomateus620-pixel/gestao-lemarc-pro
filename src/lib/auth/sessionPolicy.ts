@@ -91,6 +91,10 @@ export function isSessionTooOld(
   return now - at >= MAX_SESSION_AGE_MS;
 }
 
+export function hasLoginRecord(userId: string): boolean {
+  return Boolean(safeLocalStorage()?.getItem(LOGIN_AT_PREFIX + userId));
+}
+
 export function markLogin(userId: string, now = Date.now()) {
   try {
     safeLocalStorage()?.setItem(LOGIN_AT_PREFIX + userId, String(now));

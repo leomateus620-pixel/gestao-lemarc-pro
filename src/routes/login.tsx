@@ -32,6 +32,15 @@ import {
 
 import { clearSessionAndReload, useSlowWait } from "@/components/app/SessionWaitScreen";
 import {
+  classifyAuthError,
+  consumeSignOutReason,
+  hasLoginRecord,
+  isSessionTooOld,
+  markLogin,
+  requestPersistentStorage,
+  SIGNOUT_MESSAGES,
+} from "@/lib/auth/sessionPolicy";
+import {
   AUTH_TIMEOUT_MESSAGE,
   clearLocalAuthSession,
   createOnceGuard,
@@ -111,6 +120,8 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [sessionCheck, setSessionCheck] = useState(0);
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
 
   useEffect(() => {
     selectedModuleRef.current = selectedModule;
@@ -294,7 +305,7 @@ function LoginPage() {
     setEmailLoading(true);
     const startedAt = Date.now();
     try {
-      const { error: signInError } = await withTimeout(
+      const { data: signInData, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({ email: trimmedEmail, password }),
         SIGN_IN_TIMEOUT_MS,
         "signIn",
@@ -312,6 +323,7 @@ function LoginPage() {
         resetLoading();
         return;
       }
+      if (signInData.user) markLogin(signInData.user.id);
       // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
       logAuthIssue("signIn", { error: err, durationMs: Date.now() - startedAt });
@@ -562,7 +574,24 @@ function LoginPage() {
                   </div>
                 ) : null}
 
-                {slowWait ? (
+                {sessionCheckFailed ? (
+                  <div className="space-y-2 rounded-xl border border-amber-300/25 bg-amber-400/[0.08] px-3 py-3 text-sm text-amber-50">
+                    <p>
+                      Não foi possível confirmar sua sessão agora. Você continua conectado neste
+                      aparelho — verifique a internet e tente de novo.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSessionCheck((n) => n + 1)}
+                      className="h-10 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10"
+                    >
+                      Tentar de novo
+                    </Button>
+                  </div>
+                ) : null}
+
+                {slowWait || sessionCheckFailed ? (
                   <div className="space-y-2 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-3 text-sm text-white/80">
                     <p>Está demorando mais que o normal.</p>
                     <Button
