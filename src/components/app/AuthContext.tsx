@@ -1,8 +1,16 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { clearUserRoleCache } from "@/hooks/useUserRole";
-import { clearLocalAuthSession, logAuthIssue, withTimeout } from "@/lib/auth/withTimeout";
+import { logAuthIssue, withTimeout } from "@/lib/auth/withTimeout";
+import {
+  classifyAuthError,
+  hasSignOutReason,
+  isSessionTooOld,
+  setSignOutReason,
+  startVisibilityAutoRefresh,
+  type SignOutReason,
+} from "@/lib/auth/sessionPolicy";
 
 const SESSION_TIMEOUT_MS = 15_000;
 
@@ -10,8 +18,9 @@ type AuthCtx = {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  /** A leitura da sessão não terminou a tempo (sessão local já foi limpa). */
+  /** Não foi possível confirmar a sessão (rede/tempo). A sessão salva é mantida. */
   timedOut: boolean;
+  retry: () => void;
   displayName: string;
   avatarUrl: string | null;
   email: string | null;
@@ -24,9 +33,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [timedOut, setTimedOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const userSignOutRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    const forceLocalSignOut = async (reason: SignOutReason) => {
+      userSignOutRef.current = true;
+      setSignOutReason(reason);
+      clearUserRoleCache();
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch (error) {
+        logAuthIssue("forcedSignOut", { error });
+      }
+    };
+
     const enforceGoogleAdmin = async (s: Session | null) => {
       if (!s?.user) return;
       const provider = s.user.app_metadata?.provider;
@@ -41,38 +64,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (error || !data) {
         clearUserRoleCache();
+        userSignOutRef.current = true;
         await supabase.auth.signOut({ scope: "local" });
       }
     };
 
+    /** Aplica a regra dos 30 dias; retorna true se a sessão foi encerrada. */
+    const enforceMaxAge = (s: Session | null) => {
+      if (s && isSessionTooOld(s)) {
+        void forceLocalSignOut("expired_30d");
+        return true;
+      }
+      return false;
+    };
+
     // Callback síncrono: não aguardar chamadas do cliente aqui (evita lock preso).
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === "SIGNED_OUT") clearUserRoleCache();
+      if (event === "SIGNED_OUT") {
+        clearUserRoleCache();
+        // Saída não pedida pela pessoa = servidor recusou a renovação.
+        if (!userSignOutRef.current && !hasSignOutReason()) setSignOutReason("server_rejected");
+        userSignOutRef.current = false;
+      }
+      if (event !== "SIGNED_OUT" && enforceMaxAge(s)) return;
       setSession(s);
+      if (s) setTimedOut(false);
       if (event === "SIGNED_IN") setTimeout(() => void enforceGoogleAdmin(s), 0);
     });
 
     const startedAt = Date.now();
+    setLoading(true);
+    setTimedOut(false);
     withTimeout(supabase.auth.getSession(), SESSION_TIMEOUT_MS, "getSession")
-      .then(({ data }) => {
+      .then(async ({ data, error }) => {
         if (cancelled) return;
+        if (error) {
+          logAuthIssue("getSession", { error, durationMs: Date.now() - startedAt });
+          if (classifyAuthError(error) === "definitive") {
+            userSignOutRef.current = true;
+            await forceLocalSignOut("server_rejected");
+            setSession(null);
+          } else {
+            setTimedOut(true); // mantém a sessão salva
+          }
+          setLoading(false);
+          return;
+        }
+        if (enforceMaxAge(data.session)) {
+          userSignOutRef.current = true;
+          setSession(null);
+          setLoading(false);
+          return;
+        }
         setSession(data.session);
         setLoading(false);
         setTimeout(() => void enforceGoogleAdmin(data.session), 0);
       })
       .catch((error) => {
+        // Tempo esgotado ou rede: NUNCA apaga a sessão salva.
         logAuthIssue("getSession", { error, durationMs: Date.now() - startedAt });
-        clearLocalAuthSession();
         if (cancelled) return;
-        setSession(null);
         setTimedOut(true);
         setLoading(false);
       });
+
+    // Renovação só com o app visível; ao voltar, confere a regra dos 30 dias.
+    const stopVisibility = startVisibilityAutoRefresh(supabase.auth, () => {
+      setTimeout(() => {
+        withTimeout(supabase.auth.getSession(), SESSION_TIMEOUT_MS, "resumeSession")
+          .then(({ data }) => {
+            if (!cancelled) enforceMaxAge(data.session);
+          })
+          .catch((error) => logAuthIssue("resumeSession", { error }));
+      }, 0);
+    });
+
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
+      stopVisibility();
     };
-  }, []);
+  }, [attempt]);
 
   const user = session?.user ?? null;
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -84,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     // Sai apenas deste aparelho.
+    userSignOutRef.current = true;
     await supabase.auth.signOut({ scope: "local" });
   }
 
@@ -94,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         timedOut,
+        retry: () => setAttempt((n) => n + 1),
         displayName,
         avatarUrl,
         email: user?.email ?? null,

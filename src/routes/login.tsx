@@ -32,6 +32,15 @@ import {
 
 import { clearSessionAndReload, useSlowWait } from "@/components/app/SessionWaitScreen";
 import {
+  classifyAuthError,
+  consumeSignOutReason,
+  hasLoginRecord,
+  isSessionTooOld,
+  markLogin,
+  requestPersistentStorage,
+  SIGNOUT_MESSAGES,
+} from "@/lib/auth/sessionPolicy";
+import {
   AUTH_TIMEOUT_MESSAGE,
   clearLocalAuthSession,
   createOnceGuard,
@@ -111,6 +120,8 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [sessionCheck, setSessionCheck] = useState(0);
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
 
   useEffect(() => {
     selectedModuleRef.current = selectedModule;
@@ -157,6 +168,8 @@ function LoginPage() {
           return;
         }
         storePreferredModule(module);
+        if (!hasLoginRecord(user.id)) markLogin(user.id);
+        await requestPersistentStorage();
         window.location.assign(safeInternalDestination(search.redirect, module));
       } catch (cause) {
         logAuthIssue("moduleAccess", { error: cause, durationMs: Date.now() - startedAt });
@@ -172,25 +185,63 @@ function LoginPage() {
   );
 
   useEffect(() => {
+    const reason = consumeSignOutReason();
+    if (reason) setError(SIGNOUT_MESSAGES[reason]);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const startedAt = Date.now();
+    setSessionCheckFailed(false);
+    const expire = async () => {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch (cause) {
+        logAuthIssue("expiredSignOut", { error: cause });
+      }
+      if (!cancelled) {
+        setSessionActive(false);
+        setError(SIGNOUT_MESSAGES.expired_30d);
+      }
+    };
     withTimeout(supabase.auth.getSession(), INITIAL_SESSION_TIMEOUT_MS, "initialSession")
-      .then(({ data, error: sessionError }) => {
+      .then(async ({ data, error: sessionError }) => {
         if (sessionError) throw sessionError;
         if (cancelled || !data.session) return;
+        if (isSessionTooOld(data.session)) {
+          await expire();
+          return;
+        }
         void finishAuthentication(data.session.user);
       })
-      .catch((cause) => {
-        // Sessão antiga travada ou inválida: limpa só neste aparelho.
+      .catch(async (cause) => {
         logAuthIssue("initialSession", { error: cause, durationMs: Date.now() - startedAt });
-        clearLocalAuthSession();
-        if (!cancelled) setSessionActive(false);
+        if (classifyAuthError(cause) === "definitive") {
+          // Servidor recusou a sessão: limpa só neste aparelho.
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch {
+            clearLocalAuthSession();
+          }
+          if (!cancelled) {
+            setSessionActive(false);
+            setError(SIGNOUT_MESSAGES.server_rejected);
+          }
+          return;
+        }
+        // Tempo esgotado/rede: NÃO apaga a sessão salva.
+        if (!cancelled) setSessionCheckFailed(true);
       });
     // Callback síncrono; trabalho adiado para não segurar o lock do cliente.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
         setTimeout(() => {
-          if (!cancelled) void finishAuthentication(session.user);
+          if (cancelled) return;
+          if (isSessionTooOld(session)) {
+            void expire();
+            return;
+          }
+          void finishAuthentication(session.user);
         }, 0);
       }
     });
@@ -198,7 +249,7 @@ function LoginPage() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [finishAuthentication]);
+  }, [finishAuthentication, sessionCheck]);
 
   async function handleGoogle() {
     if (isSubmitting) return;
@@ -254,7 +305,7 @@ function LoginPage() {
     setEmailLoading(true);
     const startedAt = Date.now();
     try {
-      const { error: signInError } = await withTimeout(
+      const { data: signInData, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({ email: trimmedEmail, password }),
         SIGN_IN_TIMEOUT_MS,
         "signIn",
@@ -272,6 +323,7 @@ function LoginPage() {
         resetLoading();
         return;
       }
+      if (signInData.user) markLogin(signInData.user.id);
       // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
       logAuthIssue("signIn", { error: err, durationMs: Date.now() - startedAt });
@@ -302,8 +354,7 @@ function LoginPage() {
       await finishAuthentication(data.session.user);
     } catch (err) {
       logAuthIssue("continueSession", { error: err });
-      clearLocalAuthSession();
-      setSessionActive(false);
+      // Tempo esgotado/rede: mantém a sessão salva; só a pessoa decide limpar.
       setError(AUTH_TIMEOUT_MESSAGE);
       resetLoading();
     }
@@ -523,7 +574,24 @@ function LoginPage() {
                   </div>
                 ) : null}
 
-                {slowWait ? (
+                {sessionCheckFailed ? (
+                  <div className="space-y-2 rounded-xl border border-amber-300/25 bg-amber-400/[0.08] px-3 py-3 text-sm text-amber-50">
+                    <p>
+                      Não foi possível confirmar sua sessão agora. Você continua conectado neste
+                      aparelho — verifique a internet e tente de novo.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSessionCheck((n) => n + 1)}
+                      className="h-10 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10"
+                    >
+                      Tentar de novo
+                    </Button>
+                  </div>
+                ) : null}
+
+                {slowWait || sessionCheckFailed ? (
                   <div className="space-y-2 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-3 text-sm text-white/80">
                     <p>Está demorando mais que o normal.</p>
                     <Button
