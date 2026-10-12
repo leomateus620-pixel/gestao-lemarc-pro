@@ -11,6 +11,7 @@ import { PushPermissionGate } from "@/components/app/PushPermissionGate";
 import { RoleProvider } from "@/components/app/RoleContext";
 import { AuthProvider, useAuth } from "@/components/app/AuthContext";
 import { safeInternalDestination } from "@/lib/modules";
+import { SessionWaitScreen } from "@/components/app/SessionWaitScreen";
 
 export const Route = createFileRoute("/_app")({
   ssr: false,
@@ -86,14 +87,14 @@ function useFullscreenFormFlag() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, timedOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectRef = useRef(safeInternalDestination(location.href, "os"));
   const redirectedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user && !redirectedRef.current) {
+    if (!loading && !user && !timedOut && !redirectedRef.current) {
       redirectedRef.current = true;
       navigate({
         to: "/login",
@@ -101,13 +102,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         replace: true,
       });
     }
-  }, [loading, user, navigate]);
+  }, [loading, user, timedOut, navigate]);
 
   if (loading || !user) {
     return (
-      <div className="lemarc-app-bg grid min-h-dvh place-items-center">
-        <div className="size-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-      </div>
+      <SessionWaitScreen
+        className="lemarc-app-bg grid min-h-dvh place-items-center text-foreground"
+        spinnerClassName="size-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+        timedOut={timedOut}
+        loginHref={`/login?module=os&redirect=${encodeURIComponent(redirectRef.current)}`}
+      />
     );
   }
   return <>{children}</>;

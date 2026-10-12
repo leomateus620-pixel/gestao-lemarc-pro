@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "@/components/app/AuthContext";
 import { LeitosShell } from "@/components/leitos/LeitosShell";
 import { WireTrayAccessProvider } from "@/components/leitos/WireTrayAccessContext";
 import { safeInternalDestination } from "@/lib/modules";
+import { SessionWaitScreen } from "@/components/app/SessionWaitScreen";
 
 export const Route = createFileRoute("/leitos")({
   ssr: false,
@@ -25,14 +26,14 @@ function WireTrayLayout() {
 }
 
 function WireTrayAuthGate({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, timedOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectRef = useRef(safeInternalDestination(location.href, "wire_trays"));
   const redirectedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user && !redirectedRef.current) {
+    if (!loading && !user && !timedOut && !redirectedRef.current) {
       redirectedRef.current = true;
       navigate({
         to: "/login",
@@ -40,17 +41,16 @@ function WireTrayAuthGate({ children }: { children: ReactNode }) {
         replace: true,
       });
     }
-  }, [loading, navigate, user]);
+  }, [loading, navigate, user, timedOut]);
 
   if (loading || !user) {
     return (
-      <div
-        className="wire-root grid min-h-dvh place-items-center"
-        role="status"
-        aria-label="Validando sessão"
-      >
-        <div className="size-10 animate-spin rounded-full border-2 border-orange-200 border-t-orange-700" />
-      </div>
+      <SessionWaitScreen
+        className="wire-root grid min-h-dvh place-items-center text-slate-800"
+        spinnerClassName="size-10 animate-spin rounded-full border-2 border-orange-200 border-t-orange-700"
+        timedOut={timedOut}
+        loginHref={`/login?module=wire_trays&redirect=${encodeURIComponent(redirectRef.current)}`}
+      />
     );
   }
   return <>{children}</>;
