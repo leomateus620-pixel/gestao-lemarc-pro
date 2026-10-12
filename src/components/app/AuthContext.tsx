@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const forceLocalSignOut = async (reason: SignOutReason) => {
+      userSignOutRef.current = true;
       setSignOutReason(reason);
       clearUserRoleCache();
       try {
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (error || !data) {
         clearUserRoleCache();
+        userSignOutRef.current = true;
         await supabase.auth.signOut({ scope: "local" });
       }
     };
