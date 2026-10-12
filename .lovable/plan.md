@@ -1,98 +1,56 @@
-# Mostrar "PAUSADA" nas OS em que a equipe pausou
+# Login que não trava no celular (sessão antiga, rede lenta)
 
 ## Resumo
-A palavra "Pausada" só aparece na tela. O status gravado na OS continua `running`, e o enum, as horas, a apuração, os relatórios de faturamento e as notificações push não mudam. Uma única função decide o que mostrar a partir das sessões de trabalho. Todos os pontos da tela usam essa função.
+O login e a abertura do app passam a ter tempo limite. Se a sessão antiga guardada no aparelho estiver ruim, o app a limpa só naquele aparelho e deixa entrar de novo. "Sair" passa a desconectar só o aparelho atual. Banco, papéis, permissões, senhas, OS e horas não mudam.
 
-## Regra final (vários técnicos)
-A regra só vale para OS com `status = 'running'`. Qualquer outro status continua igual a hoje, então as OS finalizadas ou aprovadas cuja última sessão foi uma pausa não mudam.
+## Comportamento final
+- **Entrar com e-mail e senha:** se não houver resposta em 15 s, aparece "A conexão demorou demais. Verifique a internet e tente de novo." e o botão volta a funcionar. Senha errada continua mostrando "E-mail ou senha inválidos." na hora.
+- **Abrir /login com sessão antiga no aparelho:** o app tenta ler a sessão por até 8 s. Se der erro ou passar do tempo, apaga a sessão local deste aparelho (somente a chave `sb-*-auth-token`, sem chamar o servidor) e mostra o formulário normal.
+- **Depois de 10 s carregando** (no login ou na abertura do app): aparece o botão "Limpar sessão e tentar de novo". Ele apaga só a sessão deste aparelho e recarrega a página.
+- **Abertura do app (tela de carregamento antes do Início):** se a leitura da sessão não terminar em 15 s, a tela mostra "Não foi possível carregar sua sessão", com os botões "Voltar ao login" e "Limpar sessão e tentar de novo". Antes disso, o carregamento seria infinito.
+- **Sair:** desconecta somente o aparelho atual. Um técnico que sai pelo celular continua logado no tablet ou no computador.
+- **Google-admin:** continua bloqueando quem não é admin. A única mudança é que o bloqueio desconecta só aquele aparelho.
 
-Para cada técnico com sessão de trabalho (`kind='work'`) na OS, a regra olha a sessão mais recente dele:
-- **Em execução**: algum técnico tem sessão aberta (`ended_at IS NULL`). Se outro técnico estiver pausado, aparece um sub-indicador discreto "1 pausado".
-- **Pausada**: nenhum técnico tem sessão aberta, e pelo menos um tem a última sessão com `end_reason='pause'`. O motivo vem da pausa mais recente. Exemplo: "Pausada · Almoço". Se os motivos forem diferentes, aparece só "Pausada".
-- **Running sem sessão aberta e sem pausa** (todos encerraram com `finish`/`manual` e a OS não foi finalizada): continua "Em execução", como hoje. Mostrar "Aguardando finalização" seria outro pedido, por isso fica fora deste plano.
-- **Sem nenhuma sessão**: "Em execução", como hoje.
-- **Pausa de um dia para o outro** (fim de expediente, hotel): continua "Pausada" até alguém retomar. O tempo que a OS ficou pausada não importa. A regra de 14h e da meia-noite só vale para sessões abertas, não para pausas.
-- **Sessão aberta e esquecida, passando da meia-noite**: continua "Em execução". O sistema de horas já ignora essa sessão no cálculo. A tela não muda isso.
-
-## Função derivada (nova)
-`src/lib/serviceOrders/displayStatus.ts`:
-- `getOrderDisplayStatus(order, sessions)` retorna `{ key: ServiceOrderStatus | "paused", label, pauseReason, pausedCount, runningCount }`.
-- Reaproveita `getTechnicianState` de `timeSessions.ts`, sem alterar esse arquivo.
-- Também exporta `displayStatusLabel` e `displayStatusTone`. "paused" usa os tons âmbar que o `ServiceOrderTimeControl` já usa.
-
-## Como trazer as sessões para a lista inteira (sem N+1)
-- Novo `listRunningOrderTimeState` em `timeSessions.functions.ts`, com `requireSupabaseAuth` e RLS normal.
-  - Primeiro busca os ids das OS `running`.
-  - Depois faz uma única query em `service_order_time_sessions` com `.in(service_order_id)` e `kind='work'`, buscando só as colunas mínimas: id, service_order_id, technician_id, started_at, ended_at, end_reason, pause_reason.
-  - Monta a resposta no servidor: `{ [orderId]: { key, pauseReason, pausedCount, runningCount } }`. A lista recebe só esse resumo, sem as sessões.
-- Hoje são cerca de 4 OS running, então o volume é pequeno. Não precisa de mudança no banco.
-- Alternativa, não recomendada agora: uma view ou RPC só para leitura. Fica para depois se o número de OS em andamento crescer muito.
-- Novo hook `useRunningOrderTimeStateQuery()` em `useServiceOrders.ts`, com a chave `["running-order-time-state"]`.
-- Os componentes leem o mapa por id. Se faltar um id, mostram o status gravado, como hoje.
-
-## Onde aparece
-- `ServiceOrderCard.tsx`: o `ServiceOrderStatusBadge` aceita um `displayStatus` opcional. O badge e a cor de destaque (accent) do card ficam âmbar quando pausada, com o motivo junto.
-- `_app.ordens.index.tsx` (lista de OS): passa o estado para os cards e linhas.
-  - O filtro de status ganha a opção **"Pausadas"**.
-  - "Em campo" continua incluindo as pausadas, para o total em andamento não mudar.
-- `ServiceOrderIslandRow.tsx`: mesmo badge.
-- `_app.ordens.$id.tsx` (cabeçalho do detalhe): o chip usa a função derivada com as sessões que a tela já carrega. Não faz busca nova.
-- `TechnicianOrderCard.tsx` (app do técnico): `timeStateLabel` passa a mostrar "Pausada · motivo".
-- Contadores do Início e da Central (`metrics.ts`, `OperationTodayCard.tsx`, `MetricCard`): "Em andamento" fica com o mesmo total. Embaixo, mostra o desdobramento "X em execução · Y pausadas".
-  - `statusBucket` não muda.
-  - O desdobramento é calculado à parte, com o mapa.
-- Relatórios gerenciais, PDFs e faturamento: **não mudam**. Os filtros e KPIs continuam usando `order.status`. Isso fica explícito no código.
-
-## Troca automática ao pausar ou retomar
-1. **Invalidação**: depois de start, pause, resume, finish, finishColleagueWork e dos ajustes de sessão do admin, invalidar `["running-order-time-state"]` e `["service-orders"]`. A tela de quem tocou no botão troca na hora.
-2. **Para os outros aparelhos** (o Márcio na Central vendo o técnico pausar), a recomendação é atualizar a cada 30 s (`refetchInterval: 30_000`) e também ao voltar para a aba (`refetchOnWindowFocus`), só nessa consulta leve.
-   - Prós: simples, sem mudança no banco, respeita a RLS, custo baixo (uma query pequena).
-   - Contras: até 30 s de atraso.
-3. **Realtime em `service_order_time_sessions`** (opcional, fora deste plano):
-   - Prós: troca instantânea.
-   - Contras: precisa de uma migração para adicionar a tabela à publicação; a RLS é avaliada a cada evento; envolve mais conexões; e o hábito do projeto até agora é usar só react-query.
-   - Proponho deixar para uma segunda etapa, se 30 s não bastar.
-
-## O que NÃO muda
-O enum `service_order_status` e o `service_orders.status`:
-- `startWork`, `pauseWork` e `resumeWork` continuam iguais, só com as invalidações a mais.
-
-Cálculo de horas:
-- `laborSync`, `laborDerivation`, materialização, `isAbandonedSession`/`isSuspiciousSession` e as regras de 14h e da meia-noite continuam iguais.
-
-Documentos, faturamento e avisos:
-- PDFs de horas e o faturamento continuam iguais.
-- As notificações push continuam iguais: pausar ou retomar não envia aviso, e não proponho criar um.
-
-## Mudanças de banco
-Nenhuma.
+## Arquivos a alterar
+- `src/lib/auth/withTimeout.ts` (novo): `withTimeout(promise, ms, label)` lança um `AuthTimeoutError`. Também traz `clearLocalAuthSession()`, que remove as chaves `sb-*-auth-token` de localStorage e sessionStorage, e `logAuthIssue(stage, info)`.
+- `src/lib/auth/withTimeout.test.ts` (novo): testes de resolução, timeout, erro propagado e limpeza do timer.
+- `src/routes/login.tsx`:
+  - Tempo limite em `signInWithPassword` (15 s), na leitura inicial da sessão (8 s), em `getMyModuleAccess` (15 s) e em `handleContinueSession`.
+  - Guarda com `useRef` para `finishAuthentication` rodar só uma vez por usuário. Ela só é liberada de novo em caso de erro ou "Trocar conta".
+  - O callback de `onAuthStateChange` passa a ser síncrono e adia o trabalho com `setTimeout(0)`.
+  - Limpeza automática da sessão local quando a leitura falha ou passa do tempo.
+  - Botão de limpar após 10 s.
+  - `signOut({ scope: "local" })` em `handleSwitchAccount` e em `ensureGoogleAdminOrSignOut`.
+- `src/components/app/AuthContext.tsx`:
+  - Tempo limite em `getSession` (15 s). Se passar do tempo, `loading` termina com `timedOut=true` (novo campo no contexto) e a sessão local é limpa.
+  - O callback de `onAuthStateChange` só faz `setSession`. A checagem Google-admin é adiada com `setTimeout(0)`.
+  - `signOut()` passa a usar `scope: "local"`. Isso cobre AppShell, `_app.mais`, LeitosShell e WireTrayAccessContext, porque todos usam `useAuth().signOut`.
+- `src/routes/_app.tsx` (AuthGate): mostra os botões após 10 s de espera e a tela de erro quando `timedOut` vem verdadeiro.
+- `src/routes/leitos.tsx` (gate de Leitos): recebe o mesmo tratamento, porque usa o mesmo AuthContext. Só muda a tela de espera.
+- Registro de erros: `console.warn` com estágio (`getSession`, `signIn`, `moduleAccess`), duração e código do erro, sem senha, sem token e sem e-mail completo. Usa também o relatório de erros que o projeto já tem (`lovable-error-reporting`), se aceitar eventos manuais. Não cria tabela nova.
 
 ## Testes
-Novo `src/lib/serviceOrders/displayStatus.test.ts`:
-- A equipe toda pausada (Juan e Omar no almoço, como na #1226) dá "Pausada · Almoço".
-- Um técnico pausado e outro trabalhando dá "Em execução" com pausedCount 1.
-- Sem nenhuma sessão dá "Em execução".
-- OS finished ou approved com a última sessão em pausa mostra o status original.
-- Pausa `fim_expediente` iniciada ontem e sem retomar dá "Pausada".
-- Sessão aberta passando da meia-noite dá "Em execução".
-- Retomar depois da pausa (nova sessão aberta) volta para "Em execução".
-- Todos os técnicos encerrados com `finish`, sem pausa, dá "Em execução".
-- pending, dispatched, transit e cancelled não mudam.
-
-Regressão:
-- `laborDerivation.test`, `dashboardTechnicianTime.test` e `reports.test` continuam passando sem alteração. Isso confirma que os totais de horas não mudaram.
-
-Verificação no navegador:
-- A #1226 aparece "Pausada · Almoço" na Central, na lista e no detalhe.
-- O filtro "Pausadas" mostra a #1226.
-- O contador mostra o desdobramento.
+- Unitários:
+  - `withTimeout`.
+  - Guarda de `finishAuthentication`: um helper puro, `createOnceGuard`, chamado duas vezes dispara uma vez e pode ser liberado de novo.
+  - `clearLocalAuthSession` remove só as chaves `sb-*-auth-token`.
+- Suíte completa e checagem de tipos.
+- Navegador local: login normal; Supabase bloqueado por rota simulada (o erro deve aparecer em cerca de 15 s); sessão corrompida colocada em localStorage (deve limpar e mostrar o formulário).
+- Roteiro manual no Android, no Chrome e no app instalado:
+  - Login normal.
+  - Modo avião durante o envio: o erro aparece em cerca de 15 s.
+  - Sessão antiga inválida: o app limpa e deixa entrar.
+  - Botão de limpar após 10 s.
+  - Sair no celular não derruba o computador.
 
 ## Riscos
-- Diferença de até 30 s entre aparelhos, que se resolve com o Realtime depois.
-- O app do técnico usa a mesma consulta, e a RLS do técnico só deixa ver as OS dele. Isso está correto, mas o mapa vem parcial para ele, que é o esperado.
-- Dados antigos inconsistentes, como sessões espelhadas sem `technician_id`: essas sessões são ignoradas na regra para evitar uma "pausa" falsa.
+- Em rede muito lenta, 15 s pode cortar um login que daria certo. A mensagem pede para tentar de novo, e a nova tentativa funciona normalmente.
+- Limpar a sessão local exige novo login naquele aparelho, o que é intencional.
+- `scope: "local"` deixa a sessão válida no servidor até expirar, caso alguém só "saia" e o aparelho seja perdido. Para esses casos dá para encerrar as sessões pelo admin depois.
+- A causa exata do travamento do Douglas não foi confirmada. A explicação é uma inferência. O plano cobre as hipóteses mais prováveis no aparelho, mas não prova qual foi.
+- Um timeout não cancela a requisição em andamento. Se ela terminar depois, a guarda impede que o login seja finalizado em dobro.
 
 ## Perguntas em aberto
-1. Para "running" com todos os técnicos encerrados e sem pausa, mantenho "Em execução" ou quer um rótulo "Aguardando finalização"? O plano mantém "Em execução".
-2. O filtro "Pausadas" fica como opção separada e também dentro de "Em campo"? O plano faz os dois.
-3. Atualizar a cada 30 s é suficiente, ou já quer o Realtime nesta entrega?
+1. Tempos de 15 s para login e acesso e 8 s para ler a sessão ao abrir o /login: estão bons?
+2. Quer manter uma opção "Sair de todos os aparelhos" (scope global) em Mais, só para admins? O plano não inclui essa opção.
+3. Basta o registro no console e no relatório de erros já existente, sem tabela nova?
