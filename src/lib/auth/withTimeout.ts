@@ -90,6 +90,7 @@ export function logAuthIssue(stage: string, info: { error?: unknown; durationMs?
     code: err?.code,
     status: err?.status,
     timeout: isAuthTimeout(info.error),
+    kind: info.error ? classifyKind(info.error) : undefined,
     online: typeof navigator !== "undefined" ? navigator.onLine : undefined,
   };
   console.warn("[auth]", payload);
@@ -103,4 +104,15 @@ export function logAuthIssue(stage: string, info: { error?: unknown; durationMs?
   } catch {
     /* ignora */
   }
+}
+
+// Classificação simplificada aqui para evitar import circular com sessionPolicy.
+function classifyKind(error: unknown): "definitive" | "transient" {
+  if (isAuthTimeout(error)) return "transient";
+  const e = error as { name?: string; status?: number; code?: string };
+  if (e?.name === "AuthRetryableFetchError" || e?.name === "TypeError") return "transient";
+  const status = typeof e?.status === "number" ? e.status : 0;
+  return status === 400 || status === 401 || status === 403 || /refresh_token|session_not_found/.test(e?.code ?? "")
+    ? "definitive"
+    : "transient";
 }
