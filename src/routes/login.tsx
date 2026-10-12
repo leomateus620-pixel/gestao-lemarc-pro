@@ -30,6 +30,21 @@ import {
   type LemarcModule,
 } from "@/lib/modules";
 
+import { clearSessionAndReload, useSlowWait } from "@/components/app/SessionWaitScreen";
+import {
+  AUTH_TIMEOUT_MESSAGE,
+  clearLocalAuthSession,
+  createOnceGuard,
+  isAuthTimeout,
+  logAuthIssue,
+  withTimeout,
+} from "@/lib/auth/withTimeout";
+
+const SIGN_IN_TIMEOUT_MS = 15_000;
+const ACCESS_TIMEOUT_MS = 15_000;
+const SESSION_TIMEOUT_MS = 15_000;
+const INITIAL_SESSION_TIMEOUT_MS = 8_000;
+
 const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 
 const GOOGLE_RESTRICTED_MESSAGE =
@@ -52,7 +67,7 @@ async function ensureGoogleAdminOrSignOut(user: {
     .maybeSingle();
 
   if (error || !data) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return false;
   }
   return true;
@@ -101,59 +116,82 @@ function LoginPage() {
     selectedModuleRef.current = selectedModule;
   }, [selectedModule]);
 
+  const slowWait = useSlowWait(isSubmitting);
+  const finishGuard = useRef(createOnceGuard());
+
+  const resetLoading = useCallback(() => {
+    finishGuard.current.reset();
+    setIsSubmitting(false);
+    setGoogleLoading(false);
+    setEmailLoading(false);
+  }, []);
+
   const finishAuthentication = useCallback(
-    async (user: Parameters<typeof ensureGoogleAdminOrSignOut>[0]) => {
-      const ok = await ensureGoogleAdminOrSignOut(user);
+    async (user: Parameters<typeof ensureGoogleAdminOrSignOut>[0] & { id: string }) => {
+      // Evita rodar duas vezes (getSession + SIGNED_IN).
+      if (!finishGuard.current.tryAcquire(user.id)) return;
+      setIsSubmitting(true);
+      const ok = await ensureGoogleAdminOrSignOut(user).catch((error) => {
+        logAuthIssue("googleAdminCheck", { error });
+        return true;
+      });
       if (!ok) {
         setError(GOOGLE_RESTRICTED_MESSAGE);
         setSessionActive(false);
-        setIsSubmitting(false);
-        setGoogleLoading(false);
-        setEmailLoading(false);
+        resetLoading();
         return;
       }
       setSessionActive(true);
       const module = selectedModuleRef.current;
       if (!module) {
         setError("Selecione o módulo que deseja acessar.");
-        setIsSubmitting(false);
-        setGoogleLoading(false);
-        setEmailLoading(false);
+        resetLoading();
         return;
       }
+      const startedAt = Date.now();
       try {
-        const access = await fetchAccess();
+        const access = await withTimeout(fetchAccess(), ACCESS_TIMEOUT_MS, "moduleAccess");
         if (module === "wire_trays" && !access.wireTrays) {
           setError("Sua sessão está ativa, mas ainda não possui acesso ao módulo Leitos Aramados.");
-          setIsSubmitting(false);
-          setGoogleLoading(false);
-          setEmailLoading(false);
+          resetLoading();
           return;
         }
         storePreferredModule(module);
         window.location.assign(safeInternalDestination(search.redirect, module));
       } catch (cause) {
-        console.error(cause);
-        setError("Não foi possível validar os módulos autorizados. Tente novamente.");
-        setIsSubmitting(false);
-        setGoogleLoading(false);
-        setEmailLoading(false);
+        logAuthIssue("moduleAccess", { error: cause, durationMs: Date.now() - startedAt });
+        setError(
+          isAuthTimeout(cause)
+            ? AUTH_TIMEOUT_MESSAGE
+            : "Não foi possível validar os módulos autorizados. Tente novamente.",
+        );
+        resetLoading();
       }
     },
-    [fetchAccess, search.redirect],
+    [fetchAccess, search.redirect, resetLoading],
   );
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (cancelled || !data.session) return;
-      if (!cancelled) await finishAuthentication(data.session.user);
-    });
+    const startedAt = Date.now();
+    withTimeout(supabase.auth.getSession(), INITIAL_SESSION_TIMEOUT_MS, "initialSession")
+      .then(({ data, error: sessionError }) => {
+        if (sessionError) throw sessionError;
+        if (cancelled || !data.session) return;
+        void finishAuthentication(data.session.user);
+      })
+      .catch((cause) => {
+        // Sessão antiga travada ou inválida: limpa só neste aparelho.
+        logAuthIssue("initialSession", { error: cause, durationMs: Date.now() - startedAt });
+        clearLocalAuthSession();
+        if (!cancelled) setSessionActive(false);
+      });
+    // Callback síncrono; trabalho adiado para não segurar o lock do cliente.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
-        void (async () => {
-          if (!cancelled) await finishAuthentication(session.user);
-        })();
+        setTimeout(() => {
+          if (!cancelled) void finishAuthentication(session.user);
+        }, 0);
       }
     });
     return () => {
@@ -185,7 +223,7 @@ function LoginPage() {
       // Sessão foi definida no fluxo popup. Validação de admin acontece via
       // onAuthStateChange (SIGNED_IN) — não navegar direto aqui.
     } catch (err) {
-      console.error(err);
+      logAuthIssue("google", { error: err });
       setError("Erro inesperado ao acessar o sistema.");
       setIsSubmitting(false);
       setGoogleLoading(false);
@@ -214,11 +252,13 @@ function LoginPage() {
 
     setIsSubmitting(true);
     setEmailLoading(true);
+    const startedAt = Date.now();
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password,
-      });
+      const { error: signInError } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: trimmedEmail, password }),
+        SIGN_IN_TIMEOUT_MS,
+        "signIn",
+      );
       if (signInError) {
         const msg = signInError.message?.toLowerCase() ?? "";
         if (msg.includes("invalid login credentials")) {
@@ -226,18 +266,17 @@ function LoginPage() {
         } else if (msg.includes("email not confirmed")) {
           setError("E-mail ainda não confirmado. Fale com o administrador.");
         } else {
+          logAuthIssue("signIn", { error: signInError, durationMs: Date.now() - startedAt });
           setError("Não foi possível entrar. Tente novamente.");
         }
-        setIsSubmitting(false);
-        setEmailLoading(false);
+        resetLoading();
         return;
       }
       // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
-      console.error(err);
-      setError("Erro inesperado ao acessar o sistema.");
-      setIsSubmitting(false);
-      setEmailLoading(false);
+      logAuthIssue("signIn", { error: err, durationMs: Date.now() - startedAt });
+      setError(isAuthTimeout(err) ? AUTH_TIMEOUT_MESSAGE : "Erro inesperado ao acessar o sistema.");
+      resetLoading();
     }
   }
 
@@ -248,17 +287,36 @@ function LoginPage() {
       return;
     }
     setIsSubmitting(true);
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
+    try {
+      const { data } = await withTimeout(
+        supabase.auth.getSession(),
+        SESSION_TIMEOUT_MS,
+        "continueSession",
+      );
+      if (!data.session) {
+        setSessionActive(false);
+        resetLoading();
+        return;
+      }
+      finishGuard.current.reset();
+      await finishAuthentication(data.session.user);
+    } catch (err) {
+      logAuthIssue("continueSession", { error: err });
+      clearLocalAuthSession();
       setSessionActive(false);
-      setIsSubmitting(false);
-      return;
+      setError(AUTH_TIMEOUT_MESSAGE);
+      resetLoading();
     }
-    await finishAuthentication(data.session.user);
   }
 
   async function handleSwitchAccount() {
-    await supabase.auth.signOut();
+    finishGuard.current.reset();
+    try {
+      await withTimeout(supabase.auth.signOut({ scope: "local" }), SESSION_TIMEOUT_MS, "signOut");
+    } catch (err) {
+      logAuthIssue("signOut", { error: err });
+      clearLocalAuthSession();
+    }
     setSessionActive(false);
     setError("");
   }
@@ -462,6 +520,20 @@ function LoginPage() {
                   >
                     <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     <span>{error}</span>
+                  </div>
+                ) : null}
+
+                {slowWait ? (
+                  <div className="space-y-2 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-3 text-sm text-white/80">
+                    <p>Está demorando mais que o normal.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={clearSessionAndReload}
+                      className="h-10 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10"
+                    >
+                      Limpar sessão e tentar de novo
+                    </Button>
                   </div>
                 ) : null}
 
