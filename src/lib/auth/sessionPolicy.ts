@@ -81,6 +81,64 @@ export function getLastLoginAt(
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+const GOOGLE_PENDING_KEY = "lemarc:auth-google-pending";
+
+/** Método da entrada mais recente no amr (ignora token_refresh). */
+export function latestLoginMethod(session: { access_token?: string } | null | undefined): string | null {
+  const payload = decodeJwtPayload(session?.access_token);
+  const amr = Array.isArray(payload?.amr) ? (payload!.amr as Array<{ method?: string; timestamp?: number }>) : [];
+  let best: { method: string; ts: number } | null = null;
+  for (const entry of amr) {
+    if (!entry?.method || !LOGIN_METHODS.has(entry.method)) continue;
+    const ts = typeof entry.timestamp === "number" ? entry.timestamp : 0;
+    if (!best || ts > best.ts) best = { method: entry.method, ts };
+  }
+  return best?.method ?? null;
+}
+
+/**
+ * True só quando ESTA entrada foi pelo Google (amr mais recente = oauth).
+ * Identidades vinculadas (app_metadata.providers) são ignoradas.
+ * Sem amr: usa o aviso gravado ao tocar em "Entrar com Google"; sem sinal, não é Google.
+ */
+export function isGoogleSession(
+  session: { access_token?: string } | null | undefined,
+  pendingStorage: Pick<Storage, "getItem"> | null = safeSessionStorage(),
+): boolean {
+  if (!session) return false;
+  const method = latestLoginMethod(session);
+  if (method) return method === "oauth";
+  return pendingStorage?.getItem(GOOGLE_PENDING_KEY) === "1";
+}
+
+export function shouldBlockGoogleLogin(isGoogle: boolean, isAdmin: boolean): boolean {
+  return isGoogle && !isAdmin;
+}
+
+export function markGooglePending() {
+  try {
+    safeSessionStorage()?.setItem(GOOGLE_PENDING_KEY, "1");
+  } catch {
+    /* ignora */
+  }
+}
+
+export function clearGooglePending() {
+  try {
+    safeSessionStorage()?.removeItem(GOOGLE_PENDING_KEY);
+  } catch {
+    /* ignora */
+  }
+}
+
+function safeSessionStorage(): Storage | null {
+  try {
+    return typeof sessionStorage !== "undefined" ? sessionStorage : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isSessionTooOld(
   session: Parameters<typeof getLastLoginAt>[0],
   now = Date.now(),
