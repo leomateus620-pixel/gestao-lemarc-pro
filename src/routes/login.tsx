@@ -135,6 +135,10 @@ function LoginPage() {
   const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
 
   useEffect(() => {
+    setAdminOpen(isAdminAccessOpen(search.admin));
+  }, [search.admin]);
+
+  useEffect(() => {
     selectedModuleRef.current = selectedModule;
   }, [selectedModule]);
 
