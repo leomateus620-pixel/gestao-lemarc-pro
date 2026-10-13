@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_password_resets: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       client_units: {
         Row: {
           active: boolean
@@ -232,6 +256,42 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
+        }
+        Relationships: []
+      }
+      login_diagnostics: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          duration_ms: number | null
+          email_masked: string | null
+          error_code: string
+          id: string
+          online: boolean | null
+          stage: string
+          user_agent: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          email_masked?: string | null
+          error_code: string
+          id?: string
+          online?: boolean | null
+          stage: string
+          user_agent?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          email_masked?: string | null
+          error_code?: string
+          id?: string
+          online?: boolean | null
+          stage?: string
+          user_agent?: string | null
         }
         Relationships: []
       }
@@ -2448,6 +2508,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_revoke_user_sessions: {
+        Args: { _user_id: string }
+        Returns: number
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

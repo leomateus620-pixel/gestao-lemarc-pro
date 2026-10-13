@@ -10,7 +10,17 @@ import {
   LogOut,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { hasEdgeWhitespace, normalizeEmail, startsWithUppercase } from "@/lib/auth/loginInput";
+import {
+  CAPS_LOCK_HINT,
+  EDGE_SPACE_HINT,
+  LOGIN_ERROR_MESSAGES,
+  UPPERCASE_HINT,
+  classifySignInError,
+  diagnosticErrorCode,
+} from "@/lib/auth/loginErrors";
+import { reportLoginFailure } from "@/lib/auth/loginDiagnostics";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -130,6 +140,8 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  const [passwordHint, setPasswordHint] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [sessionCheck, setSessionCheck] = useState(0);
   const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
@@ -163,6 +175,7 @@ function LoginPage() {
         return true;
       });
       if (!ok) {
+        reportLoginFailure({ stage: "google", errorCode: "google_restricted" });
         setError(GOOGLE_RESTRICTED_MESSAGE);
         setSessionActive(false);
         resetLoading();
@@ -179,7 +192,8 @@ function LoginPage() {
       try {
         const access = await withTimeout(fetchAccess(), ACCESS_TIMEOUT_MS, "moduleAccess");
         if (module === "wire_trays" && !access.wireTrays) {
-          setError("Sua sessão está ativa, mas ainda não possui acesso ao módulo Leitos Aramados.");
+          reportLoginFailure({ stage: "moduleAccess", errorCode: "no_module_access", durationMs: Date.now() - startedAt });
+          setError(LOGIN_ERROR_MESSAGES.no_module_access);
           resetLoading();
           return;
         }
@@ -189,6 +203,7 @@ function LoginPage() {
         window.location.assign(safeInternalDestination(search.redirect, module));
       } catch (cause) {
         logAuthIssue("moduleAccess", { error: cause, durationMs: Date.now() - startedAt });
+        reportLoginFailure({ stage: "moduleAccess", errorCode: isAuthTimeout(cause) ? "timeout" : "module_access_error", durationMs: Date.now() - startedAt });
         setError(
           isAuthTimeout(cause)
             ? AUTH_TIMEOUT_MESSAGE
@@ -303,6 +318,7 @@ function LoginPage() {
     if (isSubmitting) return;
     setError("");
     setFieldError(null);
+    setPasswordHint(null);
 
     if (!selectedModule) {
       setFieldError("module");
@@ -311,7 +327,7 @@ function LoginPage() {
       return;
     }
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = normalizeEmail(email);
     if (!trimmedEmail || !password) {
       const field = !trimmedEmail ? "email" : "password";
       setFieldError(field);
@@ -336,14 +352,16 @@ function LoginPage() {
         "signIn",
       );
       if (signInError) {
-        const msg = signInError.message?.toLowerCase() ?? "";
-        if (msg.includes("invalid login credentials")) {
-          setError("E-mail ou senha inválidos.");
-        } else if (msg.includes("email not confirmed")) {
-          setError("E-mail ainda não confirmado. Fale com o administrador.");
-        } else {
+        const kind = classifySignInError(signInError, navigator.onLine);
+        if (kind !== "invalid_credentials") {
           logAuthIssue("signIn", { error: signInError, durationMs: Date.now() - startedAt });
-          setError("Não foi possível entrar. Tente novamente.");
+        }
+        reportLoginFailure({ stage: "signIn", errorCode: diagnosticErrorCode(signInError, kind), durationMs: Date.now() - startedAt, email: trimmedEmail });
+        setError(LOGIN_ERROR_MESSAGES[kind]);
+        if (kind === "invalid_credentials") {
+          setPasswordHint(
+            hasEdgeWhitespace(password) ? EDGE_SPACE_HINT : startsWithUppercase(password) ? UPPERCASE_HINT : null,
+          );
         }
         resetLoading();
         return;
@@ -353,7 +371,11 @@ function LoginPage() {
       // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
       logAuthIssue("signIn", { error: err, durationMs: Date.now() - startedAt });
-      setError(isAuthTimeout(err) ? AUTH_TIMEOUT_MESSAGE : "Erro inesperado ao acessar o sistema.");
+      const kind = classifySignInError(err, navigator.onLine);
+      reportLoginFailure({ stage: "signIn", errorCode: diagnosticErrorCode(err, kind), durationMs: Date.now() - startedAt, email: trimmedEmail });
+      setError(
+        kind === "timeout" ? AUTH_TIMEOUT_MESSAGE : kind === "unknown" ? "Erro inesperado ao acessar o sistema." : LOGIN_ERROR_MESSAGES[kind],
+      );
       resetLoading();
     }
   }
@@ -405,6 +427,16 @@ function LoginPage() {
     setFieldError(null);
   }
 
+  function updateCapsLock(event: KeyboardEvent<HTMLInputElement>) {
+    if (typeof event.getModifierState === "function") setCapsLock(event.getModifierState("CapsLock"));
+  }
+
+  const passwordNotices = [
+    capsLock ? CAPS_LOCK_HINT : null,
+    hasEdgeWhitespace(password) ? EDGE_SPACE_HINT : null,
+    passwordHint && passwordHint !== EDGE_SPACE_HINT ? passwordHint : null,
+  ].filter((notice): notice is string => Boolean(notice));
+
   const errorMessage = error ? (
     <div id="login-error" className="login-clean-error flex items-start gap-2 text-sm" role="alert">
       <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -455,11 +487,16 @@ function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="login-password" className="text-sm font-semibold">Senha</Label>
               <div className="relative">
-                <Input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => { setPassword(event.target.value); if (fieldError === "password") { setFieldError(null); setError(""); } }} disabled={isSubmitting} placeholder="Sua senha" aria-invalid={fieldError === "password"} aria-describedby={fieldError === "password" ? "login-error" : undefined} className="login-clean-input h-[52px] pr-14 text-base" />
+                <Input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} required value={password} onChange={(event) => { setPassword(event.target.value); setPasswordHint(null); if (fieldError === "password") { setFieldError(null); setError(""); } }} onKeyDown={updateCapsLock} onKeyUp={updateCapsLock} onBlur={() => setCapsLock(false)} disabled={isSubmitting} placeholder="Sua senha" aria-invalid={fieldError === "password"} aria-describedby={[fieldError === "password" ? "login-error" : "", passwordNotices.length ? "login-password-hints" : ""].filter(Boolean).join(" ") || undefined} className="login-clean-input h-[52px] pr-14 text-base" />
                 <Button type="button" variant="ghost" size="icon" disabled={isSubmitting} onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} title={showPassword ? "Ocultar senha" : "Mostrar senha"} className="login-clean-secondary absolute right-0.5 top-0.5 size-12">
                   {showPassword ? <EyeOff aria-hidden="true" className="size-5" /> : <Eye aria-hidden="true" className="size-5" />}
                 </Button>
               </div>
+              {passwordNotices.length ? (
+                <ul id="login-password-hints" className="login-clean-muted space-y-1 text-sm" aria-live="polite">
+                  {passwordNotices.map((notice) => <li key={notice} className="flex items-start gap-2"><AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{notice}</li>)}
+                </ul>
+              ) : null}
               {fieldError === "password" ? errorMessage : null}
             </div>
             <Button type="submit" disabled={isSubmitting || !selectedModule} className="login-clean-primary h-[52px] w-full text-base font-bold">

@@ -1,4 +1,7 @@
-import { Suspense, useMemo, type ReactNode } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { KeyRound, LogOut } from "lucide-react";
+import { TechnicianAccessDialog } from "@/components/colaboradores/TechnicianAccessDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -56,6 +59,8 @@ function PerfilContent() {
   const { data: laborHistory } = useTechnicianLaborHistoryQuery();
   const queryClient = useQueryClient();
   const updateFn = useServerFn(updateTechnician);
+  const { roles } = useUserRole();
+  const [accessMode, setAccessMode] = useState<"reset" | "revoke" | null>(null);
 
   const dashboard = useMemo(
     () => buildCollaboratorOperationalDashboard({ technicians, orders, laborHistory }),
@@ -68,6 +73,8 @@ function PerfilContent() {
   const linkedOrders = collaboratorOrdersFor(orders, id);
   const latest = collaborator.history[0];
   const rateUndefined = collaborator.hourlyRateCents == null;
+  // Só exibição: a permissão real é checada no servidor.
+  const canManageAccess = roles.includes("admin") && Boolean(technician.user_id);
 
   const mutation = useMutation({
     mutationFn: () => updateFn({ data: { ...technician, active: !collaborator.active } }),
@@ -128,7 +135,36 @@ function PerfilContent() {
               <ShieldOff size={14} />
               {collaborator.active ? "Desativar" : "Ativar"}
             </button>
+            {canManageAccess ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAccessMode("reset")}
+                  className="lemarc-pressable inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-primary/40 hover:bg-primary/10"
+                >
+                  <KeyRound size={14} />
+                  Redefinir senha
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccessMode("revoke")}
+                  className="lemarc-pressable inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-white/[0.11] bg-white/[0.055] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-rose-300/40 hover:bg-rose-400/10"
+                >
+                  <LogOut size={14} />
+                  Desconectar aparelhos
+                </button>
+              </>
+            ) : null}
           </div>
+          {canManageAccess ? (
+            <TechnicianAccessDialog
+              technicianId={technician.id}
+              technicianName={collaborator.name}
+              open={accessMode !== null}
+              mode={accessMode ?? "reset"}
+              onOpenChange={(open) => { if (!open) setAccessMode(null); }}
+            />
+          ) : null}
         </div>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-4">

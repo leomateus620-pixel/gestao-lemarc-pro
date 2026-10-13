@@ -7,6 +7,7 @@ import { Loader2, Save, Truck } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { NotificationDeliveryLog } from "@/components/app/NotificationDeliveryLog";
 import { NotificationSettings } from "@/components/app/NotificationSettings";
+import { LoginDiagnosticsLog } from "@/components/app/LoginDiagnosticsLog";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ function ConfiguracoesPage() {
         </GlassCard>
         <NotificationSettings />
         <NotificationDeliveryLog />
+        <LoginDiagnosticsLog />
       </main>
     </AppShell>
   );

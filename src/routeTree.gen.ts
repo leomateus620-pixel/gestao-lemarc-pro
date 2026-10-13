@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VersionDotjsonRouteImport } from './routes/version[.]json'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeitosRouteImport } from './routes/leitos'
 import { Route as AppRouteImport } from './routes/_app'
@@ -65,6 +66,11 @@ import { Route as AppColaboradoresIdHorasRouteImport } from './routes/_app.colab
 import { Route as AppColaboradoresIdEditarRouteImport } from './routes/_app.colaboradores.$id.editar'
 import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
 
+const VersionDotjsonRoute = VersionDotjsonRouteImport.update({
+  id: '/version.json',
+  path: '/version.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -354,6 +360,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/leitos': typeof LeitosRouteWithChildren
   '/login': typeof LoginRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/clientes': typeof AppClientesRouteWithChildren
   '/colaboradores': typeof AppColaboradoresRouteWithChildren
   '/configuracoes': typeof AppConfiguracoesRoute
@@ -409,6 +416,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/mais': typeof AppMaisRoute
@@ -459,6 +467,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/leitos': typeof LeitosRouteWithChildren
   '/login': typeof LoginRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/_app/clientes': typeof AppClientesRouteWithChildren
   '/_app/colaboradores': typeof AppColaboradoresRouteWithChildren
   '/_app/configuracoes': typeof AppConfiguracoesRoute
@@ -517,6 +526,7 @@ export interface FileRouteTypes {
     | '/'
     | '/leitos'
     | '/login'
+    | '/version.json'
     | '/clientes'
     | '/colaboradores'
     | '/configuracoes'
@@ -572,6 +582,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/version.json'
     | '/configuracoes'
     | '/dashboard'
     | '/mais'
@@ -621,6 +632,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/leitos'
     | '/login'
+    | '/version.json'
     | '/_app/clientes'
     | '/_app/colaboradores'
     | '/_app/configuracoes'
@@ -679,11 +691,19 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LeitosRoute: typeof LeitosRouteWithChildren
   LoginRoute: typeof LoginRoute
+  VersionDotjsonRoute: typeof VersionDotjsonRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/version.json': {
+      id: '/version.json'
+      path: '/version.json'
+      fullPath: '/version.json'
+      preLoaderRoute: typeof VersionDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -1282,6 +1302,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LeitosRoute: LeitosRouteWithChildren,
   LoginRoute: LoginRoute,
+  VersionDotjsonRoute: VersionDotjsonRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
