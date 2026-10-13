@@ -1,5 +1,34 @@
-import { describe, expect, it } from "vitest";
-import { safeInternalDestination } from "./modules";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readPreferredModule, storePreferredModule, safeInternalDestination } from "./modules";
+
+describe("preferred module", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("remembers and replaces the selected operation", () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("window", { localStorage: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    } });
+    expect(readPreferredModule()).toBe(null);
+    storePreferredModule("os");
+    expect(values.get("lemarc.preferred-module")).toBe("os");
+    expect(readPreferredModule()).toBe("os");
+    storePreferredModule("wire_trays");
+    expect(readPreferredModule()).toBe("wire_trays");
+  });
+  it("ignores invalid saved values", () => {
+    vi.stubGlobal("window", { localStorage: { getItem: () => "admin" } });
+    expect(readPreferredModule()).toBe(null);
+  });
+  it("continues when storage is unavailable", () => {
+    vi.stubGlobal("window", { localStorage: {
+      getItem: () => { throw new Error("Unavailable"); },
+      setItem: () => { throw new Error("Unavailable"); },
+    } });
+    expect(readPreferredModule()).toBe(null);
+    expect(() => storePreferredModule("os")).not.toThrow();
+  });
+});
 
 describe("safeInternalDestination", () => {
   it("preserves a destination inside the selected module", () => {
