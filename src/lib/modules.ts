@@ -8,13 +8,21 @@ export const moduleHome: Record<LemarcModule, "/dashboard" | "/leitos"> = {
 };
 
 export function readPreferredModule(): LemarcModule | null {
-  if (typeof window === "undefined") return null;
-  const value = window.localStorage.getItem(STORAGE_KEY);
-  return value === "os" || value === "wire_trays" ? value : null;
+  try {
+    if (typeof window === "undefined") return null;
+    const value = window.localStorage.getItem(STORAGE_KEY);
+    return value === "os" || value === "wire_trays" ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export function storePreferredModule(module: LemarcModule) {
-  if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, module);
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, module);
+  } catch {
+    // A preference is optional; storage restrictions must not prevent login.
+  }
 }
 
 export function moduleFromPath(path: string | null | undefined): LemarcModule | null {
