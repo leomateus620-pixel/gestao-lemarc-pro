@@ -6,6 +6,8 @@ import { logAuthIssue, withTimeout } from "@/lib/auth/withTimeout";
 import {
   classifyAuthError,
   hasSignOutReason,
+  isGoogleSession,
+  shouldBlockGoogleLogin,
   isSessionTooOld,
   setSignOutReason,
   startVisibilityAutoRefresh,
@@ -52,9 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const enforceGoogleAdmin = async (s: Session | null) => {
       if (!s?.user) return;
-      const provider = s.user.app_metadata?.provider;
-      const providers = (s.user.app_metadata?.providers ?? []) as string[];
-      const isGoogle = provider === "google" || providers.includes("google");
+      // Decide pelo método desta entrada (amr), não pelas identidades vinculadas.
+      const isGoogle = isGoogleSession(s);
       if (!isGoogle) return;
       const { data, error } = await supabase
         .from("user_roles")
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", s.user.id)
         .eq("role", "admin")
         .maybeSingle();
-      if (error || !data) {
+      if (shouldBlockGoogleLogin(isGoogle, !error && Boolean(data))) {
         clearUserRoleCache();
         userSignOutRef.current = true;
         await supabase.auth.signOut({ scope: "local" });

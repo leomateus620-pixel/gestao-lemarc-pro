@@ -33,7 +33,11 @@ import {
 import { clearSessionAndReload, useSlowWait } from "@/components/app/SessionWaitScreen";
 import {
   classifyAuthError,
+  clearGooglePending,
   consumeSignOutReason,
+  isGoogleSession,
+  markGooglePending,
+  shouldBlockGoogleLogin,
   hasLoginRecord,
   isSessionTooOld,
   markLogin,
@@ -59,14 +63,15 @@ const LOGIN_LOGO_SRC = "/branding/lemarc-login-logo.png";
 const GOOGLE_RESTRICTED_MESSAGE =
   "Acesso pelo Google é restrito a administradores. Técnicos devem entrar com e-mail e senha.";
 
-async function ensureGoogleAdminOrSignOut(user: {
-  id: string;
-  app_metadata?: { provider?: string; providers?: string[] } | null;
+async function ensureGoogleAdminOrSignOut(session: {
+  access_token?: string;
+  user: { id: string };
 }): Promise<boolean> {
-  const provider = user.app_metadata?.provider;
-  const providers = user.app_metadata?.providers ?? [];
-  const isGoogle = provider === "google" || providers.includes("google");
+  // Decide pelo método desta entrada (amr), não pelas identidades vinculadas.
+  const isGoogle = isGoogleSession(session);
+  clearGooglePending();
   if (!isGoogle) return true;
+  const user = session.user;
 
   const { data, error } = await supabase
     .from("user_roles")
@@ -75,7 +80,7 @@ async function ensureGoogleAdminOrSignOut(user: {
     .eq("role", "admin")
     .maybeSingle();
 
-  if (error || !data) {
+  if (shouldBlockGoogleLogin(isGoogle, !error && Boolean(data))) {
     await supabase.auth.signOut({ scope: "local" });
     return false;
   }
@@ -138,11 +143,12 @@ function LoginPage() {
   }, []);
 
   const finishAuthentication = useCallback(
-    async (user: Parameters<typeof ensureGoogleAdminOrSignOut>[0] & { id: string }) => {
+    async (session: Parameters<typeof ensureGoogleAdminOrSignOut>[0]) => {
+      const user = session.user;
       // Evita rodar duas vezes (getSession + SIGNED_IN).
       if (!finishGuard.current.tryAcquire(user.id)) return;
       setIsSubmitting(true);
-      const ok = await ensureGoogleAdminOrSignOut(user).catch((error) => {
+      const ok = await ensureGoogleAdminOrSignOut(session).catch((error) => {
         logAuthIssue("googleAdminCheck", { error });
         return true;
       });
@@ -212,7 +218,7 @@ function LoginPage() {
           await expire();
           return;
         }
-        void finishAuthentication(data.session.user);
+        void finishAuthentication(data.session);
       })
       .catch(async (cause) => {
         logAuthIssue("initialSession", { error: cause, durationMs: Date.now() - startedAt });
@@ -241,7 +247,7 @@ function LoginPage() {
             void expire();
             return;
           }
-          void finishAuthentication(session.user);
+          void finishAuthentication(session);
         }, 0);
       }
     });
@@ -260,6 +266,7 @@ function LoginPage() {
     }
     setIsSubmitting(true);
     setGoogleLoading(true);
+    markGooglePending();
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.href,
@@ -324,6 +331,7 @@ function LoginPage() {
         return;
       }
       if (signInData.user) markLogin(signInData.user.id);
+      clearGooglePending();
       // onAuthStateChange valida a autorização e resolve o destino do módulo.
     } catch (err) {
       logAuthIssue("signIn", { error: err, durationMs: Date.now() - startedAt });
@@ -351,7 +359,7 @@ function LoginPage() {
         return;
       }
       finishGuard.current.reset();
-      await finishAuthentication(data.session.user);
+      await finishAuthentication(data.session);
     } catch (err) {
       logAuthIssue("continueSession", { error: err });
       // Tempo esgotado/rede: mantém a sessão salva; só a pessoa decide limpar.

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { classifyAuthError, getLastLoginAt, isSessionTooOld, MAX_SESSION_AGE_MS } from "./sessionPolicy";
+import {
+  classifyAuthError,
+  getLastLoginAt,
+  isGoogleSession,
+  isSessionTooOld,
+  MAX_SESSION_AGE_MS,
+  shouldBlockGoogleLogin,
+} from "./sessionPolicy";
 import { AuthTimeoutError } from "./withTimeout";
 
 function jwt(payload: object) {
@@ -70,5 +77,50 @@ describe("classifyAuthError", () => {
     [null],
   ])("transitório (não limpa): %o", (err) => {
     expect(classifyAuthError(err)).toBe("transient");
+  });
+});
+
+describe("isGoogleSession", () => {
+  const t = (d: number) => Math.floor((NOW - d * DAY) / 1000);
+  const withAmr = (amr: object[]) => ({
+    access_token: jwt({ amr }),
+    user: { id: "u1", app_metadata: { provider: "email", providers: ["email", "google"] } },
+  });
+
+  it("senha com Google vinculado não é Google", () => {
+    expect(isGoogleSession(withAmr([{ method: "password", timestamp: t(0) }]), mem())).toBe(false);
+  });
+  it("oauth é Google", () => {
+    expect(isGoogleSession(withAmr([{ method: "oauth", timestamp: t(0) }]), mem())).toBe(true);
+  });
+  it("password antigo + oauth recente é Google", () => {
+    const s = withAmr([
+      { method: "password", timestamp: t(5) },
+      { method: "oauth", timestamp: t(0) },
+    ]);
+    expect(isGoogleSession(s, mem())).toBe(true);
+  });
+  it("oauth antigo + password recente não é Google", () => {
+    const s = withAmr([
+      { method: "oauth", timestamp: t(5) },
+      { method: "password", timestamp: t(0) },
+      { method: "token_refresh", timestamp: t(0) },
+    ]);
+    expect(isGoogleSession(s, mem())).toBe(false);
+  });
+  it("sem amr e sem aviso não bloqueia", () => {
+    expect(isGoogleSession({ access_token: jwt({}) }, mem())).toBe(false);
+  });
+  it("sem amr com aviso do botão Google é Google", () => {
+    expect(isGoogleSession({ access_token: jwt({}) }, mem({ "lemarc:auth-google-pending": "1" }))).toBe(true);
+  });
+});
+
+describe("shouldBlockGoogleLogin", () => {
+  it("admin via Google permitido", () => expect(shouldBlockGoogleLogin(true, true)).toBe(false));
+  it("técnico via Google bloqueado", () => expect(shouldBlockGoogleLogin(true, false)).toBe(true));
+  it("senha sempre permitida", () => {
+    expect(shouldBlockGoogleLogin(false, false)).toBe(false);
+    expect(shouldBlockGoogleLogin(false, true)).toBe(false);
   });
 });
