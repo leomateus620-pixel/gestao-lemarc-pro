@@ -128,7 +128,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const search = Route.useSearch();
   const fetchAccess = useServerFn(getMyModuleAccess);
-  const initialModule = search.module ?? moduleFromPath(search.redirect) ?? readPreferredModule();
+  const initialModule = search.module ?? moduleFromPath(search.redirect) ?? readPreferredModule() ?? "os";
   const [selectedModule, setSelectedModule] = useState<LemarcModule | null>(initialModule);
   const selectedModuleRef = useRef<LemarcModule | null>(initialModule);
   const [adminOpen, setAdminOpen] = useState(isAdminAccessOpen(search.admin));
