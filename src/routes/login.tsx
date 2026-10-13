@@ -90,7 +90,7 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   validateSearch: zodValidator(
     z.object({
-      admin: z.string().optional().catch(undefined),
+      admin: z.preprocess((value) => value === 1 ? "1" : value, z.string().optional().catch(undefined)),
       module: z.enum(["os", "wire_trays"]).optional(),
       redirect: z
         .string()
