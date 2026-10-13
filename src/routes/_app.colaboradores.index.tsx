@@ -305,7 +305,8 @@ function ColaboradoresSkeleton() {
   );
 }
 
-function ColaboradoresError({ error }: { error: Error }) {
+function ColaboradoresError({ error: rawError }: { error: unknown }) {
+  const error = rawError instanceof Error ? rawError : new Error(String(rawError));
   return (
     <AppShell title="Colaboradores">
       <div className="lemarc-wizard-card mx-auto max-w-2xl p-6 text-center">

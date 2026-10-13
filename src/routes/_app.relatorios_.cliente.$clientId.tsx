@@ -63,7 +63,8 @@ export const Route = createFileRoute("/_app/relatorios_/cliente/$clientId")({
   ),
 });
 
-function ErrorView({ error }: { error: Error }) {
+function ErrorView({ error: rawError }: { error: unknown }) {
+  const error = rawError instanceof Error ? rawError : new Error(String(rawError));
   const router = useRouter();
   return (
     <AppShell title="Relatório por cliente" back>

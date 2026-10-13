@@ -120,7 +120,7 @@ export const Route = createFileRoute("/_app/clientes/$id/")({
   ),
   errorComponent: ({ error }) => (
     <AppShell title="Erro" back>
-      <div className="mt-8 text-center text-sm text-rose-300">{error.message}</div>
+      <div className="mt-8 text-center text-sm text-rose-300">{error instanceof Error ? error.message : String(error)}</div>
     </AppShell>
   ),
 });

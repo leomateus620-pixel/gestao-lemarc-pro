@@ -98,7 +98,7 @@ export const Route = createFileRoute("/_app/ordens/$id")({
   ),
   errorComponent: ({ error }) => (
     <AppShell title="Erro ao carregar OS" back>
-      <div className="mt-8 text-center text-sm text-rose-300">{error.message}</div>
+      <div className="mt-8 text-center text-sm text-rose-300">{error instanceof Error ? error.message : String(error)}</div>
     </AppShell>
   ),
 });

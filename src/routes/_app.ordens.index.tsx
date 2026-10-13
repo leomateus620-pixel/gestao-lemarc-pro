@@ -676,7 +676,8 @@ function OrdensSkeleton() {
   );
 }
 
-function OrdensError({ error }: { error: Error }) {
+function OrdensError({ error: rawError }: { error: unknown }) {
+  const error = rawError instanceof Error ? rawError : new Error(String(rawError));
   return (
     <AppShell title="Ordens de serviço">
       <div className="lemarc-wizard-card mx-auto max-w-2xl p-6 text-center">

@@ -24,7 +24,8 @@ export const Route = createFileRoute("/_app/relatorios_/imprimir")({
   notFoundComponent: PrintNotFound,
 });
 
-function PrintError({ error, reset }: { error: Error; reset: () => void }) {
+function PrintError({ error: rawError, reset }: { error: unknown; reset: () => void }) {
+  const error = rawError instanceof Error ? rawError : new Error(String(rawError));
   const router = useRouter();
   return (
     <PrintMessage
