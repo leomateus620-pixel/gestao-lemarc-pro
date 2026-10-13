@@ -9,75 +9,66 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppRouteImport } from './routes/_app'
-import { Route as LeitosRouteImport } from './routes/leitos'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as VersionDotjsonRouteImport } from './routes/version[.]json'
-import { Route as AppClientesRouteImport } from './routes/_app.clientes'
-import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradores'
-import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
-import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
-import { Route as AppMaisRouteImport } from './routes/_app.mais'
-import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeitosRouteImport } from './routes/leitos'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as LeitosIndexRouteImport } from './routes/leitos.index'
-import { Route as LeitosConfiguracoesRouteImport } from './routes/leitos.configuracoes'
-import { Route as LeitosEstoqueRouteImport } from './routes/leitos.estoque'
-import { Route as LeitosFaturamentoRouteImport } from './routes/leitos.faturamento'
-import { Route as LeitosMaisRouteImport } from './routes/leitos.mais'
-import { Route as LeitosMovimentacoesRouteImport } from './routes/leitos.movimentacoes'
-import { Route as LeitosPedidosRouteImport } from './routes/leitos.pedidos'
-import { Route as LeitosProducaoRouteImport } from './routes/leitos.producao'
-import { Route as LeitosProdutosRouteImport } from './routes/leitos.produtos'
-import { Route as LeitosRelatoriosRouteImport } from './routes/leitos.relatorios'
 import { Route as LeitosSeparacaoRouteImport } from './routes/leitos.separacao'
-import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
-import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
-import { Route as AppColaboradoresIndexRouteImport } from './routes/_app.colaboradores.index'
-import { Route as AppColaboradoresNovoRouteImport } from './routes/_app.colaboradores.novo'
-import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
-import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
-import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
-import { Route as AppRelatoriosIndexRouteImport } from './routes/_app.relatorios.index'
-import { Route as AppRelatoriosImprimirRouteImport } from './routes/_app.relatorios_.imprimir'
-import { Route as LeitosConfiguracoesIndexRouteImport } from './routes/leitos.configuracoes.index'
-import { Route as LeitosConfiguracoesAcessosRouteImport } from './routes/leitos.configuracoes.acessos'
-import { Route as LeitosEstoqueIndexRouteImport } from './routes/leitos.estoque.index'
-import { Route as LeitosEstoqueProductIdRouteImport } from './routes/leitos.estoque.$productId'
-import { Route as LeitosPedidosIndexRouteImport } from './routes/leitos.pedidos.index'
-import { Route as LeitosPedidosOrderIdRouteImport } from './routes/leitos.pedidos.$orderId'
-import { Route as LeitosPedidosNovoRouteImport } from './routes/leitos.pedidos.novo'
-import { Route as LeitosProducaoIndexRouteImport } from './routes/leitos.producao.index'
-import { Route as LeitosProducaoProductionIdRouteImport } from './routes/leitos.producao.$productionId'
-import { Route as LeitosProducaoNovaRouteImport } from './routes/leitos.producao.nova'
+import { Route as LeitosRelatoriosRouteImport } from './routes/leitos.relatorios'
+import { Route as LeitosProdutosRouteImport } from './routes/leitos.produtos'
+import { Route as LeitosProducaoRouteImport } from './routes/leitos.producao'
+import { Route as LeitosPedidosRouteImport } from './routes/leitos.pedidos'
+import { Route as LeitosMovimentacoesRouteImport } from './routes/leitos.movimentacoes'
+import { Route as LeitosMaisRouteImport } from './routes/leitos.mais'
+import { Route as LeitosFaturamentoRouteImport } from './routes/leitos.faturamento'
+import { Route as LeitosEstoqueRouteImport } from './routes/leitos.estoque'
+import { Route as LeitosConfiguracoesRouteImport } from './routes/leitos.configuracoes'
+import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
+import { Route as AppMaisRouteImport } from './routes/_app.mais'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
+import { Route as AppColaboradoresRouteImport } from './routes/_app.colaboradores'
+import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as LeitosProdutosIndexRouteImport } from './routes/leitos.produtos.index'
+import { Route as LeitosProducaoIndexRouteImport } from './routes/leitos.producao.index'
+import { Route as LeitosPedidosIndexRouteImport } from './routes/leitos.pedidos.index'
+import { Route as LeitosEstoqueIndexRouteImport } from './routes/leitos.estoque.index'
+import { Route as LeitosConfiguracoesIndexRouteImport } from './routes/leitos.configuracoes.index'
+import { Route as AppRelatoriosIndexRouteImport } from './routes/_app.relatorios.index'
+import { Route as AppOrdensIndexRouteImport } from './routes/_app.ordens.index'
+import { Route as AppColaboradoresIndexRouteImport } from './routes/_app.colaboradores.index'
+import { Route as AppClientesIndexRouteImport } from './routes/_app.clientes.index'
 import { Route as LeitosProdutosNovoRouteImport } from './routes/leitos.produtos.novo'
-import { Route as AppClientesIdIndexRouteImport } from './routes/_app.clientes.$id.index'
-import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
-import { Route as AppColaboradoresIdIndexRouteImport } from './routes/_app.colaboradores.$id.index'
-import { Route as AppColaboradoresIdEditarRouteImport } from './routes/_app.colaboradores.$id.editar'
-import { Route as AppColaboradoresIdHorasRouteImport } from './routes/_app.colaboradores.$id.horas'
-import { Route as AppColaboradoresIdOrdensRouteImport } from './routes/_app.colaboradores.$id.ordens'
-import { Route as AppColaboradoresIdPrecificacaoRouteImport } from './routes/_app.colaboradores.$id.precificacao'
-import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
-import { Route as AppRelatoriosTecnicoIdRouteImport } from './routes/_app.relatorios.tecnico.$id'
-import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
+import { Route as LeitosProducaoNovaRouteImport } from './routes/leitos.producao.nova'
+import { Route as LeitosProducaoProductionIdRouteImport } from './routes/leitos.producao.$productionId'
+import { Route as LeitosPedidosNovoRouteImport } from './routes/leitos.pedidos.novo'
+import { Route as LeitosPedidosOrderIdRouteImport } from './routes/leitos.pedidos.$orderId'
+import { Route as LeitosEstoqueProductIdRouteImport } from './routes/leitos.estoque.$productId'
+import { Route as LeitosConfiguracoesAcessosRouteImport } from './routes/leitos.configuracoes.acessos'
+import { Route as AppRelatoriosImprimirRouteImport } from './routes/_app.relatorios_.imprimir'
+import { Route as AppOrdensNovaRouteImport } from './routes/_app.ordens.nova'
+import { Route as AppOrdensIdRouteImport } from './routes/_app.ordens.$id'
+import { Route as AppColaboradoresNovoRouteImport } from './routes/_app.colaboradores.novo'
+import { Route as AppClientesNovoRouteImport } from './routes/_app.clientes.novo'
 import { Route as LeitosProdutosProductIdIndexRouteImport } from './routes/leitos.produtos.$productId.index'
-import { Route as LeitosProdutosProductIdEditarRouteImport } from './routes/leitos.produtos.$productId.editar'
+import { Route as AppColaboradoresIdIndexRouteImport } from './routes/_app.colaboradores.$id.index'
+import { Route as AppClientesIdIndexRouteImport } from './routes/_app.clientes.$id.index'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as LeitosProdutosProductIdEditarRouteImport } from './routes/leitos.produtos.$productId.editar'
+import { Route as AppRelatoriosClienteClientIdRouteImport } from './routes/_app.relatorios_.cliente.$clientId'
+import { Route as AppRelatoriosTecnicoIdRouteImport } from './routes/_app.relatorios.tecnico.$id'
+import { Route as AppOrdensIdImprimirRouteImport } from './routes/_app.ordens.$id.imprimir'
+import { Route as AppColaboradoresIdPrecificacaoRouteImport } from './routes/_app.colaboradores.$id.precificacao'
+import { Route as AppColaboradoresIdOrdensRouteImport } from './routes/_app.colaboradores.$id.ordens'
+import { Route as AppColaboradoresIdHorasRouteImport } from './routes/_app.colaboradores.$id.horas'
+import { Route as AppColaboradoresIdEditarRouteImport } from './routes/_app.colaboradores.$id.editar'
+import { Route as AppClientesIdEditarRouteImport } from './routes/_app.clientes.$id.editar'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppRoute = AppRouteImport.update({
-  id: '/_app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeitosRoute = LeitosRouteImport.update({
-  id: '/leitos',
-  path: '/leitos',
+const VersionDotjsonRoute = VersionDotjsonRouteImport.update({
+  id: '/version.json',
+  path: '/version.json',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -85,89 +76,23 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VersionDotjsonRoute = VersionDotjsonRouteImport.update({
-  id: '/version.json',
-  path: '/version.json',
+const LeitosRoute = LeitosRouteImport.update({
+  id: '/leitos',
+  path: '/leitos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppClientesRoute = AppClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
-  getParentRoute: () => AppRoute,
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppColaboradoresRoute = AppColaboradoresRouteImport.update({
-  id: '/colaboradores',
-  path: '/colaboradores',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppDashboardRoute = AppDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMaisRoute = AppMaisRouteImport.update({
-  id: '/mais',
-  path: '/mais',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
-  id: '/relatorios',
-  path: '/relatorios',
-  getParentRoute: () => AppRoute,
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const LeitosIndexRoute = LeitosIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosConfiguracoesRoute = LeitosConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosEstoqueRoute = LeitosEstoqueRouteImport.update({
-  id: '/estoque',
-  path: '/estoque',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosFaturamentoRoute = LeitosFaturamentoRouteImport.update({
-  id: '/faturamento',
-  path: '/faturamento',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosMaisRoute = LeitosMaisRouteImport.update({
-  id: '/mais',
-  path: '/mais',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosMovimentacoesRoute = LeitosMovimentacoesRouteImport.update({
-  id: '/movimentacoes',
-  path: '/movimentacoes',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosPedidosRoute = LeitosPedidosRouteImport.update({
-  id: '/pedidos',
-  path: '/pedidos',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosProducaoRoute = LeitosProducaoRouteImport.update({
-  id: '/producao',
-  path: '/producao',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosProdutosRoute = LeitosProdutosRouteImport.update({
-  id: '/produtos',
-  path: '/produtos',
-  getParentRoute: () => LeitosRoute,
-} as any)
-const LeitosRelatoriosRoute = LeitosRelatoriosRouteImport.update({
-  id: '/relatorios',
-  path: '/relatorios',
   getParentRoute: () => LeitosRoute,
 } as any)
 const LeitosSeparacaoRoute = LeitosSeparacaoRouteImport.update({
@@ -175,50 +100,100 @@ const LeitosSeparacaoRoute = LeitosSeparacaoRouteImport.update({
   path: '/separacao',
   getParentRoute: () => LeitosRoute,
 } as any)
-const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
+const LeitosRelatoriosRoute = LeitosRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosProdutosRoute = LeitosProdutosRouteImport.update({
+  id: '/produtos',
+  path: '/produtos',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosProducaoRoute = LeitosProducaoRouteImport.update({
+  id: '/producao',
+  path: '/producao',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosPedidosRoute = LeitosPedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosMovimentacoesRoute = LeitosMovimentacoesRouteImport.update({
+  id: '/movimentacoes',
+  path: '/movimentacoes',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosMaisRoute = LeitosMaisRouteImport.update({
+  id: '/mais',
+  path: '/mais',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosFaturamentoRoute = LeitosFaturamentoRouteImport.update({
+  id: '/faturamento',
+  path: '/faturamento',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosEstoqueRoute = LeitosEstoqueRouteImport.update({
+  id: '/estoque',
+  path: '/estoque',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const LeitosConfiguracoesRoute = LeitosConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => LeitosRoute,
+} as any)
+const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMaisRoute = AppMaisRouteImport.update({
+  id: '/mais',
+  path: '/mais',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppColaboradoresRoute = AppColaboradoresRouteImport.update({
+  id: '/colaboradores',
+  path: '/colaboradores',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesRoute = AppClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AppRoute,
+} as any)
+const LeitosProdutosIndexRoute = LeitosProdutosIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppClientesRoute,
+  getParentRoute: () => LeitosProdutosRoute,
 } as any)
-const AppClientesNovoRoute = AppClientesNovoRouteImport.update({
-  id: '/novo',
-  path: '/novo',
-  getParentRoute: () => AppClientesRoute,
-} as any)
-const AppColaboradoresIndexRoute = AppColaboradoresIndexRouteImport.update({
+const LeitosProducaoIndexRoute = LeitosProducaoIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppColaboradoresRoute,
+  getParentRoute: () => LeitosProducaoRoute,
 } as any)
-const AppColaboradoresNovoRoute = AppColaboradoresNovoRouteImport.update({
-  id: '/novo',
-  path: '/novo',
-  getParentRoute: () => AppColaboradoresRoute,
-} as any)
-const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
-  id: '/ordens/',
-  path: '/ordens/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOrdensIdRoute = AppOrdensIdRouteImport.update({
-  id: '/ordens/$id',
-  path: '/ordens/$id',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOrdensNovaRoute = AppOrdensNovaRouteImport.update({
-  id: '/ordens/nova',
-  path: '/ordens/nova',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
+const LeitosPedidosIndexRoute = LeitosPedidosIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRelatoriosRoute,
+  getParentRoute: () => LeitosPedidosRoute,
 } as any)
-const AppRelatoriosImprimirRoute = AppRelatoriosImprimirRouteImport.update({
-  id: '/relatorios_/imprimir',
-  path: '/relatorios/imprimir',
-  getParentRoute: () => AppRoute,
+const LeitosEstoqueIndexRoute = LeitosEstoqueIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LeitosEstoqueRoute,
 } as any)
 const LeitosConfiguracoesIndexRoute =
   LeitosConfiguracoesIndexRouteImport.update({
@@ -226,40 +201,34 @@ const LeitosConfiguracoesIndexRoute =
     path: '/',
     getParentRoute: () => LeitosConfiguracoesRoute,
   } as any)
-const LeitosConfiguracoesAcessosRoute =
-  LeitosConfiguracoesAcessosRouteImport.update({
-    id: '/acessos',
-    path: '/acessos',
-    getParentRoute: () => LeitosConfiguracoesRoute,
-  } as any)
-const LeitosEstoqueIndexRoute = LeitosEstoqueIndexRouteImport.update({
+const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LeitosEstoqueRoute,
+  getParentRoute: () => AppRelatoriosRoute,
 } as any)
-const LeitosEstoqueProductIdRoute = LeitosEstoqueProductIdRouteImport.update({
-  id: '/$productId',
-  path: '/$productId',
-  getParentRoute: () => LeitosEstoqueRoute,
+const AppOrdensIndexRoute = AppOrdensIndexRouteImport.update({
+  id: '/ordens/',
+  path: '/ordens/',
+  getParentRoute: () => AppRoute,
 } as any)
-const LeitosPedidosIndexRoute = LeitosPedidosIndexRouteImport.update({
+const AppColaboradoresIndexRoute = AppColaboradoresIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LeitosPedidosRoute,
+  getParentRoute: () => AppColaboradoresRoute,
 } as any)
-const LeitosPedidosOrderIdRoute = LeitosPedidosOrderIdRouteImport.update({
-  id: '/$orderId',
-  path: '/$orderId',
-  getParentRoute: () => LeitosPedidosRoute,
+const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppClientesRoute,
 } as any)
-const LeitosPedidosNovoRoute = LeitosPedidosNovoRouteImport.update({
+const LeitosProdutosNovoRoute = LeitosProdutosNovoRouteImport.update({
   id: '/novo',
   path: '/novo',
-  getParentRoute: () => LeitosPedidosRoute,
+  getParentRoute: () => LeitosProdutosRoute,
 } as any)
-const LeitosProducaoIndexRoute = LeitosProducaoIndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LeitosProducaoNovaRoute = LeitosProducaoNovaRouteImport.update({
+  id: '/nova',
+  path: '/nova',
   getParentRoute: () => LeitosProducaoRoute,
 } as any)
 const LeitosProducaoProductionIdRoute =
@@ -268,34 +237,111 @@ const LeitosProducaoProductionIdRoute =
     path: '/$productionId',
     getParentRoute: () => LeitosProducaoRoute,
   } as any)
-const LeitosProducaoNovaRoute = LeitosProducaoNovaRouteImport.update({
-  id: '/nova',
-  path: '/nova',
-  getParentRoute: () => LeitosProducaoRoute,
-} as any)
-const LeitosProdutosIndexRoute = LeitosProdutosIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => LeitosProdutosRoute,
-} as any)
-const LeitosProdutosNovoRoute = LeitosProdutosNovoRouteImport.update({
+const LeitosPedidosNovoRoute = LeitosPedidosNovoRouteImport.update({
   id: '/novo',
   path: '/novo',
-  getParentRoute: () => LeitosProdutosRoute,
+  getParentRoute: () => LeitosPedidosRoute,
+} as any)
+const LeitosPedidosOrderIdRoute = LeitosPedidosOrderIdRouteImport.update({
+  id: '/$orderId',
+  path: '/$orderId',
+  getParentRoute: () => LeitosPedidosRoute,
+} as any)
+const LeitosEstoqueProductIdRoute = LeitosEstoqueProductIdRouteImport.update({
+  id: '/$productId',
+  path: '/$productId',
+  getParentRoute: () => LeitosEstoqueRoute,
+} as any)
+const LeitosConfiguracoesAcessosRoute =
+  LeitosConfiguracoesAcessosRouteImport.update({
+    id: '/acessos',
+    path: '/acessos',
+    getParentRoute: () => LeitosConfiguracoesRoute,
+  } as any)
+const AppRelatoriosImprimirRoute = AppRelatoriosImprimirRouteImport.update({
+  id: '/relatorios_/imprimir',
+  path: '/relatorios/imprimir',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdensNovaRoute = AppOrdensNovaRouteImport.update({
+  id: '/ordens/nova',
+  path: '/ordens/nova',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdensIdRoute = AppOrdensIdRouteImport.update({
+  id: '/ordens/$id',
+  path: '/ordens/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppColaboradoresNovoRoute = AppColaboradoresNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => AppColaboradoresRoute,
+} as any)
+const AppClientesNovoRoute = AppClientesNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => AppClientesRoute,
+} as any)
+const LeitosProdutosProductIdIndexRoute =
+  LeitosProdutosProductIdIndexRouteImport.update({
+    id: '/$productId/',
+    path: '/$productId/',
+    getParentRoute: () => LeitosProdutosRoute,
+  } as any)
+const AppColaboradoresIdIndexRoute = AppColaboradoresIdIndexRouteImport.update({
+  id: '/$id/',
+  path: '/$id/',
+  getParentRoute: () => AppColaboradoresRoute,
 } as any)
 const AppClientesIdIndexRoute = AppClientesIdIndexRouteImport.update({
   id: '/$id/',
   path: '/$id/',
   getParentRoute: () => AppClientesRoute,
 } as any)
-const AppClientesIdEditarRoute = AppClientesIdEditarRouteImport.update({
-  id: '/$id/editar',
-  path: '/$id/editar',
-  getParentRoute: () => AppClientesRoute,
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LeitosProdutosProductIdEditarRoute =
+  LeitosProdutosProductIdEditarRouteImport.update({
+    id: '/$productId/editar',
+    path: '/$productId/editar',
+    getParentRoute: () => LeitosProdutosRoute,
+  } as any)
+const AppRelatoriosClienteClientIdRoute =
+  AppRelatoriosClienteClientIdRouteImport.update({
+    id: '/relatorios_/cliente/$clientId',
+    path: '/relatorios/cliente/$clientId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppRelatoriosTecnicoIdRoute = AppRelatoriosTecnicoIdRouteImport.update({
+  id: '/tecnico/$id',
+  path: '/tecnico/$id',
+  getParentRoute: () => AppRelatoriosRoute,
 } as any)
-const AppColaboradoresIdIndexRoute = AppColaboradoresIdIndexRouteImport.update({
-  id: '/$id/',
-  path: '/$id/',
+const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
+  id: '/imprimir',
+  path: '/imprimir',
+  getParentRoute: () => AppOrdensIdRoute,
+} as any)
+const AppColaboradoresIdPrecificacaoRoute =
+  AppColaboradoresIdPrecificacaoRouteImport.update({
+    id: '/$id/precificacao',
+    path: '/$id/precificacao',
+    getParentRoute: () => AppColaboradoresRoute,
+  } as any)
+const AppColaboradoresIdOrdensRoute =
+  AppColaboradoresIdOrdensRouteImport.update({
+    id: '/$id/ordens',
+    path: '/$id/ordens',
+    getParentRoute: () => AppColaboradoresRoute,
+  } as any)
+const AppColaboradoresIdHorasRoute = AppColaboradoresIdHorasRouteImport.update({
+  id: '/$id/horas',
+  path: '/$id/horas',
   getParentRoute: () => AppColaboradoresRoute,
 } as any)
 const AppColaboradoresIdEditarRoute =
@@ -304,57 +350,11 @@ const AppColaboradoresIdEditarRoute =
     path: '/$id/editar',
     getParentRoute: () => AppColaboradoresRoute,
   } as any)
-const AppColaboradoresIdHorasRoute = AppColaboradoresIdHorasRouteImport.update({
-  id: '/$id/horas',
-  path: '/$id/horas',
-  getParentRoute: () => AppColaboradoresRoute,
+const AppClientesIdEditarRoute = AppClientesIdEditarRouteImport.update({
+  id: '/$id/editar',
+  path: '/$id/editar',
+  getParentRoute: () => AppClientesRoute,
 } as any)
-const AppColaboradoresIdOrdensRoute =
-  AppColaboradoresIdOrdensRouteImport.update({
-    id: '/$id/ordens',
-    path: '/$id/ordens',
-    getParentRoute: () => AppColaboradoresRoute,
-  } as any)
-const AppColaboradoresIdPrecificacaoRoute =
-  AppColaboradoresIdPrecificacaoRouteImport.update({
-    id: '/$id/precificacao',
-    path: '/$id/precificacao',
-    getParentRoute: () => AppColaboradoresRoute,
-  } as any)
-const AppOrdensIdImprimirRoute = AppOrdensIdImprimirRouteImport.update({
-  id: '/imprimir',
-  path: '/imprimir',
-  getParentRoute: () => AppOrdensIdRoute,
-} as any)
-const AppRelatoriosTecnicoIdRoute = AppRelatoriosTecnicoIdRouteImport.update({
-  id: '/tecnico/$id',
-  path: '/tecnico/$id',
-  getParentRoute: () => AppRelatoriosRoute,
-} as any)
-const AppRelatoriosClienteClientIdRoute =
-  AppRelatoriosClienteClientIdRouteImport.update({
-    id: '/relatorios_/cliente/$clientId',
-    path: '/relatorios/cliente/$clientId',
-    getParentRoute: () => AppRoute,
-  } as any)
-const LeitosProdutosProductIdIndexRoute =
-  LeitosProdutosProductIdIndexRouteImport.update({
-    id: '/$productId/',
-    path: '/$productId/',
-    getParentRoute: () => LeitosProdutosRoute,
-  } as any)
-const LeitosProdutosProductIdEditarRoute =
-  LeitosProdutosProductIdEditarRouteImport.update({
-    id: '/$productId/editar',
-    path: '/$productId/editar',
-    getParentRoute: () => LeitosProdutosRoute,
-  } as any)
-const LovableEmailQueueProcessRoute =
-  LovableEmailQueueProcessRouteImport.update({
-    id: '/lovable/email/queue/process',
-    path: '/lovable/email/queue/process',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -697,25 +697,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app': {
-      id: '/_app'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leitos': {
-      id: '/leitos'
-      path: '/leitos'
-      fullPath: '/leitos'
-      preLoaderRoute: typeof LeitosRouteImport
+    '/version.json': {
+      id: '/version.json'
+      path: '/version.json'
+      fullPath: '/version.json'
+      preLoaderRoute: typeof VersionDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -725,123 +711,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/version.json': {
-      id: '/version.json'
-      path: '/version.json'
-      fullPath: '/version.json'
-      preLoaderRoute: typeof VersionDotjsonRouteImport
+    '/leitos': {
+      id: '/leitos'
+      path: '/leitos'
+      fullPath: '/leitos'
+      preLoaderRoute: typeof LeitosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/clientes': {
-      id: '/_app/clientes'
-      path: '/clientes'
-      fullPath: '/clientes'
-      preLoaderRoute: typeof AppClientesRouteImport
-      parentRoute: typeof AppRoute
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/colaboradores': {
-      id: '/_app/colaboradores'
-      path: '/colaboradores'
-      fullPath: '/colaboradores'
-      preLoaderRoute: typeof AppColaboradoresRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/configuracoes': {
-      id: '/_app/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/configuracoes'
-      preLoaderRoute: typeof AppConfiguracoesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/dashboard': {
-      id: '/_app/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/mais': {
-      id: '/_app/mais'
-      path: '/mais'
-      fullPath: '/mais'
-      preLoaderRoute: typeof AppMaisRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/relatorios': {
-      id: '/_app/relatorios'
-      path: '/relatorios'
-      fullPath: '/relatorios'
-      preLoaderRoute: typeof AppRelatoriosRouteImport
-      parentRoute: typeof AppRoute
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/leitos/': {
       id: '/leitos/'
       path: '/'
       fullPath: '/leitos/'
       preLoaderRoute: typeof LeitosIndexRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/configuracoes': {
-      id: '/leitos/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/leitos/configuracoes'
-      preLoaderRoute: typeof LeitosConfiguracoesRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/estoque': {
-      id: '/leitos/estoque'
-      path: '/estoque'
-      fullPath: '/leitos/estoque'
-      preLoaderRoute: typeof LeitosEstoqueRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/faturamento': {
-      id: '/leitos/faturamento'
-      path: '/faturamento'
-      fullPath: '/leitos/faturamento'
-      preLoaderRoute: typeof LeitosFaturamentoRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/mais': {
-      id: '/leitos/mais'
-      path: '/mais'
-      fullPath: '/leitos/mais'
-      preLoaderRoute: typeof LeitosMaisRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/movimentacoes': {
-      id: '/leitos/movimentacoes'
-      path: '/movimentacoes'
-      fullPath: '/leitos/movimentacoes'
-      preLoaderRoute: typeof LeitosMovimentacoesRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/pedidos': {
-      id: '/leitos/pedidos'
-      path: '/pedidos'
-      fullPath: '/leitos/pedidos'
-      preLoaderRoute: typeof LeitosPedidosRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/producao': {
-      id: '/leitos/producao'
-      path: '/producao'
-      fullPath: '/leitos/producao'
-      preLoaderRoute: typeof LeitosProducaoRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/produtos': {
-      id: '/leitos/produtos'
-      path: '/produtos'
-      fullPath: '/leitos/produtos'
-      preLoaderRoute: typeof LeitosProdutosRouteImport
-      parentRoute: typeof LeitosRoute
-    }
-    '/leitos/relatorios': {
-      id: '/leitos/relatorios'
-      path: '/relatorios'
-      fullPath: '/leitos/relatorios'
-      preLoaderRoute: typeof LeitosRelatoriosRouteImport
       parentRoute: typeof LeitosRoute
     }
     '/leitos/separacao': {
@@ -851,96 +746,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeitosSeparacaoRouteImport
       parentRoute: typeof LeitosRoute
     }
-    '/_app/clientes/': {
-      id: '/_app/clientes/'
-      path: '/'
-      fullPath: '/clientes/'
-      preLoaderRoute: typeof AppClientesIndexRouteImport
-      parentRoute: typeof AppClientesRoute
+    '/leitos/relatorios': {
+      id: '/leitos/relatorios'
+      path: '/relatorios'
+      fullPath: '/leitos/relatorios'
+      preLoaderRoute: typeof LeitosRelatoriosRouteImport
+      parentRoute: typeof LeitosRoute
     }
-    '/_app/clientes/novo': {
-      id: '/_app/clientes/novo'
-      path: '/novo'
-      fullPath: '/clientes/novo'
-      preLoaderRoute: typeof AppClientesNovoRouteImport
-      parentRoute: typeof AppClientesRoute
+    '/leitos/produtos': {
+      id: '/leitos/produtos'
+      path: '/produtos'
+      fullPath: '/leitos/produtos'
+      preLoaderRoute: typeof LeitosProdutosRouteImport
+      parentRoute: typeof LeitosRoute
     }
-    '/_app/colaboradores/': {
-      id: '/_app/colaboradores/'
-      path: '/'
-      fullPath: '/colaboradores/'
-      preLoaderRoute: typeof AppColaboradoresIndexRouteImport
-      parentRoute: typeof AppColaboradoresRoute
+    '/leitos/producao': {
+      id: '/leitos/producao'
+      path: '/producao'
+      fullPath: '/leitos/producao'
+      preLoaderRoute: typeof LeitosProducaoRouteImport
+      parentRoute: typeof LeitosRoute
     }
-    '/_app/colaboradores/novo': {
-      id: '/_app/colaboradores/novo'
-      path: '/novo'
-      fullPath: '/colaboradores/novo'
-      preLoaderRoute: typeof AppColaboradoresNovoRouteImport
-      parentRoute: typeof AppColaboradoresRoute
+    '/leitos/pedidos': {
+      id: '/leitos/pedidos'
+      path: '/pedidos'
+      fullPath: '/leitos/pedidos'
+      preLoaderRoute: typeof LeitosPedidosRouteImport
+      parentRoute: typeof LeitosRoute
     }
-    '/_app/ordens/': {
-      id: '/_app/ordens/'
-      path: '/ordens'
-      fullPath: '/ordens/'
-      preLoaderRoute: typeof AppOrdensIndexRouteImport
+    '/leitos/movimentacoes': {
+      id: '/leitos/movimentacoes'
+      path: '/movimentacoes'
+      fullPath: '/leitos/movimentacoes'
+      preLoaderRoute: typeof LeitosMovimentacoesRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/mais': {
+      id: '/leitos/mais'
+      path: '/mais'
+      fullPath: '/leitos/mais'
+      preLoaderRoute: typeof LeitosMaisRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/faturamento': {
+      id: '/leitos/faturamento'
+      path: '/faturamento'
+      fullPath: '/leitos/faturamento'
+      preLoaderRoute: typeof LeitosFaturamentoRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/estoque': {
+      id: '/leitos/estoque'
+      path: '/estoque'
+      fullPath: '/leitos/estoque'
+      preLoaderRoute: typeof LeitosEstoqueRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/leitos/configuracoes': {
+      id: '/leitos/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/leitos/configuracoes'
+      preLoaderRoute: typeof LeitosConfiguracoesRouteImport
+      parentRoute: typeof LeitosRoute
+    }
+    '/_app/relatorios': {
+      id: '/_app/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AppRelatoriosRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/ordens/$id': {
-      id: '/_app/ordens/$id'
-      path: '/ordens/$id'
-      fullPath: '/ordens/$id'
-      preLoaderRoute: typeof AppOrdensIdRouteImport
+    '/_app/mais': {
+      id: '/_app/mais'
+      path: '/mais'
+      fullPath: '/mais'
+      preLoaderRoute: typeof AppMaisRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/ordens/nova': {
-      id: '/_app/ordens/nova'
-      path: '/ordens/nova'
-      fullPath: '/ordens/nova'
-      preLoaderRoute: typeof AppOrdensNovaRouteImport
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/relatorios/': {
-      id: '/_app/relatorios/'
-      path: '/'
-      fullPath: '/relatorios/'
-      preLoaderRoute: typeof AppRelatoriosIndexRouteImport
-      parentRoute: typeof AppRelatoriosRoute
-    }
-    '/_app/relatorios_/imprimir': {
-      id: '/_app/relatorios_/imprimir'
-      path: '/relatorios/imprimir'
-      fullPath: '/relatorios/imprimir'
-      preLoaderRoute: typeof AppRelatoriosImprimirRouteImport
+    '/_app/configuracoes': {
+      id: '/_app/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AppConfiguracoesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/leitos/configuracoes/': {
-      id: '/leitos/configuracoes/'
+    '/_app/colaboradores': {
+      id: '/_app/colaboradores'
+      path: '/colaboradores'
+      fullPath: '/colaboradores'
+      preLoaderRoute: typeof AppColaboradoresRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clientes': {
+      id: '/_app/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AppClientesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/leitos/produtos/': {
+      id: '/leitos/produtos/'
       path: '/'
-      fullPath: '/leitos/configuracoes/'
-      preLoaderRoute: typeof LeitosConfiguracoesIndexRouteImport
-      parentRoute: typeof LeitosConfiguracoesRoute
+      fullPath: '/leitos/produtos/'
+      preLoaderRoute: typeof LeitosProdutosIndexRouteImport
+      parentRoute: typeof LeitosProdutosRoute
     }
-    '/leitos/configuracoes/acessos': {
-      id: '/leitos/configuracoes/acessos'
-      path: '/acessos'
-      fullPath: '/leitos/configuracoes/acessos'
-      preLoaderRoute: typeof LeitosConfiguracoesAcessosRouteImport
-      parentRoute: typeof LeitosConfiguracoesRoute
-    }
-    '/leitos/estoque/': {
-      id: '/leitos/estoque/'
+    '/leitos/producao/': {
+      id: '/leitos/producao/'
       path: '/'
-      fullPath: '/leitos/estoque/'
-      preLoaderRoute: typeof LeitosEstoqueIndexRouteImport
-      parentRoute: typeof LeitosEstoqueRoute
-    }
-    '/leitos/estoque/$productId': {
-      id: '/leitos/estoque/$productId'
-      path: '/$productId'
-      fullPath: '/leitos/estoque/$productId'
-      preLoaderRoute: typeof LeitosEstoqueProductIdRouteImport
-      parentRoute: typeof LeitosEstoqueRoute
+      fullPath: '/leitos/producao/'
+      preLoaderRoute: typeof LeitosProducaoIndexRouteImport
+      parentRoute: typeof LeitosProducaoRoute
     }
     '/leitos/pedidos/': {
       id: '/leitos/pedidos/'
@@ -949,25 +872,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeitosPedidosIndexRouteImport
       parentRoute: typeof LeitosPedidosRoute
     }
-    '/leitos/pedidos/$orderId': {
-      id: '/leitos/pedidos/$orderId'
-      path: '/$orderId'
-      fullPath: '/leitos/pedidos/$orderId'
-      preLoaderRoute: typeof LeitosPedidosOrderIdRouteImport
-      parentRoute: typeof LeitosPedidosRoute
-    }
-    '/leitos/pedidos/novo': {
-      id: '/leitos/pedidos/novo'
-      path: '/novo'
-      fullPath: '/leitos/pedidos/novo'
-      preLoaderRoute: typeof LeitosPedidosNovoRouteImport
-      parentRoute: typeof LeitosPedidosRoute
-    }
-    '/leitos/producao/': {
-      id: '/leitos/producao/'
+    '/leitos/estoque/': {
+      id: '/leitos/estoque/'
       path: '/'
-      fullPath: '/leitos/producao/'
-      preLoaderRoute: typeof LeitosProducaoIndexRouteImport
+      fullPath: '/leitos/estoque/'
+      preLoaderRoute: typeof LeitosEstoqueIndexRouteImport
+      parentRoute: typeof LeitosEstoqueRoute
+    }
+    '/leitos/configuracoes/': {
+      id: '/leitos/configuracoes/'
+      path: '/'
+      fullPath: '/leitos/configuracoes/'
+      preLoaderRoute: typeof LeitosConfiguracoesIndexRouteImport
+      parentRoute: typeof LeitosConfiguracoesRoute
+    }
+    '/_app/relatorios/': {
+      id: '/_app/relatorios/'
+      path: '/'
+      fullPath: '/relatorios/'
+      preLoaderRoute: typeof AppRelatoriosIndexRouteImport
+      parentRoute: typeof AppRelatoriosRoute
+    }
+    '/_app/ordens/': {
+      id: '/_app/ordens/'
+      path: '/ordens'
+      fullPath: '/ordens/'
+      preLoaderRoute: typeof AppOrdensIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/colaboradores/': {
+      id: '/_app/colaboradores/'
+      path: '/'
+      fullPath: '/colaboradores/'
+      preLoaderRoute: typeof AppColaboradoresIndexRouteImport
+      parentRoute: typeof AppColaboradoresRoute
+    }
+    '/_app/clientes/': {
+      id: '/_app/clientes/'
+      path: '/'
+      fullPath: '/clientes/'
+      preLoaderRoute: typeof AppClientesIndexRouteImport
+      parentRoute: typeof AppClientesRoute
+    }
+    '/leitos/produtos/novo': {
+      id: '/leitos/produtos/novo'
+      path: '/novo'
+      fullPath: '/leitos/produtos/novo'
+      preLoaderRoute: typeof LeitosProdutosNovoRouteImport
+      parentRoute: typeof LeitosProdutosRoute
+    }
+    '/leitos/producao/nova': {
+      id: '/leitos/producao/nova'
+      path: '/nova'
+      fullPath: '/leitos/producao/nova'
+      preLoaderRoute: typeof LeitosProducaoNovaRouteImport
       parentRoute: typeof LeitosProducaoRoute
     }
     '/leitos/producao/$productionId': {
@@ -977,40 +935,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeitosProducaoProductionIdRouteImport
       parentRoute: typeof LeitosProducaoRoute
     }
-    '/leitos/producao/nova': {
-      id: '/leitos/producao/nova'
-      path: '/nova'
-      fullPath: '/leitos/producao/nova'
-      preLoaderRoute: typeof LeitosProducaoNovaRouteImport
-      parentRoute: typeof LeitosProducaoRoute
-    }
-    '/leitos/produtos/': {
-      id: '/leitos/produtos/'
-      path: '/'
-      fullPath: '/leitos/produtos/'
-      preLoaderRoute: typeof LeitosProdutosIndexRouteImport
-      parentRoute: typeof LeitosProdutosRoute
-    }
-    '/leitos/produtos/novo': {
-      id: '/leitos/produtos/novo'
+    '/leitos/pedidos/novo': {
+      id: '/leitos/pedidos/novo'
       path: '/novo'
-      fullPath: '/leitos/produtos/novo'
-      preLoaderRoute: typeof LeitosProdutosNovoRouteImport
+      fullPath: '/leitos/pedidos/novo'
+      preLoaderRoute: typeof LeitosPedidosNovoRouteImport
+      parentRoute: typeof LeitosPedidosRoute
+    }
+    '/leitos/pedidos/$orderId': {
+      id: '/leitos/pedidos/$orderId'
+      path: '/$orderId'
+      fullPath: '/leitos/pedidos/$orderId'
+      preLoaderRoute: typeof LeitosPedidosOrderIdRouteImport
+      parentRoute: typeof LeitosPedidosRoute
+    }
+    '/leitos/estoque/$productId': {
+      id: '/leitos/estoque/$productId'
+      path: '/$productId'
+      fullPath: '/leitos/estoque/$productId'
+      preLoaderRoute: typeof LeitosEstoqueProductIdRouteImport
+      parentRoute: typeof LeitosEstoqueRoute
+    }
+    '/leitos/configuracoes/acessos': {
+      id: '/leitos/configuracoes/acessos'
+      path: '/acessos'
+      fullPath: '/leitos/configuracoes/acessos'
+      preLoaderRoute: typeof LeitosConfiguracoesAcessosRouteImport
+      parentRoute: typeof LeitosConfiguracoesRoute
+    }
+    '/_app/relatorios_/imprimir': {
+      id: '/_app/relatorios_/imprimir'
+      path: '/relatorios/imprimir'
+      fullPath: '/relatorios/imprimir'
+      preLoaderRoute: typeof AppRelatoriosImprimirRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ordens/nova': {
+      id: '/_app/ordens/nova'
+      path: '/ordens/nova'
+      fullPath: '/ordens/nova'
+      preLoaderRoute: typeof AppOrdensNovaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ordens/$id': {
+      id: '/_app/ordens/$id'
+      path: '/ordens/$id'
+      fullPath: '/ordens/$id'
+      preLoaderRoute: typeof AppOrdensIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/colaboradores/novo': {
+      id: '/_app/colaboradores/novo'
+      path: '/novo'
+      fullPath: '/colaboradores/novo'
+      preLoaderRoute: typeof AppColaboradoresNovoRouteImport
+      parentRoute: typeof AppColaboradoresRoute
+    }
+    '/_app/clientes/novo': {
+      id: '/_app/clientes/novo'
+      path: '/novo'
+      fullPath: '/clientes/novo'
+      preLoaderRoute: typeof AppClientesNovoRouteImport
+      parentRoute: typeof AppClientesRoute
+    }
+    '/leitos/produtos/$productId/': {
+      id: '/leitos/produtos/$productId/'
+      path: '/$productId'
+      fullPath: '/leitos/produtos/$productId/'
+      preLoaderRoute: typeof LeitosProdutosProductIdIndexRouteImport
       parentRoute: typeof LeitosProdutosRoute
-    }
-    '/_app/clientes/$id/': {
-      id: '/_app/clientes/$id/'
-      path: '/$id'
-      fullPath: '/clientes/$id/'
-      preLoaderRoute: typeof AppClientesIdIndexRouteImport
-      parentRoute: typeof AppClientesRoute
-    }
-    '/_app/clientes/$id/editar': {
-      id: '/_app/clientes/$id/editar'
-      path: '/$id/editar'
-      fullPath: '/clientes/$id/editar'
-      preLoaderRoute: typeof AppClientesIdEditarRouteImport
-      parentRoute: typeof AppClientesRoute
     }
     '/_app/colaboradores/$id/': {
       id: '/_app/colaboradores/$id/'
@@ -1019,18 +1012,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppColaboradoresIdIndexRouteImport
       parentRoute: typeof AppColaboradoresRoute
     }
-    '/_app/colaboradores/$id/editar': {
-      id: '/_app/colaboradores/$id/editar'
-      path: '/$id/editar'
-      fullPath: '/colaboradores/$id/editar'
-      preLoaderRoute: typeof AppColaboradoresIdEditarRouteImport
-      parentRoute: typeof AppColaboradoresRoute
+    '/_app/clientes/$id/': {
+      id: '/_app/clientes/$id/'
+      path: '/$id'
+      fullPath: '/clientes/$id/'
+      preLoaderRoute: typeof AppClientesIdIndexRouteImport
+      parentRoute: typeof AppClientesRoute
     }
-    '/_app/colaboradores/$id/horas': {
-      id: '/_app/colaboradores/$id/horas'
-      path: '/$id/horas'
-      fullPath: '/colaboradores/$id/horas'
-      preLoaderRoute: typeof AppColaboradoresIdHorasRouteImport
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leitos/produtos/$productId/editar': {
+      id: '/leitos/produtos/$productId/editar'
+      path: '/$productId/editar'
+      fullPath: '/leitos/produtos/$productId/editar'
+      preLoaderRoute: typeof LeitosProdutosProductIdEditarRouteImport
+      parentRoute: typeof LeitosProdutosRoute
+    }
+    '/_app/relatorios_/cliente/$clientId': {
+      id: '/_app/relatorios_/cliente/$clientId'
+      path: '/relatorios/cliente/$clientId'
+      fullPath: '/relatorios/cliente/$clientId'
+      preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/relatorios/tecnico/$id': {
+      id: '/_app/relatorios/tecnico/$id'
+      path: '/tecnico/$id'
+      fullPath: '/relatorios/tecnico/$id'
+      preLoaderRoute: typeof AppRelatoriosTecnicoIdRouteImport
+      parentRoute: typeof AppRelatoriosRoute
+    }
+    '/_app/ordens/$id/imprimir': {
+      id: '/_app/ordens/$id/imprimir'
+      path: '/imprimir'
+      fullPath: '/ordens/$id/imprimir'
+      preLoaderRoute: typeof AppOrdensIdImprimirRouteImport
+      parentRoute: typeof AppOrdensIdRoute
+    }
+    '/_app/colaboradores/$id/precificacao': {
+      id: '/_app/colaboradores/$id/precificacao'
+      path: '/$id/precificacao'
+      fullPath: '/colaboradores/$id/precificacao'
+      preLoaderRoute: typeof AppColaboradoresIdPrecificacaoRouteImport
       parentRoute: typeof AppColaboradoresRoute
     }
     '/_app/colaboradores/$id/ordens': {
@@ -1040,54 +1068,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppColaboradoresIdOrdensRouteImport
       parentRoute: typeof AppColaboradoresRoute
     }
-    '/_app/colaboradores/$id/precificacao': {
-      id: '/_app/colaboradores/$id/precificacao'
-      path: '/$id/precificacao'
-      fullPath: '/colaboradores/$id/precificacao'
-      preLoaderRoute: typeof AppColaboradoresIdPrecificacaoRouteImport
+    '/_app/colaboradores/$id/horas': {
+      id: '/_app/colaboradores/$id/horas'
+      path: '/$id/horas'
+      fullPath: '/colaboradores/$id/horas'
+      preLoaderRoute: typeof AppColaboradoresIdHorasRouteImport
       parentRoute: typeof AppColaboradoresRoute
     }
-    '/_app/ordens/$id/imprimir': {
-      id: '/_app/ordens/$id/imprimir'
-      path: '/imprimir'
-      fullPath: '/ordens/$id/imprimir'
-      preLoaderRoute: typeof AppOrdensIdImprimirRouteImport
-      parentRoute: typeof AppOrdensIdRoute
+    '/_app/colaboradores/$id/editar': {
+      id: '/_app/colaboradores/$id/editar'
+      path: '/$id/editar'
+      fullPath: '/colaboradores/$id/editar'
+      preLoaderRoute: typeof AppColaboradoresIdEditarRouteImport
+      parentRoute: typeof AppColaboradoresRoute
     }
-    '/_app/relatorios/tecnico/$id': {
-      id: '/_app/relatorios/tecnico/$id'
-      path: '/tecnico/$id'
-      fullPath: '/relatorios/tecnico/$id'
-      preLoaderRoute: typeof AppRelatoriosTecnicoIdRouteImport
-      parentRoute: typeof AppRelatoriosRoute
-    }
-    '/_app/relatorios_/cliente/$clientId': {
-      id: '/_app/relatorios_/cliente/$clientId'
-      path: '/relatorios/cliente/$clientId'
-      fullPath: '/relatorios/cliente/$clientId'
-      preLoaderRoute: typeof AppRelatoriosClienteClientIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/leitos/produtos/$productId/': {
-      id: '/leitos/produtos/$productId/'
-      path: '/$productId'
-      fullPath: '/leitos/produtos/$productId/'
-      preLoaderRoute: typeof LeitosProdutosProductIdIndexRouteImport
-      parentRoute: typeof LeitosProdutosRoute
-    }
-    '/leitos/produtos/$productId/editar': {
-      id: '/leitos/produtos/$productId/editar'
-      path: '/$productId/editar'
-      fullPath: '/leitos/produtos/$productId/editar'
-      preLoaderRoute: typeof LeitosProdutosProductIdEditarRouteImport
-      parentRoute: typeof LeitosProdutosRoute
-    }
-    '/lovable/email/queue/process': {
-      id: '/lovable/email/queue/process'
-      path: '/lovable/email/queue/process'
-      fullPath: '/lovable/email/queue/process'
-      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/clientes/$id/editar': {
+      id: '/_app/clientes/$id/editar'
+      path: '/$id/editar'
+      fullPath: '/clientes/$id/editar'
+      preLoaderRoute: typeof AppClientesIdEditarRouteImport
+      parentRoute: typeof AppClientesRoute
     }
   }
 }
