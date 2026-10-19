@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Pause, Play, Square, Clock } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,16 @@ import {
   resumeWork,
   finishWork,
   finishColleagueWork,
+  startOwnWork,
 } from "@/lib/api/timeSessions.functions";
+import { linkOrderTechnicians } from "@/lib/api/serviceOrders.functions";
+import { teamStartableIds, type TeamRowAction } from "@/lib/serviceOrders/teamActions";
+import { invalidateOrderTeamQueries } from "@/lib/serviceOrders/teamCache";
+import { OrderTeamCard } from "./OrderTeamCard";
 import {
   computeTechnicianWorkedMinutes,
   getOrderLiveState,
   getTechnicianState,
-  pauseReasonLabel,
-  formatHm,
   formatDateHm,
   type TimeSession,
 } from "@/lib/serviceOrders/timeSessions";
@@ -52,6 +55,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const resumeFn = useServerFn(resumeWork);
   const finishFn = useServerFn(finishWork);
   const finishColleagueFn = useServerFn(finishColleagueWork);
+  const startOwnFn = useServerFn(startOwnWork);
+  const linkFn = useServerFn(linkOrderTechnicians);
 
   const { data: sessions = [] as TimeSession[] } = useQuery({
     queryKey: ["order-time-sessions", order.id],
@@ -90,6 +95,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
     queryClient.invalidateQueries({ queryKey: ["service-orders"] });
     queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard-technician-time"] });
+    invalidateOrderTeamQueries(queryClient, order.id);
   };
 
   const techName = (id: string) => technicians.find((t) => t.id === id)?.full_name ?? "Técnico";
@@ -123,6 +129,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
   });
 
   const [pauseOpen, setPauseOpen] = useState(false);
+  /** Escopo explícito da pausa quando aberta pela linha de um técnico. */
+  const [pauseScope, setPauseScope] = useState<string[] | null>(null);
   const pauseMut = useMutation({
     mutationFn: (input: { technicianIds: string[]; reason: string; notes: string | null }) =>
       pauseFn({
@@ -131,10 +139,12 @@ export function ServiceOrderTimeControl({ order }: Props) {
           technicianIds: input.technicianIds,
           reason: input.reason,
           notes: input.notes,
+          requireExplicitScope: true,
         },
       }),
     onSuccess: (result: any) => {
       setPauseOpen(false);
+      setPauseScope(null);
       reportBatch(result, "Serviço pausado");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao pausar"),
@@ -170,8 +180,68 @@ export function ServiceOrderTimeControl({ order }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar o tempo"),
   });
 
+  // Ações individuais do card da equipe. Uma chave por intenção: retentativas
+  // reaproveitam a mesma chave e nunca abrem outra sessão.
+  const rowKeys = useRef(new Map<string, string>());
+  const keyFor = (k: string) => {
+    let v = rowKeys.current.get(k);
+    if (!v) {
+      v = typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      rowKeys.current.set(k, v);
+    }
+    return v;
+  };
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const rowMut = useMutation({
+    mutationFn: async ({ action, techId }: { action: TeamRowAction; techId: string }) => {
+      const k = `${action}:${techId}`;
+      if (action === "start" || action === "restart") {
+        if (techId === myTechId && !isAdmin) {
+          const r = await startOwnFn({ data: { orderId: order.id, requestKey: keyFor(k) } });
+          return r.alreadyRunning ? "Seu tempo já estava em andamento." : "Suas horas foram iniciadas.";
+        }
+        const r = await linkFn({
+          data: { orderId: order.id, technicianIds: [techId], start: true, requestKey: keyFor(k) },
+        });
+        return r.started.length > 0 ? `Tempo iniciado: ${techName(techId)}.` : "O tempo já estava em andamento.";
+      }
+      if (action === "resume") {
+        await resumeFn({ data: { orderId: order.id, technicianIds: [techId], requireExplicitScope: true } });
+        return `Tempo retomado: ${techName(techId)}.`;
+      }
+      if (action === "finish") {
+        await finishFn({ data: { orderId: order.id, technicianIds: [techId], requireExplicitScope: true } });
+        return `Horas encerradas: ${techName(techId)}.`;
+      }
+      return "";
+    },
+    onMutate: ({ action, techId }) => setBusyKey(`${action}:${techId}`),
+    onSuccess: (message, { action, techId }) => {
+      rowKeys.current.delete(`${action}:${techId}`);
+      if (message) toast.success(message);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível concluir a ação."),
+    onSettled: () => {
+      setBusyKey(null);
+      invalidate();
+    },
+  });
+  const onRowAction = (action: TeamRowAction, techId: string) => {
+    if (rowMut.isPending) return;
+    if (action === "pause") {
+      setPauseScope([techId]);
+      setPauseOpen(true);
+      return;
+    }
+    rowMut.mutate({ action, techId });
+  };
+
   if (technicians.length === 0) {
     return (
+      <>
+      <OrderTeamCard order={order} rows={[]} isAdmin={isAdmin} myTechId={null} busyKey={null} onAction={() => {}} />
       <GlassCard className="lemarc-os-time-control mt-4 p-4">
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">
           Controle de tempo
@@ -180,6 +250,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
           Vincule ao menos um técnico à OS para controlar o tempo.
         </p>
       </GlassCard>
+      </>
     );
   }
 
@@ -233,10 +304,10 @@ export function ServiceOrderTimeControl({ order }: Props) {
   const states = technicians.map((t) => ({ tech: t, st: getTechnicianState(sessions, t.id) }));
   const idsWhere = (fn: (s: (typeof states)[number]) => boolean) =>
     states.filter(fn).map((s) => s.tech.id);
-  const startableIds = idsWhere(({ st }) => st.state === "idle" || st.state === "finished");
+  // Só quem nunca começou: encerrados voltam apenas por ação deliberada na linha.
+  const startableIds = teamStartableIds(states.map(({ tech, st }) => ({ id: tech.id, state: st.state })));
   const runningIds = idsWhere(({ st }) => st.state === "running");
   const pausedIds = idsWhere(({ st }) => st.state === "paused");
-  const mine = myTechId ? states.find((s) => s.tech.id === myTechId) : null;
   const isTeam = technicians.length > 1;
   const anyPending =
     startMut.isPending || pauseMut.isPending || resumeMut.isPending || finishMut.isPending;
@@ -249,7 +320,23 @@ export function ServiceOrderTimeControl({ order }: Props) {
     order.status === "approved" ||
     order.status === "cancelled";
 
+  const teamRows = states.map(({ tech, st }) => ({
+    tech,
+    state: st.state,
+    minutes: displayedMinutesFor(tech.id),
+    currentStartedAt: st.currentStartedAt ?? null,
+  }));
+
   return (
+    <>
+    <OrderTeamCard
+      order={order}
+      rows={teamRows}
+      isAdmin={isAdmin}
+      myTechId={myTechId}
+      busyKey={busyKey}
+      onAction={(action, row) => onRowAction(action, row.tech.id)}
+    />
     <GlassCard className="lemarc-os-time-control mt-4 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -318,119 +405,8 @@ export function ServiceOrderTimeControl({ order }: Props) {
             </Button>
           )}
         </div>
-        {isTeam && mine && (
-          <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-2">
-            <span className="w-full text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-              Apenas o meu tempo
-            </span>
-            {(mine.st.state === "idle" || mine.st.state === "finished") && (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1 gap-2"
-                onClick={() => startMut.mutate([mine.tech.id])}
-                disabled={anyPending}
-              >
-                <Play size={14} /> Iniciar o meu
-              </Button>
-            )}
-            {mine.st.state === "running" && (
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="flex-1 gap-2"
-                  onClick={() => setPauseOpen(true)}
-                  disabled={anyPending}
-                >
-                  <Pause size={14} /> Pausar o meu
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 gap-2"
-                  onClick={() => finishMut.mutate([mine.tech.id])}
-                  disabled={anyPending}
-                >
-                  <Square size={14} /> Encerrar o meu
-                </Button>
-              </>
-            )}
-            {mine.st.state === "paused" && (
-              <Button
-                size="sm"
-                className="flex-1 gap-2"
-                onClick={() => resumeMut.mutate([mine.tech.id])}
-                disabled={anyPending}
-              >
-                <Play size={14} /> Retomar o meu
-              </Button>
-            )}
-          </div>
-        )}
       </div>
       )}
-
-      <div className="mt-3 space-y-2">
-        {technicians.map((t) => {
-          const st = getTechnicianState(sessions, t.id);
-          // Sem cronômetro, mas com horas na apuração: conta como tempo registrado.
-          const onlyApurado = st.state === "idle" && apuradoMinutesFor(t.id) > 0;
-          return (
-            <div
-              key={t.id}
-              className={`rounded-xl border p-3 ${t.id === myTechId ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.04]"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-foreground">{t.full_name}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    <Clock size={10} className="mr-1 inline" />
-                    Trabalhadas: {formatHHmm(displayedMinutesFor(t.id))}
-                    {st.state === "running" && st.currentStartedAt && (
-                      <>
-                        {" · "}Iniciada agora às {formatHm(st.currentStartedAt)}
-                      </>
-                    )}
-                    {st.state === "paused" && (
-                      <>
-                        {" · "}
-                        <span className="text-amber-300">
-                          Pausada
-                          {st.lastPauseReason ? ` (${pauseReasonLabel(st.lastPauseReason)})` : ""}
-                          {st.lastPauseAt ? ` às ${formatHm(st.lastPauseAt)}` : ""}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                    st.state === "running"
-                      ? "border-status-done/40 bg-status-done/12 text-status-done"
-                      : st.state === "paused"
-                        ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                        : st.state === "finished" || onlyApurado
-                          ? "border-primary/40 bg-primary/10 text-primary"
-                          : "border-border bg-secondary/40 text-muted-foreground"
-                  }`}
-                >
-                  {st.state === "running"
-                    ? "Ativo"
-                    : st.state === "paused"
-                      ? "Pausado"
-                      : st.state === "finished"
-                        ? "Encerrado"
-                        : onlyApurado
-                          ? "Apurado"
-                          : "Aguardando"}
-                </span>
-              </div>
-
-            </div>
-          );
-        })}
-      </div>
 
       {sessions.length > 0 && (
         <div className="mt-4">
@@ -449,12 +425,16 @@ export function ServiceOrderTimeControl({ order }: Props) {
 
       <PauseServiceOrderDialog
         open={pauseOpen}
-        onOpenChange={setPauseOpen}
+        onOpenChange={(o) => {
+          setPauseOpen(o);
+          if (!o) setPauseScope(null);
+        }}
         orderNumber={order.number}
         technicians={states
           .filter(({ st }) => st.state === "running")
+          .filter(({ tech }) => !pauseScope || pauseScope.includes(tech.id))
           .map(({ tech }) => ({ id: tech.id, name: tech.full_name }))}
-        defaultSelectedIds={runningIds}
+        defaultSelectedIds={pauseScope ?? runningIds}
         pending={pauseMut.isPending}
         onConfirm={({ technicianIds, reason, notes }) =>
           pauseMut.mutate({ technicianIds, reason, notes })
@@ -482,5 +462,6 @@ export function ServiceOrderTimeControl({ order }: Props) {
         }
       />
     </GlassCard>
+    </>
   );
 }

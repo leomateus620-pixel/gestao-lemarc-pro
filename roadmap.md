@@ -4,3 +4,10 @@
 - [x] B: redefinir senha + desconectar aparelhos (admin, servidor, auditoria)
 - [x] C: diagnóstico de falhas de login
 - [x] D: testes unitários + e2e; AGENTS.md; tipos
+
+# Equipe técnica da OS
+- [x] Fase 1: user_id/assigned_at na projeção dos técnicos
+- [x] Fase 2: RPCs atômicas e idempotentes + migration aditiva
+- [x] Fase 3: card da equipe, diálogo, ações por técnico, "Iniciar minhas horas"
+- [x] Fase 4: apuração sem horas presumidas; finalizar com tempos abertos
+- [x] Fase 5: caches; PDF sem mudança (lê os mesmos lançamentos)

@@ -39,7 +39,6 @@ import {
   setServiceOrderTechnicians,
   updateServiceOrderStatus,
 } from "@/lib/api/serviceOrders.functions";
-import { AddOrderTechniciansDialog } from "@/components/ordens/AddOrderTechniciansDialog";
 import { getOrderFinancials, reconcileOrderLabor } from "@/lib/api/financials.functions";
 import { formatBRL, formatHHmm } from "@/lib/serviceOrders/finance";
 import { displacementTypeLabel } from "@/types/financials";
@@ -373,13 +372,6 @@ function OrdemDetalhe() {
               {technicians.length === 0
                 ? "Sem técnico definido"
                 : technicians.map((t) => t.full_name).join(", ")}
-              {isAdmin &&
-                !["finished", "review", "approved", "cancelled"].includes(order.status) && (
-                  <AddOrderTechniciansDialog
-                    orderId={order.id}
-                    assignedTechnicianIds={technicians.map((technician) => technician.id)}
-                  />
-                )}
             </DetailField>
             <DetailField icon={UserRound} label="Solicitante">
               {order.requester_name || "Não informado"}

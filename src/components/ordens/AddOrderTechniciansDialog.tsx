@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Loader2, Plus, Search } from "lucide-react";
+import { Check, Loader2, Play, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,22 +14,37 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { addServiceOrderTechnicians, listTechnicians } from "@/lib/api/serviceOrders.functions";
-import type { TechnicianLite } from "@/types/serviceOrder";
+import { linkOrderTechnicians, listTechnicians } from "@/lib/api/serviceOrders.functions";
+import { linkDialogOptions } from "@/lib/serviceOrders/teamActions";
+import { invalidateOrderTeamQueries } from "@/lib/serviceOrders/teamCache";
+import type { ServiceOrderStatus, TechnicianLite } from "@/types/serviceOrder";
+
+function newKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function AddOrderTechniciansDialog({
   orderId,
+  orderStatus,
   assignedTechnicianIds,
 }: {
   orderId: string;
+  orderStatus: ServiceOrderStatus;
   assignedTechnicianIds: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  // Uma chave por intenção: a mesma enquanto o diálogo está aberto e a seleção
+  // não muda, para que retentativas não abram outra sessão.
+  const keyRef = useRef<{ key: string; sig: string } | null>(null);
   const queryClient = useQueryClient();
   const listFn = useServerFn(listTechnicians);
-  const addFn = useServerFn(addServiceOrderTechnicians);
+  const linkFn = useServerFn(linkOrderTechnicians);
+  const options = linkDialogOptions(orderStatus);
 
   const techniciansQuery = useQuery({
     queryKey: ["technicians"],
@@ -39,58 +54,86 @@ export function AddOrderTechniciansDialog({
   });
   const technicians = (techniciansQuery.data ?? []) as TechnicianLite[];
   const assigned = useMemo(() => new Set(assignedTechnicianIds), [assignedTechnicianIds]);
-  const available = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visible = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase();
     return technicians
-      .filter((technician) => technician.active !== false && !assigned.has(technician.id))
+      .filter((t) => t.active !== false || assigned.has(t.id))
       .filter(
-        (technician) =>
-          !normalizedQuery ||
-          technician.full_name.toLocaleLowerCase().includes(normalizedQuery) ||
-          (technician.role ?? "").toLocaleLowerCase().includes(normalizedQuery),
+        (t) =>
+          !q ||
+          t.full_name.toLocaleLowerCase().includes(q) ||
+          (t.role ?? "").toLocaleLowerCase().includes(q),
       );
   }, [assigned, query, technicians]);
+  const availableCount = visible.filter((t) => !assigned.has(t.id)).length;
+
+  function keyFor(start: boolean) {
+    const sig = `${start ? "s" : "l"}:${[...selected].sort().join(",")}`;
+    if (!keyRef.current || keyRef.current.sig !== sig) keyRef.current = { key: newKey(), sig };
+    return keyRef.current.key;
+  }
 
   const mutation = useMutation({
-    mutationFn: () => addFn({ data: { orderId, technicianIds: selected } }),
-    onSuccess: (result: { addedCount: number }) => {
-      toast.success(
-        result.addedCount === 1
-          ? "Técnico adicionado à OS."
-          : `${result.addedCount} técnicos adicionados à OS.`,
-      );
-      queryClient.invalidateQueries({ queryKey: ["service-order", orderId] });
-      queryClient.invalidateQueries({ queryKey: ["service-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["order-time-sessions", orderId] });
+    mutationFn: (start: boolean) =>
+      linkFn({
+        data: { orderId, technicianIds: selected, start, requestKey: keyFor(start) },
+      }),
+    onSuccess: (result, start) => {
+      const added = result.added.length;
+      const started = result.started.length;
+      if (start) {
+        toast.success(
+          started > 0
+            ? `${started === 1 ? "Técnico vinculado e iniciado" : `${started} técnicos vinculados e iniciados`}.`
+            : "Os técnicos selecionados já estavam com tempo em andamento.",
+        );
+      } else {
+        toast.success(
+          added > 0
+            ? added === 1
+              ? "Técnico vinculado à OS."
+              : `${added} técnicos vinculados à OS.`
+            : "Os técnicos selecionados já estavam na OS.",
+        );
+      }
+      invalidateOrderTeamQueries(queryClient, orderId);
+      keyRef.current = null;
       setSelected([]);
       setQuery("");
+      setError(null);
       setOpen(false);
     },
-    onError: (error) =>
-      toast.error(
-        error instanceof Error ? error.message : "Não foi possível adicionar os técnicos.",
-      ),
+    onError: (e) => {
+      // Mantém a chave: nova tentativa devolve o resultado gravado, se houver.
+      setError(e instanceof Error ? e.message : "Não foi possível vincular os técnicos.");
+      invalidateOrderTeamQueries(queryClient, orderId);
+    },
   });
 
-  function toggleTechnician(id: string) {
-    setSelected((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+  function toggle(id: string) {
+    if (assigned.has(id) || mutation.isPending) return;
+    setError(null);
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   }
+
+  if (!options.canLink) return null;
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (nextOpen) {
+      onOpenChange={(next) => {
+        if (mutation.isPending) return;
+        setOpen(next);
+        if (next) {
           setSelected([]);
           setQuery("");
+          setError(null);
+          keyRef.current = null;
         }
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="secondary" size="sm" className="mt-2 gap-2 rounded-xl">
+        <Button type="button" variant="secondary" size="sm" className="gap-2 rounded-xl">
           <Plus size={14} /> Adicionar técnico
         </Button>
       </DialogTrigger>
@@ -98,8 +141,8 @@ export function AddOrderTechniciansDialog({
         <DialogHeader>
           <DialogTitle>Adicionar técnico à OS</DialogTitle>
           <DialogDescription>
-            O novo técnico entra com cronômetro zerado e inicia o tempo somente quando começar a
-            trabalhar.
+            Quem já está na OS continua com os mesmos horários. Cada novo técnico conta só a partir
+            do próprio início.
           </DialogDescription>
         </DialogHeader>
 
@@ -111,7 +154,7 @@ export function AddOrderTechniciansDialog({
             />
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar técnico…"
               className="pl-9"
               autoFocus
@@ -126,38 +169,41 @@ export function AddOrderTechniciansDialog({
             <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               Não foi possível carregar os técnicos.
             </p>
-          ) : available.length === 0 ? (
+          ) : availableCount === 0 && visible.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-              Nenhum técnico ativo disponível para adicionar.
+              Nenhum técnico ativo encontrado.
             </p>
           ) : (
             <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-              {available.map((technician) => {
-                const isSelected = selected.includes(technician.id);
+              {visible.map((t) => {
+                const linked = assigned.has(t.id);
+                const isSelected = selected.includes(t.id);
                 return (
                   <button
-                    key={technician.id}
+                    key={t.id}
                     type="button"
-                    onClick={() => toggleTechnician(technician.id)}
+                    onClick={() => toggle(t.id)}
+                    disabled={linked}
+                    aria-pressed={isSelected}
                     className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
-                      isSelected
-                        ? "border-primary/50 bg-primary/10"
-                        : "border-border bg-card hover:bg-muted/40"
+                      linked
+                        ? "cursor-not-allowed border-border bg-muted/30 opacity-60"
+                        : isSelected
+                          ? "border-primary/50 bg-primary/10"
+                          : "border-border bg-card hover:bg-muted/40"
                     }`}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold text-foreground">
-                        {technician.full_name}
+                        {t.full_name}
                       </span>
-                      {technician.role && (
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {technician.role}
-                        </span>
-                      )}
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {linked ? "Já está na OS" : (t.role ?? "")}
+                      </span>
                     </span>
                     <span
                       className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
-                        isSelected
+                        isSelected || linked
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border text-transparent"
                       }`}
@@ -169,29 +215,45 @@ export function AddOrderTechniciansDialog({
               })}
             </div>
           )}
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {error}
+            </p>
+          )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button
             type="button"
-            variant="ghost"
-            onClick={() => setOpen(false)}
-            disabled={mutation.isPending}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={() => mutation.mutate()}
+            variant="secondary"
+            onClick={() => mutation.mutate(false)}
             disabled={selected.length === 0 || mutation.isPending}
           >
-            {mutation.isPending ? (
+            {mutation.isPending && mutation.variables === false ? (
               <Loader2 size={16} className="mr-2 animate-spin" />
             ) : (
               <Plus size={16} className="mr-2" />
             )}
-            {mutation.isPending ? "Adicionando…" : "Adicionar selecionados"}
+            Vincular técnico
           </Button>
+          {options.canStart && (
+            <Button
+              type="button"
+              onClick={() => mutation.mutate(true)}
+              disabled={selected.length === 0 || mutation.isPending}
+            >
+              {mutation.isPending && mutation.variables === true ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <Play size={16} className="mr-2" />
+              )}
+              Vincular e iniciar agora
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

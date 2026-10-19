@@ -792,6 +792,44 @@ export type Database = {
           },
         ]
       }
+      service_order_team_requests: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          operation: string
+          request_key: string
+          result: Json
+          service_order_id: string
+          technician_ids: string[]
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          operation: string
+          request_key: string
+          result: Json
+          service_order_id: string
+          technician_ids: string[]
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          operation?: string
+          request_key?: string
+          result?: Json
+          service_order_id?: string
+          technician_ids?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_order_team_requests_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_order_technicians: {
         Row: {
           assigned_at: string
@@ -856,6 +894,7 @@ export type Database = {
           notes: string | null
           pause_notes: string | null
           pause_reason: string | null
+          request_key: string | null
           service_order_id: string
           source: string
           started_at: string
@@ -880,6 +919,7 @@ export type Database = {
           notes?: string | null
           pause_notes?: string | null
           pause_reason?: string | null
+          request_key?: string | null
           service_order_id: string
           source?: string
           started_at?: string
@@ -904,6 +944,7 @@ export type Database = {
           notes?: string | null
           pause_notes?: string | null
           pause_reason?: string | null
+          request_key?: string | null
           service_order_id?: string
           source?: string
           started_at?: string
@@ -2545,6 +2586,19 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      team_link_technicians: {
+        Args: {
+          _order_id: string
+          _request_key: string
+          _start: boolean
+          _technician_ids: string[]
+        }
+        Returns: Json
+      }
+      team_start_own: {
+        Args: { _order_id: string; _request_key: string }
+        Returns: Json
       }
       user_is_order_technician: {
         Args: { _order_id: string }

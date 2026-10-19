@@ -76,6 +76,8 @@ export type AssignedTechnician = TechnicianLite & {
   is_primary: boolean;
   /** Função do técnico nesta OS (técnico, auxiliar, responsável…). */
   assignment_role?: string | null;
+  /** Data administrativa do vínculo (não é início trabalhado). */
+  assigned_at?: string | null;
   /**
    * Técnico que possui horas/intervalos registrados nesta OS mas não está mais
    * vinculado à equipe atual. Continua aparecendo na revisão e na apuração.
