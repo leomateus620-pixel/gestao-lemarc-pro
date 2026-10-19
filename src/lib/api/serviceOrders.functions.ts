@@ -19,11 +19,11 @@ const ORDER_SELECT = `
   signature_waiver_reason, signature_waived_by, signature_waived_at,
   execution_report, execution_report_updated_by, execution_report_updated_at,
   client:clients!service_orders_client_id_fkey(id, name, unit, cnpj),
-  technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents),
+  technician:technicians!service_orders_technician_id_fkey(id, full_name, role, hourly_rate_cents, user_id),
   client_unit:client_units!service_orders_client_unit_id_fkey(id, name, sector, city, state, cnpj, distance_km_from_base, default_displacement_rate_cents, default_displacement_type),
   assigned_technicians:service_order_technicians!service_order_technicians_service_order_id_fkey(
-    is_primary, role,
-    technician:technicians!service_order_technicians_technician_id_fkey(id, full_name, role, hourly_rate_cents)
+    is_primary, role, assigned_at,
+    technician:technicians!service_order_technicians_technician_id_fkey(id, full_name, role, hourly_rate_cents, user_id)
   ),
   signatures:service_order_signatures(
     id, service_order_id, signed_by_name, signed_by_role,
@@ -159,7 +159,9 @@ function normalize(row: any): ServiceOrder {
       full_name: a.technician.full_name,
       role: a.technician.role ?? null,
       hourly_rate_cents: a.technician.hourly_rate_cents ?? null,
+      user_id: a.technician.user_id ?? null,
       assignment_role: a.role ?? null,
+      assigned_at: a.assigned_at ?? null,
       is_primary: Boolean(a.is_primary),
     }))
     .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary));
@@ -221,12 +223,14 @@ async function syncAssignmentNotificationsSafely({
   technicianIds,
   previousTechnicianIds,
   createdBy,
+  bodySuffix,
 }: {
   supabase: any;
   serviceOrderId: string;
   technicianIds: string[];
   previousTechnicianIds?: string[];
   createdBy: string;
+  bodySuffix?: string;
 }) {
   try {
     const result = await syncServiceOrderAssignmentNotifications({
@@ -242,7 +246,7 @@ async function syncAssignmentNotificationsSafely({
         userIds: result.userIds,
         eventType: "service_order_assigned",
         title: result.title,
-        body: result.body,
+        body: bodySuffix ? `${result.body} — ${bodySuffix}` : result.body,
         serviceOrderId,
         data: { type: "service_order_assigned", service_order_id: serviceOrderId },
       });
@@ -386,6 +390,54 @@ export const addServiceOrderTechnicians = createServerFn({ method: "POST" })
       createdBy: context.userId,
     });
     return { addedCount: idsToAdd.length };
+  });
+
+export type LinkOrderTechniciansResult = {
+  added: string[];
+  alreadyLinked: string[];
+  started: string[];
+  alreadyRunning: string[];
+  startedAt: string | null;
+  replayed: boolean;
+};
+
+/**
+ * Admin: vincula (e opcionalmente inicia) técnicos numa única transação no banco
+ * (`team_link_technicians`). Idempotente pela `requestKey`. Notifica só os novos.
+ */
+export const linkOrderTechnicians = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { orderId: string; technicianIds: string[]; start: boolean; requestKey: string }) => {
+      const ids = Array.from(new Set((data?.technicianIds ?? []).filter(Boolean)));
+      if (!data?.orderId) throw new Error("OS inválida.");
+      if (ids.length === 0) throw new Error("Selecione ao menos um técnico.");
+      if (!data.requestKey || data.requestKey.length < 8) throw new Error("Requisição inválida.");
+      return { orderId: data.orderId, technicianIds: ids, start: Boolean(data.start), requestKey: data.requestKey };
+    },
+  )
+  .handler(async ({ data, context }): Promise<LinkOrderTechniciansResult> => {
+    const sb = context.supabase as any;
+    const { data: result, error } = await sb.rpc("team_link_technicians", {
+      _order_id: data.orderId,
+      _technician_ids: data.technicianIds,
+      _start: data.start,
+      _request_key: data.requestKey,
+    });
+    if (error) throw new Error(error.message);
+    const r = result as LinkOrderTechniciansResult;
+    if (!r.replayed && r.added.length > 0) {
+      // Só os recém-vinculados: a equipe anterior não é avisada de novo.
+      await syncAssignmentNotificationsSafely({
+        supabase: context.supabase,
+        serviceOrderId: data.orderId,
+        technicianIds: r.added,
+        previousTechnicianIds: [],
+        createdBy: context.userId,
+        bodySuffix: data.start ? "seu tempo já está contando" : undefined,
+      });
+    }
+    return r;
   });
 
 export const setServiceOrderTechnicians = createServerFn({ method: "POST" })

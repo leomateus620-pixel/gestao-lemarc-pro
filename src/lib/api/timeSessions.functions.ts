@@ -192,6 +192,8 @@ type BatchInput = {
   technicianId?: string | null;
   /** Escopo em equipe. */
   technicianIds?: string[];
+  /** Ações novas (card da equipe): seleção vazia é rejeitada antes de qualquer escrita. */
+  requireExplicitScope?: boolean;
 };
 
 function emptyBatch(): TimeBatchResult {
@@ -304,11 +306,42 @@ async function resolveScope(sb: any, data: BatchInput): Promise<string[]> {
     ...(data.technicianId ? [data.technicianId] : []),
   ].filter((id): id is string => typeof id === "string" && id.length > 0);
   const unique = Array.from(new Set(requested));
-  if (unique.length === 0) return assigned;
+  if (unique.length === 0) {
+    if (data.requireExplicitScope) throw new Error("Selecione ao menos um técnico.");
+    return assigned;
+  }
   const invalid = unique.filter((id) => !assigned.includes(id));
   if (invalid.length > 0) throw new Error("Técnico não vinculado a esta OS.");
   return unique;
 }
+
+/**
+ * Técnico: "Iniciar minhas horas". O técnico é resolvido no banco a partir do
+ * usuário logado (`team_start_own`); o navegador não envia ID de técnico.
+ * Idempotente pela `requestKey`; se o admin já iniciou, devolve a mesma sessão.
+ */
+export const startOwnWork = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; requestKey: string }) => {
+    if (!data?.orderId) throw new Error("OS inválida.");
+    if (!data.requestKey || data.requestKey.length < 8) throw new Error("Requisição inválida.");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: result, error } = await sb.rpc("team_start_own", {
+      _order_id: data.orderId,
+      _request_key: data.requestKey,
+    });
+    if (error) throw new Error(error.message);
+    return result as {
+      technicianId: string;
+      sessionId: string;
+      startedAt: string;
+      alreadyRunning: boolean;
+      replayed: boolean;
+    };
+  });
 
 export const startWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
