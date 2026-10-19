@@ -22,7 +22,13 @@ const sp = (day: string, hm: string) => {
 const D1 = "2026-10-01";
 const D2 = "2026-10-02";
 let seq = 0;
-const work = (tech: string, day: string, a: string, b: string | null, end_reason: TimeSession["end_reason"] = "pause"): TimeSession =>
+const work = (
+  tech: string,
+  day: string,
+  a: string,
+  b: string | null,
+  end_reason: TimeSession["end_reason"] = "pause",
+): TimeSession =>
   ({
     id: `s${++seq}`,
     service_order_id: "os",
@@ -30,7 +36,9 @@ const work = (tech: string, day: string, a: string, b: string | null, end_reason
     kind: "work",
     started_at: sp(day, a),
     ended_at: b ? sp(day, b) : null,
-    duration_minutes: b ? (new Date(sp(day, b)).getTime() - new Date(sp(day, a)).getTime()) / 60000 : null,
+    duration_minutes: b
+      ? (new Date(sp(day, b)).getTime() - new Date(sp(day, a)).getTime()) / 60000
+      : null,
     pause_reason: null,
     pause_notes: null,
     end_reason: b ? end_reason : null,
@@ -101,7 +109,11 @@ describe("fixture A/B/C/D — equipe adicionada no dia 2", () => {
     expect(byTech("C")).toBe(54000);
     expect(byTech("D")).toBe(66000);
 
-    const totals = computeTotals(entries, { type: "none", count: 0, km_total: 0, rate_cents: 0, notes: null } as never, 0);
+    const totals = computeTotals(
+      entries,
+      { type: "none", count: 0, km_total: 0, rate_cents: 0, notes: null } as never,
+      0,
+    );
     expect(totals.totalLaborMinutes).toBe(1920);
     expect(totals.totalLaborMinutes / 60).toBe(32);
     expect(totals.totalLaborCents).toBe(340000);
@@ -130,7 +142,9 @@ describe("fixture A/B/C/D — equipe adicionada no dia 2", () => {
     const sessions = abSessions();
     expect(getTechnicianState(sessions, "C").state).toBe("idle");
     expect(legacyFallbackTechnicianIds(sessions, ["A", "B", "C"])).toEqual([]);
-    expect(splitSessionsByDay(sessions as SessionLike[]).filter((s) => s.technician_id === "C")).toHaveLength(0);
+    expect(
+      splitSessionsByDay(sessions as SessionLike[]).filter((s) => s.technician_id === "C"),
+    ).toHaveLength(0);
   });
 
   it("OS legada sem nenhuma sessão mantém o fallback para todos", () => {
@@ -144,7 +158,9 @@ describe("fixture A/B/C/D — equipe adicionada no dia 2", () => {
   });
 
   it("pausa e retomada criam intervalos separados; pausa não conta", () => {
-    const segs = splitSessionsByDay(cdSessions().filter((s) => s.technician_id === "C") as SessionLike[]);
+    const segs = splitSessionsByDay(
+      cdSessions().filter((s) => s.technician_id === "C") as SessionLike[],
+    );
     expect(segs.reduce((a, s) => a + s.duration_minutes, 0)).toBe(360);
   });
 });
@@ -162,20 +178,42 @@ describe("ações da equipe", () => {
   });
 
   it("técnico só age na própria linha; admin em qualquer uma", () => {
-    expect(teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: false })).toEqual([]);
-    expect(teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: true })).toEqual(["start"]);
-    expect(teamRowActions({ state: "running", orderStatus: "running", isAdmin: true, isOwnRow: false })).toEqual(["pause", "finish"]);
-    expect(teamRowActions({ state: "paused", orderStatus: "running", isAdmin: true, isOwnRow: false })).toEqual(["resume", "finish"]);
+    expect(
+      teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: false }),
+    ).toEqual([]);
+    expect(
+      teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: true }),
+    ).toEqual(["start"]);
+    expect(
+      teamRowActions({ state: "running", orderStatus: "running", isAdmin: true, isOwnRow: false }),
+    ).toEqual(["pause", "finish"]);
+    expect(
+      teamRowActions({ state: "paused", orderStatus: "running", isAdmin: true, isOwnRow: false }),
+    ).toEqual(["resume", "finish"]);
   });
 
   it("mesmo técnico pode voltar depois de encerrar (ação deliberada)", () => {
-    expect(teamRowActions({ state: "finished", orderStatus: "running", isAdmin: false, isOwnRow: true })).toEqual(["restart"]);
-    expect(teamRowActions({ state: "finished", orderStatus: "running", isAdmin: true, isOwnRow: false })).toEqual(["restart"]);
+    expect(
+      teamRowActions({ state: "finished", orderStatus: "running", isAdmin: false, isOwnRow: true }),
+    ).toEqual(["restart"]);
+    expect(
+      teamRowActions({ state: "finished", orderStatus: "running", isAdmin: true, isOwnRow: false }),
+    ).toEqual(["restart"]);
   });
 
   it("sem cronômetro fora de execução ou em OS encerrada", () => {
-    for (const status of ["pending", "dispatched", "transit", "finished", "review", "approved", "cancelled"] as const) {
-      expect(teamRowActions({ state: "idle", orderStatus: status, isAdmin: true, isOwnRow: true })).toEqual([]);
+    for (const status of [
+      "pending",
+      "dispatched",
+      "transit",
+      "finished",
+      "review",
+      "approved",
+      "cancelled",
+    ] as const) {
+      expect(
+        teamRowActions({ state: "idle", orderStatus: status, isAdmin: true, isOwnRow: true }),
+      ).toEqual([]);
     }
   });
 

@@ -83,7 +83,9 @@ export function OrderTeamCard({
                   <div className="min-w-0">
                     <div className="truncate text-sm font-bold text-foreground">
                       {row.tech.full_name}
-                      {own && <span className="ml-1 text-[11px] font-semibold text-primary">(você)</span>}
+                      {own && (
+                        <span className="ml-1 text-[11px] font-semibold text-primary">(você)</span>
+                      )}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {row.tech.assignment_role || row.tech.role || "Técnico"}
@@ -156,11 +158,19 @@ export function OrderTeamCard({
                         <Button
                           key={action}
                           size="sm"
-                          variant={action === "finish" ? "outline" : action === "pause" ? "secondary" : "default"}
+                          variant={
+                            action === "finish"
+                              ? "outline"
+                              : action === "pause"
+                                ? "secondary"
+                                : "default"
+                          }
                           className="min-h-10 flex-1 gap-2"
                           disabled={busy}
                           onClick={() =>
-                            action === "finish" ? setConfirmFinish(row.tech.id) : onAction(action, row)
+                            action === "finish"
+                              ? setConfirmFinish(row.tech.id)
+                              : onAction(action, row)
                           }
                         >
                           {busy && busyKey === `${action}:${row.tech.id}` ? (

@@ -23,7 +23,10 @@ export function teamStateLabel(state: TeamTechState): string {
 }
 
 /** O que o diálogo "Adicionar técnico" oferece conforme o status da OS. */
-export function linkDialogOptions(status: ServiceOrderStatus): { canLink: boolean; canStart: boolean } {
+export function linkDialogOptions(status: ServiceOrderStatus): {
+  canLink: boolean;
+  canStart: boolean;
+} {
   if (status === "cancelled") return { canLink: false, canStart: false };
   if (status === "running") return { canLink: true, canStart: true };
   if (PRE_START_STATUSES.includes(status)) return { canLink: true, canStart: false };

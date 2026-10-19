@@ -736,7 +736,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
 
   // Técnicos ainda com cronômetro aberto (ex.: equipe adicionada depois).
   const openTechs = techs.filter((t) =>
-    (sessions ?? []).some((s) => s.kind === "work" && s.technician_id === t.id && !s.ended_at),
+    (sessions ?? []).some((s: TimeSession) => s.kind === "work" && s.technician_id === t.id && !s.ended_at),
   );
   // Encerra no horário do servidor só os técnicos listados e acrescenta os
   // novos períodos ao rascunho, sem substituir linhas existentes.
