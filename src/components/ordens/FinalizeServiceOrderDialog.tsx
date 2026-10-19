@@ -1,4 +1,4 @@
-import { legacyFallbackTechnicianIds } from "@/lib/serviceOrders/teamActions";
+import { appendNewDraftEntries, legacyFallbackTechnicianIds } from "@/lib/serviceOrders/teamActions";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -51,6 +51,7 @@ import { isDisplacementUnset } from "@/lib/serviceOrders/finance";
 import { getOrderTechnicians, mergeHistoryTechnicians } from "@/lib/serviceOrders/technicians";
 import { finalizeServiceOrder, getOrderFinancials } from "@/lib/api/financials.functions";
 import {
+  finishWork,
   listOrderHistoryTechnicians,
   listTimeSessions,
 } from "@/lib/api/timeSessions.functions";
@@ -398,6 +399,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
   const finalizeFn = useServerFn(finalizeServiceOrder);
   const sessionsFn = useServerFn(listTimeSessions);
   const historyTechsFn = useServerFn(listOrderHistoryTechnicians);
+  const finishWorkFn = useServerFn(finishWork);
   const globalRateFn = useServerFn(getDisplacementRateCents);
   const hasSignature = Boolean(order.signature);
   const hasWaiver = Boolean(order.signature_waiver_reason);
@@ -731,6 +733,47 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Falha ao finalizar"),
   });
+
+  // Técnicos ainda com cronômetro aberto (ex.: equipe adicionada depois).
+  const openTechs = techs.filter((t) =>
+    (sessions ?? []).some((s) => s.kind === "work" && s.technician_id === t.id && !s.ended_at),
+  );
+  // Encerra no horário do servidor só os técnicos listados e acrescenta os
+  // novos períodos ao rascunho, sem substituir linhas existentes.
+  const closeOpenMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await finishWorkFn({ data: { orderId: order.id, technicianIds: ids, requireExplicitScope: true } });
+      const fresh = (await sessionsFn({ data: { orderId: order.id } })) as TimeSession[];
+      queryClient.setQueryData(["order-time-sessions", order.id], fresh);
+      return { fresh, ids };
+    },
+    onSuccess: ({ fresh, ids }) => {
+      const incoming = buildEntriesFromSessions(
+        fresh,
+        techs.filter((t) => ids.includes(t.id)),
+        "",
+        "",
+        "",
+      );
+      setEntries((cur) => appendNewDraftEntries(cur, incoming));
+      queryClient.invalidateQueries({ queryKey: ["order-time-sessions", order.id] });
+      queryClient.invalidateQueries({ queryKey: ["running-order-time-state"] });
+      toast.success("Tempos encerrados e incluídos na apuração. Revise e finalize.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível encerrar os tempos abertos."),
+  });
+  const handleFinalizeClick = () => {
+    if (openTechs.length > 0) {
+      const names = openTechs.map((t) => t.full_name).join(", ");
+      const ok = window.confirm(
+        `Ainda há tempo aberto para: ${names}.\n\nEncerrar agora (horário do servidor) e incluir esses períodos na apuração? Depois revise e finalize.`,
+      );
+      if (ok) closeOpenMut.mutate(openTechs.map((t) => t.id));
+      return;
+    }
+    mutation.mutate();
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1390,7 +1433,7 @@ export function FinalizeServiceOrderDialog({ order, open, onOpenChange }: Props)
                 </Button>
               )}
               <Button
-                onClick={() => mutation.mutate()}
+                onClick={handleFinalizeClick}
                 disabled={
                   mutation.isPending || !stepEntriesValid || !stepRatesValid || !signatureOk
                 }

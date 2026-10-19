@@ -85,3 +85,23 @@ export function legacyFallbackTechnicianIds(
   const anyWork = sessions.some((s) => s.kind === "work");
   return anyWork ? [] : technicianIds;
 }
+
+type DraftLike = { technician_id: string; work_date: string; start_time: string };
+
+/**
+ * Acrescenta ao rascunho da apuração os períodos fechados depois que ele foi
+ * aberto, sem substituir nem editar linhas existentes (inclusive as editadas
+ * pelo admin). Um período entra uma única vez (técnico + data + início).
+ */
+export function appendNewDraftEntries<T extends DraftLike>(existing: T[], incoming: T[]): T[] {
+  const key = (e: DraftLike) => `${e.technician_id}|${e.work_date}|${e.start_time.slice(0, 5)}`;
+  const seen = new Set(existing.map(key));
+  const extra: T[] = [];
+  for (const e of incoming) {
+    const k = key(e);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    extra.push(e);
+  }
+  return extra.length === 0 ? existing : [...existing, ...extra];
+}
