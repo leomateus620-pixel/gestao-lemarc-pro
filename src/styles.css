@@ -1319,6 +1319,17 @@
   padding-block: 0.75rem;
   border-bottom: 1px solid oklch(1 0 0 / 0.08);
 }
+.lemarc-os-team-card.glass-card {
+  border-radius: 1rem;
+  border-color: oklch(1 0 0 / 0.14);
+  background: oklch(0.14 0.036 252 / 0.98);
+  color: oklch(0.985 0.005 250);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 18px 40px -32px oklch(0 0 0 / 0.9);
+}
 .lemarc-os-time-control.glass-card {
   border-radius: 1rem;
   border-color: oklch(0.72 0.19 50 / 0.22);

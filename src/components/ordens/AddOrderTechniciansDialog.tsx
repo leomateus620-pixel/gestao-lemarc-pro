@@ -230,6 +230,7 @@ export function AddOrderTechniciansDialog({
           <Button
             type="button"
             variant="secondary"
+            className="disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-100 disabled:bg-muted disabled:text-muted-foreground disabled:border disabled:border-border disabled:shadow-none"
             onClick={() => mutation.mutate(false)}
             disabled={selected.length === 0 || mutation.isPending}
           >
@@ -243,6 +244,7 @@ export function AddOrderTechniciansDialog({
           {options.canStart && (
             <Button
               type="button"
+              className="disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-100 disabled:bg-muted disabled:text-muted-foreground disabled:border disabled:border-border disabled:shadow-none"
               onClick={() => mutation.mutate(true)}
               disabled={selected.length === 0 || mutation.isPending}
             >

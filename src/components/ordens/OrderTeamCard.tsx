@@ -77,7 +77,7 @@ export function OrderTeamCard({
             return (
               <li
                 key={row.tech.id}
-                className={`rounded-xl border p-3 ${own ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.04]"}`}
+                className={`rounded-xl border p-3 ${own ? "border-primary/40 bg-primary/5" : "border-white/12 bg-white/[0.03]"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -96,7 +96,7 @@ export function OrderTeamCard({
                       )}
                     </div>
                     {isAdmin && row.tech.assigned_at && (
-                      <div className="text-[10px] text-muted-foreground/80">
+                      <div className="text-[10px] text-muted-foreground">
                         Vinculado em {formatDateHm(row.tech.assigned_at)}
                       </div>
                     )}
@@ -189,7 +189,7 @@ export function OrderTeamCard({
           })}
         </ul>
       )}
-      <p className="mt-2 text-[10px] text-muted-foreground">
+      <p className="mt-2 text-[11px] text-muted-foreground">
         Encerrar as horas de um técnico não finaliza a OS.
       </p>
     </GlassCard>
