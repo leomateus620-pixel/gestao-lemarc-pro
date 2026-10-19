@@ -72,3 +72,16 @@ export function assertExplicitScope(ids: string[] | null | undefined): string[] 
   if (unique.length === 0) throw new Error("Selecione ao menos um técnico.");
   return unique;
 }
+
+/**
+ * Técnicos que recebem a linha de fallback na apuração (intervalo início
+ * global → fim). Só vale para OS legadas sem nenhuma sessão de trabalho:
+ * se qualquer técnico tem sessão, quem não tem fica sem horas presumidas.
+ */
+export function legacyFallbackTechnicianIds(
+  sessions: { kind: string; technician_id: string | null }[],
+  technicianIds: string[],
+): string[] {
+  const anyWork = sessions.some((s) => s.kind === "work");
+  return anyWork ? [] : technicianIds;
+}

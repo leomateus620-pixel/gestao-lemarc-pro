@@ -1,3 +1,4 @@
+import { legacyFallbackTechnicianIds } from "@/lib/serviceOrders/teamActions";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -180,6 +181,15 @@ function buildEntriesFromSessions(
   fallbackEnd: string,
 ): DraftEntry[] {
   const out: DraftEntry[] = [];
+  // Fallback legado (início global → fim) só quando a OS inteira não tem
+  // nenhuma sessão de trabalho. Técnico vinculado depois e sem sessão não
+  // recebe intervalo presumido: fica sem horas lançadas.
+  const fallbackIds = new Set(
+    legacyFallbackTechnicianIds(
+      sessions,
+      techs.map((t) => t.id),
+    ),
+  );
   for (const t of techs) {
     const rateInput =
       t.hourly_rate_cents != null
@@ -196,6 +206,7 @@ function buildEntriesFromSessions(
       .sort((a, b) => a.started_at.localeCompare(b.started_at));
 
     if (techSessions.length === 0) {
+      if (!fallbackIds.has(t.id)) continue;
       out.push({
         uid: uid(),
         technician_id: t.id,
