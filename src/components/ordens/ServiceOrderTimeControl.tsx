@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Pause, Play, Square, Clock } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -23,8 +23,6 @@ import {
   computeTechnicianWorkedMinutes,
   getOrderLiveState,
   getTechnicianState,
-  pauseReasonLabel,
-  formatHm,
   formatDateHm,
   type TimeSession,
 } from "@/lib/serviceOrders/timeSessions";
