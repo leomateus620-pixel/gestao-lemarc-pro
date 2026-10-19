@@ -11,3 +11,4 @@
 - [x] Fase 3: card da equipe, diálogo, ações por técnico, "Iniciar minhas horas"
 - [x] Fase 4: apuração sem horas presumidas; finalizar com tempos abertos
 - [x] Fase 5: caches; PDF sem mudança (lê os mesmos lançamentos)
+- [x] Ajustes visuais equipe técnica (botões desabilitados, fundo do cartão)
