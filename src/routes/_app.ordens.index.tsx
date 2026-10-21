@@ -1,5 +1,10 @@
 import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
-import { countPausedOrders, type OrderTimeSummary } from "@/lib/serviceOrders/displayStatus";
+import {
+  countPausedOrders,
+  countTechFinishedOrders,
+  inFieldDetail,
+  type OrderTimeSummary,
+} from "@/lib/serviceOrders/displayStatus";
 import { Suspense, useMemo, type ReactNode } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -45,6 +50,7 @@ type StatusFilter =
   | "pendente"
   | "andamento"
   | "pausada"
+  | "finalizada_tecnico"
   | "revisao"
   | "concluida"
   | "cancelada";
@@ -60,7 +66,7 @@ type SortMode =
 
 const searchSchema = z.object({
   status: fallback(
-    z.enum(["todas", "pendente", "andamento", "pausada", "revisao", "concluida", "cancelada"]),
+    z.enum(["todas", "pendente", "andamento", "pausada", "finalizada_tecnico", "revisao", "concluida", "cancelada"]),
     "todas",
   ).default("todas"),
   priority: fallback(z.enum(["todas", "baixa", "media", "alta", "urgente"]), "todas").default(
@@ -172,6 +178,7 @@ function OrdensList() {
 
   const { data: timeState } = useRunningOrderTimeStateQuery();
   const pausedInPeriod = countPausedOrders(periodOrders, timeState);
+  const techFinishedInPeriod = countTechFinishedOrders(periodOrders, timeState);
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return periodOrders
@@ -243,6 +250,7 @@ function OrdensList() {
         <option value="pendente">Pendentes</option>
         <option value="andamento">Em campo</option>
         <option value="pausada">Pausadas</option>
+        <option value="finalizada_tecnico">Finalizada pelo técnico</option>
         <option value="revisao">Em revisão</option>
         <option value="concluida">Finalizadas</option>
         <option value="cancelada">Canceladas</option>
@@ -306,10 +314,7 @@ function OrdensList() {
           {
             label: "Em campo",
             value: kpis.inField,
-            detail:
-              pausedInPeriod > 0
-                ? `${kpis.inField - pausedInPeriod} em execução · ${pausedInPeriod} ${pausedInPeriod === 1 ? "pausada" : "pausadas"}`
-                : undefined,
+            detail: inFieldDetail(kpis.inField, pausedInPeriod, techFinishedInPeriod),
           },
           { label: "Em revisão", value: kpis.review },
           {
@@ -400,10 +405,16 @@ function matchesStatus(
   if (status === "todas") return true;
   if (status === "pausada")
     return order.status === "running" && timeState?.[order.id]?.key === "paused";
+  if (status === "finalizada_tecnico")
+    return order.status === "running" && timeState?.[order.id]?.key === "tech_finished";
   if (status === "cancelada") return order.status === "cancelled";
   const bucket = statusBucket[order.status];
   if (status === "pendente") return bucket === "pending";
-  if (status === "andamento") return bucket === "inProgress";
+  if (status === "andamento")
+    return (
+      bucket === "inProgress" &&
+      !(order.status === "running" && timeState?.[order.id]?.key === "tech_finished")
+    );
   if (status === "revisao") return bucket === "review";
   if (status === "concluida") return bucket === "done";
   return true;

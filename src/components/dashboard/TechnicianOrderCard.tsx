@@ -63,15 +63,18 @@ const statusTone: Record<ServiceOrderStatus, { border: string; text: string; dot
 export function TechnicianOrderCard({ order }: { order: ServiceOrder }) {
   const display = useOrderDisplayStatus(order);
   const paused = display.key === "paused";
+  const techFinished = display.key === "tech_finished";
   const tone = paused
     ? { ...statusTone[order.status], text: "text-amber-200", dot: "bg-amber-300" }
-    : statusTone[order.status];
+    : techFinished
+      ? { ...statusTone[order.status], text: "text-sky-200", dot: "bg-sky-300" }
+      : statusTone[order.status];
   const technicians = getOrderTechnicians(order);
   const technicianLabel = technicians.length ? formatTechnicianList(technicians, 2) : "Técnico";
   const unitName = order.client_unit?.name ?? order.client?.unit ?? "Unidade não informada";
   const localName = order.location ?? order.client_unit?.sector ?? "Local não informado";
   const serviceType = serviceTypeName(order);
-  const time = paused ? display.label : timeStateLabel(order);
+  const time = paused || techFinished ? display.label : timeStateLabel(order);
   const scheduled = formatServiceOrderDateTime(order.scheduled_for);
   const needsAction = technicianOrderNeedsAction(order);
 
@@ -92,7 +95,7 @@ export function TechnicianOrderCard({ order }: { order: ServiceOrder }) {
             <span className="text-slate-500">·</span>
             <span className={cn("inline-flex items-center gap-1.5", tone.text)}>
               <span className={cn("size-1.5 rounded-full", tone.dot)} />
-              {paused ? "Pausada" : statusLabel[order.status]}
+              {paused ? "Pausada" : techFinished ? display.label : statusLabel[order.status]}
             </span>
             {order.priority && (
               <>

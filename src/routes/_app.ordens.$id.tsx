@@ -55,7 +55,7 @@ import { ServiceOrderMaterialsSection } from "@/components/ordens/attachments/Se
 import { finishWork, listTimeSessions, startWork } from "@/lib/api/timeSessions.functions";
 import {
   getOrderDisplayStatus,
-  PAUSED_BADGE_TONE,
+  derivedBadgeTone,
   pausedSubLabel,
 } from "@/lib/serviceOrders/displayStatus";
 import { Link } from "@tanstack/react-router";
@@ -318,10 +318,10 @@ function OrdemDetalhe() {
               <span
                 className={cn(
                   "lemarc-status-chip",
-                  headerDisplay.key === "paused" ? PAUSED_BADGE_TONE : statusTone[order.status],
+                  derivedBadgeTone(headerDisplay) ?? statusTone[order.status],
                 )}
               >
-                {headerDisplay.key === "paused" ? headerDisplay.label : statusLabel[order.status]}
+                {derivedBadgeTone(headerDisplay) ? headerDisplay.label : statusLabel[order.status]}
               </span>
               {headerSub && (
                 <span className="text-[11px] font-bold text-amber-200/90">{headerSub}</span>

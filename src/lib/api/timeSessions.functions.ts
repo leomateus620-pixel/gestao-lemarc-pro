@@ -112,10 +112,7 @@ export const listRunningOrderTimeState = createServerFn({ method: "GET" })
       list.push(r);
       byOrder.set(r.service_order_id, list);
     }
-    const result: Record<
-      string,
-      { key: "running" | "paused"; pauseReason: string | null; pausedCount: number; runningCount: number }
-    > = {};
+    const result: Record<string, import("@/lib/serviceOrders/displayStatus").OrderTimeSummary> = {};
     for (const [id, list] of byOrder) result[id] = summarizeOrderTime(list);
     return result;
   });

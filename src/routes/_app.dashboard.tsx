@@ -56,7 +56,7 @@ import type { ServiceOrder, ServiceOrderStatus } from "@/types/serviceOrder";
 import { TechnicianOrderCard } from "@/components/dashboard/TechnicianOrderCard";
 import { toast } from "sonner";
 import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
-import { countPausedOrders } from "@/lib/serviceOrders/displayStatus";
+import { countPausedOrders, countTechFinishedOrders } from "@/lib/serviceOrders/displayStatus";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Central de Operação — Gestão Lemarc" }] }),
@@ -309,7 +309,7 @@ function averageWorkedTimeLabel(orders: ServiceOrder[]) {
   return minutes ? `${hours}h${String(minutes).padStart(2, "0")}` : `${hours}h`;
 }
 
-function buildCardSummaries(metrics: DashboardMetrics, pausedCount = 0) {
+function buildCardSummaries(metrics: DashboardMetrics, pausedCount = 0, techFinishedCount = 0) {
   const activeOrders = [
     ...metrics.pendingOrders,
     ...metrics.inProgressOrders,
@@ -333,8 +333,9 @@ function buildCardSummaries(metrics: DashboardMetrics, pausedCount = 0) {
       { label: "Abertas no período", value: metrics.pendingOrders.length },
     ],
     inProgress: [
-      { label: "Em execução", value: metrics.inProgress - pausedCount },
+      { label: "Em execução", value: metrics.inProgress - pausedCount - techFinishedCount },
       { label: "Pausadas", value: pausedCount },
+      { label: "Finalizadas pelo técnico", value: techFinishedCount },
       { label: "Técnicos em execução", value: metrics.techniciansInField },
       { label: "Deslocamentos", value: transitOrders.length },
     ],
@@ -382,9 +383,10 @@ function Dashboard() {
   const periodSearch = periodSearchParams(period, periodRange);
   const { data: timeState } = useRunningOrderTimeStateQuery();
   const pausedCount = countPausedOrders(metrics.inProgressOrders, timeState);
+  const techFinishedCount = countTechFinishedOrders(metrics.inProgressOrders, timeState);
   const summaries = useMemo(
-    () => buildCardSummaries(metrics, pausedCount),
-    [metrics, pausedCount],
+    () => buildCardSummaries(metrics, pausedCount, techFinishedCount),
+    [metrics, pausedCount, techFinishedCount],
   );
   const recent = useMemo(() => getRecentServiceOrders(orders, 4), [orders]);
   const recentOrderIds = useMemo(() => recent.map((order) => order.id), [recent]);
