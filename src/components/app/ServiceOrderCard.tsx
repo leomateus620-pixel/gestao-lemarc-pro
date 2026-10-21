@@ -55,7 +55,7 @@ import {
 } from "@/types/serviceOrder";
 import { formatTechnicianList, getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 
-type CardAccent = "orange" | "blue" | "amber" | "green" | "red" | "steel";
+type CardAccent = "orange" | "blue" | "amber" | "sky" | "green" | "red" | "steel";
 type ServiceOrderCardVariant = "default" | "dashboard";
 
 type ServiceOrderCardProps = {
