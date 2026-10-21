@@ -12,3 +12,8 @@
 - [x] Fase 4: apuração sem horas presumidas; finalizar com tempos abertos
 - [x] Fase 5: caches; PDF sem mudança (lê os mesmos lançamentos)
 - [x] Ajustes visuais equipe técnica (botões desabilitados, fundo do cartão)
+
+# Selo "Finalizada pelo técnico" (só exibição)
+- [x] Regra derivada + precedência (em andamento > pausada > finalizada pelo técnico)
+- [x] Selos em lista, cartão, cartão do técnico e cabeçalho; filtro próprio; contadores "Em campo"
+- [x] Testes Vitest
