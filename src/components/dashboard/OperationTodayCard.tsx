@@ -5,7 +5,11 @@ import type { DashboardMetrics } from "@/lib/serviceOrders/metrics";
 import type { Period, PeriodRange } from "@/lib/serviceOrders/period";
 import { periodContextLabel, periodLabel } from "@/lib/serviceOrders/period";
 import { useRunningOrderTimeStateQuery } from "@/hooks/useServiceOrders";
-import { countPausedOrders } from "@/lib/serviceOrders/displayStatus";
+import {
+  countPausedOrders,
+  countTechFinishedOrders,
+  inFieldDetail,
+} from "@/lib/serviceOrders/displayStatus";
 
 function greetingPrefix(): string {
   const h = new Date().getHours();
@@ -28,6 +32,7 @@ export function OperationTodayCard({
   const pendingTotal = metrics.pending + metrics.inProgress + metrics.awaitingReview;
   const { data: timeState } = useRunningOrderTimeStateQuery();
   const pausedCount = countPausedOrders(metrics.inProgressOrders, timeState);
+  const techFinishedCount = countTechFinishedOrders(metrics.inProgressOrders, timeState);
   const contextLabel = periodContextLabel(period, periodRange);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -135,11 +140,7 @@ export function OperationTodayCard({
             value={metrics.inProgress}
             icon={Activity}
             tone="orange"
-            hint={
-              pausedCount > 0
-                ? `${metrics.inProgress - pausedCount} em execução · ${pausedCount} ${pausedCount === 1 ? "pausada" : "pausadas"}`
-                : undefined
-            }
+            hint={inFieldDetail(metrics.inProgress, pausedCount, techFinishedCount)}
           />
           <Stat
             label="Aguard. revisão"

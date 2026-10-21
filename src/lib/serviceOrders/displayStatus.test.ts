@@ -100,11 +100,12 @@ describe("getOrderDisplayStatus", () => {
     expect(d.pausedCount).toBe(0);
   });
 
-  it("todos encerrados com finish sem pausa → Em execução", () => {
+  it("todos encerrados (#1272) → Finalizada pelo técnico", () => {
     const d = getOrderDisplayStatus({ status: "running" }, [
       s({ ended_at: "2026-10-02T15:00:00Z", duration_minutes: 240, end_reason: "finish" }),
     ]);
-    expect(d.key).toBe("running");
+    expect(d.key).toBe("tech_finished");
+    expect(d.label).toBe("Finalizada pelo técnico");
   });
 
   it("ignora sessões sem técnico e de deslocamento", () => {

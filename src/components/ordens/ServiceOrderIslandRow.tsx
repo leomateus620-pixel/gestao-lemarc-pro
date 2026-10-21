@@ -1,6 +1,6 @@
 import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
 import {
-  PAUSED_BADGE_TONE,
+  derivedBadgeTone,
   pausedSubLabel,
   type OrderDisplayStatus,
 } from "@/lib/serviceOrders/displayStatus";
@@ -365,7 +365,7 @@ function StatusPill({
   display?: OrderDisplayStatus;
   compact?: boolean;
 }) {
-  const paused = display?.key === "paused";
+  const derivedTone = derivedBadgeTone(display);
   const sub = display ? pausedSubLabel(display) : null;
   return (
     <>
@@ -373,11 +373,11 @@ function StatusPill({
         className={cn(
           "inline-flex w-fit items-center gap-1.5 rounded-full border font-black uppercase tracking-[0.04em]",
           compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
-          paused ? PAUSED_BADGE_TONE : statusTone[status],
+          derivedTone ?? statusTone[status],
         )}
       >
         <span className="size-1.5 rounded-full bg-current" />
-        {paused ? display!.label : statusLabel[status]}
+        {derivedTone ? display!.label : statusLabel[status]}
       </span>
       {sub && <span className="text-[9px] font-bold text-amber-200/90">{sub}</span>}
     </>

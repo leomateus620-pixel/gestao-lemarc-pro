@@ -29,7 +29,7 @@ import { usePhysicsCard } from "@/hooks/usePhysicsCard";
 import { isAlert, isIncomplete, missingFields, statusBucket } from "@/lib/serviceOrders/status";
 import { useOrderDisplayStatus } from "@/hooks/useServiceOrders";
 import {
-  PAUSED_BADGE_TONE,
+  derivedBadgeTone,
   pausedSubLabel,
   type OrderDisplayStatus,
 } from "@/lib/serviceOrders/displayStatus";
@@ -55,7 +55,7 @@ import {
 } from "@/types/serviceOrder";
 import { formatTechnicianList, getOrderTechnicians } from "@/lib/serviceOrders/technicians";
 
-type CardAccent = "orange" | "blue" | "amber" | "green" | "red" | "steel";
+type CardAccent = "orange" | "blue" | "amber" | "sky" | "green" | "red" | "steel";
 type ServiceOrderCardVariant = "default" | "dashboard";
 
 type ServiceOrderCardProps = {
@@ -68,6 +68,7 @@ const accentConfig: Record<CardAccent, { color: string; glow: string }> = {
   orange: { color: "var(--primary)", glow: "oklch(0.72 0.19 50 / 0.42)" },
   blue: { color: "var(--status-transit)", glow: "oklch(0.7 0.15 230 / 0.34)" },
   amber: { color: "var(--status-review)", glow: "oklch(0.78 0.16 90 / 0.34)" },
+  sky: { color: "oklch(0.78 0.12 230)", glow: "oklch(0.78 0.12 230 / 0.34)" },
   green: { color: "var(--status-done)", glow: "oklch(0.7 0.16 155 / 0.28)" },
   red: { color: "var(--destructive)", glow: "oklch(0.62 0.22 25 / 0.36)" },
   steel: { color: "var(--status-pending)", glow: "oklch(0.72 0.025 250 / 0.26)" },
@@ -91,9 +92,10 @@ const priorityTone: Record<ServicePriority, string> = {
   urgente: "border-destructive/[0.45] bg-destructive/[0.13] text-destructive",
 };
 
-function cardAccent(order: ServiceOrder, paused = false): CardAccent {
+function cardAccent(order: ServiceOrder, paused = false, techFinished = false): CardAccent {
   if (order.priority === "urgente" || isAlert(order)) return "red";
   if (paused) return "amber";
+  if (techFinished) return "sky";
 
   const bucket = statusBucket[order.status];
   if (bucket === "pending") return "orange";
@@ -106,7 +108,7 @@ function cardAccent(order: ServiceOrder, paused = false): CardAccent {
 
 export function ServiceOrderCard({ order, children, variant = "default" }: ServiceOrderCardProps) {
   const displayStatus = useOrderDisplayStatus(order);
-  const accent = accentConfig[cardAccent(order, displayStatus.key === "paused")];
+  const accent = accentConfig[cardAccent(order, displayStatus.key === "paused", displayStatus.key === "tech_finished")];
   const navigate = useNavigate();
   const isDashboardVariant = variant === "dashboard";
   const physics = usePhysicsCard<HTMLDivElement>({
@@ -395,18 +397,18 @@ function ServiceOrderStatusBadge({
   status: ServiceOrderStatus;
   display?: OrderDisplayStatus;
 }) {
-  const paused = display?.key === "paused";
+  const derivedTone = derivedBadgeTone(display);
   const sub = display ? pausedSubLabel(display) : null;
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <span
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.12em]",
-          paused ? PAUSED_BADGE_TONE : statusTone[status],
+          derivedTone ?? statusTone[status],
         )}
       >
         <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_9px_currentColor]" />
-        {paused ? display!.label : statusLabel[status]}
+        {derivedTone ? display!.label : statusLabel[status]}
       </span>
       {sub && (
         <span className="text-[0.6rem] font-bold text-amber-300/90">{sub}</span>
