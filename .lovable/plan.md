@@ -1,53 +1,63 @@
-# Relatório de uso do banco (só leitura — sem implementação)
+# Selo "Finalizada pelo técnico" (só exibição)
 
-Data: 20/10/2026. Nada foi alterado.
+## Regra exata
+Vale somente para OS gravadas como `running`. Nas outras OS, nada muda.
 
-## 1) Tamanho e limites
-- Banco: 82,6 MB; disco de dados em 18% de uso. Fonte: `db_health` e `pg_database_size`.
-- Log de transações (WAL): 96 MB (normal, é reciclado). Fonte: `db_health`.
-- Limites do plano: não consultei a cobrança. O disco está com folga de cerca de 80%. O limite exato aparece em Backend → Advanced settings.
+Considera só as sessões de trabalho (`kind = work`) que têm técnico. Para cada técnico com sessão, o estado vem da regra que já existe (`getTechnicianState`).
 
-## 2) Maiores tabelas (tamanho total com índices; linhas estimadas)
-Fonte: `pg_total_relation_size` / `reltuples` (estimativa do Postgres).
-| Tabela | Total | Linhas |
-|---|---|---|
-| service_order_signatures | 11 MB | 176 |
-| notification_delivery_log | 632 kB | 718 |
-| service_order_notifications | 536 kB | 326 |
-| service_order_time_sessions | 416 kB | 660 |
-| service_order_labor_entries | 312 kB | 673 |
-| service_orders | 264 kB | 191 |
-| service_order_technicians | 216 kB | 336 |
-As tabelas de Leitos Aramados são quase vazias (menos de 100 kB).
-As assinaturas pesam cerca de 65 kB por linha porque a imagem fica gravada no campo `signature_data_url`.
+Ordem de prioridade:
+1. Algum técnico em andamento: **Em execução**. Aparece "N pausados" no rótulo menor, como hoje. Ex.: #1267, #1275.
+2. Ninguém em andamento e algum pausado: **Pausada**, como hoje. Ex.: #1266, #1248.
+3. Ninguém em andamento nem pausado, e pelo menos uma sessão encerrada: **Finalizada pelo técnico**. Ex.: #1246, #1272, #1274.
+4. Nenhuma sessão de trabalho: **Em execução**, como hoje. Isso preserva as OS antigas iniciadas sem cronômetro.
 
-## 3) Arquivos (storage)
-Fonte: `storage.objects`, campo metadata.size.
-| Bucket | Arquivos | Tamanho |
-|---|---|---|
-| service-order-attachments (fotos) | 272 | 77 MB |
-| service-order-materials (PDFs) | 63 | 13 MB |
-| service-order-signatures | 250 | 10 MB |
-Total de cerca de 100 MB.
+**Técnico vinculado que nunca iniciou:** não impede o novo selo. Concordo com a proposta. Ele não tem sessão aberta e não segura tempo. Se ele bloqueasse o selo, uma OS em que o admin vinculou alguém "por via das dúvidas" ficaria para sempre "Em execução", que é o problema de hoje. Ele continua aparecendo como "Não iniciado" no cartão da equipe, e o admin decide ao finalizar. Consequência: nenhuma consulta nova aos técnicos vinculados.
 
-## 4) Crescimento por mês (contagem de created_at)
-| Mês | OS | Sessões de tempo | Fotos | Log de push |
-|---|---|---|---|---|
-| 07/2026 | 19 | 41 | 29 | – |
-| 08 | 59 | 210 | 86 | – |
-| 09 | 62 | 253 | 81 | 305 |
-| 10 (até dia 20) | 53 | 173 | 59 | 450 |
-O ritmo está estável em cerca de 60 OS por mês. O log de push é o item que mais cresce. A estimativa é de 1 a 2 MB de banco e de 25 a 30 MB de arquivos por mês, ou seja, anos de folga.
+**Reabrir tempo / Voltar a trabalhar:** abre uma nova sessão, então a OS volta sozinha para Em execução. Uma pausa depois disso leva a Pausada.
 
-## 5) Conexões e desempenho
-- Conexões: 12 de 60; pool 1 de 200; memória em 61%; nenhum alerta em 48 h. Fonte: `db_health`.
-- Consulta mais lenta: a lista de OS. Foram 3.108 chamadas, com média de 388 ms e pico de 4,1 s. Fonte: `slow_queries`. Ela carrega junto o `signature_data_url` (a imagem da assinatura) de cada OS. A causa provável é esse volume de dados, não a falta de índice. Isso ainda não foi confirmado com EXPLAIN.
-- 1.025 transações desfeitas desde o último reinício. É baixo e esperado, porque as RPCs recusam operações inválidas.
-- Não fiz a varredura de índices faltando.
+## O que NÃO muda
+O status gravado e os seus valores possíveis, a finalização (o botão "Finalizar OS" continua disponível), a apuração de horas, o PDF, as permissões e o banco.
 
-## 6) Riscos e recomendações (só sugestões)
-1. Tirar a imagem da assinatura da consulta da lista de OS. É o maior ganho de velocidade, principalmente no celular.
-2. A longo prazo, guardar as assinaturas só como arquivo, sem a cópia dentro do banco.
-3. Definir quanto tempo guardar o log de push (por exemplo, 90 dias).
-4. Fotos: comprimir no envio, se ainda não for feito. É o que mais ocupa espaço.
-5. Não há necessidade de aumentar o servidor nem o disco agora.
+## Arquivos
+- `src/lib/serviceOrders/displayStatus.ts`:
+  - `OrderTimeSummary.key` passa a ser `"running" | "paused" | "tech_finished"`, com o novo `finishedCount`.
+  - `DisplayStatusKey` ganha `"tech_finished"`.
+  - `summarizeOrderTime` aplica as prioridades 1 a 4.
+  - `displayFromSummary` passa a devolver o rótulo "Finalizada pelo técnico".
+  - Nova constante `TECH_FINISHED_BADGE_TONE`.
+  - Nova função `countTechFinishedOrders`.
+  - `countPausedOrders` não muda.
+- `src/lib/api/timeSessions.functions.ts` (`listRunningOrderTimeState`): só o tipo do retorno muda, porque a função já reaproveita `summarizeOrderTime`. A atualização a cada 30 s e ao voltar para a tela continua igual (`useServiceOrders.ts`).
+- O selo: `ServiceOrderStatusBadge`, o mesmo arquivo do `ServiceOrderCard`, ganha o tom novo. `ServiceOrderCard` (`cardAccent`), `ServiceOrderIslandRow`, `TechnicianOrderCard`/`TechnicianOrderList` e o cabeçalho de `_app.ordens.$id.tsx` (que já usa `getOrderDisplayStatus`) passam a exibir o novo estado sem lógica própria.
+- `src/routes/_app.ordens.index.tsx`:
+  - novo filtro "Finalizada pelo técnico", com a mesma lógica do filtro Pausada (linha 402);
+  - o filtro "Em execução" deixa de incluir essas OS.
+- Contadores (`_app.ordens.index.tsx` linha 311, `_app.dashboard.tsx`, `OperationTodayCard.tsx`):
+  - **"Em campo"** continua contando todas as OS `running`, porque o admin ainda precisa agir nelas;
+  - o rótulo menor fica: "X em execução · Y pausadas · Z finalizadas pelo técnico";
+  - "em execução" passa a ser em campo − pausadas − finalizadas pelo técnico.
+
+## Cor
+Um tom ciano/azul-claro da paleta: borda `sky-400/50`, fundo `sky-500/15`, texto `sky-200`. Ele se distingue do verde de Em execução, do âmbar de Pausada e do laranja (cor principal) de Finalizada. Acento lateral do cartão no mesmo tom.
+
+## Testes (Vitest, `displayStatus.test.ts`)
+- Um técnico: em andamento → Em execução; pausa → Pausada; retoma → Em execução; encerra → Finalizada pelo técnico; reabre → Em execução.
+- Encerrado + pausado → Pausada.
+- Encerrado + em andamento → Em execução.
+- Encerrado + vinculado que nunca iniciou → Finalizada pelo técnico.
+- OS sem sessões → Em execução.
+- OS `finished`, `review`, `approved` ou `pending` com sessões encerradas → status original, sem mudança.
+- `countTechFinishedOrders` e `countPausedOrders` com uma mistura de OS.
+- Os 13 casos atuais continuam passando.
+
+## Riscos
+- Uma OS em que o técnico encerrou sem querer aparece como "Finalizada pelo técnico" até alguém reabrir o tempo. É o comportamento desejado, mas é bom avisar a equipe.
+- Sessões criadas sem `technician_id` são ignoradas, como hoje.
+- Durante o intervalo de até 30 s da atualização, o selo pode ficar defasado.
+
+## Perguntas em aberto
+1. O texto do selo é longo no celular. Usar "Finalizada pelo técnico" por extenso ou "Fin. técnico" no cartão compacto?
+2. Na tela do técnico, o próprio técnico também deve ver esse selo, ou só o admin?
+3. "Em campo" continua contando essas OS (proposta: sim) ou elas saem do total?
+
+Observação: o roadmap não foi atualizado agora porque, neste modo, só o plano pode ser editado. Será incluído ao implementar.
