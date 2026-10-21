@@ -188,7 +188,7 @@ export function ServiceOrderIslandRow({
             </span>
 
             <span className="flex min-w-0 items-center justify-between gap-2">
-              <OrderStatusCluster status={order.status} priority={order.priority} compact />
+              <OrderStatusCluster status={order.status} display={displayStatus} priority={order.priority} compact />
               {openedChipLabel && <OrderOpenedChip label={openedChipLabel} />}
             </span>
 
