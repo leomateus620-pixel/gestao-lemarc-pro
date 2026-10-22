@@ -555,9 +555,15 @@ export const finishWork = createServerFn({ method: "POST" })
     const result = emptyBatch();
     for (const technicianId of scope) {
       try {
+        const open = await findOpenWork(sb, data.orderId, technicianId).catch(() => null);
+        const patch: Record<string, unknown> = {
+          ended_at: new Date().toISOString(),
+          end_reason: "finish",
+        };
+        if (open) patch.metadata = { ...((open as any).metadata ?? {}), ended_by: context.userId };
         const { data: closedRows, error } = await writer
           .from("service_order_time_sessions")
-          .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
+          .update(patch)
           .eq("service_order_id", data.orderId)
           .eq("technician_id", technicianId)
           .eq("kind", "work")
