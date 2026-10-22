@@ -1,63 +1,63 @@
-# Selo "Finalizada pelo técnico" (só exibição)
+# Técnico age sobre colegas da mesma OS
 
-## Regra exata
-Vale somente para OS gravadas como `running`. Nas outras OS, nada muda.
+## O que já existe (lido no código)
+- `resolveScope` (timeSessions.functions.ts l.299): ids pedidos precisam estar vinculados à OS (`service_order_technicians` + técnico principal); senão "Técnico não vinculado a esta OS.". Com `requireExplicitScope`, vazio é rejeitado.
+- `startWork` / `pauseWork` / `resumeWork` / `finishWork` chamam `assertOrderTimeAccess` (admin OU `user_is_order_technician`) e gravam `created_by = context.userId` nas sessões novas.
+- `startWork` com técnico encerrado já abre uma sessão nova ("Voltar a trabalhar" usa esse caminho).
+- **Lacunas encontradas:** (a) `resolveScope` NÃO confere se o técnico alvo está ativo; (b) `startWork`/`resumeWork` não recusam OS fechada (finished/review/approved/cancelled) no servidor — só a tela esconde; (c) a pausa/encerramento gravam o ator em `adjusted_by`? Só no fechamento automático; pausa/encerramento manuais serão conferidos e, se não gravam o ator, passam a gravar em `metadata.actor_user_id` (sem migration).
 
-Considera só as sessões de trabalho (`kind = work`) que têm técnico. Para cada técnico com sessão, o estado vem da regra que já existe (`getTechnicianState`).
+## 1. Ações por linha nos colegas (OrderTeamCard)
+- `teamRowActions`: remover a regra `!isAdmin && !isOwnRow → []`. Técnico da OS recebe nas linhas dos colegas as mesmas ações do admin: Iniciar, Pausar, Retomar, Encerrar, Voltar a trabalhar. Continua tudo só com OS `running`.
+- Técnico não vinculado à OS: nenhuma ação (novo parâmetro `isOrderTechnician`).
+- Ação em outra pessoa pede confirmação curta inline (mesmo padrão do "Confirmar encerramento"): "Voltar a trabalhar para José?", "Pausar José?", "Encerrar José?", "Iniciar para José?". Na própria linha, comportamento igual ao de hoje.
+- Na linha do colega o rótulo usa a forma neutra ("Iniciar", "Pausar", "Retomar", "Reabrir tempo" → passa a ser "Voltar a trabalhar" também, para ficar igual ao pedido; "Encerrar").
+- "Iniciar minhas horas" (própria linha) continua usando `team_start_own`, sem mudança.
 
-Ordem de prioridade:
-1. Algum técnico em andamento: **Em execução**. Aparece "N pausados" no rótulo menor, como hoje. Ex.: #1267, #1275.
-2. Ninguém em andamento e algum pausado: **Pausada**, como hoje. Ex.: #1266, #1248.
-3. Ninguém em andamento nem pausado, e pelo menos uma sessão encerrada: **Finalizada pelo técnico**. Ex.: #1246, #1272, #1274.
-4. Nenhuma sessão de trabalho: **Em execução**, como hoje. Isso preserva as OS antigas iniciadas sem cronômetro.
+## 2. Botão "Voltar a trabalhar com a equipe" (ServiceOrderTimeControl)
+- Aparece quando há pelo menos um técnico encerrado ou pausado e a OS está `running` (admin e técnico da OS).
+- Abre um diálogo novo `ResumeTeamDialog` listando encerrados e pausados, cada um com caixa marcada; o usuário pode desmarcar. Botão confirmar desabilitado com zero marcados.
+- Ao confirmar: pausados → `resumeWork({ technicianIds, requireExplicitScope: true })`; encerrados → `startWork({ technicianIds, requireExplicitScope: true })`. Em andamento e nunca iniciados não aparecem.
+- "Retomar a equipe (N)" atual é substituído por esse botão quando houver encerrados; se só houver pausados, mantém o fluxo atual também com confirmação de lista (mesmo diálogo).
+- Nunca reinício automático: "Iniciar para a equipe" continua só para quem nunca iniciou.
 
-**Técnico vinculado que nunca iniciou:** não impede o novo selo. Concordo com a proposta. Ele não tem sessão aberta e não segura tempo. Se ele bloqueasse o selo, uma OS em que o admin vinculou alguém "por via das dúvidas" ficaria para sempre "Em execução", que é o problema de hoje. Ele continua aparecendo como "Não iniciado" no cartão da equipe, e o admin decide ao finalizar. Consequência: nenhuma consulta nova aos técnicos vinculados.
+## 3. Servidor
+- Todas as ações novas enviam `technicianIds` explícitos + `requireExplicitScope: true`.
+- `resolveScope` passa a recusar técnico inativo ("Técnico inativo.") — leitura de `technicians.active`.
+- `startWork`, `resumeWork`, `pauseWork`, `finishWork` passam a recusar OS fora de `running` quando vêm do card da equipe (`requireExplicitScope`), preservando o caminho legado que coloca OS pending/dispatched/transit em `running` ao iniciar.
+- Ator registrado: `created_by` nas sessões novas (já existe); pausa/encerramento gravam `metadata.actor_user_id` se hoje não registram ninguém.
+- Extrair a validação pura para `src/lib/serviceOrders/teamScope.ts` (`validateTeamScope({ requested, assigned, activeIds })`) para poder testar sem banco.
+- Sem migration, sem mudança de RLS, sem escrita no banco durante a validação.
 
-**Reabrir tempo / Voltar a trabalhar:** abre uma nova sessão, então a OS volta sozinha para Em execução. Uma pausa depois disso leva a Pausada.
+## 4. Sem regressão
+- Admin: mesmas ações e rótulos de hoje (só ganha a confirmação ao agir em outra pessoa? Não: admin fica igual, sem confirmação extra).
+- Selos derivados (`summarizeOrderTime`) não mudam; voltam sozinhos a Em execução / Pausada / Finalizada pelo técnico conforme as sessões.
+- Apuração, revisão, PDF, `team_link_technicians`, `team_start_own` inalterados.
 
-## O que NÃO muda
-O status gravado e os seus valores possíveis, a finalização (o botão "Finalizar OS" continua disponível), a apuração de horas, o PDF, as permissões e o banco.
+## Testes (Vitest)
+- `teamActions.test.ts`: técnico vê Pausar/Encerrar em colega em andamento, Retomar/Encerrar em pausado, Voltar a trabalhar em encerrado, Iniciar em nunca iniciado; técnico não vinculado → nenhuma ação; admin inalterado (todos os casos atuais); OS não-running → nada.
+- `teamScope.test.ts`: vazio rejeitado; alvo não vinculado rejeitado; alvo inativo rejeitado; seleção parcial devolve só os marcados.
+- Novo `resumeTeamSelection` (puro): separa marcados em `resumeIds` (pausados) e `restartIds` (encerrados); desmarcados ficam de fora; em andamento/idle nunca entram.
+- `displayStatus.test.ts`: sequência #1267 — os dois encerrados → Finalizada pelo técnico; técnico volta José → Em execução; pausa José com Matheus encerrado → Pausada; encerra → Finalizada pelo técnico.
+- Os testes atuais continuam passando (exceto a falha antiga de Leitos Aramados).
 
 ## Arquivos
-- `src/lib/serviceOrders/displayStatus.ts`:
-  - `OrderTimeSummary.key` passa a ser `"running" | "paused" | "tech_finished"`, com o novo `finishedCount`.
-  - `DisplayStatusKey` ganha `"tech_finished"`.
-  - `summarizeOrderTime` aplica as prioridades 1 a 4.
-  - `displayFromSummary` passa a devolver o rótulo "Finalizada pelo técnico".
-  - Nova constante `TECH_FINISHED_BADGE_TONE`.
-  - Nova função `countTechFinishedOrders`.
-  - `countPausedOrders` não muda.
-- `src/lib/api/timeSessions.functions.ts` (`listRunningOrderTimeState`): só o tipo do retorno muda, porque a função já reaproveita `summarizeOrderTime`. A atualização a cada 30 s e ao voltar para a tela continua igual (`useServiceOrders.ts`).
-- O selo: `ServiceOrderStatusBadge`, o mesmo arquivo do `ServiceOrderCard`, ganha o tom novo. `ServiceOrderCard` (`cardAccent`), `ServiceOrderIslandRow`, `TechnicianOrderCard`/`TechnicianOrderList` e o cabeçalho de `_app.ordens.$id.tsx` (que já usa `getOrderDisplayStatus`) passam a exibir o novo estado sem lógica própria.
-- `src/routes/_app.ordens.index.tsx`:
-  - novo filtro "Finalizada pelo técnico", com a mesma lógica do filtro Pausada (linha 402);
-  - o filtro "Em execução" deixa de incluir essas OS.
-- Contadores (`_app.ordens.index.tsx` linha 311, `_app.dashboard.tsx`, `OperationTodayCard.tsx`):
-  - **"Em campo"** continua contando todas as OS `running`, porque o admin ainda precisa agir nelas;
-  - o rótulo menor fica: "X em execução · Y pausadas · Z finalizadas pelo técnico";
-  - "em execução" passa a ser em campo − pausadas − finalizadas pelo técnico.
-
-## Cor
-Um tom ciano/azul-claro da paleta: borda `sky-400/50`, fundo `sky-500/15`, texto `sky-200`. Ele se distingue do verde de Em execução, do âmbar de Pausada e do laranja (cor principal) de Finalizada. Acento lateral do cartão no mesmo tom.
-
-## Testes (Vitest, `displayStatus.test.ts`)
-- Um técnico: em andamento → Em execução; pausa → Pausada; retoma → Em execução; encerra → Finalizada pelo técnico; reabre → Em execução.
-- Encerrado + pausado → Pausada.
-- Encerrado + em andamento → Em execução.
-- Encerrado + vinculado que nunca iniciou → Finalizada pelo técnico.
-- OS sem sessões → Em execução.
-- OS `finished`, `review`, `approved` ou `pending` com sessões encerradas → status original, sem mudança.
-- `countTechFinishedOrders` e `countPausedOrders` com uma mistura de OS.
-- Os 13 casos atuais continuam passando.
+- `src/lib/serviceOrders/teamActions.ts` (+ teste)
+- `src/lib/serviceOrders/teamScope.ts` (novo, + teste)
+- `src/components/ordens/OrderTeamCard.tsx`
+- `src/components/ordens/ResumeTeamDialog.tsx` (novo)
+- `src/components/ordens/ServiceOrderTimeControl.tsx`
+- `src/routes/_app.ordens.$id.tsx` (passar `isOrderTechnician`, roteamento das ações de colega)
+- `src/lib/api/timeSessions.functions.ts` (`resolveScope`, guarda de status)
+- `src/lib/serviceOrders/displayStatus.test.ts`, `AGENTS.md` (substituir a regra do card: técnico da OS age em todas as linhas), `roadmap.md`
 
 ## Riscos
-- Uma OS em que o técnico encerrou sem querer aparece como "Finalizada pelo técnico" até alguém reabrir o tempo. É o comportamento desejado, mas é bom avisar a equipe.
-- Sessões criadas sem `technician_id` são ignoradas, como hoje.
-- Durante o intervalo de até 30 s da atualização, o selo pode ficar defasado.
+- Um técnico pode pausar/encerrar um colega por engano; a confirmação reduz, e o ator fica registrado.
+- Duplo toque no diálogo: o servidor já pula quem está em andamento ("Já estava com tempo em andamento"), então não abre duas sessões; não é idempotente por chave como `team_start_own`.
+- Notificação: agir sobre colega não envia aviso (hoje também não).
+- Concorrência real técnico×técnico não será testada no banco (regra de não escrever em produção).
 
 ## Perguntas em aberto
-1. O texto do selo é longo no celular. Usar "Finalizada pelo técnico" por extenso ou "Fin. técnico" no cartão compacto?
-2. Na tela do técnico, o próprio técnico também deve ver esse selo, ou só o admin?
-3. "Em campo" continua contando essas OS (proposta: sim) ou elas saem do total?
-
-Observação: o roadmap não foi atualizado agora porque, neste modo, só o plano pode ser editado. Será incluído ao implementar.
+1. O admin também deve ver a confirmação curta ao agir sobre outra pessoa, ou fica como hoje (sem)? Proposta: como hoje.
+2. Na linha do colega encerrado, rótulo "Voltar a trabalhar" (proposta) ou manter "Reabrir tempo"?
+3. Avisar o colega por notificação quando outro técnico pausa/encerra/retoma o tempo dele? Proposta: não, nesta etapa.
+4. Recusar técnico inativo como alvo — confirma? (hoje não é recusado.)
