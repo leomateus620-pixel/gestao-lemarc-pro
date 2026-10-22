@@ -343,11 +343,16 @@ export function ServiceOrderTimeControl({ order }: Props) {
     states.filter(fn).map((s) => s.tech.id);
   // Só quem nunca começou: encerrados voltam apenas por ação deliberada na linha.
   const startableIds = teamStartableIds(states.map(({ tech, st }) => ({ id: tech.id, state: st.state })));
+  const finishedIds = states.filter(({ st }) => st.state === "finished").map((s) => s.tech.id);
   const runningIds = idsWhere(({ st }) => st.state === "running");
   const pausedIds = idsWhere(({ st }) => st.state === "paused");
   const isTeam = technicians.length > 1;
   const anyPending =
-    startMut.isPending || pauseMut.isPending || resumeMut.isPending || finishMut.isPending;
+    startMut.isPending ||
+    pauseMut.isPending ||
+    resumeMut.isPending ||
+    finishMut.isPending ||
+    resumeTeamMut.isPending;
   void isTecnico;
   // OS encerrada: o controle vira somente leitura (totais + histórico), sem
   // iniciar/pausar/retomar/encerrar. Ajustes ficam na "Apuração de horas".
@@ -370,6 +375,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
       order={order}
       rows={teamRows}
       isAdmin={isAdmin}
+      isOrderTechnician={!!myTechId}
       myTechId={myTechId}
       busyKey={busyKey}
       onAction={(action, row) => onRowAction(action, row.tech.id)}
@@ -422,14 +428,27 @@ export function ServiceOrderTimeControl({ order }: Props) {
               <Pause size={16} /> Pausar{isTeam ? ` (${runningIds.length})` : ""}
             </Button>
           )}
-          {pausedIds.length > 0 && (
+          {finishedIds.length > 0 ? (
             <Button
               className="min-h-11 flex-1 gap-2"
-              onClick={() => resumeMut.mutate(pausedIds)}
+              onClick={() => setResumeTeamOpen(true)}
               disabled={anyPending}
             >
-              <Play size={16} /> Retomar{isTeam ? ` a equipe (${pausedIds.length})` : ""}
+              <RotateCcw size={16} />
+              {isTeam ? "Voltar a trabalhar com a equipe" : "Voltar a trabalhar"}
             </Button>
+          ) : (
+            pausedIds.length > 0 && (
+              <Button
+                className="min-h-11 flex-1 gap-2"
+                onClick={() =>
+                  isAdmin || !isTeam ? resumeMut.mutate(pausedIds) : setResumeTeamOpen(true)
+                }
+                disabled={anyPending}
+              >
+                <Play size={16} /> Retomar{isTeam ? ` a equipe (${pausedIds.length})` : ""}
+              </Button>
+            )
           )}
           {runningIds.length > 0 && (
             <Button
