@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Pause, Play, Square } from "lucide-react";
+import { Pause, Play, RotateCcw, Square } from "lucide-react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import { linkOrderTechnicians } from "@/lib/api/serviceOrders.functions";
 import { teamStartableIds, type TeamRowAction } from "@/lib/serviceOrders/teamActions";
 import { invalidateOrderTeamQueries } from "@/lib/serviceOrders/teamCache";
 import { OrderTeamCard } from "./OrderTeamCard";
+import { ResumeTeamDialog } from "./ResumeTeamDialog";
+import { resumeTeamSelection } from "@/lib/serviceOrders/teamScope";
 import {
   computeTechnicianWorkedMinutes,
   getOrderLiveState,
@@ -494,6 +496,27 @@ export function ServiceOrderTimeControl({ order }: Props) {
         pending={pauseMut.isPending}
         onConfirm={({ technicianIds, reason, notes }) =>
           pauseMut.mutate({ technicianIds, reason, notes })
+        }
+      />
+
+      <ResumeTeamDialog
+        open={resumeTeamOpen}
+        onOpenChange={setResumeTeamOpen}
+        pending={resumeTeamMut.isPending}
+        items={states
+          .filter(({ st }) => st.state === "paused" || st.state === "finished")
+          .map(({ tech, st }) => ({
+            id: tech.id,
+            name: tech.full_name,
+            state: st.state as "paused" | "finished",
+          }))}
+        onConfirm={(selected) =>
+          resumeTeamMut.mutate(
+            resumeTeamSelection(
+              states.map(({ tech, st }) => ({ id: tech.id, state: st.state })),
+              selected,
+            ),
+          )
         }
       />
 
