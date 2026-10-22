@@ -168,6 +168,34 @@ export function ServiceOrderTimeControl({ order }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar"),
   });
 
+  // "Voltar a trabalhar com a equipe": pausados retomam, encerrados reabrem.
+  // Sempre com a lista confirmada pelo usuário (nunca reinício automático).
+  const [resumeTeamOpen, setResumeTeamOpen] = useState(false);
+  const resumeTeamMut = useMutation({
+    mutationFn: async (ids: { resumeIds: string[]; restartIds: string[] }) => {
+      const succeeded: string[] = [];
+      if (ids.resumeIds.length > 0) {
+        const r = await resumeFn({
+          data: { orderId: order.id, technicianIds: ids.resumeIds, requireExplicitScope: true },
+        });
+        succeeded.push(...r.succeeded);
+      }
+      if (ids.restartIds.length > 0) {
+        const r = await startFn({
+          data: { orderId: order.id, technicianIds: ids.restartIds, requireExplicitScope: true },
+        });
+        succeeded.push(...r.succeeded);
+      }
+      return { succeeded };
+    },
+    onSuccess: (result) => {
+      setResumeTeamOpen(false);
+      reportBatch(result, "Voltou a trabalhar");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao voltar a trabalhar"),
+    onSettled: () => invalidate(),
+  });
+
   const [openTimeAlert, setOpenTimeAlert] = useState<OpenTimeAlertDetails | null>(null);
   const finishColleagueMut = useMutation({
     mutationFn: (technicianId: string) =>
