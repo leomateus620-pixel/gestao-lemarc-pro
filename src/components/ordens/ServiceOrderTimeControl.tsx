@@ -230,6 +230,15 @@ export function ServiceOrderTimeControl({ order }: Props) {
           const r = await startOwnFn({ data: { orderId: order.id, requestKey: keyFor(k) } });
           return r.alreadyRunning ? "Seu tempo já estava em andamento." : "Suas horas foram iniciadas.";
         }
+        if (!isAdmin) {
+          // Técnico da OS iniciando/reabrindo o tempo de um colega.
+          const r = await startFn({
+            data: { orderId: order.id, technicianIds: [techId], requireExplicitScope: true },
+          });
+          return r.succeeded.length > 0
+            ? `Tempo iniciado: ${techName(techId)}.`
+            : "O tempo já estava em andamento.";
+        }
         const r = await linkFn({
           data: { orderId: order.id, technicianIds: [techId], start: true, requestKey: keyFor(k) },
         });
