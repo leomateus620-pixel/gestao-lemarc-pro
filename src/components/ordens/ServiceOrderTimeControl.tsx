@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Pause, Play, Square } from "lucide-react";
+import { Pause, Play, RotateCcw, Square } from "lucide-react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import { linkOrderTechnicians } from "@/lib/api/serviceOrders.functions";
 import { teamStartableIds, type TeamRowAction } from "@/lib/serviceOrders/teamActions";
 import { invalidateOrderTeamQueries } from "@/lib/serviceOrders/teamCache";
 import { OrderTeamCard } from "./OrderTeamCard";
+import { ResumeTeamDialog } from "./ResumeTeamDialog";
+import { resumeTeamSelection } from "@/lib/serviceOrders/teamScope";
 import {
   computeTechnicianWorkedMinutes,
   getOrderLiveState,
@@ -168,6 +170,34 @@ export function ServiceOrderTimeControl({ order }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao encerrar"),
   });
 
+  // "Voltar a trabalhar com a equipe": pausados retomam, encerrados reabrem.
+  // Sempre com a lista confirmada pelo usuário (nunca reinício automático).
+  const [resumeTeamOpen, setResumeTeamOpen] = useState(false);
+  const resumeTeamMut = useMutation({
+    mutationFn: async (ids: { resumeIds: string[]; restartIds: string[] }) => {
+      const succeeded: string[] = [];
+      if (ids.resumeIds.length > 0) {
+        const r = await resumeFn({
+          data: { orderId: order.id, technicianIds: ids.resumeIds, requireExplicitScope: true },
+        });
+        succeeded.push(...r.succeeded);
+      }
+      if (ids.restartIds.length > 0) {
+        const r = await startFn({
+          data: { orderId: order.id, technicianIds: ids.restartIds, requireExplicitScope: true },
+        });
+        succeeded.push(...r.succeeded);
+      }
+      return { succeeded };
+    },
+    onSuccess: (result) => {
+      setResumeTeamOpen(false);
+      reportBatch(result, "Voltou a trabalhar");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao voltar a trabalhar"),
+    onSettled: () => invalidate(),
+  });
+
   const [openTimeAlert, setOpenTimeAlert] = useState<OpenTimeAlertDetails | null>(null);
   const finishColleagueMut = useMutation({
     mutationFn: (technicianId: string) =>
@@ -201,6 +231,15 @@ export function ServiceOrderTimeControl({ order }: Props) {
         if (techId === myTechId && !isAdmin) {
           const r = await startOwnFn({ data: { orderId: order.id, requestKey: keyFor(k) } });
           return r.alreadyRunning ? "Seu tempo já estava em andamento." : "Suas horas foram iniciadas.";
+        }
+        if (!isAdmin) {
+          // Técnico da OS iniciando/reabrindo o tempo de um colega.
+          const r = await startFn({
+            data: { orderId: order.id, technicianIds: [techId], requireExplicitScope: true },
+          });
+          return r.succeeded.length > 0
+            ? `Tempo iniciado: ${techName(techId)}.`
+            : "O tempo já estava em andamento.";
         }
         const r = await linkFn({
           data: { orderId: order.id, technicianIds: [techId], start: true, requestKey: keyFor(k) },
@@ -306,11 +345,16 @@ export function ServiceOrderTimeControl({ order }: Props) {
     states.filter(fn).map((s) => s.tech.id);
   // Só quem nunca começou: encerrados voltam apenas por ação deliberada na linha.
   const startableIds = teamStartableIds(states.map(({ tech, st }) => ({ id: tech.id, state: st.state })));
+  const finishedIds = states.filter(({ st }) => st.state === "finished").map((s) => s.tech.id);
   const runningIds = idsWhere(({ st }) => st.state === "running");
   const pausedIds = idsWhere(({ st }) => st.state === "paused");
   const isTeam = technicians.length > 1;
   const anyPending =
-    startMut.isPending || pauseMut.isPending || resumeMut.isPending || finishMut.isPending;
+    startMut.isPending ||
+    pauseMut.isPending ||
+    resumeMut.isPending ||
+    finishMut.isPending ||
+    resumeTeamMut.isPending;
   void isTecnico;
   // OS encerrada: o controle vira somente leitura (totais + histórico), sem
   // iniciar/pausar/retomar/encerrar. Ajustes ficam na "Apuração de horas".
@@ -333,6 +377,7 @@ export function ServiceOrderTimeControl({ order }: Props) {
       order={order}
       rows={teamRows}
       isAdmin={isAdmin}
+      isOrderTechnician={!!myTechId}
       myTechId={myTechId}
       busyKey={busyKey}
       onAction={(action, row) => onRowAction(action, row.tech.id)}
@@ -385,14 +430,27 @@ export function ServiceOrderTimeControl({ order }: Props) {
               <Pause size={16} /> Pausar{isTeam ? ` (${runningIds.length})` : ""}
             </Button>
           )}
-          {pausedIds.length > 0 && (
+          {finishedIds.length > 0 ? (
             <Button
               className="min-h-11 flex-1 gap-2"
-              onClick={() => resumeMut.mutate(pausedIds)}
+              onClick={() => setResumeTeamOpen(true)}
               disabled={anyPending}
             >
-              <Play size={16} /> Retomar{isTeam ? ` a equipe (${pausedIds.length})` : ""}
+              <RotateCcw size={16} />
+              {isTeam ? "Voltar a trabalhar com a equipe" : "Voltar a trabalhar"}
             </Button>
+          ) : (
+            pausedIds.length > 0 && (
+              <Button
+                className="min-h-11 flex-1 gap-2"
+                onClick={() =>
+                  isAdmin || !isTeam ? resumeMut.mutate(pausedIds) : setResumeTeamOpen(true)
+                }
+                disabled={anyPending}
+              >
+                <Play size={16} /> Retomar{isTeam ? ` a equipe (${pausedIds.length})` : ""}
+              </Button>
+            )
           )}
           {runningIds.length > 0 && (
             <Button
@@ -438,6 +496,27 @@ export function ServiceOrderTimeControl({ order }: Props) {
         pending={pauseMut.isPending}
         onConfirm={({ technicianIds, reason, notes }) =>
           pauseMut.mutate({ technicianIds, reason, notes })
+        }
+      />
+
+      <ResumeTeamDialog
+        open={resumeTeamOpen}
+        onOpenChange={setResumeTeamOpen}
+        pending={resumeTeamMut.isPending}
+        items={states
+          .filter(({ st }) => st.state === "paused" || st.state === "finished")
+          .map(({ tech, st }) => ({
+            id: tech.id,
+            name: tech.full_name,
+            state: st.state as "paused" | "finished",
+          }))}
+        onConfirm={(selected) =>
+          resumeTeamMut.mutate(
+            resumeTeamSelection(
+              states.map(({ tech, st }) => ({ id: tech.id, state: st.state })),
+              selected,
+            ),
+          )
         }
       />
 

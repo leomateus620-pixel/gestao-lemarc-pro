@@ -17,3 +17,9 @@
 - [x] Regra derivada + precedência (em andamento > pausada > finalizada pelo técnico)
 - [x] Selos em lista, cartão, cartão do técnico e cabeçalho; filtro próprio; contadores "Em campo"
 - [x] Testes Vitest
+
+# Técnico age sobre colegas da mesma OS
+- [x] Ações por linha nos colegas com confirmação curta
+- [x] "Voltar a trabalhar com a equipe" com lista para desmarcar
+- [x] Servidor: alvo ativo, OS em execução, ator registrado
+- [x] Testes Vitest

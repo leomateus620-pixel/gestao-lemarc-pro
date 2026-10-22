@@ -35,8 +35,8 @@ export function linkDialogOptions(status: ServiceOrderStatus): {
 }
 
 /**
- * Ações disponíveis numa linha do card. Admin age em qualquer linha; o técnico
- * só na própria linha e só se tiver usuário (o servidor confere de novo).
+ * Ações disponíveis numa linha do card. Admin e técnico vinculado à OS agem em
+ * qualquer linha da equipe; quem não é da OS não age (o servidor confere de novo).
  * Cronômetro individual só com a OS em execução.
  */
 export function teamRowActions(input: {
@@ -44,9 +44,11 @@ export function teamRowActions(input: {
   orderStatus: ServiceOrderStatus;
   isAdmin: boolean;
   isOwnRow: boolean;
+  /** Usuário é técnico vinculado a esta OS. */
+  isOrderTechnician?: boolean;
 }): TeamRowAction[] {
-  const { state, orderStatus, isAdmin, isOwnRow } = input;
-  if (!isAdmin && !isOwnRow) return [];
+  const { state, orderStatus, isAdmin, isOwnRow, isOrderTechnician = false } = input;
+  if (!isAdmin && !isOwnRow && !isOrderTechnician) return [];
   if (CLOSED_STATUSES.includes(orderStatus)) return [];
   if (orderStatus !== "running") return [];
   switch (state) {

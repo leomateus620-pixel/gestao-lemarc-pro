@@ -297,19 +297,41 @@ export const listOrderHistoryTechnicians = createServerFn({ method: "GET" })
  * pertencem à OS. Sem escopo explícito, aplica a toda a equipe.
  */
 async function resolveScope(sb: any, data: BatchInput): Promise<string[]> {
+  const { validateTeamScope, assertTeamOrderRunning } = await import(
+    "@/lib/serviceOrders/teamScope"
+  );
   const assigned = await listOrderTechnicianIds(sb, data.orderId);
   const requested = [
     ...(Array.isArray(data.technicianIds) ? data.technicianIds : []),
     ...(data.technicianId ? [data.technicianId] : []),
-  ].filter((id): id is string => typeof id === "string" && id.length > 0);
-  const unique = Array.from(new Set(requested));
-  if (unique.length === 0) {
-    if (data.requireExplicitScope) throw new Error("Selecione ao menos um técnico.");
-    return assigned;
+  ];
+  let activeIds = assigned;
+  if (requested.some(Boolean) && assigned.length > 0) {
+    const { data: rows, error } = await sb
+      .from("technicians")
+      .select("id, active")
+      .in("id", assigned);
+    if (error) throw new Error(error.message);
+    activeIds = (rows ?? [])
+      .filter((r: { active: boolean | null }) => r.active !== false)
+      .map((r: { id: string }) => r.id);
   }
-  const invalid = unique.filter((id) => !assigned.includes(id));
-  if (invalid.length > 0) throw new Error("Técnico não vinculado a esta OS.");
-  return unique;
+  const scope = validateTeamScope({
+    requested,
+    assigned,
+    activeIds,
+    requireExplicit: !!data.requireExplicitScope,
+  });
+  if (data.requireExplicitScope) {
+    const { data: order, error } = await sb
+      .from("service_orders")
+      .select("status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    assertTeamOrderRunning(order?.status);
+  }
+  return scope;
 }
 
 /**
@@ -424,6 +446,7 @@ export const pauseWork = createServerFn({ method: "POST" })
             end_reason: "pause",
             pause_reason: data.reason,
             pause_notes: data.notes ?? null,
+            metadata: { ...((open as any).metadata ?? {}), ended_by: context.userId },
           })
           .eq("id", open.id)
           .select("id");
@@ -532,9 +555,15 @@ export const finishWork = createServerFn({ method: "POST" })
     const result = emptyBatch();
     for (const technicianId of scope) {
       try {
+        const open = await findOpenWork(sb, data.orderId, technicianId).catch(() => null);
+        const patch: Record<string, unknown> = {
+          ended_at: new Date().toISOString(),
+          end_reason: "finish",
+        };
+        if (open) patch.metadata = { ...((open as any).metadata ?? {}), ended_by: context.userId };
         const { data: closedRows, error } = await writer
           .from("service_order_time_sessions")
-          .update({ ended_at: new Date().toISOString(), end_reason: "finish" })
+          .update(patch)
           .eq("service_order_id", data.orderId)
           .eq("technician_id", technicianId)
           .eq("kind", "work")

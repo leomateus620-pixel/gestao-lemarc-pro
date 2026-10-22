@@ -177,9 +177,30 @@ describe("ações da equipe", () => {
     ).toEqual(["C"]);
   });
 
-  it("técnico só age na própria linha; admin em qualquer uma", () => {
+  it("quem não é da OS não age; técnico da OS e admin agem em qualquer linha", () => {
     expect(
       teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: false }),
+    ).toEqual([]);
+    const colleague = (state: "idle" | "running" | "paused" | "finished") =>
+      teamRowActions({
+        state,
+        orderStatus: "running",
+        isAdmin: false,
+        isOwnRow: false,
+        isOrderTechnician: true,
+      });
+    expect(colleague("idle")).toEqual(["start"]);
+    expect(colleague("running")).toEqual(["pause", "finish"]);
+    expect(colleague("paused")).toEqual(["resume", "finish"]);
+    expect(colleague("finished")).toEqual(["restart"]);
+    expect(
+      teamRowActions({
+        state: "running",
+        orderStatus: "finished",
+        isAdmin: false,
+        isOwnRow: false,
+        isOrderTechnician: true,
+      }),
     ).toEqual([]);
     expect(
       teamRowActions({ state: "idle", orderStatus: "running", isAdmin: false, isOwnRow: true }),

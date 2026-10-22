@@ -27,10 +27,19 @@ const STATE_CLS: Record<TeamTechState, string> = {
   idle: "border-border bg-secondary/40 text-muted-foreground",
 };
 
+const COLLEAGUE_CONFIRM: Record<TeamRowAction, string> = {
+  start: "Iniciar para",
+  restart: "Voltar a trabalhar para",
+  resume: "Retomar para",
+  pause: "Pausar",
+  finish: "Encerrar horas de",
+};
+
 export function OrderTeamCard({
   order,
   rows,
   isAdmin,
+  isOrderTechnician = false,
   myTechId,
   busyKey,
   onAction,
@@ -38,12 +47,16 @@ export function OrderTeamCard({
   order: ServiceOrder;
   rows: Row[];
   isAdmin: boolean;
+  /** Usuário é técnico vinculado a esta OS (age em toda a equipe). */
+  isOrderTechnician?: boolean;
   myTechId: string | null;
   /** `${action}:${techId}` em andamento (bloqueia duplo clique). */
   busyKey: string | null;
   onAction: (action: TeamRowAction, row: Row) => void;
 }) {
   const [confirmFinish, setConfirmFinish] = useState<string | null>(null);
+  /** Técnico agindo sobre um colega: `${action}:${techId}` aguardando confirmação. */
+  const [confirmColleague, setConfirmColleague] = useState<string | null>(null);
 
   return (
     <GlassCard className="lemarc-os-team-card mt-4 p-4 sm:p-5">
@@ -72,8 +85,11 @@ export function OrderTeamCard({
               orderStatus: order.status,
               isAdmin,
               isOwnRow: own,
+              isOrderTechnician,
             });
             const busy = busyKey?.endsWith(`:${row.tech.id}`) ?? false;
+            const colleague = !isAdmin && !own;
+            const firstName = row.tech.full_name.split(" ")[0];
             return (
               <li
                 key={row.tech.id}
@@ -111,7 +127,33 @@ export function OrderTeamCard({
                 {actions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {actions.map((action) => {
-                      if (action === "finish" && confirmFinish === row.tech.id) {
+                      if (colleague && confirmColleague === `${action}:${row.tech.id}`) {
+                        return (
+                          <div key={action} className="flex w-full gap-2">
+                            <Button
+                              size="sm"
+                              variant={action === "finish" ? "destructive" : "default"}
+                              className="min-h-10 flex-1"
+                              disabled={busy}
+                              onClick={() => {
+                                setConfirmColleague(null);
+                                onAction(action, row);
+                              }}
+                            >
+                              {COLLEAGUE_CONFIRM[action]} {firstName}?
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="min-h-10"
+                              onClick={() => setConfirmColleague(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        );
+                      }
+                      if (!colleague && action === "finish" && confirmFinish === row.tech.id) {
                         return (
                           <Button
                             key={action}
@@ -128,6 +170,7 @@ export function OrderTeamCard({
                           </Button>
                         );
                       }
+                      if (colleague && confirmColleague?.endsWith(`:${row.tech.id}`)) return null;
                       const label =
                         action === "start"
                           ? own
@@ -140,7 +183,7 @@ export function OrderTeamCard({
                             : action === "resume"
                               ? "Retomar"
                               : action === "restart"
-                                ? own
+                                ? own || colleague
                                   ? "Voltar a trabalhar"
                                   : "Reabrir tempo"
                                 : own
@@ -168,9 +211,11 @@ export function OrderTeamCard({
                           className="min-h-10 flex-1 gap-2"
                           disabled={busy}
                           onClick={() =>
-                            action === "finish"
-                              ? setConfirmFinish(row.tech.id)
-                              : onAction(action, row)
+                            colleague
+                              ? setConfirmColleague(`${action}:${row.tech.id}`)
+                              : action === "finish"
+                                ? setConfirmFinish(row.tech.id)
+                                : onAction(action, row)
                           }
                         >
                           {busy && busyKey === `${action}:${row.tech.id}` ? (
