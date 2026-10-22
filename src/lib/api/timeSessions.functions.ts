@@ -446,6 +446,7 @@ export const pauseWork = createServerFn({ method: "POST" })
             end_reason: "pause",
             pause_reason: data.reason,
             pause_notes: data.notes ?? null,
+            metadata: { ...((open as any).metadata ?? {}), ended_by: context.userId },
           })
           .eq("id", open.id)
           .select("id");
